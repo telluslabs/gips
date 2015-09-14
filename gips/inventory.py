@@ -170,12 +170,17 @@ class ProjectInventory(Inventory):
     def get_data(self, dates=None, products=None, chunk=None):
         """ Read all files as time series, stacking all products """
         # TODO - change to absolute dates
+
+        if dates is None:
+            dates = self.dates
+
         days = numpy.array([int(d.strftime('%j')) for d in dates])
         imgarr = []
         if dates is None:
             dates = self.dates
         if products is None:
             products = self.requested_products
+
         for p in products:
             gimg = self.get_timeseries(p, dates=dates)
             # TODO - move numpy.squeeze into swig interface file?
@@ -188,6 +193,12 @@ class ProjectInventory(Inventory):
             imgarr.append(arr)
         data = numpy.vstack(tuple(imgarr))
         return data
+
+    def get_location(self):
+        # this is a terrible hack to get the name of the feature associated with the inventory
+        data = self.data[self.dates[0]]
+        location = os.path.split(os.path.split(data.filenames.values()[0])[0])[1]
+        return location
 
     def get_filepaths(self):
         filepaths = {}
