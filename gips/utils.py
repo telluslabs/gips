@@ -160,6 +160,8 @@ def create_environment_settings(repos_path, email=''):
 def create_user_settings(email=''):
     """ Create a settings file using the included template and the provided top level directory """
     from gips.user_settings_template import __file__ as src
+    if src[-1] == 'c':
+        src = src[:-1]
     cfgpath = os.path.expanduser('~/.gips')
     if not os.path.exists(cfgpath):
         os.mkdir(cfgpath)
