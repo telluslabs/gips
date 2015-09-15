@@ -76,7 +76,8 @@ class Tiles(object):
         """ Calls process for each tile """
         [t.process(*args, products=self.products.products, **kwargs) for t in self.tiles.values()]
 
-    def mosaic(self, datadir, res=None, interpolation=0, crop=False, overwrite=False):
+    def mosaic(self, datadir, res=None, interpolation=0, crop=False,
+               overwrite=False, alltouch=False):
         """ Combine tiles into a single mosaic, warp if res provided """
         if self.spatial.site is None:
             raise Exception('Site required for creating mosaics')
@@ -95,7 +96,10 @@ class Tiles(object):
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
                     if self.spatial.site is not None and res is not None:
-                        CookieCutter(images, self.spatial.site, fout, res[0], res[1], crop, interpolation)
+                        CookieCutter(
+                            images, self.spatial.site, fout, res[0], res[1],
+                            crop, interpolation, {}, alltouch,
+                        )
                     else:
                         mosaic(images, fout, self.spatial.site)
                 except Exception, e:
