@@ -307,7 +307,7 @@ class landsatData(Data):
             toa = toa and (self._products[val[0]].get('toa', False) or 'toa' in val)
         if not toa:
             start = datetime.now()
-            if not settings().REPOS[self.Repository.name]['6S']:
+            if not settings().REPOS[self.Repository.name.lower()]['6S']:
                 raise Exception('6S is required for atmospheric correction')
             try:
                 wvlens = [(meta[b]['wvlen1'], meta[b]['wvlen2']) for b in visbands]
@@ -489,7 +489,7 @@ class landsatData(Data):
 
         # cleanup directory
         try:
-            if settings().REPOS[self.Repository.name]['extract']:
+            if settings().REPOS[self.Repository.name.lower()]['extract']:
                 for bname in self.assets[''].datafiles():
                     if bname[-7:] != 'MTL.txt':
                         files = glob.glob(os.path.join(self.path, bname) + '*')
@@ -608,7 +608,7 @@ class landsatData(Data):
         # make sure metadata is loaded
         self.meta()
 
-        if settings().REPOS[self.Repository.name]['extract']:
+        if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract all files
             datafiles = self.assets[''].extract(self.metadata['filenames'])
         else:
