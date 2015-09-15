@@ -176,8 +176,6 @@ class ProjectInventory(Inventory):
 
         days = numpy.array([int(d.strftime('%j')) for d in dates])
         imgarr = []
-        if dates is None:
-            dates = self.dates
         if products is None:
             products = self.requested_products
 
