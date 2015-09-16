@@ -45,6 +45,7 @@ for f in glob.glob('gips/scripts/*.py'):
     except:
         print traceback.format_exc()
 
+
 setup(
     name='gips',
     version=__version__,
@@ -52,8 +53,11 @@ setup(
     author='Matthew Hanson',
     author_email='matt.a.hanson@gmail.com',
     packages=find_packages(),
-    package_data={'' : ['*.shp', '*.prj', '*.shx', '*.dbf']},
-    install_requires=['Py6S>=1.5.0', 'shapely', 'gippy>=0.3.0', 'python-dateutil', 'pydap', 'pysolar==0.7', 'landsat-util==0.7.0'],
+    package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf']},
+    install_requires=[
+        'Py6S>=1.5.0', 'shapely', 'gippy>=0.3.6', 'python-dateutil', 'pydap',
+        'pysolar==0.7', 'landsat-util==0.7.0',
+    ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
 )
