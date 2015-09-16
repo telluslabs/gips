@@ -53,7 +53,7 @@ setup(
     author_email='matt.a.hanson@gmail.com',
     packages=find_packages(),
     package_data={'' : ['*.shp', '*.prj', '*.shx', '*.dbf']},
-    install_requires=['Py6S>=1.5.0', 'shapely', 'gippy>=0.3.0', 'python-dateutil', 'pydap'],
+    install_requires=['Py6S>=1.5.0', 'shapely', 'gippy>=0.3.0', 'python-dateutil', 'pydap', 'pysolar==0.7', 'landsat-util==0.7.0'],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
 )
