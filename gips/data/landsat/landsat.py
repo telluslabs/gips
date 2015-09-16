@@ -172,10 +172,10 @@ class landsatAsset(Asset):
         paths_rows = tile[:3] + "," + tile[3:]
         fdate = date.strftime('%Y-%m-%d')
         # why is asset an empty string?
-        VerboseOut('Fetching %s %s %s' % (asset, tile, fdate), 1)
         s = search.Search()
         response = s.search(paths_rows=paths_rows, start_date=fdate, end_date=fdate, cloud_max=90)
         if response['status'] == 'SUCCESS':
+            VerboseOut('Fetching %s %s %s' % (asset, tile, fdate), 1)
             if response['total_returned'] != 1:
                 raise Exception('Single date, single location, returned more than one result')
             result = response['results'][0]
