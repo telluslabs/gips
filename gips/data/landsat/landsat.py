@@ -21,6 +21,7 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
+
 import os
 import re
 from datetime import datetime
@@ -30,11 +31,20 @@ import glob
 import traceback
 from copy import deepcopy
 
+import commands
+
 import gippy
 from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices
 from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
 from gips.utils import VerboseOut, RemoveFiles, basename, settings
+
+# NAME CLASH WORKAROUND:
+# Do this:
+# % cd /path/to/repo/gips/venv/lib/python2.7/site-packages
+# % ln -s landsat landsat_util
+from landsat_util import search, downloader
+
 
 requirements = ['Py6S>=1.5.0']
 
@@ -155,6 +165,35 @@ class landsatAsset(Asset):
             }
         self.visbands = [col for col in smeta['colors'] if col[0:4] != "LWIR"]
         self.lwbands = [col for col in smeta['colors'] if col[0:4] == "LWIR"]
+
+
+    @classmethod
+    def fetch(cls, asset, tile, date):
+        paths_rows = tile[:3] + "," + tile[3:]
+        fdate = date.strftime('%Y-%m-%d')
+        # why is asset an empty string?
+        VerboseOut('Fetching %s %s %s' % (asset, tile, fdate), 1)
+        s = search.Search()
+        response = s.search(paths_rows=paths_rows, start_date=fdate, end_date=fdate, cloud_max=90)
+        if response['status'] == 'SUCCESS':
+            if response['total_returned'] != 1:
+                raise Exception('Single date, single location, returned more than one result')
+            result = response['results'][0]
+            cloudpct = result['cloud']
+            sceneID = result['sceneID']
+            stage_dir = os.path.join(cls.Repository.path(), 'stage')
+            sceneIDs = [str(sceneID)]
+            d = downloader.Downloader(download_dir=stage_dir)
+            d.download(sceneIDs)
+            # do the following because the downloaded .bz file has owner/group
+            # settings that cause the GDAL virtual filesystem access to fail
+            bz_path = glob.glob(os.path.join(stage_dir, sceneID + '*'))[0]
+            gz_path = os.path.splitext(bz_path)[0] + ".gz"
+            cmd = "tar xvfj %s |xargs tar cvfz %s" % (bz_path, gz_path)
+            VerboseOut("Reformatting bz->gz", 1)
+            result = commands.getstatusoutput(cmd)
+            VerboseOut("removing %s" % bz_path)
+            os.remove(bz_path)
 
     def updated(self, newasset):
         '''
@@ -479,14 +518,13 @@ class landsatData(Data):
             # Run atmospherically corrected
             if len(indices) > 0:
                 fnames = [os.path.join(self.path, self.basename + '_' + key) for key in indices]
-                for col in visbands:
+                for col in visbands:                    
                     img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]) * (1.0 / atm6s.results[col][2])
                 prodout = Indices(img, dict(zip([p[0] for p in indices.values()], fnames)), md)
                 prodout = dict(zip(indices.keys(), prodout.values()))
                 [self.AddFile(sensor, key, fname) for key, fname in prodout.items()]
             VerboseOut(' -> %s: processed %s in %s' % (self.basename, indices0.keys(), datetime.now() - start), 1)
         img = None
-
         # cleanup directory
         try:
             if settings().REPOS[self.Repository.name.lower()]['extract']:
@@ -496,7 +534,7 @@ class landsatData(Data):
                         RemoveFiles(files)
             shutil.rmtree(os.path.join(self.path, 'modtran'))
         except:
-            #VerboseOut(traceback.format_exc(), 4)
+            # VerboseOut(traceback.format_exc(), 4)
             pass
 
     def filter(self, pclouds=100, **kwargs):
