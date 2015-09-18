@@ -131,6 +131,18 @@ class modisAsset(Asset):
             'startdate': datetime.date(2002, 7, 4),
             'latency': -7
         },
+        'MOD10A2': {
+            'pattern': 'MOD10A2*hdf',
+            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A2.005',
+            'startdate': datetime.date(2000, 2, 24),
+            'latency': -3
+        },
+        'MYD10A2': {
+            'pattern': 'MYD10A2*hdf',
+            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A2.005',
+            'startdate': datetime.date(2002, 7, 4),
+            'latency': -3
+        },
     }
 
     # Should this be specified on a per asset basis? (in which case retrieve from asset)
@@ -154,11 +166,14 @@ class modisAsset(Asset):
 
         year, month, day = date.timetuple()[:3]
         mainurl = '%s/%s.%02d.%02d' % (cls._assets[asset]['url'], str(year), month, day)
+        # TODO: we need to test connection to website before entering the try block (otherwise it hangs forever on Wed. with no output)
+
         try:
             listing = urllib.urlopen(mainurl).readlines()
         except Exception:
             # MODIS servers do maintenance on wednesday
             raise Exception("Unable to access %s --- is it Wednesday?" % mainurl)
+
 
         pattern = '(%s.A%s%s.%s.005.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
         cpattern = re.compile(pattern)
@@ -203,7 +218,7 @@ class modisData(Data):
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         #"Terra/Aqua Daily": ['temp', 'obstime'],
-        "Terra/Aqua Daily": ['snow', 'temp', 'obstime'],
+        "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
         "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
     }
     _products = {
@@ -217,6 +232,11 @@ class modisData(Data):
             'assets': ['MCD43A2'],
         },
         # Daily
+        'fsnow': {
+            #'description': 'Snow and ice cover data',
+            'description': 'Fractional snow cover data',
+            'assets': ['MOD10A1', 'MYD10A1'],
+        },
         'snow': {
             'description': 'Snow and ice cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
@@ -242,7 +262,10 @@ class modisData(Data):
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
         },
-
+        #  'snow8': {
+        #     'description': 'Snow and ice cover data: 8 day',
+        #     'assets': ['MOD10A2', 'MYD10A2'],
+        # },
     }
 
     def process(self, *args, **kwargs):
@@ -369,6 +392,135 @@ class modisData(Data):
                 imgout.SetBandName('VARI', 3)
                 imgout.SetBandName('BRGT', 4)
                 imgout.SetBandName('SATVI', 5)
+
+
+            # SNOW/ICE COVER PRODUCT - FRACTIONAL masked with binary
+
+            #### TODO: DO NOT DOWNLOAD June 15 - Oct 15 for CONUS because there's no snow in summer
+            if val[0] == "fsnow":
+                VERSION = "1.0"
+                meta['VERSION'] = VERSION
+                fname = '%s_%s_%s' % (bname, sensor, key)
+
+                if not missingassets:
+                    availbands = [0, 1]
+                    snowsds = [allsds[0], allsds[3], allsds[4], allsds[7]]
+                elif missingassets[0] == 'MYD10A1':
+                    availbands = [0]
+                    snowsds = [allsds[0], allsds[3]]
+                elif missingassets[0] == 'MOD10A1':
+                    availbands = [1]
+                    snowsds = [allsds[0], allsds[3]]
+                else:
+                    raise
+
+                img = gippy.GeoImage(snowsds)
+
+                # there are two snow bands
+                for iband, band in enumerate(availbands):
+
+                    # get the data values for both bands
+                    cover = img[2 * iband].Read()
+                    frac = img[2 * iband + 1].Read()
+
+                    # check out frac
+                    wbad1 = np.where((frac == 200) | (frac == 201) | (frac == 211) |
+                                     (frac == 250) | (frac == 254) | (frac == 255))
+                    wsurface1 = np.where((frac == 225) | (frac == 237) | (frac == 239))
+                    wvalid1 = np.where((frac >= 0) & (frac <= 100))
+
+                    nbad1 = len(wbad1[0])
+                    nsurface1 = len(wsurface1[0])
+                    nvalid1 = len(wvalid1[0]) 
+                    assert nbad1 + nsurface1 + nvalid1 == frac.size, "frac contains invalid values"
+
+                    # check out cover
+                    wbad2 = np.where((cover == 0) | (cover == 1) | (cover == 11) |
+                                     (cover == 50) | (cover == 254) | (cover == 255))
+                    wsurface2 = np.where((cover == 25) | (cover == 37) | (cover == 39))
+                    wvalid2 = np.where((cover == 100) | (cover == 200))
+
+                    nbad2 = len(wbad2[0])
+                    nsurface2 = len(wsurface2[0])
+                    nvalid2 = len(wvalid2[0])
+                    assert nbad2 + nsurface2 + nvalid2 == cover.size, "cover contains invalid values"
+
+                    # assign output data here
+                    coverout = np.zeros_like(cover, dtype=np.uint8)
+                    fracout = np.zeros_like(frac, dtype=np.uint8)
+
+                    fracout[wvalid1] = frac[wvalid1]
+                    fracout[wsurface1] = 0
+                    fracout[wbad1] = 127
+                    coverout[wvalid2] = 100
+                    coverout[wsurface2] = 0
+                    coverout[wbad2] = 127
+
+                    if len(availbands) == 2:
+                        if iband == 0:
+                            fracout1 = np.copy(fracout)
+                            coverout1 = np.copy(coverout)
+                        else:
+                            # both the current and previous are valid
+                            w = np.where((fracout != 127) & (fracout1 != 127))
+                            fracout[w] = np.mean(np.array([fracout[w], fracout1[w]]), axis=0).astype('uint8')
+
+                            # the current is not valid but previous is valid
+                            w = np.where((fracout == 127) & (fracout1 != 127))
+                            fracout[w] = fracout1[w]
+
+                            # both the current and previous are valid
+                            w = np.where((coverout != 127) & (coverout1 != 127))
+                            coverout[w] = np.mean(np.array([coverout[w], coverout1[w]]), axis=0).astype('uint8')
+
+                            # the current is not valid but previous is valid
+                            w = np.where((coverout == 127) & (coverout1 != 127))
+                            coverout[w] = coverout1[w]
+
+                fracmissingcoverclear = np.sum((fracout == 127) & (coverout == 0))
+                fracmissingcoversnow = np.sum((fracout == 127) & (coverout == 100))
+                fracclearcovermissing = np.sum((fracout == 0) & (coverout == 127))
+                fracclearcoversnow = np.sum((fracout == 0) & (coverout == 100))
+                fracsnowcovermissing = np.sum((fracout > 0) & (fracout <= 100) & (coverout == 127))
+                fracsnowcoverclear = np.sum((fracout > 0) & (fracout <= 100) & (coverout == 0))
+                #fracmostlycoverclear = np.sum((fracout > 50) & (fracout <= 100) & (coverout == 0))
+                totsnowfrac = int(0.01 * np.sum(fracout[fracout <= 100]))
+                totsnowcover = int(0.01 * np.sum(coverout[coverout <= 100]))
+                numvalidfrac = np.sum(fracout != 127)
+                numvalidcover = np.sum(coverout != 127)
+
+                # mask fractional product with binary 
+                mask = np.where((coverout == 0) | (coverout == 50))
+                fracout[mask] = 0
+
+                if totsnowcover == 0 or totsnowfrac == 0:
+                    print "no snow or ice: skipping", str(self.date), str(self.id), str(missingassets)
+
+                meta['FRACMISSINGCOVERCLEAR'] = fracmissingcoverclear
+                meta['FRACMISSINGCOVERSNOW'] = fracmissingcoversnow
+                meta['FRACCLEARCOVERMISSING'] = fracclearcovermissing
+                meta['FRACCLEARCOVERSNOW'] = fracclearcoversnow
+                meta['FRACSNOWCOVERMISSING'] = fracsnowcovermissing
+                meta['FRACSNOWCOVERCLEAR'] = fracsnowcoverclear
+                meta['FRACMOSTLYCOVERCLEAR'] = np.sum((fracout > 50) & (fracout <= 100) & (coverout == 0))
+                meta['TOTSNOWFRAC'] = totsnowfrac
+                meta['TOTSNOWCOVER'] = totsnowcover
+                meta['NUMVALIDFRAC'] = numvalidfrac
+                meta['NUMVALIDCOVER'] = numvalidcover
+
+                # create output gippy image
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                imgout.SetNoData(127)
+                imgout.SetOffset(0.0)
+                imgout.SetGain(1.0)
+                #imgout.SetBandName('Snow Cover', 1)
+                imgout.SetBandName('Fractional Snow Cover', 1)
+
+                #imgout[0].Write(coverout)
+                imgout[0].Write(fracout)
+
+                VerboseOut('Completed writing %s' % fname)
+
 
             ###################################################################
             # SNOW/ICE COVER PRODUCT
