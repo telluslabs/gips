@@ -49,6 +49,13 @@ from landsat_util import search, downloader
 requirements = ['Py6S>=1.5.0']
 
 
+def binmask(arr, bit):
+    """ Return boolean array indicating which elements as binary have a 1 in
+        a specified bit position. Input is Numpy array.
+    """
+    return arr & (1 << (bit - 1)) == (1 << (bit - 1))
+
+
 class landsatRepository(Repository):
     """ Singleton (all class methods) to be overridden by child data classes """
     name = 'Landsat'
@@ -166,7 +173,6 @@ class landsatAsset(Asset):
         self.visbands = [col for col in smeta['colors'] if col[0:4] != "LWIR"]
         self.lwbands = [col for col in smeta['colors'] if col[0:4] == "LWIR"]
 
-
     @classmethod
     def fetch(cls, asset, tile, date):
         paths_rows = tile[:3] + "," + tile[3:]
@@ -189,11 +195,15 @@ class landsatAsset(Asset):
             # settings that cause the GDAL virtual filesystem access to fail
             bz_path = glob.glob(os.path.join(stage_dir, sceneID + '*'))[0]
             gz_path = os.path.splitext(bz_path)[0] + ".gz"
-            cmd = "tar xvfj %s |xargs tar cvfz %s" % (bz_path, gz_path)
+            cmd = "tar xvfj %s -C %s |xargs tar cvfz %s -C %s" % (bz_path, stage_dir, gz_path, stage_dir)
             VerboseOut("Reformatting bz->gz", 1)
             result = commands.getstatusoutput(cmd)
             VerboseOut("removing %s" % bz_path)
+            bands_path = glob.glob(os.path.join(stage_dir, sceneID + '_*.*'))
+            # clean up - the .tar.gz will get moved on archive
             os.remove(bz_path)
+            for band_path in bands_path:
+                os.remove(band_path)
 
     def updated(self, newasset):
         '''
@@ -263,6 +273,10 @@ class landsatData(Data):
         'wtemp': {
             'description': 'Water temperature (atmospherically correct) - valid for water only',
             # It's not really TOA, but the product code will take care of atm correction itself
+            'toa': True
+        },
+        'bqa': {
+            'description': 'LC8 band quality',
             'toa': True
         },
         #'Indices': {
@@ -489,6 +503,25 @@ class landsatData(Data):
                         band = (tmpimg[col] - (atmos.output[1] + (1 - e) * atmos.output[2])) / (atmos.output[0] * e)
                         band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)) * meta[col]['K2'] - 273.15
                         band.Process(imgout[col])
+
+                elif val[0] == 'bqa':
+                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 7)
+                    qaimg = self._readqa()
+                    qadata = qaimg.Read()
+                    notfilled = ~binmask(qadata, 1)
+                    notdropped = ~binmask(qadata, 2)
+                    notterrain = ~binmask(qadata, 3)
+                    notcirrus = ~binmask(qadata, 14) & binmask(qadata, 13)
+                    notcloud = ~binmask(qadata, 16) & binmask(qadata, 15)
+                    allgood = notfilled * notdropped * notterrain * notcirrus * notcloud
+                    imgout[0].Write(allgood.astype('int16'))
+                    imgout[1].Write(notfilled.astype('int16'))
+                    imgout[2].Write(notdropped.astype('int16'))
+                    imgout[3].Write(notterrain.astype('int16'))
+                    imgout[4].Write(notsnow.astype('int16'))
+                    imgout[5].Write(notcirrus.astype('int16'))
+                    imgout[6].Write(notcloud.astype('int16'))
+
                 fname = imgout.Filename()
                 imgout.SetMeta(md)
                 imgout = None
@@ -623,6 +656,11 @@ class landsatData(Data):
             'lon': lon,
         }
 
+        try:
+            qafilename = [f for f in datafiles if '_BQA.TIF' in f][0]
+        except Exception:
+            qafilename = None
+
         self.metadata = {
             'filenames': filenames,
             'gain': gain,
@@ -630,7 +668,8 @@ class landsatData(Data):
             'dynrange': dynrange,
             'geometry': _geometry,
             'datetime': dt,
-            'clouds': clouds
+            'clouds': clouds,
+            'qafilename': qafilename
         }
         #self.metadata.update(smeta)
 
@@ -640,11 +679,26 @@ class landsatData(Data):
         meta['GIPS-landsat Version'] = cls.version
         return meta
 
+    def _readqa(self):
+        # make sure metadata is loaded
+        if not hasattr(self, 'metadata'):
+            self.meta()
+        if settings().REPOS[self.Repository.name.lower()]['extract']:
+            # Extract files
+            qadatafile = self.assets[''].extract([self.metadata['qafilename']])
+        else:
+            # Use tar.gz directly using GDAL's virtual filesystem
+            qadatafile = os.path.join('/vsitar/' + self.assets[''].filename, self.metadata['qafilename'])
+        qaimg = gippy.GeoImage(qadatafile)
+        return qaimg
+
+
     def _readraw(self):
         """ Read in Landsat bands using original tar.gz file """
         start = datetime.now()
         # make sure metadata is loaded
-        self.meta()
+        if not hasattr(self, 'metadata'):
+            self.meta()
 
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract all files
