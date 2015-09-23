@@ -55,7 +55,12 @@ setup(
     packages=find_packages(),
     package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf']},
     install_requires=[
-        'Py6S>=1.5.0', 'shapely', 'gippy>=0.3.6', 'python-dateutil', 'pydap',
+        'Py6S>=1.5.0',
+        'shapely',
+        'gippy>=0.3.6',
+        'python-dateutil',
+        'pydap',
+        'pysolar==0.7',
         'landsat-util==0.8.0ircwaves',
     ],
     dependency_links = [

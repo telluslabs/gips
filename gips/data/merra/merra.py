@@ -31,10 +31,35 @@ import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, basename, open_vector
 
+import time
+
 from pdb import set_trace
 
 
 requirements = ['pydap']
+
+
+import signal    
+
+class Timeout():
+    """Timeout class using ALARM signal."""
+
+    class Timeout(Exception):
+        pass
+ 
+    def __init__(self, sec):
+        self.sec = sec
+ 
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.raise_timeout)
+        signal.alarm(self.sec)
+ 
+    def __exit__(self, *args):
+        signal.alarm(0)    # disable alarm
+ 
+    def raise_timeout(self, *args):
+        raise Timeout.Timeout()
+
 
 
 class merraRepository(Repository):
@@ -156,12 +181,16 @@ class merraAsset(Asset):
             f = cls._assets[asset]['source'] % (ver, date.year, date.month, date.day)
             loc = "%s/%04d/%02d/%s" % (url, date.year, date.month, f)
             try:
-                dataset = open_url(loc)
-            except:
-                continue
+                with Timeout(30):
+                    dataset = open_url(loc)
+            except Timeout.Timeout:
+                print "Timeout"
+            except Exception,e:
+                pass
             else:
                 success = True
                 break
+
         if not success:
             raise Exception('Data unavailable (%s)' % loc)
         return dataset
