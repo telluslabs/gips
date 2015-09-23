@@ -63,9 +63,9 @@ setup(
         'pysolar==0.7',
         'landsat-util==0.8.0ircwaves',
     ],
-    dependency_links = [
+    dependency_links=[
         'http://github.com/ircwaves/landsat-util/tarball/develop#egg=landsat-util-0.8.0ircwaves'
-    ]
+    ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
 )
