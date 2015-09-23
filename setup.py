@@ -56,7 +56,11 @@ setup(
     package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf']},
     install_requires=[
         'Py6S>=1.5.0', 'shapely', 'gippy>=0.3.6', 'python-dateutil', 'pydap',
+        'landsat-util==0.8.0ircwaves',
     ],
+    dependency_links = [
+        'http://github.com/ircwaves/landsat-util/tarball/develop#egg=landsat-util-0.8.0ircwaves'
+    ]
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
 )
