@@ -60,7 +60,7 @@ setup(
         'gippy>=0.3.6',
         'python-dateutil',
         'pydap',
-        'pysolar==0.7',
+        'pysolar==0.6',
         'landsat-util==0.8.0ircwaves',
     ],
     dependency_links=[
