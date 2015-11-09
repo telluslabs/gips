@@ -26,40 +26,37 @@ import datetime
 import time
 from pydap.client import open_url
 import numpy
+import signal
 
 import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, basename, open_vector
 
-import time
-
-from pdb import set_trace
+# TODO: use gippy instead
+from gips.data.merra import raster
 
 
 requirements = ['pydap']
 
-
-import signal    
 
 class Timeout():
     """Timeout class using ALARM signal."""
 
     class Timeout(Exception):
         pass
- 
+
     def __init__(self, sec):
         self.sec = sec
- 
+
     def __enter__(self):
         signal.signal(signal.SIGALRM, self.raise_timeout)
         signal.alarm(self.sec)
- 
+
     def __exit__(self, *args):
         signal.alarm(0)    # disable alarm
- 
+
     def raise_timeout(self, *args):
         raise Timeout.Timeout()
-
 
 
 class merraRepository(Repository):
@@ -129,8 +126,10 @@ class merraAsset(Asset):
         'PRECTOT': {
            'description': 'Total Precipitation (kg m-2 s-1)',
            'pattern': 'MERRA_PRECTOT_*.tif',
-           'url': 'http://goldsmr2.sci.gsfc.nasa.gov/opendap/MERRA/MST1NXMLD.5.2.0',
-           'source': 'MERRA%s.prod.simul.tavg1_2d_mld_Nx.%04d%02d%02d.hdf',
+           # 'url': 'http://goldsmr2.sci.gsfc.nasa.gov/opendap/MERRA/MST1NXMLD.5.2.0',
+           'url': 'http://goldsmr4.sci.gsfc.nasa.gov/opendap/MERRA2/M2T1NXFLX.5.12.4',
+           # 'source': 'MERRA%s.prod.simul.tavg1_2d_mld_Nx.%04d%02d%02d.hdf',
+           'source': 'MERRA2_%s.tavg1_2d_flx_Nx.%04d%02d%02d.nc4',
            'startdate': datetime.date(1980, 1, 1),
            'latency': 60,
            'bandnames': _bandnames
@@ -253,8 +252,8 @@ class merraAsset(Asset):
         meta = {'ASSET': asset, 'TILE': tile, 'DATE': str(date.date()), 'DESCRIPTION': description}
         doy = date.strftime('%j')
         fout = os.path.join(cls.Repository.path('stage'), "MERRA_%s_%s_%4d%s.tif" % (asset, tile, date.year, doy))
-        # TODO - use GIPPY to write
-        from agspy.utils import raster
+
+        # TODO: use gippy instead
         proj = raster.create_proj(4326)
         geo = (bounds[0], cls._defaultresolution[0], 0.0, bounds[3], 0.0, -cls._defaultresolution[1])
         print "writing", fout
