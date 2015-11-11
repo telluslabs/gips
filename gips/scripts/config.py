@@ -57,8 +57,8 @@ def main():
                         print
                         print v
                         exec('pprint.pprint(s.%s)' % v)
-            except Exception, e:
-                #print traceback.format_exc()
+            except ImportError as e:
+                # print traceback.format_exc()
                 print 'Unable to access settings. Run `gips_config env`'
 
         elif args.command == 'env':
@@ -81,7 +81,7 @@ def main():
                 create_repos()
             except Exception, e:
                 print 'Could not create user settings: %s' % e
-                
+
     except Exception, e:
 
         VerboseOut(traceback.format_exc(), 1)
@@ -90,4 +90,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

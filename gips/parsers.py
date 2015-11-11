@@ -21,10 +21,8 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
-import os
 import sys
 import argparse
-import traceback
 
 from gips.utils import data_sources
 import gippy
