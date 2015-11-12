@@ -76,11 +76,15 @@ def main():
                 # first try importing environment settings
                 import gips.settings
                 cfgfile = create_user_settings()
+            except ImportError:
+                print 'Could not create user settings: %s' % e
+
+            try:
                 print 'User settings file: %s' % cfgfile
                 print 'Creating repository directories'
                 create_repos()
-            except Exception, e:
-                print 'Could not create user settings: %s' % e
+            except Exception as e:
+                print 'Could not create repository directories'
 
     except Exception, e:
 
