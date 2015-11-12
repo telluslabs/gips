@@ -219,9 +219,10 @@ def import_data_module(clsname):
     import imp
     path = settings().REPOS[clsname].get('driver', '')
     if path == '':
-        path = os.path.join( os.path.dirname(__file__), 'data', clsname, clsname + '.py') #__init__.py' )
+        path = os.path.join( os.path.dirname(__file__), 'data', clsname)
     try:
-        mod = imp.load_source(clsname, path)
+        fmtup = imp.find_module(clsname, [path])
+        mod = imp.load_module(clsname, *fmtup)
         return mod
     except:
         print traceback.format_exc()
