@@ -39,8 +39,8 @@ from gips.utils import VerboseOut
 from pdb import set_trace
 
 
-PROJ = """PROJCS["WELD_CONUS",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Albers"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-96.0],PARAMETER["Standard_Parallel_1",29.5],PARAMETER["Standard_Parallel_2",45.5],PARAMETER["Latitude_Of_Origin",23.0],UNIT["Meter",1.0]]"""
-
+# PROJ = """PROJCS["WELD_CONUS",GEOGCS["GCS_WGS_1984",DATUM["D_WGS_1984",SPHEROID["WGS_1984",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Albers"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["Central_Meridian",-96.0],PARAMETER["Standard_Parallel_1",29.5],PARAMETER["Standard_Parallel_2",45.5],PARAMETER["Latitude_Of_Origin",23.0],UNIT["Meter",1.0]]"""
+PROJ = """PROJCS["WELD_CONUS",GEOGCS["GCS_WGS_1984",DATUM["WGS_1984",SPHEROID["WGS_84",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Albers_Conic_Equal_Area"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["longitude_of_center",-96.0],PARAMETER["Standard_Parallel_1",29.5],PARAMETER["Standard_Parallel_2",45.5],PARAMETER["latitude_of_center",23.0],UNIT["Meter",1.0]]"""
 
 def binmask(arr, bit):
     """ Return boolean array indicating which elements as binary have a 1 in
@@ -203,7 +203,7 @@ class weldData(Data):
             meta = self.meta_dict()
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
 
-            # LAND VEGETATION INDICES PRODUCT
+            # SNOW ICE INDEX PRODUCT
             if val[0] == "ndsi":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
@@ -246,69 +246,49 @@ class weldData(Data):
 
                 imgout.SetBandName('NDSI', 1)
 
-                # set_trace()
+            # VEGETATION INDEX PRODUCT
+            if val[0] == "ndvi":
+                VERSION = "1.0"
+                meta['VERSION'] = VERSION
+                sensor = "WELD"
+                fname = "%s_%s_%s" % (bname, sensor, key)
 
-                # redimg[redimg < 0.0] = 0.0
-                # nirimg[nirimg < 0.0] = 0.0
-                # bluimg[bluimg < 0.0] = 0.0
-                # grnimg[grnimg < 0.0] = 0.0
-                # mirimg[mirimg < 0.0] = 0.0
-                # swrimg[swrimg < 0.0] = 0.0
+                refl = gippy.GeoImage(allsds)
 
-                # redimg[redimg > 1.0] = 1.0
-                # nirimg[nirimg > 1.0] = 1.0
-                # bluimg[bluimg > 1.0] = 1.0
-                # grnimg[grnimg > 1.0] = 1.0
-                # mirimg[mirimg > 1.0] = 1.0
-                # swrimg[swrimg > 1.0] = 1.0
+                # band 3
+                redimg = refl[2].Read()
+                missing = refl[2].NoDataValue()
 
-                # # red, nir
-                # ndvi = missing + np.zeros_like(redimg)
-                # wg = np.where((redimg != missing) & (nirimg != missing) & (redimg + nirimg != 0.0))
-                # ndvi[wg] = (nirimg[wg] - redimg[wg]) / (nirimg[wg] + redimg[wg])
+                # band 4
+                nirimg = refl[3].Read()
+                assert refl[3].NoDataValue() == missing
 
-                # # nir, mir
-                # lswi = missing + np.zeros_like(redimg)
-                # wg = np.where((nirimg != missing) & (mirimg != missing) & (nirimg + mirimg != 0.0))
-                # lswi[wg] = (nirimg[wg] - mirimg[wg]) / (nirimg[wg] + mirimg[wg])
+                cldimg = refl[11].Read()
+                accaimg = refl[13].Read()
 
-                # # blu, grn, red
-                # vari = missing + np.zeros_like(redimg)
-                # wg = np.where((grnimg != missing) & (redimg != missing) & (bluimg != missing) & (grnimg + redimg - bluimg != 0.0))
-                # vari[wg] = (grnimg[wg] - redimg[wg]) / (grnimg[wg] + redimg[wg] - bluimg[wg])
+                ndvi = missing + np.zeros_like(grnimg)
+                wg = np.where((redimg != missing) & (nirimg != missing) & (redimg + nirimg != 0.0) & (cldimg == 0))
+                ng = len(wg[0])
 
-                # # blu, grn, red, nir
-                # brgt = missing + np.zeros_like(redimg)
-                # wg = np.where((nirimg != missing)&(redimg != missing)&(bluimg != missing)&(grnimg != missing))
-                # brgt[wg] = 0.3*bluimg[wg] + 0.3*redimg[wg] + 0.1*nirimg[wg] + 0.3*grnimg[wg]
+                print "ng", ng
+                if ng == 0:
+                    continue
+                
+                ndsi[wg] = (nirimg[wg] - redimg[wg]) / (nirimg[wg] + redimg[wg])
 
-                # # red, mir, swr
-                # satvi = missing + np.zeros_like(redimg)
-                # # I think the following line has an error:
-                # # wg = np.where((redimg != missing)&(mirimg != missing)&(swrimg != missing)&(((mirimg + redimg + 0.5)*swrimg) != 0.0))
-                # wg = np.where((redimg != missing)&(mirimg != missing)&(swrimg != missing)&((mirimg + redimg + 0.5) != 0.0))
-                # satvi[wg] = (((mirimg[wg] - redimg[wg])/(mirimg[wg] + redimg[wg] + 0.5))*1.5) - (swrimg[wg] / 2.0)
+                print ndvi.min(), ndvi.max()
+                print ndvi[wg].min(), ndvi[wg].max()
 
-                # print "writing", fname
+                print "writing", fname
+                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Float32, 1)
+                imgout.SetNoData(float(missing))
+                imgout.SetOffset(0.0)
+                imgout.SetGain(1.0)
+                imgout.SetProjection(PROJ)
+                imgout[0].Write(ndvi)
 
-                # # create output gippy image
-                # imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 5)
+                imgout.SetBandName('NDVI', 1)
 
-                # imgout.SetNoData(missing)
-                # imgout.SetOffset(0.0)
-                # imgout.SetGain(0.0001)
-
-                # imgout[0].Write(ndvi)
-                # imgout[1].Write(lswi)
-                # imgout[2].Write(vari)
-                # imgout[3].Write(brgt)
-                # imgout[4].Write(satvi)
-
-                # imgout.SetBandName('NDVI', 1)
-                # imgout.SetBandName('LSWI', 2)
-                # imgout.SetBandName('VARI', 3)
-                # imgout.SetBandName('BRGT', 4)
-                # imgout.SetBandName('SATVI', 5)
 
             # set metadata
             meta = {k: str(v) for k, v in meta.iteritems()}
