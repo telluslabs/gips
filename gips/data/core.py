@@ -30,6 +30,7 @@ import glob
 from itertools import groupby
 from shapely.wkt import loads
 import tarfile
+import zipfile
 import traceback
 import ftplib
 import shutil
@@ -225,6 +226,10 @@ class Asset(object):
                 tfile = tarfile.open(self.filename)
                 tfile = tarfile.open(self.filename)
                 datafiles = tfile.getnames()
+            elif zipfile.is_zipfile(self.filename):
+                zfile = zipfile.ZipFile(self.filename)
+                datafiles = ['/vsizip/' + os.path.join(self.filename, f)
+                             for f in zfile.namelist()]
             else:
                 # Try subdatasets
                 fh = gdal.Open(self.filename)
