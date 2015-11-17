@@ -41,9 +41,15 @@ def main():
         print title
         cls = import_data_class(args.command)
 
-        extents = SpatialExtent.factory(cls, args.site, args.key, args.where, args.tiles, args.pcov, args.ptile)
+        extents = SpatialExtent.factory(
+            cls, args.site, args.key, args.where, args.tiles, args.pcov,
+            args.ptile
+        )
         for extent in extents:
-            inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
+            inv = DataInventory(
+                cls, extent,
+                TemporalExtent(args.dates, args.days), **vars(args)
+            )
             inv.process(overwrite=args.overwrite)
 
     except Exception, e:
