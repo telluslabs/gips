@@ -4,3 +4,9 @@ gips/settings.py
 Oceancolor
 oceancolor*
 epydoc
+\#*
+.\#*
+.eggs
+build
+dist
+gips.egg-info

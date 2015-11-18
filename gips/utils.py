@@ -122,19 +122,23 @@ def link(src, dst, hard=False):
 # Settings functions
 ##############################################################################
 
+
 def settings():
     """ Retrieve GIPS settings - first from user, then from system """
     import imp
     try:
         # import user settings first
-        src = imp.load_source('settings', os.path.expanduser('~/.gips/settings.py'))
+        src = imp.load_source(
+            'settings',
+            os.path.expanduser('~/.gips/settings.py')
+        )
         return src
-    except Exception, e:
+    except (ImportError, IOError) as e:
         try:
             import gips.settings
             return gips.settings
-        except:
-            raise Exception('No settings found...did you run gips_config?')
+        except ImportError:
+            raise ImportError('No settings found...did you run gips_config?')
 
 
 def create_environment_settings(repos_path, email=''):
@@ -215,9 +219,10 @@ def import_data_module(clsname):
     import imp
     path = settings().REPOS[clsname].get('driver', '')
     if path == '':
-        path = os.path.join( os.path.dirname(__file__), 'data', clsname, clsname + '.py') #__init__.py' )
+        path = os.path.join( os.path.dirname(__file__), 'data', clsname)
     try:
-        mod = imp.load_source(clsname, path)
+        fmtup = imp.find_module(clsname, [path])
+        mod = imp.load_module(clsname, *fmtup)
         return mod
     except:
         print traceback.format_exc()
@@ -258,7 +263,7 @@ def open_vector(fname, key="", where=''):
             vector = GeoVector(filename, parts[1])
             vector.SetPrimaryKey(key)
 
-        except Exception, e:
+        except Exception as e:
             VerboseOut(traceback.format_exc(), 4)
     if where != '':
         # return array of features
