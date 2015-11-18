@@ -6,9 +6,9 @@ See the [GIPS](http://gipit.github.io/gips/) for documentation.
 The following have been authors or contributers to GIPS
 
     Matthew Hanson, matt.a.hanson@gmail.com
-    Bobby Braswell
+    Bobby Braswell (Rob), rbraswell@appliedgeosolutions.com
     Ian Cooke, icooke@appliedgeosolutions.com
-
+    Pavel Dorovskoy, pavel@appliedgeosolutions.com
 
 #### License (GPL v2)
 
