@@ -56,15 +56,6 @@ class modisRepository(Repository):
         v = str(int(feature.GetField(fldindex_v))).zfill(2)
         return "h%sv%s" % (h, v)
 
-    # @classmethod
-    # def find_dates(cls, tile):
-    #     """ Get list of dates available in repository for a tile """
-    #     tdir = cls.path(tile=tile)
-    #     if os.path.exists(tdir):
-    #         return [datetime.strptime(os.path.basename(d), cls._datedir).date() for d in os.listdir(tdir)]
-    #     else:
-    #         return []
-
 
 class modisAsset(Asset):
     Repository = modisRepository
@@ -143,6 +134,7 @@ class modisAsset(Asset):
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
+
     }
 
     # Should this be specified on a per asset basis? (in which case retrieve from asset)
@@ -165,8 +157,10 @@ class modisAsset(Asset):
         #super(modisAsset, cls).fetch(asset, tile, date)
 
         year, month, day = date.timetuple()[:3]
-        mainurl = '%s/%s.%02d.%02d' % (cls._assets[asset]['url'], str(year), month, day)
-        # TODO: we need to test connection to website before entering the try block (otherwise it hangs forever on Wed. with no output)
+
+        mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
+        pattern = '(%s.A%s%s.%s.005.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
+        cpattern = re.compile(pattern)
 
         try:
             listing = urllib.urlopen(mainurl).readlines()
@@ -174,11 +168,7 @@ class modisAsset(Asset):
             # MODIS servers do maintenance on wednesday
             raise Exception("Unable to access %s --- is it Wednesday?" % mainurl)
 
-
-        pattern = '(%s.A%s%s.%s.005.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
-        cpattern = re.compile(pattern)
         success = False
-
         for item in listing:
             if cpattern.search(item):
                 if 'xml' in item:
@@ -217,7 +207,6 @@ class modisData(Data):
     _pattern = '*.tif'
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
-        #"Terra/Aqua Daily": ['temp', 'obstime'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
         "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
     }
@@ -233,7 +222,6 @@ class modisData(Data):
         },
         # Daily
         'fsnow': {
-            #'description': 'Snow and ice cover data',
             'description': 'Fractional snow cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
         },
@@ -262,10 +250,10 @@ class modisData(Data):
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
         },
-        #  'snow8': {
-        #     'description': 'Snow and ice cover data: 8 day',
-        #     'assets': ['MOD10A2', 'MYD10A2'],
-        # },
+        'clouds': {
+            'description': 'Cloud Mask',
+            'assets': ['MOD10A1']
+        }
     }
 
     def process(self, *args, **kwargs):
@@ -312,6 +300,7 @@ class modisData(Data):
                     os.remove(fname)
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
+
 
             # LAND VEGETATION INDICES PRODUCT
             if val[0] == "indices":
@@ -394,9 +383,42 @@ class modisData(Data):
                 imgout.SetBandName('SATVI', 5)
 
 
-            # SNOW/ICE COVER PRODUCT - FRACTIONAL masked with binary
 
-            #### TODO: DO NOT DOWNLOAD June 15 - Oct 15 for CONUS because there's no snow in summer
+            # CLOUD MASK PRODUCT
+            if val[0] == "clouds":
+                VERSION = "1.0"
+                meta['VERSION'] = VERSION
+                sensor = 'MOD'
+                fname = '%s_%s_%s' % (bname, sensor, key)
+
+                img = gippy.GeoImage(allsds)
+
+                data = img[0].Read()
+                clouds = np.zeros_like(data)
+
+                clouds[data == 0] = 127
+                clouds[data == 1] = 127
+                clouds[data == 11] = 127
+                clouds[data == 25] = 0
+                clouds[data == 37] = 0
+                clouds[data == 39] = 0
+                clouds[data == 50] = 1
+                clouds[data == 100] = 0
+                clouds[data == 200] = 0
+                clouds[data == 254] = 127
+                clouds[data == 255] = 127
+
+                # create output gippy image
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                imgout.SetNoData(127)
+                imgout.SetOffset(0.0)
+                imgout.SetGain(1.0)
+                imgout.SetBandName('Cloud Cover', 1)
+                imgout[0].Write(clouds)
+                VerboseOut('Completed writing %s' % fname)
+
+
+            # SNOW/ICE COVER PRODUCT - FRACTIONAL masked with binary
             if val[0] == "fsnow":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
@@ -827,7 +849,7 @@ class modisData(Data):
                     os.remove(fname)
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
-                
+
             if val[0] == "temp8tn":
                 sensor = 'MOD'
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
