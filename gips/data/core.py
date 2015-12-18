@@ -240,8 +240,9 @@ class Asset(object):
                 return datafiles
             else:
                 return [self.filename]
-        except:
-            raise Exception('Problem accessing asset(s) in %s' % self.filename)
+        except Exception as e:
+            raise Exception('Problem accessing asset(s) in {}\n ({})'
+                            .format(self.filename, e))
 
     def extract(self, filenames=[]):
         """ Extract filenames from asset (if archive file) """
