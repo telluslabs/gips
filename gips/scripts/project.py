@@ -44,7 +44,10 @@ def main():
         print title
         cls = import_data_class(args.command)
 
-        extents = SpatialExtent.factory(cls, args.site, args.key, args.where, args.tiles, args.pcov, args.ptile)
+        extents = SpatialExtent.factory(
+            cls, args.site, args.key, args.where, args.tiles, args.pcov,
+            args.ptile
+        )
 
         # create tld: SITENAME--KEY_DATATYPE_SUFFIX
         if args.notld:
@@ -53,11 +56,17 @@ def main():
             key = '' if args.key == '' else '--' + args.key
             suffix = '' if args.suffix == '' else '_' + args.suffix
             res = '' if args.res is None else '_%sx%s' % (args.res[0], args.res[1])
-            bname = extents[0].site.LayerName() + key + res + '_' + args.command + suffix
+            bname = (
+                extents[0].site.LayerName() +
+                key + res + '_' + args.command + suffix
+            )
             tld = os.path.join(args.outdir, bname)
 
         for extent in extents:
-            inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
+            inv = DataInventory(
+                cls, extent,
+                TemporalExtent(args.dates, args.days), **vars(args)
+            )
             datadir = os.path.join(tld, extent.site.Value())
             if inv.numfiles > 0:
                 inv.mosaic(
@@ -71,8 +80,7 @@ def main():
             inv = ProjectInventory(datadir)
             inv.pprint()
 
-
-    except Exception, e:
+    except Exception as e:
         import traceback
         VerboseOut(traceback.format_exc(), 4)
         print 'Data Project error: %s' % e

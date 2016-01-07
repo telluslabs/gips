@@ -551,7 +551,7 @@ class landsatData(Data):
             # Run atmospherically corrected
             if len(indices) > 0:
                 fnames = [os.path.join(self.path, self.basename + '_' + key) for key in indices]
-                for col in visbands:                    
+                for col in visbands:
                     img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]) * (1.0 / atm6s.results[col][2])
                 prodout = Indices(img, dict(zip([p[0] for p in indices.values()], fnames)), md)
                 prodout = dict(zip(indices.keys(), prodout.values()))
@@ -585,6 +585,8 @@ class landsatData(Data):
 
         datafiles = self.assets[''].datafiles()
         mtlfilename = [f for f in datafiles if 'MTL.txt' in f][0]
+        if os.path.exists(mtlfilename) and os.stat(mtlfilename).st_size == 0:
+            os.remove(mtlfilename)
         if not os.path.exists(mtlfilename):
             mtlfilename = self.assets[''].extract([mtlfilename])[0]
         # Read MTL file
@@ -592,7 +594,8 @@ class landsatData(Data):
             text = open(mtlfilename, 'r').read()
         except IOError as e:
             raise Exception('({})'.format(e))
-
+        if len(text) < 10:
+            raise Exception('MTL file is too short. {}'.format(mtlfilename))
         smeta = self.assets['']._sensors[self.sensor_set[0]]
 
         # Process MTL text - replace old metadata tags with new
