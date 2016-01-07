@@ -131,15 +131,23 @@ class landsatAsset(Asset):
                 [-0.3294, 0.0557, 0.1056, 0.1855, -0.4349, 0.8085],
                 [0.1079, -0.9023, 0.4119, 0.0575, -0.0259, 0.0252],
             ]
+        },
+        'LC8SR': {
+            'description': 'Landsat 8 Surface Reflectance',
         }
+
     }
 
     # TODO - consider assets and sensors relationship ?
     _assets = {
-        '': {
-            'pattern': 'L*.tar.gz'
-            #_pattern = r'^L[TEC][4578].*\.tar\.gz$'
+        'DN' : {
+            # 'pattern': 'L*.tar.gz'
+            'pattern': 'L????????????????????.tar.gz',
+        },
+        'SR': {
+            'pattern': 'L*-SC*.tar.gz',
         }
+
     }
 
     _defaultresolution = [30.0, 30.0]
@@ -147,31 +155,43 @@ class landsatAsset(Asset):
     def __init__(self, filename):
         """ Inspect a single file and get some metadata """
         super(landsatAsset, self).__init__(filename)
+
         fname = os.path.basename(filename)
-        self.sensor = fname[0:3]
+
         self.tile = fname[3:9]
         year = fname[9:13]
         doy = fname[13:16]
-        self.version = int(fname[19:21])
         self.date = datetime.strptime(year + doy, "%Y%j")
+
+        if "-" in filename:
+            print 'SR asset'
+            self.asset = 'SR'
+            self.sensor = 'LC8SR'
+            self.version = int(fname[20:22])
+        else:
+            print 'DN asset'
+            self.asset = 'DN'
+            self.sensor = fname[0:3]
+            self.version = int(fname[19:21])
+            # Landsat DN specific additions
+            smeta = self._sensors[self.sensor]
+            self.meta = {}
+            for i, band in enumerate(smeta['colors']):
+                wvlen = smeta['bandlocs'][i]
+                self.meta[band] = {
+                    'bandnum': i + 1,
+                    'wvlen': wvlen,
+                    'wvlen1': wvlen - smeta['bandwidths'][i] / 2.0,
+                    'wvlen2': wvlen + smeta['bandwidths'][i] / 2.0,
+                    'E': smeta['E'][i],
+                    'K1': smeta['K1'][i],
+                    'K2': smeta['K2'][i],
+                }
+            self.visbands = [col for col in smeta['colors'] if col[0:4] != "LWIR"]
+            self.lwbands = [col for col in smeta['colors'] if col[0:4] == "LWIR"]
+
         if self.sensor not in self._sensors.keys():
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
-        # Landsat specific additions
-        smeta = self._sensors[self.sensor]
-        self.meta = {}
-        for i, band in enumerate(smeta['colors']):
-            wvlen = smeta['bandlocs'][i]
-            self.meta[band] = {
-                'bandnum': i + 1,
-                'wvlen': wvlen,
-                'wvlen1': wvlen - smeta['bandwidths'][i] / 2.0,
-                'wvlen2': wvlen + smeta['bandwidths'][i] / 2.0,
-                'E': smeta['E'][i],
-                'K1': smeta['K1'][i],
-                'K2': smeta['K2'][i],
-            }
-        self.visbands = [col for col in smeta['colors'] if col[0:4] != "LWIR"]
-        self.lwbands = [col for col in smeta['colors'] if col[0:4] == "LWIR"]
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -232,18 +252,22 @@ class landsatData(Data):
     _products = {
         #'Standard':
         'rad': {
+            'assets': ['DN'],
             'description': 'Surface-leaving radiance',
             'arguments': [__toastring]
         },
         'ref': {
+            'assets': ['DN'],
             'description': 'Surface reflectance',
             'arguments': [__toastring]
         },
         'temp': {
+            'assets': ['DN'],
             'description': 'Brightness (apparent) temperature',
             'toa': True
         },
         'acca': {
+            'assets': ['DN'],
             'description': 'Automated Cloud Cover Assessment',
             'arguments': [
                 'X: erosion kernel diameter in pixels (default: 5)',
@@ -254,81 +278,105 @@ class landsatData(Data):
             'toa': True
         },
         'fmask': {
+            'assets': ['DN'],
             'description': 'Fmask cloud cover',
             'nargs': '*',
             'toa': True
         },
         'tcap': {
+            'assets': ['DN'],
             'description': 'Tassled cap transformation',
             'toa': True
         },
         'dn': {
+            'assets': ['DN'],
             'description': 'Raw digital numbers',
             'toa': True
         },
         'volref': {
+            'assets': ['DN'],
             'description': 'Volumetric water reflectance - valid for water only',
             'arguments': [__toastring]
         },
         'wtemp': {
+            'assets': ['DN'],
             'description': 'Water temperature (atmospherically correct) - valid for water only',
             # It's not really TOA, but the product code will take care of atm correction itself
             'toa': True
         },
         'bqa': {
+            'assets': ['DN'],
             'description': 'LC8 band quality',
             'toa': True
         },
         #'Indices': {
         'bi': {
+            'assets': ['DN'],
             'description': 'Brightness Index',
             'arguments': [__toastring]
         },
         'evi': {
+            'assets': ['DN'],
             'description': 'Enhanced Vegetation Index',
             'arguments': [__toastring]
         },
         'lswi': {
+            'assets': ['DN'],
             'description': 'Land Surface Water Index',
             'arguments': [__toastring]
         },
         'msavi2': {
+            'assets': ['DN'],
             'description': 'Modified Soil-Adjusted Vegetation Index (revised)',
             'arguments': [__toastring]
         },
         'ndsi': {
+            'assets': ['DN'],
             'description': 'Normalized Difference Snow Index',
             'arguments': [__toastring]
         },
         'ndvi': {
+            'assets': ['DN'],
             'description': 'Normalized Difference Vegetation Index',
             'arguments': [__toastring]
         },
         'ndwi': {
+            'assets': ['DN'],
             'description': 'Normalized Difference Water Index',
             'arguments': [__toastring]
         },
         'satvi': {
+            'assets': ['DN'],
             'description': 'Soil-Adjusted Total Vegetation Index',
             'arguments': [__toastring]
         },
         #'Tillage Indices': {
         'ndti': {
+            'assets': ['DN'],
             'description': 'Normalized Difference Tillage Index',
             'arguments': [__toastring]
         },
         'crc': {
+            'assets': ['DN'],
             'description': 'Crop Residue Cover',
             'arguments': [__toastring]
         },
         'sti': {
+            'assets': ['DN'],
             'description': 'Standard Tillage Index',
             'arguments': [__toastring]
         },
         'isti': {
+            'assets': ['DN'],
             'description': 'Inverse Standard Tillage Index',
             'arguments': [__toastring]
         },
+        # NEW!!!
+        'ndvi8sr': {
+            'assets': ['SR'],
+            'description': 'Normalized Difference Vegetation from LC8SR',
+        },
+
     }
 
     def process(self, products=None, overwrite=False, **kwargs):
@@ -521,6 +569,14 @@ class landsatData(Data):
                     imgout[4].Write(notsnow.astype('int16'))
                     imgout[5].Write(notcirrus.astype('int16'))
                     imgout[6].Write(notcloud.astype('int16'))
+
+                elif val[0] == 'ndvi8sr':
+
+                    from pdb import set_trace
+
+                    set_trace()
+
+
 
                 fname = imgout.Filename()
                 imgout.SetMeta(md)
