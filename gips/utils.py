@@ -30,6 +30,8 @@ import commands
 import shutil
 import traceback
 
+from pdb import set_trace
+
 
 class Colors():
     _c = '\033['
@@ -267,6 +269,9 @@ def open_vector(fname, key="", where=''):
             VerboseOut(traceback.format_exc(), 4)
     if where != '':
         # return array of features
+
+        # set_trace()
+
         return vector.where(where)
         features = []
     else:
