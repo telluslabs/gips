@@ -147,7 +147,6 @@ class landsatAsset(Asset):
         'SR': {
             'pattern': 'L*-SC*.tar.gz',
         }
-
     }
 
     _defaultresolution = [30.0, 30.0]
@@ -157,6 +156,8 @@ class landsatAsset(Asset):
         super(landsatAsset, self).__init__(filename)
 
         fname = os.path.basename(filename)
+
+        print "fname", fname
 
         self.tile = fname[3:9]
         year = fname[9:13]
@@ -247,6 +248,7 @@ class landsatData(Data):
     _productgroups = {
         'Index': ['bi', 'evi', 'lswi', 'msavi2', 'ndsi', 'ndvi', 'ndwi', 'satvi'],
         'Tillage': ['ndti', 'crc', 'sti', 'isti'],
+        'LC8SR': ['ndvi8sr']
     }
     __toastring = 'toa: use top of the atmosphere reflectance'
     _products = {
@@ -387,244 +389,312 @@ class landsatData(Data):
 
         start = datetime.now()
 
-        # Add the sensor for this date to the basename
-        self.basename = self.basename + '_' + self.sensor_set[0]
+        assets = set()
+        for key, val in products.requested.items():
+            assets.update(self._products[val[0]]['assets'])
 
-        # Read the assets
-        try:
-            img = self._readraw()
-        except Exception, e:
-            VerboseOut(traceback.format_exc(), 5)
-            raise Exception('Error reading %s: %s' % (basename(self.assets[''].filename), e))
+        if len(assets) != 1:
+            raise Exception('This driver does not support creation of products from different Assets at the same time')
 
-        meta = self.assets[''].meta
-        visbands = self.assets[''].visbands
-        lwbands = self.assets[''].lwbands
-        md = self.meta_dict()
+        asset = list(assets)[0]
 
-        # running atmosphere if any products require it
-        toa = True
-        for val in products.requested.values():
-            toa = toa and (self._products[val[0]].get('toa', False) or 'toa' in val)
-        if not toa:
-            start = datetime.now()
-            if not settings().REPOS[self.Repository.name.lower()]['6S']:
-                raise Exception('6S is required for atmospheric correction')
+
+        # TODO: De-hack this
+        # Better approach, but needs some thought, is to loop over assets
+        # Ian, you are right. I just don't have enough time to do it.
+
+        if asset == 'SR':
+
+            datafiles = self.assets['SR'].datafiles()
+
+            imgpaths = dict()
+
+            for datafile in datafiles:
+
+                key = datafile.partition('_')[2].split('.')[0]
+                path = os.path.join('/vsitar/' + self.assets['SR'].filename, datafile)
+
+                imgpaths[key] = path
+
+            # print imgpaths
+
+            bname = os.path.join(self.path, self.basename)
+
+            for key, val in products.requested.items():
+
+                if val[0] == "ndvi8sr":
+
+                    sensor = 'LC8SR'
+                    fname = '%s_%s_%s' % (bname, sensor, key)
+
+                    img = gippy.GeoImage([imgpaths['sr_band4'], imgpaths['sr_band5']])
+
+                    missing = float(img[0].NoDataValue())
+
+                    red = img[0].Read().astype('float32')
+                    nir = img[1].Read().astype('float32')
+
+                    red[(red != missing) & (red < 0.0)] = 0.0
+                    red[red > 1.0] = 1.0
+                    nir[(nir != missing) & (nir < 0.0)] = 0.0
+                    nir[nir > 1.0] = 1.0
+
+                    wvalid = numpy.where((red != missing) & (nir != missing) & (red + nir != 0.0))
+
+                    red[wvalid] *= 1.E-4
+                    nir[wvalid] *= 1.E-4
+
+                    ndvi = missing + numpy.zeros_like(red)
+                    ndvi[wvalid] = (nir[wvalid] - red[wvalid])/(nir[wvalid] + red[wvalid])
+
+                    print "writing", fname
+                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
+                    imgout.SetNoData(-9999.)
+                    imgout.SetOffset(0.0)
+                    imgout.SetGain(1.0)
+                    imgout.SetBandName('NDVI', 1)
+
+                    imgout[0].Write(ndvi)
+
+
+
+
+        elif asset == 'DN':
+
+            # This block contains everything that existed in the first generation Landsat driver
+
+            # Add the sensor for this date to the basename
+            self.basename = self.basename + '_' + self.sensors[asset]
+
+            # Read the assets
             try:
-                wvlens = [(meta[b]['wvlen1'], meta[b]['wvlen2']) for b in visbands]
-                geo = self.metadata['geometry']
-                atm6s = SIXS(visbands, wvlens, geo, self.metadata['datetime'], sensor=self.sensor_set[0])
-                md["AOD Source"] = str(atm6s.aod[0])
-                md["AOD Value"] = str(atm6s.aod[1])
+                img = self._readraw()
             except Exception, e:
-                VerboseOut(traceback.format_exc(), 4)
-                raise Exception('Problem running 6S atmospheric model: %s' % e)
+                VerboseOut(traceback.format_exc(), 5)
+                raise Exception('Error reading %s: %s' % (basename(self.assets['DN'].filename), e))
 
-        # Break down by group
-        groups = products.groups()
+            meta = self.assets['DN'].meta
+            visbands = self.assets['DN'].visbands
+            lwbands = self.assets['DN'].lwbands
+            md = self.meta_dict()
 
-        # create non-atmospherically corrected apparent reflectance and temperature image
-        reflimg = gippy.GeoImage(img)
-        theta = numpy.pi * self.metadata['geometry']['solarzenith'] / 180.0
-        sundist = (1.0 - 0.016728 * numpy.cos(numpy.pi * 0.9856 * (float(self.day) - 4.0) / 180.0))
-        for col in self.assets[''].visbands:
-            reflimg[col] = img[col] * (1.0 / ((meta[col]['E'] * numpy.cos(theta)) / (numpy.pi * sundist * sundist)))
-        for col in self.assets[''].lwbands:
-            reflimg[col] = (((img[col].pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)) * meta[col]['K2'] - 273.15
+            # running atmosphere if any products require it
+            toa = True
+            for val in products.requested.values():
+                toa = toa and (self._products[val[0]].get('toa', False) or 'toa' in val)
+            if not toa:
+                start = datetime.now()
 
-        # This is landsat, so always just one sensor for a given date
-        sensor = self.sensors['']
+                if not settings().REPOS[self.Repository.name.lower()]['6S']:
+                    raise Exception('6S is required for atmospheric correction')
+                try:
+                    wvlens = [(meta[b]['wvlen1'], meta[b]['wvlen2']) for b in visbands]
+                    geo = self.metadata['geometry']
+                    atm6s = SIXS(visbands, wvlens, geo, self.metadata['datetime'], sensor=self.sensor_set[0])
+                    md["AOD Source"] = str(atm6s.aod[0])
+                    md["AOD Value"] = str(atm6s.aod[1])
+                except Exception, e:
+                    VerboseOut(traceback.format_exc(), 4)
+                    raise Exception('Problem running 6S atmospheric model: %s' % e)
 
-        # Process standard products
-        for key, val in groups['Standard'].items():
-            start = datetime.now()
-            # TODO - update if no atmos desired for others
-            toa = self._products[val[0]].get('toa', False) or 'toa' in val
-            # Create product
+            # Break down by group
+            groups = products.groups()
+
+            # create non-atmospherically corrected apparent reflectance and temperature image
+            reflimg = gippy.GeoImage(img)
+            theta = numpy.pi * self.metadata['geometry']['solarzenith'] / 180.0
+            sundist = (1.0 - 0.016728 * numpy.cos(numpy.pi * 0.9856 * (float(self.day) - 4.0) / 180.0))
+            for col in self.assets['DN'].visbands:
+                reflimg[col] = img[col] * (1.0 / ((meta[col]['E'] * numpy.cos(theta)) / (numpy.pi * sundist * sundist)))
+            for col in self.assets['DN'].lwbands:
+                reflimg[col] = (((img[col].pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)) * meta[col]['K2'] - 273.15
+
+            # This is landsat, so always just one sensor for a given date
+            sensor = self.sensors['DN']
+
+            # Process standard products
+            for key, val in groups['Standard'].items():
+                start = datetime.now()
+                # TODO - update if no atmos desired for others
+                toa = self._products[val[0]].get('toa', False) or 'toa' in val
+                # Create product
+                try:
+                    fname = os.path.join(self.path, self.basename + '_' + key)
+                    if val[0] == 'acca':
+                        s_azim = self.metadata['geometry']['solarazimuth']
+                        s_elev = 90 - self.metadata['geometry']['solarzenith']
+                        try:
+                            erosion = int(val[1]) if len(val) > 1 else 5
+                            dilation = int(val[2]) if len(val) > 2 else 10
+                            cloudheight = int(val[3]) if len(val) > 3 else 4000
+                        except:
+                            erosion = 5
+                            dilation = 10
+                            cloudheight = 4000
+                        imgout = ACCA(reflimg, fname, s_elev, s_azim, erosion, dilation, cloudheight)
+                    elif val[0] == 'fmask':
+                        try:
+                            tolerance = int(val[1]) if len(val) > 1 else 3
+                            dilation = int(val[2]) if len(val) > 2 else 5
+                        except:
+                            tolerance = 3
+                            dilation = 5
+                        imgout = Fmask(reflimg, fname, tolerance, dilation)
+                    elif val[0] == 'rad':
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
+                        for i in range(0, imgout.NumBands()):
+                            imgout.SetBandName(visbands[i], i + 1)
+                        imgout.SetNoData(-32768)
+                        imgout.SetGain(0.1)
+                        if toa:
+                            for col in visbands:
+                                img[col].Process(imgout[col])
+                        else:
+                            for col in visbands:
+                                ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]).Process(imgout[col])
+                        # Mask out any pixel for which any band is nodata
+                        #imgout.ApplyMask(img.DataMask())
+                    elif val[0] == 'ref':
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
+                        for i in range(0, imgout.NumBands()):
+                            imgout.SetBandName(visbands[i], i + 1)
+                        imgout.SetNoData(-32768)
+                        imgout.SetGain(0.0001)
+                        if toa:
+                            for c in visbands:
+                                reflimg[c].Process(imgout[c])
+                        else:
+                            for c in visbands:
+                                (((img[c] - atm6s.results[c][1]) / atm6s.results[c][0]) * (1.0 / atm6s.results[c][2])).Process(imgout[c])
+                        # Mask out any pixel for which any band is nodata
+                        #imgout.ApplyMask(img.DataMask())
+                    elif val[0] == 'tcap':
+                        tmpimg = gippy.GeoImage(reflimg)
+                        tmpimg.PruneBands(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'])
+                        arr = numpy.array(self.Asset._sensors[self.sensor_set[0]]['tcap']).astype('float32')
+                        imgout = LinearTransform(tmpimg, fname, arr)
+                        outbands = ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6']
+                        for i in range(0, imgout.NumBands()):
+                            imgout.SetBandName(outbands[i], i + 1)
+                    elif val[0] == 'temp':
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
+                        for i in range(0, imgout.NumBands()):
+                            imgout.SetBandName(lwbands[i], i + 1)
+                        imgout.SetNoData(-32768)
+                        imgout.SetGain(0.1)
+                        [reflimg[col].Process(imgout[col]) for col in lwbands]
+                    elif val[0] == 'dn':
+                        rawimg = self._readraw()
+                        rawimg.SetGain(1.0)
+                        rawimg.SetOffset(0.0)
+                        imgout = rawimg.Process(fname)
+                        rawimg = None
+                    elif val[0] == 'volref':
+                        bands = deepcopy(visbands)
+                        bands.remove("SWIR1")
+                        imgout = gippy.GeoImage(fname, reflimg, gippy.GDT_Int16, len(bands))
+                        [imgout.SetBandName(band, i + 1) for i, band in enumerate(bands)]
+                        imgout.SetNoData(-32768)
+                        imgout.SetGain(0.0001)
+                        r = 0.54    # Water-air reflection
+                        p = 0.03    # Internal Fresnel reflectance
+                        pp = 0.54   # Water-air Fresnel reflectance
+                        n = 1.34    # Refractive index of water
+                        Q = 1.0     # Downwelled irradiance / upwelled radiance
+                        A = ((1 - p) * (1 - pp)) / (n * n)
+                        srband = reflimg['SWIR1'].Read()
+                        nodatainds = srband == reflimg['SWIR1'].NoDataValue()
+                        for band in bands:
+                            bimg = reflimg[band].Read()
+                            diffimg = bimg - srband
+                            diffimg = diffimg / (A + r * Q * diffimg)
+                            diffimg[bimg == reflimg[band].NoDataValue()] = imgout[band].NoDataValue()
+                            diffimg[nodatainds] = imgout[band].NoDataValue()
+                            imgout[band].Write(diffimg)
+                    elif val[0] == 'wtemp':
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
+                        [imgout.SetBandName(lwbands[i], i + 1) for i in range(0, imgout.NumBands())]
+                        imgout.SetNoData(-32768)
+                        imgout.SetGain(0.1)
+                        tmpimg = gippy.GeoImage(img)
+                        for col in lwbands:
+                            band = tmpimg[col]
+                            m = meta[col]
+                            lat = self.metadata['geometry']['lat']
+                            lon = self.metadata['geometry']['lon']
+                            dt = self.metadata['datetime']
+                            atmos = MODTRAN(m['bandnum'], m['wvlen1'], m['wvlen2'], dt, lat, lon, True)
+                            e = 0.95
+                            band = (tmpimg[col] - (atmos.output[1] + (1 - e) * atmos.output[2])) / (atmos.output[0] * e)
+                            band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)) * meta[col]['K2'] - 273.15
+                            band.Process(imgout[col])
+
+                    elif val[0] == 'bqa':
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 7)
+                        qaimg = self._readqa()
+                        qadata = qaimg.Read()
+                        notfilled = ~binmask(qadata, 1)
+                        notdropped = ~binmask(qadata, 2)
+                        notterrain = ~binmask(qadata, 3)
+                        notcirrus = ~binmask(qadata, 14) & binmask(qadata, 13)
+                        notcloud = ~binmask(qadata, 16) & binmask(qadata, 15)
+                        allgood = notfilled * notdropped * notterrain * notcirrus * notcloud
+                        imgout[0].Write(allgood.astype('int16'))
+                        imgout[1].Write(notfilled.astype('int16'))
+                        imgout[2].Write(notdropped.astype('int16'))
+                        imgout[3].Write(notterrain.astype('int16'))
+                        imgout[4].Write(notsnow.astype('int16'))
+                        imgout[5].Write(notcirrus.astype('int16'))
+                        imgout[6].Write(notcloud.astype('int16'))
+
+
+                    fname = imgout.Filename()
+                    imgout.SetMeta(md)
+                    imgout = None
+                    self.AddFile(sensor, key, fname)
+                    VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.now() - start), 1)
+                except Exception, e:
+                    VerboseOut('Error creating product %s for %s: %s' % (key, basename(self.assets['DN'].filename), e), 2)
+                    VerboseOut(traceback.format_exc(), 3)
+
+            # Process Indices
+            indices0 = dict(groups['Index'], **groups['Tillage'])
+            if len(indices0) > 0:
+                start = datetime.now()
+                indices = {}
+                indices_toa = {}
+                for key, val in indices0.items():
+                    if 'toa' in val:
+                        indices_toa[key] = val
+                    else:
+                        indices[key] = val
+                # Run TOA
+                if len(indices_toa) > 0:
+                    fnames = [os.path.join(self.path, self.basename + '_' + key) for key in indices_toa]
+                    prodout = Indices(reflimg, dict(zip([p[0] for p in indices_toa.values()], fnames)), md)
+                    prodout = dict(zip(indices_toa.keys(), prodout.values()))
+                    [self.AddFile(sensor, key, fname) for key, fname in prodout.items()]
+                # Run atmospherically corrected
+                if len(indices) > 0:
+                    fnames = [os.path.join(self.path, self.basename + '_' + key) for key in indices]
+                    for col in visbands:
+                        img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]) * (1.0 / atm6s.results[col][2])
+                    prodout = Indices(img, dict(zip([p[0] for p in indices.values()], fnames)), md)
+                    prodout = dict(zip(indices.keys(), prodout.values()))
+                    [self.AddFile(sensor, key, fname) for key, fname in prodout.items()]
+                VerboseOut(' -> %s: processed %s in %s' % (self.basename, indices0.keys(), datetime.now() - start), 1)
+            img = None
+            # cleanup directory
             try:
-                fname = os.path.join(self.path, self.basename + '_' + key)
-                if val[0] == 'acca':
-                    s_azim = self.metadata['geometry']['solarazimuth']
-                    s_elev = 90 - self.metadata['geometry']['solarzenith']
-                    try:
-                        erosion = int(val[1]) if len(val) > 1 else 5
-                        dilation = int(val[2]) if len(val) > 2 else 10
-                        cloudheight = int(val[3]) if len(val) > 3 else 4000
-                    except:
-                        erosion = 5
-                        dilation = 10
-                        cloudheight = 4000
-                    imgout = ACCA(reflimg, fname, s_elev, s_azim, erosion, dilation, cloudheight)
-                elif val[0] == 'fmask':
-                    try:
-                        tolerance = int(val[1]) if len(val) > 1 else 3
-                        dilation = int(val[2]) if len(val) > 2 else 5
-                    except:
-                        tolerance = 3
-                        dilation = 5
-                    imgout = Fmask(reflimg, fname, tolerance, dilation)
-                elif val[0] == 'rad':
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
-                    for i in range(0, imgout.NumBands()):
-                        imgout.SetBandName(visbands[i], i + 1)
-                    imgout.SetNoData(-32768)
-                    imgout.SetGain(0.1)
-                    if toa:
-                        for col in visbands:
-                            img[col].Process(imgout[col])
-                    else:
-                        for col in visbands:
-                            ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]).Process(imgout[col])
-                    # Mask out any pixel for which any band is nodata
-                    #imgout.ApplyMask(img.DataMask())
-                elif val[0] == 'ref':
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
-                    for i in range(0, imgout.NumBands()):
-                        imgout.SetBandName(visbands[i], i + 1)
-                    imgout.SetNoData(-32768)
-                    imgout.SetGain(0.0001)
-                    if toa:
-                        for c in visbands:
-                            reflimg[c].Process(imgout[c])
-                    else:
-                        for c in visbands:
-                            (((img[c] - atm6s.results[c][1]) / atm6s.results[c][0]) * (1.0 / atm6s.results[c][2])).Process(imgout[c])
-                    # Mask out any pixel for which any band is nodata
-                    #imgout.ApplyMask(img.DataMask())
-                elif val[0] == 'tcap':
-                    tmpimg = gippy.GeoImage(reflimg)
-                    tmpimg.PruneBands(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'])
-                    arr = numpy.array(self.Asset._sensors[self.sensor_set[0]]['tcap']).astype('float32')
-                    imgout = LinearTransform(tmpimg, fname, arr)
-                    outbands = ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6']
-                    for i in range(0, imgout.NumBands()):
-                        imgout.SetBandName(outbands[i], i + 1)
-                elif val[0] == 'temp':
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
-                    for i in range(0, imgout.NumBands()):
-                        imgout.SetBandName(lwbands[i], i + 1)
-                    imgout.SetNoData(-32768)
-                    imgout.SetGain(0.1)
-                    [reflimg[col].Process(imgout[col]) for col in lwbands]
-                elif val[0] == 'dn':
-                    rawimg = self._readraw()
-                    rawimg.SetGain(1.0)
-                    rawimg.SetOffset(0.0)
-                    imgout = rawimg.Process(fname)
-                    rawimg = None
-                elif val[0] == 'volref':
-                    bands = deepcopy(visbands)
-                    bands.remove("SWIR1")
-                    imgout = gippy.GeoImage(fname, reflimg, gippy.GDT_Int16, len(bands))
-                    [imgout.SetBandName(band, i + 1) for i, band in enumerate(bands)]
-                    imgout.SetNoData(-32768)
-                    imgout.SetGain(0.0001)
-                    r = 0.54    # Water-air reflection
-                    p = 0.03    # Internal Fresnel reflectance
-                    pp = 0.54   # Water-air Fresnel reflectance
-                    n = 1.34    # Refractive index of water
-                    Q = 1.0     # Downwelled irradiance / upwelled radiance
-                    A = ((1 - p) * (1 - pp)) / (n * n)
-                    srband = reflimg['SWIR1'].Read()
-                    nodatainds = srband == reflimg['SWIR1'].NoDataValue()
-                    for band in bands:
-                        bimg = reflimg[band].Read()
-                        diffimg = bimg - srband
-                        diffimg = diffimg / (A + r * Q * diffimg)
-                        diffimg[bimg == reflimg[band].NoDataValue()] = imgout[band].NoDataValue()
-                        diffimg[nodatainds] = imgout[band].NoDataValue()
-                        imgout[band].Write(diffimg)
-                elif val[0] == 'wtemp':
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
-                    [imgout.SetBandName(lwbands[i], i + 1) for i in range(0, imgout.NumBands())]
-                    imgout.SetNoData(-32768)
-                    imgout.SetGain(0.1)
-                    tmpimg = gippy.GeoImage(img)
-                    for col in lwbands:
-                        band = tmpimg[col]
-                        m = meta[col]
-                        lat = self.metadata['geometry']['lat']
-                        lon = self.metadata['geometry']['lon']
-                        dt = self.metadata['datetime']
-                        atmos = MODTRAN(m['bandnum'], m['wvlen1'], m['wvlen2'], dt, lat, lon, True)
-                        e = 0.95
-                        band = (tmpimg[col] - (atmos.output[1] + (1 - e) * atmos.output[2])) / (atmos.output[0] * e)
-                        band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)) * meta[col]['K2'] - 273.15
-                        band.Process(imgout[col])
-
-                elif val[0] == 'bqa':
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 7)
-                    qaimg = self._readqa()
-                    qadata = qaimg.Read()
-                    notfilled = ~binmask(qadata, 1)
-                    notdropped = ~binmask(qadata, 2)
-                    notterrain = ~binmask(qadata, 3)
-                    notcirrus = ~binmask(qadata, 14) & binmask(qadata, 13)
-                    notcloud = ~binmask(qadata, 16) & binmask(qadata, 15)
-                    allgood = notfilled * notdropped * notterrain * notcirrus * notcloud
-                    imgout[0].Write(allgood.astype('int16'))
-                    imgout[1].Write(notfilled.astype('int16'))
-                    imgout[2].Write(notdropped.astype('int16'))
-                    imgout[3].Write(notterrain.astype('int16'))
-                    imgout[4].Write(notsnow.astype('int16'))
-                    imgout[5].Write(notcirrus.astype('int16'))
-                    imgout[6].Write(notcloud.astype('int16'))
-
-                elif val[0] == 'ndvi8sr':
-
-                    from pdb import set_trace
-
-                    set_trace()
-
-
-
-                fname = imgout.Filename()
-                imgout.SetMeta(md)
-                imgout = None
-                self.AddFile(sensor, key, fname)
-                VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.now() - start), 1)
-            except Exception, e:
-                VerboseOut('Error creating product %s for %s: %s' % (key, basename(self.assets[''].filename), e), 2)
-                VerboseOut(traceback.format_exc(), 3)
-
-        # Process Indices
-        indices0 = dict(groups['Index'], **groups['Tillage'])
-        if len(indices0) > 0:
-            start = datetime.now()
-            indices = {}
-            indices_toa = {}
-            for key, val in indices0.items():
-                if 'toa' in val:
-                    indices_toa[key] = val
-                else:
-                    indices[key] = val
-            # Run TOA
-            if len(indices_toa) > 0:
-                fnames = [os.path.join(self.path, self.basename + '_' + key) for key in indices_toa]
-                prodout = Indices(reflimg, dict(zip([p[0] for p in indices_toa.values()], fnames)), md)
-                prodout = dict(zip(indices_toa.keys(), prodout.values()))
-                [self.AddFile(sensor, key, fname) for key, fname in prodout.items()]
-            # Run atmospherically corrected
-            if len(indices) > 0:
-                fnames = [os.path.join(self.path, self.basename + '_' + key) for key in indices]
-                for col in visbands:
-                    img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]) * (1.0 / atm6s.results[col][2])
-                prodout = Indices(img, dict(zip([p[0] for p in indices.values()], fnames)), md)
-                prodout = dict(zip(indices.keys(), prodout.values()))
-                [self.AddFile(sensor, key, fname) for key, fname in prodout.items()]
-            VerboseOut(' -> %s: processed %s in %s' % (self.basename, indices0.keys(), datetime.now() - start), 1)
-        img = None
-        # cleanup directory
-        try:
-            if settings().REPOS[self.Repository.name.lower()]['extract']:
-                for bname in self.assets[''].datafiles():
-                    if bname[-7:] != 'MTL.txt':
-                        files = glob.glob(os.path.join(self.path, bname) + '*')
-                        RemoveFiles(files)
-            shutil.rmtree(os.path.join(self.path, 'modtran'))
-        except:
-            # VerboseOut(traceback.format_exc(), 4)
-            pass
+                if settings().REPOS[self.Repository.name.lower()]['extract']:
+                    for bname in self.assets['DN'].datafiles():
+                        if bname[-7:] != 'MTL.txt':
+                            files = glob.glob(os.path.join(self.path, bname) + '*')
+                            RemoveFiles(files)
+                shutil.rmtree(os.path.join(self.path, 'modtran'))
+            except:
+                # VerboseOut(traceback.format_exc(), 4)
+                pass
 
     def filter(self, pclouds=100, **kwargs):
         """ Check if tile passes filter """
@@ -639,12 +709,14 @@ class landsatData(Data):
 
         # test if metadata already read in, if so, return
 
-        datafiles = self.assets[''].datafiles()
+        datafiles = self.assets['DN'].datafiles()
+
+
         mtlfilename = [f for f in datafiles if 'MTL.txt' in f][0]
         if os.path.exists(mtlfilename) and os.stat(mtlfilename).st_size == 0:
             os.remove(mtlfilename)
         if not os.path.exists(mtlfilename):
-            mtlfilename = self.assets[''].extract([mtlfilename])[0]
+            mtlfilename = self.assets['DN'].extract([mtlfilename])[0]
         # Read MTL file
         try:
             text = open(mtlfilename, 'r').read()
@@ -652,12 +724,16 @@ class landsatData(Data):
             raise Exception('({})'.format(e))
         if len(text) < 10:
             raise Exception('MTL file is too short. {}'.format(mtlfilename))
-        smeta = self.assets['']._sensors[self.sensor_set[0]]
+
+
+        sensor = self.assets['DN'].sensor
+        smeta = self.assets['DN']._sensors[sensor]
 
         # Process MTL text - replace old metadata tags with new
         # NOTE This is not comprehensive, there may be others
         text = text.replace('ACQUISITION_DATE', 'DATE_ACQUIRED')
         text = text.replace('SCENE_CENTER_SCAN_TIME', 'SCENE_CENTER_TIME')
+
         for (ob, nb) in zip(smeta['oldbands'], smeta['bands']):
             text = re.sub(r'\WLMIN_BAND' + ob, 'RADIANCE_MINIMUM_BAND_' + nb, text)
             text = re.sub(r'\WLMAX_BAND' + ob, 'RADIANCE_MAXIMUM_BAND_' + nb, text)
@@ -744,10 +820,10 @@ class landsatData(Data):
             self.meta()
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract files
-            qadatafile = self.assets[''].extract([self.metadata['qafilename']])
+            qadatafile = self.assets['DN'].extract([self.metadata['qafilename']])
         else:
             # Use tar.gz directly using GDAL's virtual filesystem
-            qadatafile = os.path.join('/vsitar/' + self.assets[''].filename, self.metadata['qafilename'])
+            qadatafile = os.path.join('/vsitar/' + self.assets['DN'].filename, self.metadata['qafilename'])
         qaimg = gippy.GeoImage(qadatafile)
         return qaimg
 
@@ -761,10 +837,10 @@ class landsatData(Data):
 
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract all files
-            datafiles = self.assets[''].extract(self.metadata['filenames'])
+            datafiles = self.assets['DN'].extract(self.metadata['filenames'])
         else:
             # Use tar.gz directly using GDAL's virtual filesystem
-            datafiles = [os.path.join('/vsitar/' + self.assets[''].filename, f) for f in self.metadata['filenames']]
+            datafiles = [os.path.join('/vsitar/' + self.assets['DN'].filename, f) for f in self.metadata['filenames']]
 
         image = gippy.GeoImage(datafiles)
         image.SetNoData(0)
@@ -774,7 +850,11 @@ class landsatData(Data):
         #    image.SetMeta(key,str(val))
 
         # Geometry used for calculating incident irradiance
-        colors = self.assets['']._sensors[self.sensor_set[0]]['colors']
+        # colors = self.assets['DN']._sensors[self.sensor_set[0]]['colors']
+
+        sensor = self.assets['DN'].sensor
+        colors = self.assets['DN']._sensors[sensor]['colors']
+
         for bi in range(0, len(self.metadata['filenames'])):
             image.SetBandName(colors[bi], bi + 1)
             # need to do this or can we index correctly?
