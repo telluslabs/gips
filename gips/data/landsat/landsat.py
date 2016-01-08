@@ -46,6 +46,9 @@ from gips.utils import VerboseOut, RemoveFiles, basename, settings
 from landsat_util import search, downloader
 
 
+from pdb import set_trace
+
+
 requirements = ['Py6S>=1.5.0']
 
 
@@ -140,8 +143,7 @@ class landsatAsset(Asset):
 
     # TODO - consider assets and sensors relationship ?
     _assets = {
-        'DN' : {
-            # 'pattern': 'L*.tar.gz'
+        'DN': {
             'pattern': 'L????????????????????.tar.gz',
         },
         'SR': {
@@ -378,6 +380,10 @@ class landsatData(Data):
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
         },
+        'landmask': {
+            'assets': ['SR'],
+            'description': 'Land mask from LC8SR',
+        },
 
     }
 
@@ -434,18 +440,21 @@ class landsatData(Data):
                     red = img[0].Read().astype('float32')
                     nir = img[1].Read().astype('float32')
 
-                    red[(red != missing) & (red < 0.0)] = 0.0
-                    red[red > 1.0] = 1.0
-                    nir[(nir != missing) & (nir < 0.0)] = 0.0
-                    nir[nir > 1.0] = 1.0
-
                     wvalid = numpy.where((red != missing) & (nir != missing) & (red + nir != 0.0))
 
                     red[wvalid] *= 1.E-4
                     nir[wvalid] *= 1.E-4
 
+                    # TODO: change this so that these pixels become missing
+                    red[(red != missing) & (red < 0.0)] = 0.0
+                    red[red > 1.0] = 1.0
+                    nir[(nir != missing) & (nir < 0.0)] = 0.0
+                    nir[nir > 1.0] = 1.0
+
                     ndvi = missing + numpy.zeros_like(red)
                     ndvi[wvalid] = (nir[wvalid] - red[wvalid])/(nir[wvalid] + red[wvalid])
+
+                    # set_trace()
 
                     print "writing", fname
                     imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
@@ -453,10 +462,27 @@ class landsatData(Data):
                     imgout.SetOffset(0.0)
                     imgout.SetGain(1.0)
                     imgout.SetBandName('NDVI', 1)
-
                     imgout[0].Write(ndvi)
 
+                if val[0] == "landmask":
 
+                    sensor = 'LC8SR'
+                    fname = '%s_%s_%s' % (bname, sensor, key)
+
+                    img = gippy.GeoImage([imgpaths['cfmask'], imgpaths['cfmask_conf']])
+
+                    cfmask = img[0].Read()
+                    # array([  0,   1,   2,   3,   4, 255], dtype=uint8)
+                    # 0 means clear! but I want 1 to mean clear
+
+                    cfmask[cfmask > 0] = 2
+                    cfmask[cfmask == 0] = 1
+                    cfmask[cfmask == 2] = 0
+
+                    print "writing", fname
+                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                    imgout.SetBandName('Land mask', 1)
+                    imgout[0].Write(cfmask)
 
 
         elif asset == 'DN':
