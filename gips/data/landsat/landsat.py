@@ -159,7 +159,7 @@ class landsatAsset(Asset):
 
         fname = os.path.basename(filename)
 
-        print "fname", fname
+        VerboseOut( ("fname", fname), 2)
 
         self.tile = fname[3:9]
         year = fname[9:13]
@@ -167,12 +167,12 @@ class landsatAsset(Asset):
         self.date = datetime.strptime(year + doy, "%Y%j")
 
         if "-" in filename:
-            print 'SR asset'
+            VerboseOut( ('SR asset'), 2)
             self.asset = 'SR'
             self.sensor = 'LC8SR'
             self.version = int(fname[20:22])
         else:
-            print 'DN asset'
+            VerboseOut( ('DN asset'), 2)
             self.asset = 'DN'
             self.sensor = fname[0:3]
             self.version = int(fname[19:21])
@@ -456,7 +456,7 @@ class landsatData(Data):
 
                     # set_trace()
 
-                    print "writing", fname
+                    VerboseOut( ("writing", fname), 2)
                     imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
                     imgout.SetNoData(-9999.)
                     imgout.SetOffset(0.0)
@@ -479,7 +479,7 @@ class landsatData(Data):
                     cfmask[cfmask == 0] = 1
                     cfmask[cfmask == 2] = 0
 
-                    print "writing", fname
+                    VerboseOut( ("writing", fname), 2)
                     imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
                     imgout.SetBandName('Land mask', 1)
                     imgout[0].Write(cfmask)
