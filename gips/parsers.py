@@ -128,8 +128,8 @@ class GIPSParser(argparse.ArgumentParser):
         group.add_argument('--res', nargs=2, help=h, default=None, type=float)
         h = 'If warping interpolate using: 0-NN, 1-Bilinear, 2-Cubic'
         group.add_argument('--interpolation', help=h, choices=[0, 1, 2], default=0, type=int)
-        h = ('Crop output to intersection of each image and the vector bounding boxes'
-             ' (output image sizes will vary accordingly).')
+        h = ('Crop output to intersection of the images and the vector bounding boxes'
+             ' (USE CAUTIOUSLY, as strange behaviors may arise).')
         group.add_argument('--crop', help=, default=False, action='store_true')
         h = 'Crop out spatial extent to include all pixels touched by the polygons(s)'
         group.add_argument('--alltouch', help=h, default=False, action='store_true')
