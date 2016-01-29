@@ -142,6 +142,7 @@ class landsatAsset(Asset):
     }
 
     # TODO - consider assets and sensors relationship ?
+    # TODO - move patterns from `glob` to `re`
     _assets = {
         'DN': {
             'pattern': 'L????????????????????.tar.gz',
