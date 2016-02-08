@@ -48,8 +48,7 @@ class Tiles(object):
         self.tiles = {}
         for t in self.spatial.tiles:
             tile = dataclass(t, self.date)
-            # TODO - fix custom filter based on dataclass...sensor should pass to 'dataclass'
-            if tile.valid and tile.filter(**kwargs):  # and tile.sensor in sensors:
+            if tile.valid and tile.filter(**kwargs):
                 self.tiles[t] = tile
 
     def __len__(self):
