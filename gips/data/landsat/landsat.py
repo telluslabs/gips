@@ -39,10 +39,6 @@ from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
 from gips.utils import VerboseOut, RemoveFiles, basename, settings
 
-# NAME CLASH WORKAROUND:
-# Do this:
-# % cd /path/to/repo/gips/venv/lib/python2.7/site-packages
-# % ln -s landsat landsat_util
 from landsat_util import search, downloader
 
 
