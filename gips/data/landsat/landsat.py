@@ -724,11 +724,18 @@ class landsatData(Data):
                 # VerboseOut(traceback.format_exc(), 4)
                 pass
 
-    def filter(self, pclouds=100, **kwargs):
+    def filter(self, pclouds=100, sensors=None, **kwargs):
         """ Check if tile passes filter """
         if pclouds < 100:
             self.meta()
             if self.metadata['clouds'] > pclouds:
+                return False
+        if sensors:
+            if type(sensors) is str:
+                sensors = [sensors]
+            sensors = set(sensors)
+            # ideally, the data class would be trimmed by
+            if not sensors.intersection(self.sensor_set):
                 return False
         return True
 
