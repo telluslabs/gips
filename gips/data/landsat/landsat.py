@@ -34,7 +34,7 @@ from copy import deepcopy
 import commands
 
 import gippy
-from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices
+from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
 from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
 from gips.utils import VerboseOut, RemoveFiles, basename, settings
@@ -315,6 +315,17 @@ class landsatData(Data):
             'description': 'LC8 band quality',
             'toa': True
         },
+        'bqashadow': {
+            'assets': ['DN'],
+            'description': 'LC8 QA + Shadow Smear',
+            'arguments': [
+                'X: erosion kernel diameter in pixels (default: 5)',
+                'Y: dilation kernel diameter in pixels (default: 10)',
+                'Z: cloud height in meters (default: 4000)'
+            ],
+            'nargs': '*',
+            'toa': True
+        },
         #'Indices': {
         'bi': {
             'assets': ['DN'],
@@ -405,7 +416,6 @@ class landsatData(Data):
             raise Exception('This driver does not support creation of products from different Assets at the same time')
 
         asset = list(assets)[0]
-
 
         # TODO: De-hack this
         # Better approach, but needs some thought, is to loop over assets
@@ -559,6 +569,16 @@ class landsatData(Data):
                             erosion = 5
                             dilation = 10
                             cloudheight = 4000
+                        resset = set(
+                            [band.Resolution() for band in (
+                                self.assets['DN'].visbands +
+                                self.assets['DN'].lwbands)]
+                        )
+                        if len(resset) > 1:
+                            raise Exception(
+                                'ACCA requires all bands to have the same '
+                                'spatial resolution.  Found:\n\t' + str(resset)
+                            )
                         imgout = ACCA(reflimg, fname, s_elev, s_azim, erosion, dilation, cloudheight)
                     elif val[0] == 'fmask':
                         try:
@@ -675,7 +695,42 @@ class landsatData(Data):
                         imgout[5].Write(notcirrus.astype('int16'))
                         imgout[6].Write(notcloud.astype('int16'))
 
+                    elif val[0] == 'bqashadow':
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_UInt16, 1)
+                        imgout[0].SetNoData(0)
+                        qaimg = self._readqa()
+                        qadata = qaimg.Read()
+                        fill = binmask(qadata, 1)
+                        dropped = binmask(qadata, 2)
+                        terrain = binmask(qadata, 3)
+                        cirrus = binmask(qadata, 14)
+                        othercloud = binmask(qadata, 16)
+                        cloud = (cirrus + othercloud) + 2 * (fill + dropped + terrain)
+                        abfn = fname + '-intermediate'
+                        abimg = gippy.GeoImage(abfn, img, gippy.GDT_UInt16, 1)
+                        abimg[0].SetNoData(2)
+                        abimg[0].Write(cloud.astype(numpy.uint16))
+                        abimg.Process()
+                        abimg = None
+                        abimg = gippy.GeoImage(abfn + '.tif')
 
+                        s_azim = self.metadata['geometry']['solarazimuth']
+                        s_elev = 90 - self.metadata['geometry']['solarzenith']
+                        try:
+                            erosion = int(val[1]) if len(val) > 1 else 5
+                            dilation = int(val[2]) if len(val) > 2 else 10
+                            cloudheight = int(val[3]) if len(val) > 3 else 4000
+                        except:
+                            erosion = 5
+                            dilation = 10
+                            cloudheight = 4000
+                        imgout = AddShadowMask(
+                            abimg, imgout, 0, s_elev, s_azim, erosion,
+                            dilation, cloudheight, {'notes': 'dev-version'}
+                        )
+                        imgout.Process()
+                        abimg = None
+                        os.remove(abfn)
                     fname = imgout.Filename()
                     imgout.SetMeta(md)
                     imgout = None
