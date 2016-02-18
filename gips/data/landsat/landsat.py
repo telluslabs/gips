@@ -570,9 +570,10 @@ class landsatData(Data):
                             dilation = 10
                             cloudheight = 4000
                         resset = set(
-                            [band.Resolution() for band in (
-                                self.assets['DN'].visbands +
-                                self.assets['DN'].lwbands)]
+                            [(reflimg[band].Resolution().x(),
+                              reflimg[band].Resolution().y())
+                             for band in (self.assets['DN'].visbands +
+                                          self.assets['DN'].lwbands)]
                         )
                         if len(resset) > 1:
                             raise Exception(
@@ -730,7 +731,7 @@ class landsatData(Data):
                         )
                         imgout.Process()
                         abimg = None
-                        os.remove(abfn)
+                        os.remove(abfn + '.tif')
                     fname = imgout.Filename()
                     imgout.SetMeta(md)
                     imgout = None
