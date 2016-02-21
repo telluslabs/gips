@@ -141,22 +141,30 @@ class Tiles(object):
         """ Print asset header """
         self.dataclass.pprint_asset_header()
 
+    def _colorize_product(self, prod, colors=None):
+        color = ['', '']
+        if colors is not None:
+            s = self.which_sensor(prod)
+            if s is not None:
+                color = [colors[s], Colors.OFF]
+        return color[0] + prod + color[1]
+
+
     def pprint(self, dformat='%j', colors=None):
         """ Print coverage for each and every asset """
         #assets = [a for a in self.dataclass.Asset._assets]
         sys.stdout.write('{:^12}'.format(self.date.strftime(dformat)))
         asset_coverage = self.asset_coverage()
         for a in sorted(asset_coverage):
-            color = ['', '']
-            if colors is not None:
-                s = self.which_sensor(a)
-                if s is not None:
-                    color = [colors[s], Colors.OFF]
             cov = asset_coverage[a]
             if cov > 0:
-                sys.stdout.write(color[0] + '  {:>4.1f}%   '.format(cov) + color[1])
+                text = self._colorize_product(
+                    '  {:>4.1f}%   '.format(cov), colors
+                )
             else:
-                sys.stdout.write('          ')
+                text = '          '
+            sys.stdout.write(text)
+
         products = [p for t in self.tiles for p in self.tiles[t].products]
         # Check product is available for all tiles before reporting as processed
         prods = []
@@ -164,6 +172,6 @@ class Tiles(object):
             if products.count(p) == len(self.tiles):
                 prods.append(p)
         for p in sorted(set(prods)):
-            color = colors[self.which_sensor(p)]
-            sys.stdout.write('  ' + color + p + Colors.OFF)
+            text = self._colorize_product(p, colors)
+            sys.stdout.write('  ' + text)
         sys.stdout.write('\n')

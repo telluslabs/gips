@@ -20,7 +20,12 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 v0.8.2
-- landsat assets now tagged as 'DN' and 'SR' for USGS downloaded surface reflectance.
+- landsat assets now tagged as 'DN' and 'SR' for USGS downloaded surface
+  reflectance.
+- added landsat 'bqashadow' product that uses `gippy.algorithms.AddShadowMask`
+  to catch shadows of BQA detected clouds via shadow smear.
+- enabled `--sensors` filter for landsat.
+- fixed: `gips.tiles.Tiles.pprint` TypeError when `colors` is None
 
 v0.8.1
 - added support for `alltouch` paramter in CookieCutter (gippy==0.3.6)
