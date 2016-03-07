@@ -97,6 +97,11 @@ class GIPSParser(argparse.ArgumentParser):
         group.add_argument('--chunksize', help='Chunk size in MB', default=128.0, type=float)
         group.add_argument('--numprocs', help='Desired number of processors (if allowed)', default=2, type=int)
         group.add_argument('--format', help='Format for output file', default="GTiff")
+        h = ('Don\'t process. Instead, generate batch file with single '
+             'gips_process command on each line.  \'overwrite\', '
+             '\'chunksize\', and `\format\' are passed through.  '
+             '\'numprocs\' is set to 1.')
+        group.add_argument('--batchout', help=h, default=None)
         self.parent_parsers.append(parser)
         return parser
 
