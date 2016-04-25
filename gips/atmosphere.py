@@ -182,7 +182,7 @@ class MODTRAN():
             os.symlink(self._datadir, 'DATA')
 
         if profile:
-            mprofile = MerraData.profile(lon, lat, dtime)
+            mprofile = merraData.profile(lon, lat, dtime)
             pressure = mprofile['pressure']
             temp = mprofile['temp']
             humidity = mprofile['humidity']
