@@ -202,7 +202,7 @@ class modisAsset(Asset):
 class modisData(Data):
     """ A tile of data (all assets and products) """
     name = 'Modis'
-    version = '0.9.0'
+    version = '1.0.0'
     Asset = modisAsset
     _pattern = '*.tif'
     _productgroups = {
@@ -356,15 +356,17 @@ class modisData(Data):
 
                 # red, mir, swr
                 satvi = missing + np.zeros_like(redimg)
-                # I think the following line has an error:
-                # wg = np.where((redimg != missing)&(mirimg != missing)&(swrimg != missing)&(((mirimg + redimg + 0.5)*swrimg) != 0.0))
                 wg = np.where((redimg != missing)&(mirimg != missing)&(swrimg != missing)&((mirimg + redimg + 0.5) != 0.0))
                 satvi[wg] = (((mirimg[wg] - redimg[wg])/(mirimg[wg] + redimg[wg] + 0.5))*1.5) - (swrimg[wg] / 2.0)
 
-                print "writing", fname
+                # blu, red, nir
+                evi = missing + np.zeros_like(redimg)
+                wg = np.where((bluimg != missing) & (redimg != missing) & (nirimg != missing) & (nirimg + 6.0*redimg - 7.5*bluimg + 1.0 != 0.0))
+                evi[wg] = (2.5*(nirimg[wg] - redimg[wg])) / (nirimg[wg] + 6.0*redimg[wg] - 7.5*bluimg[wg] + 1.0)
 
                 # create output gippy image
-                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 5)
+                print "writing", fname
+                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 6)
 
                 imgout.SetNoData(missing)
                 imgout.SetOffset(0.0)
@@ -381,7 +383,7 @@ class modisData(Data):
                 imgout.SetBandName('VARI', 3)
                 imgout.SetBandName('BRGT', 4)
                 imgout.SetBandName('SATVI', 5)
-
+                imgout.SetBandName('EVI', 6)
 
 
             # CLOUD MASK PRODUCT
