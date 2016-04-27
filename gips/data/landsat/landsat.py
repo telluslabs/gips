@@ -679,6 +679,8 @@ class landsatData(Data):
                             band.Process(imgout[col])
 
                     elif val[0] == 'bqa':
+                        if 'LC8' not in self.sensor_set:
+                            continue
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 7)
                         qaimg = self._readqa()
                         qadata = qaimg.Read()
@@ -697,6 +699,8 @@ class landsatData(Data):
                         imgout[6].Write(notcloud.astype('int16'))
 
                     elif val[0] == 'bqashadow':
+                        if 'LC8' not in self.sensor_set:
+                            continue
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_UInt16, 1)
                         imgout[0].SetNoData(0)
                         qaimg = self._readqa()

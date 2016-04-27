@@ -689,8 +689,9 @@ class Data(object):
         try:
             fname = self.filenames[(sensor, product)]
             return gippy.GeoImage(fname)
-        except:
-            raise Exception('error reading product (%s, %s)' % (sensor, product))
+
+        except Exception as e:
+            raise Exception('error reading product (%s, %s, %s)' % (sensor, product, e))
 
     def open_assets(self, product):
         """ Open and return a GeoImage of the assets """

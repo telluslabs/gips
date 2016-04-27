@@ -63,10 +63,8 @@ def main():
             tld = os.path.join(args.outdir, bname)
 
         for extent in extents:
-            inv = DataInventory(
-                cls, extent,
-                TemporalExtent(args.dates, args.days), **vars(args)
-            )
+            t_extent = TemporalExtent(args.dates, args.days)
+            inv = DataInventory(cls, extent, t_extent, **vars(args))
             datadir = os.path.join(tld, extent.site.Value())
             if inv.numfiles > 0:
                 inv.mosaic(
@@ -74,12 +72,14 @@ def main():
                     res=args.res, interpolation=args.interpolation,
                     crop=args.crop, alltouch=args.alltouch,
                 )
-            # if not args.tree:
-            #     inv = ProjectInventory(datadir)
-            #     inv.pprint()
-            inv = ProjectInventory(datadir)
-            inv.pprint()
-
+                inv = ProjectInventory(datadir)
+                inv.pprint()
+            else:
+                VerboseOut(
+                    'No data found for {} within temporal extent {}'
+                    .format(str(t_extent), str(t_extent)),
+                    2,
+                )
     except Exception as e:
         import traceback
         VerboseOut(traceback.format_exc(), 4)
