@@ -134,6 +134,12 @@ class modisAsset(Asset):
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
+        'MCD12Q1': {
+            'pattern': 'MCD12Q1*hdf',
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
+            'startdate': datetime.date(2002, 7, 4),
+            'latency': -3
+        },
 
     }
 
@@ -158,8 +164,12 @@ class modisAsset(Asset):
 
         year, month, day = date.timetuple()[:3]
 
+        if asset == "MCD12Q1" and (month != 1 or day != 1):
+            print "Land cover data are only available for Jan. 1"
+            return
+
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
-        pattern = '(%s.A%s%s.%s.005.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
+        pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
         cpattern = re.compile(pattern)
 
         try:
@@ -219,6 +229,10 @@ class modisData(Data):
         'quality': {
             'description': 'MCD Product Quality',
             'assets': ['MCD43A2'],
+        },
+        'landcover': {
+            'description': 'MCD Annual Land Cover',
+            'assets': ['MCD12Q1'],
         },
         # Daily
         'fsnow': {
@@ -294,6 +308,15 @@ class modisData(Data):
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
 
 
+            if val[0] == "landcover":
+                fname = '%s_%s_%s.tif' % (bname, sensor, key)
+                if os.path.lexists(fname):
+                    os.remove(fname)
+
+                os.symlink(allsds[0], fname)
+                imgout = gippy.GeoImage(fname)
+
+
             if val[0] == "quality":
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 if os.path.lexists(fname):
@@ -304,6 +327,7 @@ class modisData(Data):
 
             # LAND VEGETATION INDICES PRODUCT
             if val[0] == "indices":
+
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
                 sensor = 'MCD'
