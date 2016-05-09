@@ -35,6 +35,7 @@ from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut
 
+from pdb import set_trace
 
 def binmask(arr, bit):
     """ Return boolean array indicating which elements as binary have a 1 in
@@ -351,12 +352,12 @@ class modisData(Data):
                 mirimg[mirimg < 0.0] = 0.0
                 swrimg[swrimg < 0.0] = 0.0
 
-                redimg[redimg > 1.0] = 1.0
-                nirimg[nirimg > 1.0] = 1.0
-                bluimg[bluimg > 1.0] = 1.0
-                grnimg[grnimg > 1.0] = 1.0
-                mirimg[mirimg > 1.0] = 1.0
-                swrimg[swrimg > 1.0] = 1.0
+                redimg[(redimg != missing)&(redimg > 1.0)] = 1.0
+                nirimg[(nirimg != missing)&(nirimg > 1.0)] = 1.0
+                bluimg[(bluimg != missing)&(bluimg > 1.0)] = 1.0
+                grnimg[(grnimg != missing)&(grnimg > 1.0)] = 1.0
+                mirimg[(mirimg != missing)&(mirimg > 1.0)] = 1.0
+                swrimg[(swrimg != missing)&(swrimg > 1.0)] = 1.0
 
                 # red, nir
                 ndvi = missing + np.zeros_like(redimg)
