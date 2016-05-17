@@ -35,6 +35,7 @@ from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut
 
+from pdb import set_trace
 
 def binmask(arr, bit):
     """ Return boolean array indicating which elements as binary have a 1 in
@@ -134,6 +135,12 @@ class modisAsset(Asset):
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
+        'MCD12Q1': {
+            'pattern': 'MCD12Q1*hdf',
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
+            'startdate': datetime.date(2002, 7, 4),
+            'latency': -3
+        },
 
     }
 
@@ -158,8 +165,12 @@ class modisAsset(Asset):
 
         year, month, day = date.timetuple()[:3]
 
+        if asset == "MCD12Q1" and (month != 1 or day != 1):
+            print "Land cover data are only available for Jan. 1"
+            return
+
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
-        pattern = '(%s.A%s%s.%s.005.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
+        pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
         cpattern = re.compile(pattern)
 
         try:
@@ -202,7 +213,7 @@ class modisAsset(Asset):
 class modisData(Data):
     """ A tile of data (all assets and products) """
     name = 'Modis'
-    version = '0.9.0'
+    version = '1.0.0'
     Asset = modisAsset
     _pattern = '*.tif'
     _productgroups = {
@@ -219,6 +230,10 @@ class modisData(Data):
         'quality': {
             'description': 'MCD Product Quality',
             'assets': ['MCD43A2'],
+        },
+        'landcover': {
+            'description': 'MCD Annual Land Cover',
+            'assets': ['MCD12Q1'],
         },
         # Daily
         'fsnow': {
@@ -294,6 +309,15 @@ class modisData(Data):
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
 
 
+            if val[0] == "landcover":
+                fname = '%s_%s_%s.tif' % (bname, sensor, key)
+                if os.path.lexists(fname):
+                    os.remove(fname)
+
+                os.symlink(allsds[0], fname)
+                imgout = gippy.GeoImage(fname)
+
+
             if val[0] == "quality":
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 if os.path.lexists(fname):
@@ -304,6 +328,7 @@ class modisData(Data):
 
             # LAND VEGETATION INDICES PRODUCT
             if val[0] == "indices":
+
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
                 sensor = 'MCD'
@@ -327,12 +352,12 @@ class modisData(Data):
                 mirimg[mirimg < 0.0] = 0.0
                 swrimg[swrimg < 0.0] = 0.0
 
-                redimg[redimg > 1.0] = 1.0
-                nirimg[nirimg > 1.0] = 1.0
-                bluimg[bluimg > 1.0] = 1.0
-                grnimg[grnimg > 1.0] = 1.0
-                mirimg[mirimg > 1.0] = 1.0
-                swrimg[swrimg > 1.0] = 1.0
+                redimg[(redimg != missing)&(redimg > 1.0)] = 1.0
+                nirimg[(nirimg != missing)&(nirimg > 1.0)] = 1.0
+                bluimg[(bluimg != missing)&(bluimg > 1.0)] = 1.0
+                grnimg[(grnimg != missing)&(grnimg > 1.0)] = 1.0
+                mirimg[(mirimg != missing)&(mirimg > 1.0)] = 1.0
+                swrimg[(swrimg != missing)&(swrimg > 1.0)] = 1.0
 
                 # red, nir
                 ndvi = missing + np.zeros_like(redimg)
@@ -356,15 +381,17 @@ class modisData(Data):
 
                 # red, mir, swr
                 satvi = missing + np.zeros_like(redimg)
-                # I think the following line has an error:
-                # wg = np.where((redimg != missing)&(mirimg != missing)&(swrimg != missing)&(((mirimg + redimg + 0.5)*swrimg) != 0.0))
                 wg = np.where((redimg != missing)&(mirimg != missing)&(swrimg != missing)&((mirimg + redimg + 0.5) != 0.0))
                 satvi[wg] = (((mirimg[wg] - redimg[wg])/(mirimg[wg] + redimg[wg] + 0.5))*1.5) - (swrimg[wg] / 2.0)
 
-                print "writing", fname
+                # blu, red, nir
+                evi = missing + np.zeros_like(redimg)
+                wg = np.where((bluimg != missing) & (redimg != missing) & (nirimg != missing) & (nirimg + 6.0*redimg - 7.5*bluimg + 1.0 != 0.0))
+                evi[wg] = (2.5*(nirimg[wg] - redimg[wg])) / (nirimg[wg] + 6.0*redimg[wg] - 7.5*bluimg[wg] + 1.0)
 
                 # create output gippy image
-                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 5)
+                print "writing", fname
+                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 6)
 
                 imgout.SetNoData(missing)
                 imgout.SetOffset(0.0)
@@ -381,7 +408,7 @@ class modisData(Data):
                 imgout.SetBandName('VARI', 3)
                 imgout.SetBandName('BRGT', 4)
                 imgout.SetBandName('SATVI', 5)
-
+                imgout.SetBandName('EVI', 6)
 
 
             # CLOUD MASK PRODUCT

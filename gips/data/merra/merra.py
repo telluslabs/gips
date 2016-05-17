@@ -199,7 +199,7 @@ class merraAsset(Asset):
             'url': 'http://goldsmr4.sci.gsfc.nasa.gov:80/opendap/MERRA2_MONTHLY/M2C0NXASM.5.12.4',
             'source': 'MERRA2_%s.const_2d_asm_Nx.%04d%02d%02d.nc4',
             'startdate': datetime.date(1980, 1, 1),
-            'latency': None,
+            'latency': 0,
             'bandnames': ['FRLAND']
         }
 
