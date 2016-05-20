@@ -61,7 +61,10 @@ def main():
             inv = ProjectInventory(projdir, args.products)
             for date in inv.dates:
                 VerboseOut('Masking files from %s' % date)
-                available_masks = inv[date].masks(args.pmask)
+                if args.filemask is None and args.pmask == []:
+                    available_masks = inv[date].masks()
+                else:
+                    available_masks = inv[date].masks(args.pmask)
                 for p in inv.products(date):
                     # don't mask any masks
                     if p in available_masks:
