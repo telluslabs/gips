@@ -746,7 +746,7 @@ class Data(object):
         for root, dirs, filenames in os.walk(path):
             for filename in filenames:
                 f = os.path.join(root, filename)
-                print f
+                VerboseOut(f, 2)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
                     try:
