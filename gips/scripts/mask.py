@@ -52,7 +52,7 @@ def main():
     # TODO - check that at least 1 of filemask or pmask is supplied
 
     try:
-        print title
+        VerboseOut(title)
         for projdir in args.projdir:
 
             if args.filemask is not None:
