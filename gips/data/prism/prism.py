@@ -19,6 +19,10 @@
 #
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
+#
+#   PRISM Climate data is copyrighted by the PRISM Climate Group,
+#   Oregon State University.  For information acceptable use, see
+#   http://prism.oregonstate.edu/documents/PRISM_terms_of_use.pdf.
 ################################################################################
 
 import os
@@ -125,7 +129,6 @@ class prismAsset(Asset):
                 ftp.retrbinary('RETR %s' % filename, ofile.write)
             ftp.close()
         except Exception, e:
-            VerboseOut(traceback.format_exc(), 4)
             raise Exception("Error downloading: %s" % e)
         else:
             assets = cls.archive(stagedir)
