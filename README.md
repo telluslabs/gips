@@ -1,6 +1,14 @@
 # GIPS
 
-See the [GIPS](http://gipit.github.io/gips/) for documentation.
+See http://gipit.github.io/gips/ for documentation, but know it is not
+necessarily current.
+
+## Installation
+
+After cloning this git repo & changing to its directory, run `install.sh`,
+which only supports recent versions of Ubuntu.  It will use `sudo` to install
+system packages, and may ask for authentication accordingly.  It runs apt-get,
+which may prompt you for confirmation of its actions.
 
 #### Authors and Contributors
 The following have been authors or contributers to GIPS
