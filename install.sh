@@ -15,7 +15,7 @@ echo === install system deps ===
 
 # TODO I doubt *ALL* the boost libs are needed and there are MANY of them;
 # would be great to reduce the bulk
-sudo apt-get install g++ gfortran swig \
+sudo apt-get install virtualenv python g++ gfortran swig \
                      libboost-all-dev libfreetype6-dev libgnutls-dev \
                      libatlas-base-dev libgdal-dev libgdal1-dev gdal-bin \
                      python-pip python-numpy python-scipy python-gdal 
