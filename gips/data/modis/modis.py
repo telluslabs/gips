@@ -71,13 +71,13 @@ class modisAsset(Asset):
     _assets = {
         'MCD43A4': {
             'pattern': 'MCD43A4*hdf',
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.005',
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MCD43A2': {
             'pattern': 'MCD43A2*hdf',
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.005',
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
@@ -402,7 +402,7 @@ class modisData(Data):
                 imgout[2].Write(vari)
                 imgout[3].Write(brgt)
                 imgout[4].Write(satvi)
-
+                
                 imgout.SetBandName('NDVI', 1)
                 imgout.SetBandName('LSWI', 2)
                 imgout.SetBandName('VARI', 3)
