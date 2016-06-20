@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
@@ -21,8 +21,8 @@ sudo apt-get install virtualenv python g++ gfortran swig \
                      python-pip python-numpy python-scipy python-gdal 
 
 echo === clone source repo and setup virtualenv ===
-virtualenv ve --system-site-packages
-source ve/bin/activate
+virtualenv .venv --system-site-packages
+source .venv/bin/activate
 
 echo === install a few dependencies via pip ===
 pip install -r dev_requirements.txt
