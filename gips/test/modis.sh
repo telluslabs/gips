@@ -6,8 +6,7 @@ set -e
 
 ARGS="-s $GIPSTESTPATH/NHseacoast.shp -d 2012-12-01,2012-12-10 -v 4"
 
-gips_info modis
-gips_inventory modis $ARGS --fetch
+# TODO test this cmd too:  gips_info modis
 gips_process modis $ARGS
 
 # mosaic
