@@ -229,11 +229,15 @@ class modisData(Data):
         },
         'quality': {
             'description': 'MCD Product Quality',
-            'assets': ['MCD43A2'],
+            'assets': ['MCD43A4'],
         },
         'landcover': {
             'description': 'MCD Annual Land Cover',
             'assets': ['MCD12Q1'],
+        },
+        'refl': {
+            'description': 'MCD Reflectance',
+            'assets': ['MCD43A4'],
         },
         # Daily
         'fsnow': {
@@ -313,17 +317,38 @@ class modisData(Data):
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 if os.path.lexists(fname):
                     os.remove(fname)
-
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
 
+            if val[0] == "refl":
+                fname = '%s_%s_%s.tif' % (bname, sensor, key)
+                img = gippy.GeoImage(sds[7:])
+                nodata = img[0].NoDataValue()
+                gain = img[0].Gain()
+                offset = img[0].Offset()
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
+                imgout.SetNoData(nodata)
+                imgout.SetOffset(offset)
+                imgout.SetGain(gain)
+                for i in range(6):
+                    data = img[i].Read()
+                    imgout[i].Write(data)
+
+                
             if val[0] == "quality":
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                if os.path.lexists(fname):
-                    os.remove(fname)
-                os.symlink(allsds[0], fname)
-                imgout = gippy.GeoImage(fname)
+                img = gippy.GeoImage(sds[:7])
+                nodata = img[0].NoDataValue()
+                gain = img[0].Gain()
+                offset = img[0].Offset()
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 6)
+                imgout.SetNoData(nodata)
+                imgout.SetOffset(offset)
+                imgout.SetGain(gain)
+                for i in range(6):
+                    data = img[i].Read()
+                    imgout[i].Write(data)
 
 
             # LAND VEGETATION INDICES PRODUCT
@@ -338,12 +363,12 @@ class modisData(Data):
 
                 missing = 32767
 
-                redimg = refl[0].Read()
-                nirimg = refl[1].Read()
-                bluimg = refl[2].Read()
-                grnimg = refl[3].Read()
-                mirimg = refl[5].Read()
-                swrimg = refl[6].Read() # formerly swir2
+                redimg = refl[7].Read()
+                nirimg = refl[8].Read()
+                bluimg = refl[9].Read()
+                grnimg = refl[10].Read()
+                mirimg = refl[11].Read()
+                swrimg = refl[12].Read() # formerly swir2
 
                 redimg[redimg < 0.0] = 0.0
                 nirimg[nirimg < 0.0] = 0.0
