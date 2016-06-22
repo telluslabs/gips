@@ -15,12 +15,20 @@ def pytest_addoption(parser):
     existing sources are assumed to be sufficient."""
     help_str = "Set up a test data repo."
     parser.addoption("--setup-repo", action="store_true", help=help_str)
+    help_str = ("The directory housing the data repo for testing purposes.  "
+                "MUST match GIPS' configured REPOS setting.")
+    parser.addini('data-repo', help=help_str)
 
 def pytest_configure(config):
     """If the user wishes, bring data repo into usable state for testing."""
     if config.getoption("setup_repo"):
         logger.debug("--setup-repo detected; setting up data repo")
         setup_data_repo()
+    dr = str(config.getini('data-repo'))
+    if not dr:
+        raise ValueError("No value specified for 'data-repo' in pytest.ini")
+    else:
+        logger.debug("value detected for data-repo: " + dr)
 
 def setup_data_repo():
     """Construct the data repo and populate it with test data."""

@@ -6,13 +6,13 @@ from scripttest import TestFileEnvironment
 
 logger = logging
 
-# where input and output files go; in other words everything but the data repo
-SYSTEM_TEST_WD = "/home/tolson/src/gips/test" # TODO this is unused
-DATA_REPO_ROOT = "/home/tolson/src/gips/data-root" # TODO this MUST be programmable
-# TODO don't hardcode paths ----v
-NH_SHP_PATH = '/home/tolson/src/gips/gips/test/NHseacoast.shp'
-STD_ARGS = ('modis', '-s', NH_SHP_PATH,
-            '-d', '2012-12-01,2012-12-03', '-v', '4')
+# set constants, mostly places to find various needed files
+TEST_DATA_DIR  = str(pytest.config.rootdir.join('gips/test'))
+# TODO if data-repo is wrong, silent error(!!)
+DATA_REPO_ROOT = str(pytest.config.getini('data-repo'))
+NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
+STD_ARGS       = ('modis', '-s', NH_SHP_PATH,
+                  '-d', '2012-12-01,2012-12-03', '-v', '4')
 
 @pytest.fixture
 def setup_modis_data(pytestconfig):
@@ -52,12 +52,15 @@ def test_file_environment():
     """Provide means to test files created by run & clean them up after."""
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     yield gtfe
+    # TODO when does this step get skipped?  During some errors it seems?
     gtfe.remove_created()
 
 def test_e2e_process(setup_modis_data, test_file_environment):
     """Test gips_process on modis data."""
     logger.info('starting run')
     # TODO why is expect_error there?
+    # TODO better error reporting when this process fails (break path to
+    # shapefile to reproduce problem)
     outcome = test_file_environment.run('gips_process', *STD_ARGS,
                                         expect_error=True)
     logger.info('run complete')

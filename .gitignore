@@ -10,3 +10,4 @@ epydoc
 build
 dist
 gips.egg-info
+pytest.ini
