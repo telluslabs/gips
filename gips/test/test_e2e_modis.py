@@ -1,4 +1,4 @@
-import logging
+import logging, os
 
 import pytest
 import envoy
@@ -43,7 +43,8 @@ class GipsTestFileEnv(TestFileEnvironment):
         """Remove files created by test run."""
         if self.proc_result is None:
             raise RuntimeError("No previous run to clean up from.")
-        # TODO remove created files here
+        for fname in self.proc_result.files_created.keys():
+            os.remove(os.path.join(DATA_REPO_ROOT, fname))
 
 
 @pytest.yield_fixture
