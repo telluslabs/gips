@@ -3,13 +3,16 @@ import envoy
 
 ### TODO for logging:
 # use logging properly:  logger = logging.getLogger(__name__)
-# config in cmd line (verbosity levels) 
+# config in cmd line (verbosity levels)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging
 
 # pytest_* functions are hooks automatically detected by pytest
 def pytest_addoption(parser):
-    """Add --setup-repo to py.test to optionally set up a data repo."""
+    """Add --setup-repo to py.test to optionally set up a data repo.
+
+    If this option is present, data sources will be downloaded; otherwise
+    existing sources are assumed to be sufficient."""
     help_str = "Set up a test data repo."
     parser.addoption("--setup-repo", action="store_true", help=help_str)
 

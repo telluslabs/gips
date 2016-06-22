@@ -12,7 +12,7 @@ DATA_REPO_ROOT = "/home/tolson/src/gips/data-root" # TODO this MUST be programma
 # TODO don't hardcode paths ----v
 NH_SHP_PATH = '/home/tolson/src/gips/gips/test/NHseacoast.shp'
 STD_ARGS = ('modis', '-s', NH_SHP_PATH,
-            '-d', '2012-12-01,2012-12-10', '--fetch', '-v', '4')
+            '-d', '2012-12-01,2012-12-03', '-v', '4')
 
 @pytest.fixture
 def setup_modis_data(pytestconfig):
@@ -21,22 +21,42 @@ def setup_modis_data(pytestconfig):
         logger.debug("Skipping repo setup per lack of option.")
         return
     logger.info("Downloading MODIS data . . .")
-    cmd_str = ("gips_inventory modis -s gips/test/NHseacoast.shp "
-               "-d 2012-12-01,2012-12-10 --fetch -v 4")
+    cmd_str = 'gips_inventory ' + ' '.join(STD_ARGS) + ' --fetch'
     outcome = envoy.run(cmd_str)
     logger.info("MODIS data download complete.")
     if outcome.status_code != 0:
         raise RuntimeError("MODIS data setup via `gips_inventory` failed",
                            outcome.std_out, outcome.std_err, outcome)
 
-@pytest.fixture
+
+class GipsTestFileEnv(TestFileEnvironment):
+    """As superclass but customized for GIPS use case.
+
+    Saves ProcResult objects in self.proc_result."""
+    proc_result = None
+
+    def run(self, *args, **kwargs):
+        self.proc_result = super(GipsTestFileEnv, self).run(*args, **kwargs)
+        return self.proc_result
+
+    def remove_created(self):
+        """Remove files created by test run."""
+        if self.proc_result is None:
+            raise RuntimeError("No previous run to clean up from.")
+        # TODO remove created files here
+
+
+@pytest.yield_fixture
 def test_file_environment():
-    """Use scripttest to provide a directory for testing."""
-    return TestFileEnvironment(DATA_REPO_ROOT, start_clear=False)
+    """Provide means to test files created by run & clean them up after."""
+    gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
+    yield gtfe
+    gtfe.remove_created()
 
 def test_e2e_process(setup_modis_data, test_file_environment):
     """Test gips_process on modis data."""
     logger.info('starting run')
+    # TODO why is expect_error there?
     outcome = test_file_environment.run('gips_process', *STD_ARGS,
                                         expect_error=True)
     logger.info('run complete')
