@@ -8,8 +8,7 @@ logger = logging.getLogger(__name__)
 
 # set constants, mostly places to find various needed files
 TEST_DATA_DIR  = str(pytest.config.rootdir.join('gips/test'))
-# TODO if data-repo is wrong, silent error(!!)
-DATA_REPO_ROOT = str(pytest.config.getini('data-repo'))
+DATA_REPO_ROOT = pytest.config.getini('data-repo')
 NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
 # changing this will require changes in expected_files below:
 STD_ARGS       = ('modis', '-s', NH_SHP_PATH,
@@ -53,13 +52,16 @@ def test_file_environment():
     """Provide means to test files created by run & clean them up after."""
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     yield gtfe
-    # TODO when does this step get skipped?  During some errors it seems?
+    # This step isn't effective if DATA_REPO_ROOT isn't right; in that case it
+    # ruins further test runs because files already exist when the test starts.
+    # Maybe add self-healing by having setup_modis_data run in a TFE and
+    # detecting which files are present when it starts.
     gtfe.remove_created()
 
-# TODO Are these broken or what?  Each None is a broken symlink:
 # list of recorded output file names and their checksums; each should be
 # created by the test
 expected_files = {
+    # TODO Are these broken or what?  Each None is a broken symlink:
     'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_quality.tif': None,
     'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8td.tif': None,
     'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8tn.tif': None,
@@ -102,15 +104,13 @@ expected_files = {
 def test_e2e_process(setup_modis_data, test_file_environment):
     """Test gips_process on modis data."""
     logger.info('starting run')
-    # TODO why is expect_error there?
-    # TODO better error reporting when this process fails (break path to
-    # shapefile to reproduce problem)
-    # TODO how do I make gips_process output appear on the console in real time?
-    outcome = test_file_environment.run('gips_process', *STD_ARGS,
-                                        expect_error=True)
+    outcome = test_file_environment.run('gips_process', *STD_ARGS)
     logger.info('run complete')
 
     # extract the checksum from each found file
     detected_files = {k: v.hash for k, v in outcome.files_created.items()}
     # repo should now have specific new files with the right content
-    assert (expected_files == detected_files and not outcome.files_deleted)
+    assert (outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_deleted
+            and expected_files == detected_files)
