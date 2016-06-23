@@ -4,13 +4,14 @@ import pytest
 import envoy
 from scripttest import TestFileEnvironment
 
-logger = logging
+logger = logging.getLogger(__name__)
 
 # set constants, mostly places to find various needed files
 TEST_DATA_DIR  = str(pytest.config.rootdir.join('gips/test'))
 # TODO if data-repo is wrong, silent error(!!)
 DATA_REPO_ROOT = str(pytest.config.getini('data-repo'))
 NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
+# changing this will require changes in expected_files below:
 STD_ARGS       = ('modis', '-s', NH_SHP_PATH,
                   '-d', '2012-12-01,2012-12-03', '-v', '4')
 

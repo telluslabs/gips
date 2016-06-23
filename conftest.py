@@ -1,34 +1,47 @@
 import logging
 import envoy
 
-### TODO for logging:
-# use logging properly:  logger = logging.getLogger(__name__)
-# config in cmd line (verbosity levels)
-logging.basicConfig(level=logging.DEBUG)
-logger = logging
+# configure logging (can config in command-line & config file, see below)
+log_format = '%(levelname)-8s %(filename)s:%(lineno)d: %(message)s'
+root_logger = logging.getLogger()
+root_streamer = logging.StreamHandler()
+root_streamer.setFormatter(logging.Formatter(log_format))
+root_logger.addHandler(root_streamer)
+
+logger = logging.getLogger(__name__)
 
 # pytest_* functions are hooks automatically detected by pytest
 def pytest_addoption(parser):
-    """Add --setup-repo to py.test to optionally set up a data repo.
+    """Add custom options & settings to py.test.
 
-    If this option is present, data sources will be downloaded; otherwise
-    existing sources are assumed to be sufficient."""
-    help_str = "Set up a test data repo."
+    These set up the data repo & configure log level."""
+    help_str = ("Set log level to one of:  'debug', 'info', 'warning', "
+                "'error', or 'critical'.  Default is 'warning'.")
+    parser.addoption("--log-level", action="store",
+                     default="warning", help=help_str)
+
+    help_str = "Set up a test data repo & download data for test purposes."
     parser.addoption("--setup-repo", action="store_true", help=help_str)
+
     help_str = ("The directory housing the data repo for testing purposes.  "
                 "MUST match GIPS' configured REPOS setting.")
     parser.addini('data-repo', help=help_str)
 
+
 def pytest_configure(config):
-    """If the user wishes, bring data repo into usable state for testing."""
+    """Process user config & command-line options."""
+    root_logger.setLevel(config.getoption("log_level").upper())
+
     if config.getoption("setup_repo"):
         logger.debug("--setup-repo detected; setting up data repo")
         setup_data_repo()
+
     dr = str(config.getini('data-repo'))
     if not dr:
         raise ValueError("No value specified for 'data-repo' in pytest.ini")
     else:
         logger.debug("value detected for data-repo: " + dr)
+
 
 def setup_data_repo():
     """Construct the data repo and populate it with test data."""
