@@ -44,7 +44,7 @@ def pytest_configure(config):
 
 
 def setup_data_repo():
-    """Construct the data repo and populate it with test data."""
+    """Construct the data repo if it is absent."""
     # confirm the user's done basic config
     gcp = envoy.run("gips_config print")
     if gcp.status_code != 0:
