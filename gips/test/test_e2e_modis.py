@@ -1,4 +1,5 @@
 import logging, os
+from pprint import pformat
 
 import pytest
 import envoy
@@ -35,9 +36,27 @@ class GipsTestFileEnv(TestFileEnvironment):
     Saves ProcResult objects in self.proc_result."""
     proc_result = None
 
+    @staticmethod
+    def log_findings(description, files):
+        """If user asks for debug output, log post-run file findings.
+
+        Logs in a format suitable for updating known good values when tests
+        need to be updated to match code changes."""
+        files_and_hashes = {k: getattr(v, 'hash', None)
+                            for k, v in files.items()}
+        logger.debug("{}: {}".format(description, pformat(files_and_hashes)))
+
     def run(self, *args, **kwargs):
-        self.proc_result = super(GipsTestFileEnv, self).run(*args, **kwargs)
-        return self.proc_result
+        """As super().run but store result & prevent premature exits."""
+        pr = super(GipsTestFileEnv, self).run(
+                *args, expect_error=True, expect_stderr=True, **kwargs)
+        self.proc_result = pr
+        logging.debug("standard output: {}".format(pr.stdout))
+        logging.debug("standard error: {}".format(pr.stderr))
+        self.log_findings("Created files", pr.files_created)
+        self.log_findings("Updated files", pr.files_updated)
+        self.log_findings("Deleted files", pr.files_deleted)
+        return pr
 
     def remove_created(self):
         """Remove files created by test run."""
@@ -110,6 +129,9 @@ def test_e2e_process(setup_modis_data, test_file_environment):
     # extract the checksum from each found file
     detected_files = {k: v.hash for k, v in outcome.files_created.items()}
     # repo should now have specific new files with the right content
+    # TODO refactor this into four separate tests that DO NOT repeat the
+    # gips_process command; need this because 'and' is lazy so not all branches
+    # are being evaluated (and thus reported-on).
     assert (outcome.returncode == 0
             and not outcome.stderr
             and not outcome.files_deleted
