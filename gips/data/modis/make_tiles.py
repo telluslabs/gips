@@ -12,7 +12,8 @@ from shapely.geometry import mapping, Polygon
 
 from pdb import set_trace
 
-STARTDIR = "/data2/modis/tiles"
+
+STARTDIR = "/titan/data/modis/tiles"
 DATE = '2004001'
 WIDTH = 2400
 OUTPATH = "new/tiles.shp"
@@ -22,7 +23,7 @@ PROJ = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m
 def write_shapefile(data, proj):
     schema = {
         'geometry': 'Polygon',
-        'properties': {'h': 'int', 'v': 'int', 'tileid': 'str', 'bounds': 'str'},
+        'properties': {'tileid': 'str', 'bounds': 'str'},
     }
     crs = from_string(proj)
     with fiona.open(OUTPATH, 'w', 'ESRI Shapefile', schema, crs=crs) as shp:
@@ -32,12 +33,11 @@ def write_shapefile(data, proj):
             xmin, ymin = tuple(arr.min(axis=0))
             xmax, ymax = tuple(arr.max(axis=0))
             bounds = str((xmin, ymin, xmax, ymax))
-            h = int(tileid[1:3])
-            v = int(tileid[4:6])
+
             poly = Polygon(coords)
             shp.write({
                 'geometry': mapping(poly),
-                'properties': {'h': h, 'v': v, 'tileid': tileid, 'bounds': bounds},
+                'properties': {'tileid': tileid, 'bounds': bounds},
             })
 
 

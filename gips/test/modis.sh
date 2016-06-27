@@ -16,10 +16,6 @@ gips_process modis $ARGS
 gips_project modis $ARGS --res 100 100 --outdir modis_project --notld
 gips_stats modis_project/*
 
-# mosaic selected location
-gips_project modis $ARGS --res 1000 1000 --outdir modis_project_loc --notld
-gips_stats modis_project_loc/*
-
 # mosaic without warping
 gips_project modis $ARGS --outdir modis_project_nowarp --notld
 gips_stats modis_project_nowarp

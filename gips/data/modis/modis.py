@@ -71,13 +71,13 @@ class modisAsset(Asset):
     _assets = {
         'MCD43A4': {
             'pattern': 'MCD43A4*hdf',
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.005',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MCD43A2': {
             'pattern': 'MCD43A2*hdf',
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.005',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
@@ -229,15 +229,11 @@ class modisData(Data):
         },
         'quality': {
             'description': 'MCD Product Quality',
-            'assets': ['MCD43A4'],
+            'assets': ['MCD43A2'],
         },
         'landcover': {
             'description': 'MCD Annual Land Cover',
             'assets': ['MCD12Q1'],
-        },
-        'refl': {
-            'description': 'MCD Reflectance',
-            'assets': ['MCD43A4'],
         },
         # Daily
         'fsnow': {
@@ -317,38 +313,17 @@ class modisData(Data):
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 if os.path.lexists(fname):
                     os.remove(fname)
+
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
 
-            if val[0] == "refl":
-                fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                img = gippy.GeoImage(sds[7:])
-                nodata = img[0].NoDataValue()
-                gain = img[0].Gain()
-                offset = img[0].Offset()
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
-                imgout.SetNoData(nodata)
-                imgout.SetOffset(offset)
-                imgout.SetGain(gain)
-                for i in range(6):
-                    data = img[i].Read()
-                    imgout[i].Write(data)
-
-                
             if val[0] == "quality":
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                img = gippy.GeoImage(sds[:7])
-                nodata = img[0].NoDataValue()
-                gain = img[0].Gain()
-                offset = img[0].Offset()
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 6)
-                imgout.SetNoData(nodata)
-                imgout.SetOffset(offset)
-                imgout.SetGain(gain)
-                for i in range(6):
-                    data = img[i].Read()
-                    imgout[i].Write(data)
+                if os.path.lexists(fname):
+                    os.remove(fname)
+                os.symlink(allsds[0], fname)
+                imgout = gippy.GeoImage(fname)
 
 
             # LAND VEGETATION INDICES PRODUCT
@@ -363,12 +338,12 @@ class modisData(Data):
 
                 missing = 32767
 
-                redimg = refl[7].Read()
-                nirimg = refl[8].Read()
-                bluimg = refl[9].Read()
-                grnimg = refl[10].Read()
-                mirimg = refl[11].Read()
-                swrimg = refl[12].Read() # formerly swir2
+                redimg = refl[0].Read()
+                nirimg = refl[1].Read()
+                bluimg = refl[2].Read()
+                grnimg = refl[3].Read()
+                mirimg = refl[5].Read()
+                swrimg = refl[6].Read() # formerly swir2
 
                 redimg[redimg < 0.0] = 0.0
                 nirimg[nirimg < 0.0] = 0.0
@@ -427,7 +402,7 @@ class modisData(Data):
                 imgout[2].Write(vari)
                 imgout[3].Write(brgt)
                 imgout[4].Write(satvi)
-                
+
                 imgout.SetBandName('NDVI', 1)
                 imgout.SetBandName('LSWI', 2)
                 imgout.SetBandName('VARI', 3)
