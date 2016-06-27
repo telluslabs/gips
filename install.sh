@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -e
 
@@ -21,11 +21,11 @@ sudo apt-get install virtualenv python g++ gfortran swig \
                      python-pip python-numpy python-scipy python-gdal 
 
 echo === clone source repo and setup virtualenv ===
-virtualenv ve --system-site-packages
-. ve/bin/activate
+virtualenv .venv --system-site-packages
+source .venv/bin/activate
 
-echo === install untracked dependencies ===
-pip install six==1.9.0
+echo === install a few dependencies via pip ===
+pip install -r dev_requirements.txt
 # gippy has to be done this way because gippy stopped being tracked in pypi
 pip install 'https://github.com/Applied-GeoSolutions/gippy/tarball/v0.3.x#egg=gippy-0.3.8-'`date +%Y%m%d`
 

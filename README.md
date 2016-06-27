@@ -6,11 +6,41 @@ necessarily current.
 ## Installation
 
 After cloning this git repo & changing to its directory, run `install.sh`,
-which only supports recent versions of Ubuntu.  It will use `sudo` to install
-system packages, and may ask for authentication accordingly.  It runs apt-get,
-which may prompt you for confirmation of its actions.
+which only officially supports recent versions of Ubuntu.  It will use `sudo`
+to install system packages, and may ask for authentication accordingly.  It
+runs apt-get, which may prompt you for confirmation of its actions.
 
-#### Authors and Contributors
+To permit automated testing, create a file named `pytest.ini` in the project
+directory, and use it to set the `data-repo` setting to any full path to a
+directory.  It will be created if it doesn't exist when the tests run:
+
+```
+[pytest]
+data-repo = /home/your-user-name-here/src/gips/data-repo
+```
+
+## Running Automated tests
+
+The test suite is based on pytest:  https://pytest.org/latest/contents.html
+
+```
+#!bash
+
+# to run all tests (after activating your virtualenv):
+py.test --setup-repo # only needed for the first run
+py.test              # save significant time without --setup-repo
+py.test -s           # echo stdout & stderr to console (captured by default)
+```
+
+Select specific tests per usual for pytest:
+
+https://pytest.org/latest/usage.html#specifying-tests-selecting-tests
+
+You can also select tests based on mark (marks are tags for tests):
+
+https://pytest.org/latest/example/markers.html
+
+## Authors and Contributors
 The following have been authors or contributers to GIPS
 
     Matthew Hanson, matt.a.hanson@gmail.com
@@ -18,7 +48,7 @@ The following have been authors or contributers to GIPS
     Ian Cooke, icooke@appliedgeosolutions.com
     Pavel Dorovskoy, pavel@appliedgeosolutions.com
 
-#### License (GPL v2)
+## License (GPL v2)
 
     Copyright (C) 2014 Applied Geosolutions, oss@appliedgeosolutions.com
 
