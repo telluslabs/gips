@@ -119,6 +119,36 @@ expected_files = {
     'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275
 }
 
+# these are possibly the correct values for modis collection 6
+#expected_files = {
+#    'modis/tiles/h12v04/2012336/MCD43A4.A2012336.h12v04.006.2016112010833.hdf.index': 502383905,
+#    'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf.index': -1075525670,
+#    'modis/tiles/h12v04/2012336/MOD11A1.A2012336.h12v04.005.2012339180517.hdf.index': -1602319177,
+#    'modis/tiles/h12v04/2012336/MYD10A1.A2012336.h12v04.005.2012340031954.hdf.index': 1623945316,
+#    'modis/tiles/h12v04/2012336/MYD11A1.A2012336.h12v04.005.2012341040543.hdf.index': -1720582124,
+#    'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_fsnow.tif': -843500181,
+#    'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_refl.tif': -312269530,
+#    'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_snow.tif': 388495321,
+#    'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_obstime.tif': 1994827924,
+#    'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_temp.tif': 2094570047,
+#    'modis/tiles/h12v04/2012336/h12v04_2012336_MOD_clouds.tif': 161070470,
+#    'modis/tiles/h12v04/2012337/MOD10A1.A2012337.h12v04.005.2012340033542.hdf.index': 1739917027,
+#    'modis/tiles/h12v04/2012337/MOD11A1.A2012337.h12v04.005.2012339204007.hdf.index': 640817914,
+#    'modis/tiles/h12v04/2012337/MOD11A2.A2012337.h12v04.005.2012346152330.hdf.index': 53371709,
+#    'modis/tiles/h12v04/2012337/MYD11A1.A2012337.h12v04.005.2012341072847.hdf.index': 1676310978,
+#    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_clouds.tif': -832284681,
+#    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8tn.tif': None,
+#    'modis/tiles/h12v04/2012338/MCD43A4.A2012338.h12v04.006.2016112020013.hdf.index': 1671208837,
+#    'modis/tiles/h12v04/2012338/MOD10A1.A2012338.h12v04.005.2012341091201.hdf.index': 1725484908,
+#    'modis/tiles/h12v04/2012338/MOD11A1.A2012338.h12v04.005.2012341041222.hdf.index': 838676814,
+#    'modis/tiles/h12v04/2012338/MYD10A1.A2012338.h12v04.005.2012340142152.hdf.index': -130649785,
+#    'modis/tiles/h12v04/2012338/MYD11A1.A2012338.h12v04.005.2012341075802.hdf.index': -642783734,
+#    'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_fsnow.tif': -1930181337,
+#    'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_snow.tif': 387672365,
+#    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_obstime.tif': -1693632983,
+#    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_temp.tif': 1712906003,
+#    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275
+#}
 
 def test_e2e_process(setup_modis_data, test_file_environment):
     """Test gips_process on modis data."""
