@@ -240,10 +240,43 @@ def test_e2e_project(setup_modis_data, keep_data_repo_clean, output_tfe):
     outcome = output_tfe.run('gips_project', *args)
     logger.info('run complete')
 
-    # extract the checksum from each found file
+    # confirm generated files match expected fingerprints
     detected_files = extract_hashes(outcome.files_created)
-    # repo should now have specific new files with the right content
     assert (outcome.returncode == 0
             and not outcome.stderr
             and not outcome.files_deleted
             and expected_project_created_files == detected_files)
+
+
+expected_stats_created_files = {
+    'clouds_stats.txt': -142855826,
+    'fsnow_stats.txt': 1649245444,
+    'indices_stats.txt': 551916811,
+    'ndvi8_stats.txt': -1389553863,
+    'obstime_stats.txt': -1289336000,
+    'quality_stats.txt': 41881649,
+    'snow_stats.txt': 239300424,
+    'temp8td_stats.txt': 2023193464,
+    'temp8tn_stats.txt': -1364990917,
+    'temp_stats.txt': -1532103523
+}
+
+
+def test_e2e_stats(setup_modis_data, keep_data_repo_clean, output_tfe):
+    """Test gips_stats on projected files."""
+    # generate data needed for stats computation
+    args = STD_ARGS + ('--res', '100', '100',
+                       '--outdir', OUTPUT_DIR, '--notld')
+    outcome = output_tfe.run('gips_project', *args)
+    assert outcome.returncode == 0 # confirm it worked; not really in the test
+
+    # compute stats
+    gtfe = GipsTestFileEnv(OUTPUT_DIR, start_clear=False)
+    outcome = gtfe.run('gips_stats', OUTPUT_DIR)
+
+    # check for correct stats content
+    detected_files = extract_hashes(outcome.files_created)
+    assert (outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_deleted
+            and expected_stats_created_files == detected_files)
