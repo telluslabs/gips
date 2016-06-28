@@ -3,7 +3,7 @@ from pprint import pformat
 
 import pytest
 import envoy
-from scripttest import TestFileEnvironment
+from scripttest import TestFileEnvironment, ProcResult
 
 logger = logging.getLogger(__name__)
 
@@ -65,12 +65,14 @@ class GipsTestFileEnv(TestFileEnvironment):
         for fname in self.proc_result.files_created.keys():
             os.remove(os.path.join(DATA_REPO_ROOT, fname))
 
+
 def extract_hashes(files):
     """Return a dict of file names and unique hashes of their content.
 
     `files` should be a dict in a result object from TestFileEnvironment.run().
     Directories' don't have hashes so use None instead."""
     return {k: getattr(v, 'hash', None) for k, v in files.items()}
+
 
 @pytest.yield_fixture
 def test_file_environment():
@@ -85,12 +87,24 @@ def test_file_environment():
 
 
 @pytest.yield_fixture
+def keep_data_repo_clean(test_file_environment):
+    """Keep data repo clean without having to run anything in it.
+
+    This emulates tfe.run()'s checking the directory before and after a run,
+    then working out how the directory has changed.  Unfortunately half the
+    work is done in tfe, the other half in ProcResult."""
+    tfe = test_file_environment
+    before = tfe._find_files()
+    yield # directory mutation happens here
+    after = tfe._find_files()
+    tfe.proc_result = ProcResult(tfe, ['N/A'], '', '', '', 0, before, after)
+
+
+@pytest.fixture
 def output_tfe():
     """Provide means to test files created by run & clean them up after."""
     gtfe = GipsTestFileEnv(OUTPUT_DIR)
-    yield gtfe
-    #gtfe.remove_created()
-    pass
+    return gtfe
 
 
 # list of recorded output file names and their checksums; each should be
@@ -191,6 +205,7 @@ def test_e2e_info(test_file_environment):
             and not outcome.files_deleted
             and outcome.stdout == expected_info_stdout)
 
+
 expected_project_created_files = {
     '0': None, # directory
     '0/2012336_MCD_fsnow.tif': -1883071404,
@@ -215,7 +230,8 @@ expected_project_created_files = {
     '0/2012338_MOD_clouds.tif': 1789735888
 }
 
-def test_e2e_project(setup_modis_data, output_tfe):
+
+def test_e2e_project(setup_modis_data, keep_data_repo_clean, output_tfe):
     """Test gips_project modis with warped tiles."""
     # gips_project modis $ARGS --res 100 100 --outdir modis_project --notld
     args = STD_ARGS + ('--res', '100', '100',
