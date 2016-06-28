@@ -17,6 +17,7 @@ def pytest_addoption(parser):
     These set up the data repo & configure log level."""
     help_str = ("Set log level to one of:  'debug', 'info', 'warning', "
                 "'error', or 'critical'.  Default is 'warning'.")
+    # TODO also support --ll <level>
     parser.addoption("--log-level", action="store",
                      default="warning", help=help_str)
 
@@ -26,6 +27,9 @@ def pytest_addoption(parser):
     help_str = ("The directory housing the data repo for testing purposes.  "
                 "MUST match GIPS' configured REPOS setting.")
     parser.addini('data-repo', help=help_str)
+
+    parser.addini('output-dir',
+                  help="The directory housing output files from test runs.")
 
 
 def pytest_configure(config):

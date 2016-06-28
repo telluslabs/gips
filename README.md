@@ -11,12 +11,14 @@ to install system packages, and may ask for authentication accordingly.  It
 runs apt-get, which may prompt you for confirmation of its actions.
 
 To permit automated testing, create a file named `pytest.ini` in the project
-directory, and use it to set the `data-repo` setting to any full path to a
-directory.  It will be created if it doesn't exist when the tests run:
+directory, and use it to set the `data-repo` and `output-dir` settings to any
+full paths to any directories.  These directories will be created if they don't
+exist when the tests run:
 
 ```
 [pytest]
 data-repo = /home/your-user-name-here/src/gips/data-repo
+output-dir = /home/your-user-name-here/src/gips/testout
 ```
 
 ## Running Automated tests

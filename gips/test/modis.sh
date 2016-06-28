@@ -11,11 +11,8 @@ ARGS2="-s /etc/gips/test/nsamerica.shp --where "CNTRY_NAME='Guyana'" -d 2012-12-
 
 echo ARGS="$ARGS"
 
-# TODO test this cmd too:  gips_info modis
-gips_process modis $ARGS
-
 # mosaic
-gips_project modis $ARGS --res 100 100 --outdir modis_project --notld
+# in progress:  gips_project modis $ARGS --res 100 100 --outdir modis_project --notld
 gips_stats modis_project/*
 
 # mosaic without warping

@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 # set constants, mostly places to find various needed files
 TEST_DATA_DIR  = str(pytest.config.rootdir.join('gips/test'))
 DATA_REPO_ROOT = pytest.config.getini('data-repo')
+OUTPUT_DIR     = pytest.config.getini('output-dir')
 NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
 # changing this will require changes in expected_files below:
 STD_ARGS       = ('modis', '-s', NH_SHP_PATH,
@@ -42,8 +43,7 @@ class GipsTestFileEnv(TestFileEnvironment):
 
         Logs in a format suitable for updating known good values when tests
         need to be updated to match code changes."""
-        files_and_hashes = {k: getattr(v, 'hash', None)
-                            for k, v in files.items()}
+        files_and_hashes = extract_hashes(files)
         logger.debug("{}: {}".format(description, pformat(files_and_hashes)))
 
     def run(self, *args, **kwargs):
@@ -65,6 +65,12 @@ class GipsTestFileEnv(TestFileEnvironment):
         for fname in self.proc_result.files_created.keys():
             os.remove(os.path.join(DATA_REPO_ROOT, fname))
 
+def extract_hashes(files):
+    """Return a dict of file names and unique hashes of their content.
+
+    `files` should be a dict in a result object from TestFileEnvironment.run().
+    Directories' don't have hashes so use None instead."""
+    return {k: getattr(v, 'hash', None) for k, v in files.items()}
 
 @pytest.yield_fixture
 def test_file_environment():
@@ -76,6 +82,15 @@ def test_file_environment():
     # Maybe add self-healing by having setup_modis_data run in a TFE and
     # detecting which files are present when it starts.
     gtfe.remove_created()
+
+
+@pytest.yield_fixture
+def output_tfe():
+    """Provide means to test files created by run & clean them up after."""
+    gtfe = GipsTestFileEnv(OUTPUT_DIR)
+    yield gtfe
+    #gtfe.remove_created()
+    pass
 
 
 # list of recorded output file names and their checksums; each should be
@@ -120,6 +135,8 @@ expected_process_created_files = {
     'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275
 }
 
+# TODO test_e2e_inventory_fetch # label so it's usually skipped
+# TODO test_e2e_inventory # copy pattern in e2e_info
 
 def test_e2e_process(setup_modis_data, test_file_environment):
     """Test gips_process on modis data."""
@@ -128,7 +145,7 @@ def test_e2e_process(setup_modis_data, test_file_environment):
     logger.info('run complete')
 
     # extract the checksum from each found file
-    detected_files = {k: v.hash for k, v in outcome.files_created.items()}
+    detected_files = extract_hashes(outcome.files_created)
     # repo should now have specific new files with the right content
     # TODO refactor this into four separate tests that DO NOT repeat the
     # gips_process command; need this because 'and' is lazy so not all branches
@@ -173,3 +190,44 @@ def test_e2e_info(test_file_environment):
             and not outcome.files_updated
             and not outcome.files_deleted
             and outcome.stdout == expected_info_stdout)
+
+expected_project_created_files = {
+    '0': None, # directory
+    '0/2012336_MCD_fsnow.tif': -1883071404,
+    '0/2012336_MCD_obstime.tif': 1180170371,
+    '0/2012336_MCD_snow.tif': -1824464052,
+    '0/2012336_MOD-MYD_temp.tif': 2024858861,
+    '0/2012336_MOD_clouds.tif': -1957614367,
+    '0/2012337_MCD_fsnow.tif': -856980949,
+    '0/2012337_MCD_indices.tif': -2065700846,
+    '0/2012337_MCD_obstime.tif': 1283853420,
+    '0/2012337_MCD_quality.tif': 1722910771,
+    '0/2012337_MCD_snow.tif': -1690607189,
+    '0/2012337_MOD-MYD_temp.tif': 407802214,
+    '0/2012337_MOD_clouds.tif': -415873821,
+    '0/2012337_MOD_ndvi8.tif': -1739368216,
+    '0/2012337_MOD_temp8td.tif': 900823219,
+    '0/2012337_MOD_temp8tn.tif': -727707878,
+    '0/2012338_MCD_fsnow.tif': -1017381876,
+    '0/2012338_MCD_obstime.tif': -922366135,
+    '0/2012338_MCD_snow.tif': -319441628,
+    '0/2012338_MOD-MYD_temp.tif': -869467051,
+    '0/2012338_MOD_clouds.tif': 1789735888
+}
+
+def test_e2e_project(setup_modis_data, output_tfe):
+    """Test gips_project modis with warped tiles."""
+    # gips_project modis $ARGS --res 100 100 --outdir modis_project --notld
+    args = STD_ARGS + ('--res', '100', '100',
+                       '--outdir', OUTPUT_DIR, '--notld')
+    logger.info('starting run')
+    outcome = output_tfe.run('gips_project', *args)
+    logger.info('run complete')
+
+    # extract the checksum from each found file
+    detected_files = extract_hashes(outcome.files_created)
+    # repo should now have specific new files with the right content
+    assert (outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_deleted
+            and expected_project_created_files == detected_files)
