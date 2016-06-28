@@ -77,9 +77,10 @@ def test_file_environment():
     # detecting which files are present when it starts.
     gtfe.remove_created()
 
+
 # list of recorded output file names and their checksums; each should be
 # created by the test
-expected_files = {
+expected_process_created_files = {
     # TODO Are these broken or what?  Each None is a broken symlink:
     'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_quality.tif': None,
     'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8td.tif': None,
@@ -119,36 +120,6 @@ expected_files = {
     'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275
 }
 
-# these are possibly the correct values for modis collection 6
-#expected_files = {
-#    'modis/tiles/h12v04/2012336/MCD43A4.A2012336.h12v04.006.2016112010833.hdf.index': 502383905,
-#    'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf.index': -1075525670,
-#    'modis/tiles/h12v04/2012336/MOD11A1.A2012336.h12v04.005.2012339180517.hdf.index': -1602319177,
-#    'modis/tiles/h12v04/2012336/MYD10A1.A2012336.h12v04.005.2012340031954.hdf.index': 1623945316,
-#    'modis/tiles/h12v04/2012336/MYD11A1.A2012336.h12v04.005.2012341040543.hdf.index': -1720582124,
-#    'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_fsnow.tif': -843500181,
-#    'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_refl.tif': -312269530,
-#    'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_snow.tif': 388495321,
-#    'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_obstime.tif': 1994827924,
-#    'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_temp.tif': 2094570047,
-#    'modis/tiles/h12v04/2012336/h12v04_2012336_MOD_clouds.tif': 161070470,
-#    'modis/tiles/h12v04/2012337/MOD10A1.A2012337.h12v04.005.2012340033542.hdf.index': 1739917027,
-#    'modis/tiles/h12v04/2012337/MOD11A1.A2012337.h12v04.005.2012339204007.hdf.index': 640817914,
-#    'modis/tiles/h12v04/2012337/MOD11A2.A2012337.h12v04.005.2012346152330.hdf.index': 53371709,
-#    'modis/tiles/h12v04/2012337/MYD11A1.A2012337.h12v04.005.2012341072847.hdf.index': 1676310978,
-#    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_clouds.tif': -832284681,
-#    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8tn.tif': None,
-#    'modis/tiles/h12v04/2012338/MCD43A4.A2012338.h12v04.006.2016112020013.hdf.index': 1671208837,
-#    'modis/tiles/h12v04/2012338/MOD10A1.A2012338.h12v04.005.2012341091201.hdf.index': 1725484908,
-#    'modis/tiles/h12v04/2012338/MOD11A1.A2012338.h12v04.005.2012341041222.hdf.index': 838676814,
-#    'modis/tiles/h12v04/2012338/MYD10A1.A2012338.h12v04.005.2012340142152.hdf.index': -130649785,
-#    'modis/tiles/h12v04/2012338/MYD11A1.A2012338.h12v04.005.2012341075802.hdf.index': -642783734,
-#    'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_fsnow.tif': -1930181337,
-#    'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_snow.tif': 387672365,
-#    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_obstime.tif': -1693632983,
-#    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_temp.tif': 1712906003,
-#    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275
-#}
 
 def test_e2e_process(setup_modis_data, test_file_environment):
     """Test gips_process on modis data."""
@@ -165,4 +136,40 @@ def test_e2e_process(setup_modis_data, test_file_environment):
     assert (outcome.returncode == 0
             and not outcome.stderr
             and not outcome.files_deleted
-            and expected_files == detected_files)
+            and expected_process_created_files == detected_files)
+
+
+# trailing whitespace and other junk characters are in current output
+expected_info_stdout = """\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
+\x1b[1m
+Modis Products v1.0.0\x1b[0m
+\x1b[1m
+Terra 8-day Products
+\x1b[0m   ndvi8       Normalized Difference Vegetation Index: 250m
+   temp8td     Surface temperature: 1km                
+   temp8tn     Surface temperature: 1km                
+\x1b[1m
+Nadir BRDF-Adjusted 16-day Products
+\x1b[0m   indices     Land indices                            
+   quality     MCD Product Quality                     
+\x1b[1m
+Terra/Aqua Daily Products
+\x1b[0m   fsnow       Fractional snow cover data              
+   obstime     MODIS Terra/Aqua overpass time          
+   snow        Snow and ice cover data                 
+   temp        Surface temperature data                
+\x1b[1m
+Standard Products
+\x1b[0m   clouds      Cloud Mask                              
+   landcover   MCD Annual Land Cover                   
+"""
+
+def test_e2e_info(test_file_environment):
+    """Test `gips_info modis` and confirm recorded output is given."""
+    outcome = test_file_environment.run('gips_info', 'modis')
+    assert (outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_created
+            and not outcome.files_updated
+            and not outcome.files_deleted
+            and outcome.stdout == expected_info_stdout)

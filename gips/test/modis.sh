@@ -9,6 +9,8 @@ ARGS="-s $GIPSTESTPATH/NHseacoast.shp -d 2012-12-01,2012-12-10 -v 4"
 # TODO why is this here but unused?
 ARGS2="-s /etc/gips/test/nsamerica.shp --where "CNTRY_NAME='Guyana'" -d 2012-12-01 -v 4"
 
+echo ARGS="$ARGS"
+
 # TODO test this cmd too:  gips_info modis
 gips_process modis $ARGS
 
