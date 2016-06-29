@@ -146,7 +146,7 @@ expected_process_created_files = {
     'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_snow.tif': 387672365,
     'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_obstime.tif': -1693632983,
     'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_temp.tif': 1712906003,
-    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275
+    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275,
 }
 
 # TODO test_e2e_inventory_fetch # label so it's usually skipped
@@ -227,7 +227,7 @@ expected_project_created_files = {
     '0/2012338_MCD_obstime.tif': -922366135,
     '0/2012338_MCD_snow.tif': -319441628,
     '0/2012338_MOD-MYD_temp.tif': -869467051,
-    '0/2012338_MOD_clouds.tif': 1789735888
+    '0/2012338_MOD_clouds.tif': 1789735888,
 }
 
 
@@ -268,7 +268,7 @@ expected_project_no_warp_created_files = {
     '0/2012338_MCD_obstime.tif': -1256437319,
     '0/2012338_MCD_snow.tif': 415741551,
     '0/2012338_MOD-MYD_temp.tif': -566077737,
-    '0/2012338_MOD_clouds.tif': -1110899594
+    '0/2012338_MOD_clouds.tif': -1110899594,
 }
 
 
@@ -308,6 +308,49 @@ def test_e2e_tiles(setup_modis_data, keep_data_repo_clean, output_tfe):
             and not outcome.stderr
             and not outcome.files_deleted
             and expected_tiles_created_files == detected_files)
+
+
+expected_tiles_copy_created_files = {
+    'h12v04': None, # directory
+    'h12v04/h12v04_2012336_MCD_fsnow.tif': 1284302156,
+    'h12v04/h12v04_2012336_MCD_obstime.tif': -1094139895,
+    'h12v04/h12v04_2012336_MCD_snow.tif': -2069225181,
+    'h12v04/h12v04_2012336_MOD-MYD_temp.tif': -1168080196,
+    'h12v04/h12v04_2012336_MOD_clouds.tif': -221229092,
+    'h12v04/h12v04_2012337_MCD_fsnow.tif': 1361214837,
+    'h12v04/h12v04_2012337_MCD_indices.tif': 1837681424,
+    'h12v04/h12v04_2012337_MCD_obstime.tif': -1655167224,
+    'h12v04/h12v04_2012337_MCD_quality.tif': 1493878267,
+    'h12v04/h12v04_2012337_MCD_snow.tif': 1201721272,
+    'h12v04/h12v04_2012337_MOD-MYD_temp.tif': -746264257,
+    'h12v04/h12v04_2012337_MOD_clouds.tif': 1101505794,
+    'h12v04/h12v04_2012337_MOD_ndvi8.tif': 99716648,
+    'h12v04/h12v04_2012337_MOD_temp8td.tif': -508252777,
+    'h12v04/h12v04_2012337_MOD_temp8tn.tif': 866606587,
+    'h12v04/h12v04_2012338_MCD_fsnow.tif': -647359984,
+    'h12v04/h12v04_2012338_MCD_obstime.tif': -1721291893,
+    'h12v04/h12v04_2012338_MCD_snow.tif': -1222056036,
+    'h12v04/h12v04_2012338_MOD-MYD_temp.tif': 1547257469,
+    'h12v04/h12v04_2012338_MOD_clouds.tif': -2052728372,
+}
+
+
+def test_e2e_tiles_copy(setup_modis_data, keep_data_repo_clean, output_tfe):
+    """Test gips_tiles modis with copying."""
+    # doesn't quite use STD_ARGS this time
+    COPY_STD_ARGS = ('modis', '-t', 'h12v04',
+                     '-d', '2012-12-01,2012-12-03', '-v', '4')
+    args = COPY_STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
+    logger.info('starting run')
+    outcome = output_tfe.run('gips_tiles', *args)
+    logger.info('run complete')
+
+    # confirm generated files match expected fingerprints
+    detected_files = extract_hashes(outcome.files_created)
+    assert (outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_deleted
+            and expected_tiles_copy_created_files == detected_files)
 
 
 expected_stats_created_files = {
