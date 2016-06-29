@@ -220,7 +220,7 @@ expected_process_created_files = {
     'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275,
 }
 
-def test_e2e_process(setup_modis_data, test_file_environment):
+def test_process(setup_modis_data, test_file_environment):
     """Test gips_process on modis data."""
     logger.info('starting run')
     outcome = test_file_environment.run('gips_process', *STD_ARGS)
@@ -263,7 +263,7 @@ Standard Products
    landcover   MCD Annual Land Cover                   
 """
 
-def test_e2e_info(test_file_environment):
+def test_info(test_file_environment):
     """Test `gips_info modis` and confirm recorded output is given."""
     outcome = test_file_environment.run('gips_info', 'modis')
     assert (outcome.returncode == 0
@@ -299,7 +299,7 @@ expected_project_created_files = {
 }
 
 
-def test_e2e_project(setup_modis_data, keep_data_repo_clean, output_tfe):
+def test_project(setup_modis_data, keep_data_repo_clean, output_tfe):
     """Test gips_project modis with warping."""
     args = STD_ARGS + ('--res', '100', '100',
                        '--outdir', OUTPUT_DIR, '--notld')
@@ -340,7 +340,7 @@ expected_project_no_warp_created_files = {
 }
 
 
-def test_e2e_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe):
+def test_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe):
     """Test gips_project modis without warping."""
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     logger.info('starting run')
@@ -362,7 +362,7 @@ expected_tiles_created_files = {
 }
 
 
-def test_e2e_tiles(setup_modis_data, keep_data_repo_clean, output_tfe):
+def test_tiles(setup_modis_data, keep_data_repo_clean, output_tfe):
     """Test gips_tiles modis with warping."""
     # gips_tiles modis $ARGS --outdir modis_warped_tiles --notld
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
@@ -403,7 +403,7 @@ expected_tiles_copy_created_files = {
 }
 
 
-def test_e2e_tiles_copy(setup_modis_data, keep_data_repo_clean, output_tfe):
+def test_tiles_copy(setup_modis_data, keep_data_repo_clean, output_tfe):
     """Test gips_tiles modis with copying."""
     # doesn't quite use STD_ARGS this time
     COPY_STD_ARGS = ('modis', '-t', 'h12v04',
@@ -435,7 +435,7 @@ expected_stats_created_files = {
 }
 
 
-def test_e2e_stats(setup_modis_data, keep_data_repo_clean, output_tfe):
+def test_stats(setup_modis_data, keep_data_repo_clean, output_tfe):
     """Test gips_stats on projected files."""
     # generate data needed for stats computation
     args = STD_ARGS + ('--res', '100', '100',
