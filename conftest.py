@@ -50,6 +50,8 @@ def pytest_configure(config):
 def setup_data_repo():
     """Construct the data repo if it is absent."""
     # confirm the user's done basic config
+    # TODO do these checks every run if fast enough
+    # TODO add option to clear the repo before setting it up
     gcp = envoy.run("gips_config print")
     if gcp.status_code != 0:
         raise RuntimeError("config check via `gips_config print` failed",

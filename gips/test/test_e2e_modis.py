@@ -12,7 +12,7 @@ TEST_DATA_DIR  = str(pytest.config.rootdir.join('gips/test'))
 DATA_REPO_ROOT = pytest.config.getini('data-repo')
 OUTPUT_DIR     = pytest.config.getini('output-dir')
 NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
-# changing this will require changes in expected_files below:
+# changing this will require changes in expected_*_files below:
 STD_ARGS       = ('modis', '-s', NH_SHP_PATH,
                   '-d', '2012-12-01,2012-12-03', '-v', '4')
 
@@ -107,6 +107,54 @@ def output_tfe():
     return gtfe
 
 
+# TODO test_e2e_inventory # copy pattern in e2e_info
+
+
+expected_inventory_fetch_created_files = {
+    'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf': 1588268768,
+    'modis/tiles/h12v04/2012336/MOD11A1.A2012336.h12v04.005.2012339180517.hdf': -868909291,
+    'modis/tiles/h12v04/2012336/MYD10A1.A2012336.h12v04.005.2012340031954.hdf': 1810195064,
+    'modis/tiles/h12v04/2012336/MYD11A1.A2012336.h12v04.005.2012341040543.hdf': 1579682812,
+    'modis/tiles/h12v04/2012337/MCD43A2.A2012337.h12v04.005.2012356160504.hdf': 1983871800,
+    'modis/tiles/h12v04/2012337/MCD43A4.A2012337.h12v04.005.2012356160504.hdf': -1050109825,
+    'modis/tiles/h12v04/2012337/MOD09Q1.A2012337.h12v04.005.2012346141041.hdf': 1786923716,
+    'modis/tiles/h12v04/2012337/MOD10A1.A2012337.h12v04.005.2012340033542.hdf': -1365792644,
+    'modis/tiles/h12v04/2012337/MOD11A1.A2012337.h12v04.005.2012339204007.hdf': 1707500981,
+    'modis/tiles/h12v04/2012337/MOD11A2.A2012337.h12v04.005.2012346152330.hdf': -168268015,
+    'modis/tiles/h12v04/2012337/MYD10A1.A2012337.h12v04.005.2012340112013.hdf': -577720815,
+    'modis/tiles/h12v04/2012337/MYD11A1.A2012337.h12v04.005.2012341072847.hdf': 1606986907,
+    'modis/tiles/h12v04/2012338/MOD10A1.A2012338.h12v04.005.2012341091201.hdf': 1691161136,
+    'modis/tiles/h12v04/2012338/MOD11A1.A2012338.h12v04.005.2012341041222.hdf': 1621811920,
+    'modis/tiles/h12v04/2012338/MYD10A1.A2012338.h12v04.005.2012340142152.hdf': 1292876648,
+    'modis/tiles/h12v04/2012338/MYD11A1.A2012338.h12v04.005.2012341075802.hdf': 1495599893,
+}
+
+
+# TODO label so it's usually skipped
+def test_inventory_fetch(test_file_environment):
+    """Test gips_inventory --fetch; actually contacts data provider."""
+    args = STD_ARGS + ('--fetch',)
+
+    # check repo before run to see if it's cleaned out
+    before = set(test_file_environment._find_files().keys())
+    expected = set(expected_inventory_fetch_created_files.keys())
+    if before & expected:
+        raise RuntimeError('Output files found before test; repo '
+                           'may not be clean.')
+
+    logger.info('starting run')
+    outcome = test_file_environment.run('gips_inventory', *args)
+    logger.info('run complete')
+
+    # repo should now have specific new files with the right content
+    detected_files = extract_hashes(outcome.files_created)
+
+    assert (outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_deleted
+            and expected_inventory_fetch_created_files == detected_files)
+
+
 # list of recorded output file names and their checksums; each should be
 # created by the test
 expected_process_created_files = {
@@ -148,9 +196,6 @@ expected_process_created_files = {
     'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_temp.tif': 1712906003,
     'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275,
 }
-
-# TODO test_e2e_inventory_fetch # label so it's usually skipped
-# TODO test_e2e_inventory # copy pattern in e2e_info
 
 def test_e2e_process(setup_modis_data, test_file_environment):
     """Test gips_process on modis data."""
