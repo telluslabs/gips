@@ -150,15 +150,23 @@ class modisAsset(Asset):
     def __init__(self, filename):
         """ Inspect a single file and get some metadata """
         super(modisAsset, self).__init__(filename)
+
         bname = os.path.basename(filename)
-        self.asset = bname[0:7]
-        self.tile = bname[17:23]
-        year = bname[9:13]
-        doy = bname[13:16]
+        parts = bname.split('.')
+        
+        self.asset = parts[0]
+        self.tile = parts[2]
+        self.sensor = parts[0][:3]
 
+        year = parts[1][1:5]
+        doy = parts[1][5:8]
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
-        self.sensor = bname[:3]
 
+        collection = int(parts[3])
+        file_version = int(parts[4])
+        self.version = float('{}.{}'.format(collection, file_version))
+
+        
     @classmethod
     def fetch(cls, asset, tile, date):
         #super(modisAsset, cls).fetch(asset, tile, date)
@@ -209,7 +217,18 @@ class modisAsset(Asset):
             #raise Exception('Unable to find remote match for %s at %s' % (pattern, mainurl))
             VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
 
+    def updated(self, newasset):
+        '''
+        Compare the version for this to that of newasset.
+        Return true if newasset version is greater.
+        '''
+        return (self.sensor == newasset.sensor and
+                self.tile == newasset.tile and
+                self.date == newasset.date and
+                self.version < newasset.version)
 
+
+            
 class modisData(Data):
     """ A tile of data (all assets and products) """
     name = 'Modis'
