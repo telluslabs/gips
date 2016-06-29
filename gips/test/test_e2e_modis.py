@@ -107,9 +107,6 @@ def output_tfe():
     return gtfe
 
 
-# TODO test_e2e_inventory # copy pattern in e2e_info
-
-
 expected_inventory_fetch_created_files = {
     'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf': 1588268768,
     'modis/tiles/h12v04/2012336/MOD11A1.A2012336.h12v04.005.2012339180517.hdf': -868909291,
@@ -153,6 +150,32 @@ def test_inventory_fetch(test_file_environment):
             and not outcome.stderr
             and not outcome.files_deleted
             and expected_inventory_fetch_created_files == detected_files)
+
+
+expected_inventory_stdout = """\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
+Retrieving inventory for site NHseacoast-0
+
+\x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
+\x1b[1m
+Tile Coverage
+\x1b[4m  Tile      % Coverage   % Tile Used\x1b[0m
+  h12v04      100.0%        0.2%
+
+\x1b[1m\x1b[4m    DATE     MCD12Q1   MCD43A2   MCD43A4   MOD09Q1   MOD10A1   MOD10A2   MOD11A1   MOD11A2   MYD10A1   MYD10A2   MYD11A1   MYD11A2   Product  \x1b[0m
+\x1b[1m2012        
+\x1b[0m    336                                               100.0%               100.0%               100.0%               100.0%             \n    337                 100.0%     100.0%     100.0%     100.0%               100.0%     100.0%     100.0%               100.0%             \n    338                                               100.0%               100.0%               100.0%               100.0%             \n\n\n3 files on 3 dates\n\x1b[1m\nSENSORS\x1b[0m\n\x1b[35mMCD: Aqua/Terra Combined\x1b[0m\n\x1b[31mMOD: Terra\x1b[0m\n\x1b[32mMOD-MYD: Aqua/Terra together\x1b[0m\n\x1b[34mMYD: Aqua\x1b[0m
+"""
+
+
+def test_inventory(setup_modis_data, test_file_environment):
+    """Test `gips_inventory modis` and confirm recorded output is given."""
+    outcome = test_file_environment.run('gips_inventory', *STD_ARGS)
+    assert (outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_created
+            and not outcome.files_updated
+            and not outcome.files_deleted
+            and outcome.stdout == expected_inventory_stdout)
 
 
 # list of recorded output file names and their checksums; each should be
