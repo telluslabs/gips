@@ -3,7 +3,7 @@
 set -e
 
 # this script needs to run in the clone dir
-git remote get-url origin | grep Applied-GeoSolutions/gips.git -q
+git remote show origin | grep 'Fetch URL: .*gips.git$' -q
 test -d .git
 
 echo === install system deps ===
@@ -18,7 +18,7 @@ echo === install system deps ===
 sudo apt-get install virtualenv python g++ gfortran swig \
                      libboost-all-dev libfreetype6-dev libgnutls-dev \
                      libatlas-base-dev libgdal-dev libgdal1-dev gdal-bin \
-                     python-pip python-numpy python-scipy python-gdal 
+                     python-pip python-numpy python-scipy python-gdal
 
 echo === clone source repo and setup virtualenv ===
 virtualenv .venv --system-site-packages
@@ -33,6 +33,8 @@ echo === install GIPS itself ===
 # TODO --process-dependency-links is deprecated
 pip install --process-dependency-links -e .
 
-# check install: if this exits 0, install probably succeeded
-gips_config print &>/dev/null
-echo "Install complete."
+# help user with configuration
+echo "Install complete.  GIPS configuration:"
+if ! gips_config print; then
+    echo 'Configure GIPS with:  `gips_config env -e <emailaddr> -r <full-path-to-desired-repo>`.'
+fi
