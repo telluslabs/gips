@@ -287,6 +287,29 @@ def test_e2e_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe)
             and expected_project_no_warp_created_files == detected_files)
 
 
+expected_tiles_created_files = {
+    'h12v04': None, # directory
+    # TODO there should be something here but nothing is saved here during
+    # manual runs.
+}
+
+
+def test_e2e_tiles(setup_modis_data, keep_data_repo_clean, output_tfe):
+    """Test gips_tiles modis with warping."""
+    # gips_tiles modis $ARGS --outdir modis_warped_tiles --notld
+    args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
+    logger.info('starting run')
+    outcome = output_tfe.run('gips_tiles', *args)
+    logger.info('run complete')
+
+    # confirm generated files match expected fingerprints
+    detected_files = extract_hashes(outcome.files_created)
+    assert (outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_deleted
+            and expected_tiles_created_files == detected_files)
+
+
 expected_stats_created_files = {
     'clouds_stats.txt': -142855826,
     'fsnow_stats.txt': 1649245444,

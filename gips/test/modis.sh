@@ -12,10 +12,12 @@ ARGS2="-s /etc/gips/test/nsamerica.shp --where "CNTRY_NAME='Guyana'" -d 2012-12-
 echo ARGS="$ARGS"
 
 # mosaic without warping
+# TODO it's not clear if this needs to be converted to a test as gips_stats is
+# already exercised by a previous test.
 gips_stats modis_project_nowarp
 
 # warp tiles
-gips_tiles modis $ARGS --outdir modis_warped_tiles --notld
+# DONE:  gips_tiles modis $ARGS --outdir modis_warped_tiles --notld
 gips_stats modis_warped_tiles/*
 
 # copy tiles
