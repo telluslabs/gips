@@ -232,8 +232,7 @@ expected_project_created_files = {
 
 
 def test_e2e_project(setup_modis_data, keep_data_repo_clean, output_tfe):
-    """Test gips_project modis with warped tiles."""
-    # gips_project modis $ARGS --res 100 100 --outdir modis_project --notld
+    """Test gips_project modis with warping."""
     args = STD_ARGS + ('--res', '100', '100',
                        '--outdir', OUTPUT_DIR, '--notld')
     logger.info('starting run')
@@ -246,6 +245,46 @@ def test_e2e_project(setup_modis_data, keep_data_repo_clean, output_tfe):
             and not outcome.stderr
             and not outcome.files_deleted
             and expected_project_created_files == detected_files)
+
+
+expected_project_no_warp_created_files = {
+    '0': None, # directory
+    '0/2012336_MCD_fsnow.tif': -232655043,
+    '0/2012336_MCD_obstime.tif': -508398437,
+    '0/2012336_MCD_snow.tif': 1704870455,
+    '0/2012336_MOD-MYD_temp.tif': -1437591930,
+    '0/2012336_MOD_clouds.tif': 792250507,
+    '0/2012337_MCD_fsnow.tif': -118176399,
+    '0/2012337_MCD_indices.tif': -517980660,
+    '0/2012337_MCD_obstime.tif': -266130329,
+    '0/2012337_MCD_quality.tif': -148594234,
+    '0/2012337_MCD_snow.tif': -1562861219,
+    '0/2012337_MOD-MYD_temp.tif': 125915217,
+    '0/2012337_MOD_clouds.tif': 1172608606,
+    '0/2012337_MOD_ndvi8.tif': 1952565287,
+    '0/2012337_MOD_temp8td.tif': 2072205290,
+    '0/2012337_MOD_temp8tn.tif': -937913415,
+    '0/2012338_MCD_fsnow.tif': -50404254,
+    '0/2012338_MCD_obstime.tif': -1256437319,
+    '0/2012338_MCD_snow.tif': 415741551,
+    '0/2012338_MOD-MYD_temp.tif': -566077737,
+    '0/2012338_MOD_clouds.tif': -1110899594
+}
+
+
+def test_e2e_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe):
+    """Test gips_project modis without warping."""
+    args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
+    logger.info('starting run')
+    outcome = output_tfe.run('gips_project', *args)
+    logger.info('run complete')
+
+    # confirm generated files match expected fingerprints
+    detected_files = extract_hashes(outcome.files_created)
+    assert (outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_deleted
+            and expected_project_no_warp_created_files == detected_files)
 
 
 expected_stats_created_files = {
