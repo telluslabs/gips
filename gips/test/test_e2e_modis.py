@@ -127,7 +127,7 @@ expected_inventory_fetch_created_files = {
 }
 
 
-# TODO label so it's usually skipped
+@pytest.mark.skip(reason="very slow") # temporary solution
 def test_inventory_fetch(test_file_environment):
     """Test gips_inventory --fetch; actually contacts data provider."""
     args = STD_ARGS + ('--fetch',)
