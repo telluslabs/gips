@@ -261,7 +261,7 @@ class DataInventory(Inventory):
                 dataclass.fetch(self.products.base, self.spatial.tiles, self.temporal, self.update)
             except Exception, e:
                 raise Exception('Error downloading %s: %s' % (dataclass.name, e))
-            dataclass.Asset.archive(Repository.path('stage'))
+            dataclass.Asset.archive(Repository.path('stage'), update=self.update)
 
         # find data
         self.data = {}
