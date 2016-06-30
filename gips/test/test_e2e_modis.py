@@ -118,8 +118,11 @@ def output_tfe():
     gtfe = GipsTestFileEnv(OUTPUT_DIR)
     return gtfe
 
+slow = pytest.mark.skipif(not pytest.config.getoption("slow"),
+                          reason="--slow is required for this test")
 
-@pytest.mark.skip(reason="very slow") # temporary solution
+
+@slow
 def test_inventory_fetch(test_file_environment):
     """Test gips_inventory --fetch; actually contacts data provider."""
     # only get data for one day to save time

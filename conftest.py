@@ -30,6 +30,7 @@ def pytest_addoption(parser):
 
     parser.addini('output-dir',
                   help="The directory housing output files from test runs.")
+    parser.addoption("--slow", action="store_true", help="Run slow tests")
 
 
 def pytest_configure(config):
@@ -45,6 +46,9 @@ def pytest_configure(config):
         raise ValueError("No value specified for 'data-repo' in pytest.ini")
     else:
         logger.debug("value detected for data-repo: " + dr)
+
+    if config.getoption("slow"):
+        logger.debug("--slow detected; will run tests marked 'slow'")
 
 
 def setup_data_repo():
