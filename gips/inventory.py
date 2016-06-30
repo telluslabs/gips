@@ -34,6 +34,8 @@ from gips.utils import VerboseOut, Colors
 from gips.data.core import Data
 from gips.mapreduce import MapReduce
 
+from pdb import set_trace
+
 
 class Inventory(object):
     """ Base class for inventories """
@@ -234,7 +236,7 @@ class ProjectInventory(Inventory):
 class DataInventory(Inventory):
     """ Manager class for data inventories (collection of Tiles class) """
 
-    def __init__(self, dataclass, spatial, temporal, products=None, fetch=False, **kwargs):
+    def __init__(self, dataclass, spatial, temporal, products=None, fetch=False, update=False, **kwargs):
         """ Create a new inventory
         :dataclass: The Data class to use (e.g., LandsatData, ModisData)
         :spatial: The spatial extent requested
@@ -250,9 +252,13 @@ class DataInventory(Inventory):
         self.temporal = temporal
         self.products = dataclass.RequestedProducts(products)
 
+        self.update = update
+
+        print "datainventory"
+
         if fetch:
             try:
-                dataclass.fetch(self.products.base, self.spatial.tiles, self.temporal)
+                dataclass.fetch(self.products.base, self.spatial.tiles, self.temporal, self.update)
             except Exception, e:
                 raise Exception('Error downloading %s: %s' % (dataclass.name, e))
             dataclass.Asset.archive(Repository.path('stage'))
