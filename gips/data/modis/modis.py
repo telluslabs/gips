@@ -319,7 +319,7 @@ class modisData(Data):
                 else:
                     availassets.append(asset)
                     allsds.extend(sds)
-                    versions[asset] = int(re.findall('MCD43A4.*\.00(\d)\.\d{13}\.hdf', sds[0])[0])
+                    versions[asset] = int(re.findall('M.*\.00(\d)\.\d{13}\.hdf', sds[0])[0])
 
             if not availassets:
                 # some products aren't available for every day but this is trying every day
