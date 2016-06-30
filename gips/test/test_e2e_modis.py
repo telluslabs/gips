@@ -212,6 +212,40 @@ def test_project(setup_modis_data, keep_data_repo_clean, output_tfe):
             and expected_project_created_files == detected_files)
 
 
+def test_project_two_runs(setup_modis_data, keep_data_repo_clean, output_tfe):
+    """As test_project, but run twice to confirm idempotence of gips_project.
+
+    The data repo is only cleaned up after both runs are complete; this is
+    intentional as changes in the data repo may influence gips_project.
+    """
+    args = STD_ARGS + ('--res', '100', '100',
+                       '--outdir', OUTPUT_DIR, '--notld')
+
+    logger.info('starting first run: gips_project ' + ' '.join(args))
+    outcome = output_tfe.run('gips_project', *args)
+    logger.info('first run complete')
+
+    # confirm generated files match expected fingerprints
+    detected_files = extract_hashes(outcome.files_created)
+    assert ('initial test_project run'
+            and outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_deleted
+            and expected_project_created_files == detected_files)
+
+    logger.info('starting second run: gips_project ' + ' '.join(args))
+    outcome = output_tfe.run('gips_project', *args)
+    logger.info('second run complete')
+
+    # confirm generated files match expected fingerprints
+    detected_files = extract_hashes(outcome.files_created)
+    assert ('final test_project run'
+            and outcome.returncode == 0
+            and not outcome.stderr
+            and not outcome.files_deleted
+            and not detected_files) # shouldn't create any files this time
+
+
 def test_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe):
     """Test gips_project modis without warping."""
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
