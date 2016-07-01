@@ -228,6 +228,7 @@ class merraAsset(Asset):
         if url == '':
             raise Exception("%s: URL not defined for asset %s" % (cls.__name__, asset))
         success = False
+
         for ver in ['100', '200', '300', '301', '400']:
 
             if asset != "FRLAND":
@@ -295,6 +296,7 @@ class merraAsset(Asset):
         iy1 = iy0 + ysize
 
         VerboseOut('Retrieving data for bounds (%s, %s) - (%s, %s)' % (bounds[0], bounds[1], bounds[2], bounds[3]), 3)
+
         data = dataset[asset][:, iy0:iy1, ix0:ix1].astype('float32')
         data = data[:, ::-1, :]
 
