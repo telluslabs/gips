@@ -174,15 +174,15 @@ class merraAsset(Asset):
             'latency': 60,
             'bandnames': _bandnames
         },
-        # 'PROFILE': {
-        #     'description': 'Atmospheric Profile',
-        #     'pattern': 'MAI6NVANA_PROFILE_*.tif',
-        #     'url': 'http://goldsmr3.sci.gsfc.nasa.gov:80/opendap/MERRA/MAI6NVANA.5.2.0',
-        #     'source': 'MERRA%s.prod.assim.inst6_3d_ana_Nv.%04d%02d%02d.hdf',
-        #     'startdate': datetime.date(1980, 1, 1),
-        #     'latency': 60,
-        #     'bandnames': ['0000GMT', '0600GMT', '1200GMT', '1800GMT']
-        # },
+         'PROFILE': {
+             'description': 'Atmospheric Profile',
+             'pattern': 'MAI6NVANA_PROFILE_*.tif',
+             'url': 'http://goldsmr5.sci.gsfc.nasa.gov/opendap/MERRA2/M2I6NVANA.5.12.4',
+             'source': 'MERRA2_%s.inst6_3d_ana_Nv.%04d%02d%02d.nc4',
+             'startdate': datetime.date(1980, 1, 1),
+             'latency': 60,
+             'bandnames': ['0000GMT', '0600GMT', '1200GMT', '1800GMT']
+         },
         # 'PROFILEP': {
         #     'description': 'Atmospheric Profile',
         #     'pattern': 'MAI6NVANA_PROFILE_*.tif',
@@ -228,7 +228,6 @@ class merraAsset(Asset):
         if url == '':
             raise Exception("%s: URL not defined for asset %s" % (cls.__name__, asset))
         success = False
-
         for ver in ['100', '200', '300', '301', '400']:
 
             if asset != "FRLAND":
@@ -296,7 +295,6 @@ class merraAsset(Asset):
         iy1 = iy0 + ysize
 
         VerboseOut('Retrieving data for bounds (%s, %s) - (%s, %s)' % (bounds[0], bounds[1], bounds[2], bounds[3]), 3)
-
         data = dataset[asset][:, iy0:iy1, ix0:ix1].astype('float32')
         data = data[:, ::-1, :]
 
@@ -429,7 +427,7 @@ class merraData(Data):
         (x, y) = cls.Asset.lonlat2xy(lon, lat)
 
         # TODO - I know these are hours (0, 6, 12, 18), but it's still an assumption
-        times = [datetime.datetime.combine(dtime.date(), datetime.time(int(d / 60.0))) for d in dataset['TIME'][:]]
+        times = [datetime.datetime.combine(dtime.date(), datetime.time(int(d / 60.0))) for d in dataset['time'][:]]
         unixtime = time.mktime(dtime.timetuple())
         timediff = numpy.array([unixtime - time.mktime(t.timetuple()) for t in times])
         timeind = numpy.abs(timediff).argmin()
