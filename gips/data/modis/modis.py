@@ -810,7 +810,8 @@ class modisData(Data):
             if val[0] == "obstime":
                 VERSION = "1"
                 meta['VERSION'] = VERSION
-                fname = '%s_%s_%s' % (bname, 'MOD-MYD', key)
+                sensor = 'MOD-MYD'
+                fname = '%s_%s_%s' % (bname, sensor, key)
 
                 if not missingassets:
                     availbands = [0, 1, 2, 3]
