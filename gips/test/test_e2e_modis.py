@@ -164,7 +164,7 @@ def test_inventory(setup_modis_data, test_file_environment):
             and not outcome.files_created
             and not outcome.files_updated
             and not outcome.files_deleted
-            and outcome.stdout == expected_inventory_stdout)
+            and expected_inventory_stdout == outcome.stdout)
 
 
 def test_process(setup_modis_data, test_file_environment):

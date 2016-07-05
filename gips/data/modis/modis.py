@@ -288,8 +288,9 @@ class modisData(Data):
             availassets = []
             allsds = []
 
-            # Default sensor for products
-            sensor = 'MCD'
+            # no default sensor for products; we *want* it to NameError if not
+            # properly set
+            if 'sensor' in locals(): del sensor
 
             for asset in assets:
                 try:
@@ -310,6 +311,7 @@ class modisData(Data):
 
 
             if val[0] == "landcover":
+                sensor = 'MCD'
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 if os.path.lexists(fname):
                     os.remove(fname)
@@ -319,6 +321,7 @@ class modisData(Data):
 
 
             if val[0] == "quality":
+                sensor = 'MCD'
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 if os.path.lexists(fname):
                     os.remove(fname)
@@ -449,6 +452,7 @@ class modisData(Data):
             if val[0] == "fsnow":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
+                sensor = 'MCD'
                 fname = '%s_%s_%s' % (bname, sensor, key)
 
                 if not missingassets:
@@ -576,6 +580,7 @@ class modisData(Data):
             if val[0] == "snow":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
+                sensor = 'MCD'
                 fname = '%s_%s_%s' % (bname, sensor, key)
 
                 if not missingassets:
