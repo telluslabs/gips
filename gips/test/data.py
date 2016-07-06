@@ -1,14 +1,24 @@
-expected_inventory_fetch_created_files = {
-    'modis/tiles/h12v04': None,
-    'modis/tiles/h12v04/2012336': None,
-    'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf': 1588268768,
-    'modis/tiles/h12v04/2012336/MOD11A1.A2012336.h12v04.005.2012339180517.hdf': -868909291,
-    'modis/tiles/h12v04/2012336/MYD10A1.A2012336.h12v04.005.2012340031954.hdf': 1810195064,
-    'modis/tiles/h12v04/2012336/MYD11A1.A2012336.h12v04.005.2012341040543.hdf': 1579682812,
-}
+expectations = {}
 
 
-expected_inventory_stdout = """\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
+def expect(test, **kwargs):
+    # TODO make this aware of driver; right now there will be test name conflicts
+    expectations[test] = dict(kwargs)
+
+
+expect('test_inventory_fetch',
+    updated={'modis/stage': None, 'modis/tiles': None},
+    created={
+        'modis/tiles/h12v04': None,
+        'modis/tiles/h12v04/2012336': None,
+        'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf': 1588268768,
+        'modis/tiles/h12v04/2012336/MOD11A1.A2012336.h12v04.005.2012339180517.hdf': -868909291,
+        'modis/tiles/h12v04/2012336/MYD10A1.A2012336.h12v04.005.2012340031954.hdf': 1810195064,
+        'modis/tiles/h12v04/2012336/MYD11A1.A2012336.h12v04.005.2012341040543.hdf': 1579682812,
+    },
+)
+
+expect('test_inventory', stdout="""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
 Retrieving inventory for site NHseacoast-0
 
 \x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
@@ -21,53 +31,55 @@ Tile Coverage
 \x1b[1m2012        
 \x1b[0m    336                                               100.0%               100.0%               100.0%               100.0%             \n    337                 100.0%     100.0%     100.0%     100.0%               100.0%     100.0%     100.0%               100.0%             \n    338                                               100.0%               100.0%               100.0%               100.0%             \n\n\n3 files on 3 dates\n\x1b[1m\nSENSORS\x1b[0m\n\x1b[35mMCD: Aqua/Terra Combined\x1b[0m\n\x1b[31mMOD: Terra\x1b[0m\n\x1b[32mMOD-MYD: Aqua/Terra together\x1b[0m\n\x1b[34mMYD: Aqua\x1b[0m
 """
+)
 
-
-# list of recorded output file names and their checksums; each should be
-# created by the test
-expected_process_created_files = {
-    # TODO Are these broken or what?  Each None is a broken symlink:
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_quality.tif': None,
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8td.tif': None,
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8tn.tif': None,
-    'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf.index': -1075525670,
-    'modis/tiles/h12v04/2012336/MOD11A1.A2012336.h12v04.005.2012339180517.hdf.index': -1602319177,
-    'modis/tiles/h12v04/2012336/MYD10A1.A2012336.h12v04.005.2012340031954.hdf.index': 1623945316,
-    'modis/tiles/h12v04/2012336/MYD11A1.A2012336.h12v04.005.2012341040543.hdf.index': -1720582124,
-    'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_fsnow.tif': -843500181,
-    'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_snow.tif': 388495321,
-    'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_obstime.tif': 1994827924,
-    'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_temp.tif': 2094570047,
-    'modis/tiles/h12v04/2012336/h12v04_2012336_MOD_clouds.tif': 161070470,
-    'modis/tiles/h12v04/2012337/MCD43A2.A2012337.h12v04.005.2012356160504.hdf.index': 1869798455,
-    'modis/tiles/h12v04/2012337/MCD43A4.A2012337.h12v04.005.2012356160504.hdf.index': 1702701995,
-    'modis/tiles/h12v04/2012337/MOD09Q1.A2012337.h12v04.005.2012346141041.hdf.index': 1528708875,
-    'modis/tiles/h12v04/2012337/MOD10A1.A2012337.h12v04.005.2012340033542.hdf.index': 1739917027,
-    'modis/tiles/h12v04/2012337/MOD11A1.A2012337.h12v04.005.2012339204007.hdf.index': 640817914,
-    'modis/tiles/h12v04/2012337/MOD11A2.A2012337.h12v04.005.2012346152330.hdf.index': 53371709,
-    'modis/tiles/h12v04/2012337/MYD10A1.A2012337.h12v04.005.2012340112013.hdf.index': 531935583,
-    'modis/tiles/h12v04/2012337/MYD11A1.A2012337.h12v04.005.2012341072847.hdf.index': 1676310978,
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_fsnow.tif': 297883486,
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_indices.tif': -2140726827,
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_snow.tif': -748640537,
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD-MYD_obstime.tif': -1729084231,
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD-MYD_temp.tif': -1718009535,
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_clouds.tif': -832284681,
-    'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_ndvi8.tif': -593200294,
-    'modis/tiles/h12v04/2012338/MOD10A1.A2012338.h12v04.005.2012341091201.hdf.index': 1725484908,
-    'modis/tiles/h12v04/2012338/MOD11A1.A2012338.h12v04.005.2012341041222.hdf.index': 838676814,
-    'modis/tiles/h12v04/2012338/MYD10A1.A2012338.h12v04.005.2012340142152.hdf.index': -130649785,
-    'modis/tiles/h12v04/2012338/MYD11A1.A2012338.h12v04.005.2012341075802.hdf.index': -642783734,
-    'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_fsnow.tif': -1930181337,
-    'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_snow.tif': 387672365,
-    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_obstime.tif': -1693632983,
-    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_temp.tif': 1712906003,
-    'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275,
-}
-
+expect('test_process',
+    updated={'modis/tiles/h12v04/2012336': None,
+             'modis/tiles/h12v04/2012337': None,
+             'modis/tiles/h12v04/2012338': None},
+    created={
+        # TODO Are these broken or what?  Each None is a broken symlink:
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_quality.tif': None,
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8td.tif': None,
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8tn.tif': None,
+        'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf.index': -1075525670,
+        'modis/tiles/h12v04/2012336/MOD11A1.A2012336.h12v04.005.2012339180517.hdf.index': -1602319177,
+        'modis/tiles/h12v04/2012336/MYD10A1.A2012336.h12v04.005.2012340031954.hdf.index': 1623945316,
+        'modis/tiles/h12v04/2012336/MYD11A1.A2012336.h12v04.005.2012341040543.hdf.index': -1720582124,
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_fsnow.tif': -843500181,
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_snow.tif': 388495321,
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_obstime.tif': 1994827924,
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_temp.tif': 2094570047,
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MOD_clouds.tif': 161070470,
+        'modis/tiles/h12v04/2012337/MCD43A2.A2012337.h12v04.005.2012356160504.hdf.index': 1869798455,
+        'modis/tiles/h12v04/2012337/MCD43A4.A2012337.h12v04.005.2012356160504.hdf.index': 1702701995,
+        'modis/tiles/h12v04/2012337/MOD09Q1.A2012337.h12v04.005.2012346141041.hdf.index': 1528708875,
+        'modis/tiles/h12v04/2012337/MOD10A1.A2012337.h12v04.005.2012340033542.hdf.index': 1739917027,
+        'modis/tiles/h12v04/2012337/MOD11A1.A2012337.h12v04.005.2012339204007.hdf.index': 640817914,
+        'modis/tiles/h12v04/2012337/MOD11A2.A2012337.h12v04.005.2012346152330.hdf.index': 53371709,
+        'modis/tiles/h12v04/2012337/MYD10A1.A2012337.h12v04.005.2012340112013.hdf.index': 531935583,
+        'modis/tiles/h12v04/2012337/MYD11A1.A2012337.h12v04.005.2012341072847.hdf.index': 1676310978,
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_fsnow.tif': 297883486,
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_indices.tif': -2140726827,
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_snow.tif': -748640537,
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD-MYD_obstime.tif': -1729084231,
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD-MYD_temp.tif': -1718009535,
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_clouds.tif': -832284681,
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_ndvi8.tif': -593200294,
+        'modis/tiles/h12v04/2012338/MOD10A1.A2012338.h12v04.005.2012341091201.hdf.index': 1725484908,
+        'modis/tiles/h12v04/2012338/MOD11A1.A2012338.h12v04.005.2012341041222.hdf.index': 838676814,
+        'modis/tiles/h12v04/2012338/MYD10A1.A2012338.h12v04.005.2012340142152.hdf.index': -130649785,
+        'modis/tiles/h12v04/2012338/MYD11A1.A2012338.h12v04.005.2012341075802.hdf.index': -642783734,
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_fsnow.tif': -1930181337,
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_snow.tif': 387672365,
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_obstime.tif': -1693632983,
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_temp.tif': 1712906003,
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275,
+    },
+)
 
 # trailing whitespace and other junk characters are in current output
-expected_info_stdout = """\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
+expect('test_info', stdout= """\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
 \x1b[1m
 Modis Products v1.0.0\x1b[0m
 \x1b[1m
@@ -89,10 +101,9 @@ Terra/Aqua Daily Products
 Standard Products
 \x1b[0m   clouds      Cloud Mask                              
    landcover   MCD Annual Land Cover                   
-"""
+""")
 
-
-expected_project_created_files = {
+expect('test_project', created={
     '0': None, # directory
     '0/2012336_MCD_fsnow.tif': -1883071404,
     '0/2012336_MOD-MYD_obstime.tif': 1180170371,
@@ -114,10 +125,11 @@ expected_project_created_files = {
     '0/2012338_MCD_snow.tif': -319441628,
     '0/2012338_MOD-MYD_temp.tif': -869467051,
     '0/2012338_MOD_clouds.tif': 1789735888,
-}
+})
 
+expect('test_project_two_runs', **expectations['test_project'])
 
-expected_project_no_warp_created_files = {
+expect('test_project_no_warp', created={
     '0': None, # directory
     '0/2012336_MCD_fsnow.tif': -232655043,
     '0/2012336_MOD-MYD_obstime.tif': -508398437,
@@ -139,10 +151,12 @@ expected_project_no_warp_created_files = {
     '0/2012338_MCD_snow.tif': 415741551,
     '0/2012338_MOD-MYD_temp.tif': -566077737,
     '0/2012338_MOD_clouds.tif': -1110899594,
-}
+})
 
+# TODO there should be something here but nothing is saved here during manual runs.
+expect('test_tiles', created={'h12v04': None})
 
-expected_tiles_copy_created_files = {
+expect('test_tiles_copy', created={
     'h12v04': None, # directory
     'h12v04/h12v04_2012336_MCD_fsnow.tif': 1284302156,
     'h12v04/h12v04_2012336_MOD-MYD_obstime.tif': -1094139895,
@@ -164,10 +178,9 @@ expected_tiles_copy_created_files = {
     'h12v04/h12v04_2012338_MCD_snow.tif': -1222056036,
     'h12v04/h12v04_2012338_MOD-MYD_temp.tif': 1547257469,
     'h12v04/h12v04_2012338_MOD_clouds.tif': -2052728372,
-}
+})
 
-
-expected_stats_created_files = {
+expect('test_stats', created={
     'clouds_stats.txt': -142855826,
     'fsnow_stats.txt': 1649245444,
     'indices_stats.txt': 551916811,
@@ -178,4 +191,4 @@ expected_stats_created_files = {
     'temp8td_stats.txt': 2023193464,
     'temp8tn_stats.txt': -1364990917,
     'temp_stats.txt': -1532103523
-}
+})

@@ -4,6 +4,9 @@ from pprint import pformat
 import pytest
 from scripttest import TestFileEnvironment, ProcResult, FoundFile, FoundDir
 
+from . import data
+
+
 # technically imported by people who use `from .util import *`
 # TODO change to _log to prevent accidental import
 logger = logging.getLogger(__name__)
@@ -57,10 +60,16 @@ class GipsTestFileEnv(TestFileEnvironment):
         self.log_findings("Deleted files", pr.files_deleted)
         return GipsProcResult(pr)
 
-    def remove_created(self):
+    def remove_created(self, strict=False):
         """Remove files & directories created by test run."""
         if self.proc_result is None:
-            raise RuntimeError("No previous run to clean up from.")
+            msg = "No previous run to clean up from."
+            if strict:
+                raise RuntimeError(msg)
+            else:
+                logger.warning("Can't remove_created: " + msg)
+                return
+
         created = self.proc_result.files_created
         # first remove all the files
         fn = [n for (n, t) in created.items() if isinstance(t, FoundFile)]
@@ -158,3 +167,8 @@ def output_tfe():
     """Provide means to test files created by run & clean them up after."""
     gtfe = GipsTestFileEnv(OUTPUT_DIR)
     return gtfe
+
+
+@pytest.fixture
+def expected(request):
+    return GipsProcResult(**data.expectations[request.function.func_name])
