@@ -1,6 +1,9 @@
 import logging
 import envoy
 
+from _pytest.assertion.util import _compare_eq_dict, _diff_text
+from gips.test.util import GipsProcResult, set_constants
+
 # configure logging (can config in command-line & config file, see below)
 log_format = '%(levelname)-8s %(filename)s:%(lineno)d: %(message)s'
 root_logger = logging.getLogger()
@@ -50,6 +53,8 @@ def pytest_configure(config):
     if config.getoption("slow"):
         logger.debug("--slow detected; will run tests marked 'slow'")
 
+    set_constants(config)
+
 
 def setup_data_repo():
     """Construct the data repo if it is absent."""
@@ -68,3 +73,46 @@ def setup_data_repo():
         raise RuntimeError("data root setup via `gips_config env` failed",
                            gcp.std_out, gcp.std_err, gcp)
     logger.debug("`gips_config env` succeeded; data repo (possibly) created")
+
+
+def pytest_assertrepr_compare(config, op, left, right):
+    """When asserting equality between process results, show detailed differences."""
+    checks = (op == '==', isinstance(left, GipsProcResult), isinstance(right, GipsProcResult))
+    if not all(checks):
+        return
+
+    def header_and_indent(header, lines):
+        # note strings with no diff return []
+        if lines:
+            return [header + ':'] + ['  ' + line for line in lines]
+        else:
+            return [header + ':  matches']
+
+    verbose = False # TODO get that from 'config'?
+
+    output = ['GipsProcResult == GipsProcResult:']
+
+    oper = {True: '==', False: '!='}[left.exit_status == right.exit_status]
+    output += ['exit_status:  {} {} {}'.format(left.exit_status, oper, right.exit_status)]
+
+    # TODO text comparison breaks due to misunderstanding terminal sequences (I think it needs to
+    # esape them)
+    # TODO can't trust a diff to be accurate; have to use own comparison (matches vs. "Omitting 2
+    # identical items, use -v to show").
+    if left.compare_stdout:
+        stdout_diff = _diff_text(left.stdout, right.stdout, verbose)
+        output += header_and_indent('stdout', stdout_diff)
+    else:
+        output += ['stdout:  ignored']
+
+    stderr_diff  = _diff_text(left.stderr, right.stderr, verbose)
+    updated_diff = _compare_eq_dict(left.updated, right.updated, verbose)
+    deleted_diff = _compare_eq_dict(left.deleted, right.deleted, verbose)
+    created_diff = _compare_eq_dict(left.created, right.created, verbose)
+
+    output += header_and_indent('stderr', stderr_diff)
+    output += header_and_indent('updated', updated_diff)
+    output += header_and_indent('deleted', deleted_diff)
+    output += header_and_indent('created', created_diff)
+
+    return output

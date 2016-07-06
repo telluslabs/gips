@@ -9,15 +9,15 @@ from scripttest import TestFileEnvironment, ProcResult, FoundFile, FoundDir
 logger = logging.getLogger(__name__)
 
 
-# set constants, mostly places to find various needed files
-TEST_DATA_DIR  = str(pytest.config.rootdir.join('gips/test'))
-DATA_REPO_ROOT = pytest.config.getini('data-repo')
-OUTPUT_DIR     = pytest.config.getini('output-dir')
-NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
-
-
-slow = pytest.mark.skipif(not pytest.config.getoption("slow"),
-                          reason="--slow is required for this test")
+def set_constants(config):
+    # set constants, mostly places to find various needed files
+    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH, slow
+    TEST_DATA_DIR  = str(config.rootdir.join('gips/test'))
+    DATA_REPO_ROOT = config.getini('data-repo')
+    OUTPUT_DIR     = config.getini('output-dir')
+    NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
+    slow = pytest.mark.skipif(not config.getoption("slow"),
+                              reason="--slow is required for this test")
 
 
 def extract_hashes(files):
@@ -40,6 +40,7 @@ class GipsTestFileEnv(TestFileEnvironment):
 
         Logs in a format suitable for updating known good values when tests
         need to be updated to match code changes."""
+        # TODO no need to extract things that are extracted already elsewhere
         files_and_hashes = extract_hashes(files)
         logger.debug("{}: {}".format(description, pformat(files_and_hashes)))
 
@@ -54,7 +55,7 @@ class GipsTestFileEnv(TestFileEnvironment):
         self.log_findings("Created files", pr.files_created)
         self.log_findings("Updated files", pr.files_updated)
         self.log_findings("Deleted files", pr.files_deleted)
-        return pr
+        return GipsProcResult(pr)
 
     def remove_created(self):
         """Remove files & directories created by test run."""
@@ -71,6 +72,59 @@ class GipsTestFileEnv(TestFileEnvironment):
             full_n = os.path.join(DATA_REPO_ROOT, n)
             if os.path.lexists(full_n):
                 shutil.rmtree(full_n)
+
+
+class GipsProcResult(object):
+    attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted', 'created')
+    def __init__(self, proc_result=None, compare_stdout=None, **kwargs):
+        """stdout is usually produced but it's not often tested, so ignore it for comparisons
+        unless the user explicitly asks for it, and let compare_stdout override that if needed.
+        """
+        if proc_result is None:
+            self.exit_status = 0
+            self.stdout = None
+            self.stderr = u''
+            self.updated = {}
+            self.deleted = {}
+            self.created = {}
+        else:
+            # self.proc_result = proc_result # not sure if this is needed
+            self.exit_status = proc_result.returncode
+            self.stdout = proc_result.stdout
+            self.stderr = proc_result.stderr
+            self.updated = extract_hashes(proc_result.files_updated)
+            self.deleted = extract_hashes(proc_result.files_deleted)
+            self.created = extract_hashes(proc_result.files_created)
+
+        input_fields = set(kwargs.keys())
+        if not input_fields.issubset(set(self.attribs)):
+            raise ValueError('Unknown attributes for GipsProcResult',
+                             list(input_fields - set(self.attribs)))
+
+        self.__dict__.update(kwargs) # set user's desired values
+
+        # guess the user's wishes regarding stdout comparison;
+        # explicit request should override guesswork
+        if compare_stdout is not None:
+            self.compare_stdout = compare_stdout
+        else:
+            self.compare_stdout = self.stdout is not None
+        # need a valid value to compare against either way
+        self.stdout = self.stdout or u''
+
+    def __eq__(self, other):
+        matches = (
+            self.exit_status == other.exit_status,
+            not self.compare_stdout or self.stdout == other.stdout,
+            self.stderr == other.stderr,
+            self.updated == other.updated,
+            self.deleted == other.deleted,
+            self.created == other.created,
+        )
+        return all(matches)
+
+    def __repr__(self):
+        return "GipsProcResult(object) repr called!"
 
 
 @pytest.yield_fixture
