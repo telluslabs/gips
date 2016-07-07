@@ -148,18 +148,21 @@ def test_file_environment():
     gtfe.remove_created()
 
 
-@pytest.yield_fixture
-def keep_data_repo_clean(test_file_environment):
+@pytest.yield_fixture(scope='module')
+def keep_data_repo_clean(request):
     """Keep data repo clean without having to run anything in it.
 
     This emulates tfe.run()'s checking the directory before and after a run,
     then working out how the directory has changed.  Unfortunately half the
     work is done in tfe, the other half in ProcResult."""
-    tfe = test_file_environment
-    before = tfe._find_files()
-    yield # directory mutation happens here
-    after = tfe._find_files()
-    tfe.proc_result = ProcResult(tfe, ['N/A'], '', '', '', 0, before, after)
+    file_env = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
+    before = file_env._find_files()
+    logger.debug("Generating file env: {}".format(file_env))
+    yield file_env
+    after = file_env._find_files()
+    file_env.proc_result = ProcResult(file_env, ['N/A'], '', '', '', 0, before, after)
+    file_env.remove_created()
+    logger.debug("Finalized file env: {}".format(file_env))
 
 
 @pytest.fixture
