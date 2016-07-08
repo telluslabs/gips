@@ -7,9 +7,7 @@ from scripttest import TestFileEnvironment, ProcResult, FoundFile, FoundDir
 from . import data
 
 
-# technically imported by people who use `from .util import *`
-# TODO change to _log to prevent accidental import
-logger = logging.getLogger(__name__)
+_log = logging.getLogger(__name__)
 
 
 def set_constants(config):
@@ -45,7 +43,7 @@ class GipsTestFileEnv(TestFileEnvironment):
         need to be updated to match code changes."""
         # TODO no need to extract things that are extracted already elsewhere
         files_and_hashes = extract_hashes(files)
-        logger.debug("{}: {}".format(description, pformat(files_and_hashes)))
+        _log.debug("{}: {}".format(description, pformat(files_and_hashes)))
 
     def run(self, *args, **kwargs):
         """As super().run but store result & prevent premature exits."""
@@ -67,7 +65,7 @@ class GipsTestFileEnv(TestFileEnvironment):
             if strict:
                 raise RuntimeError(msg)
             else:
-                logger.warning("Can't remove_created: " + msg)
+                _log.warning("Can't remove_created: " + msg)
                 return
 
         created = self.proc_result.files_created
@@ -136,6 +134,7 @@ class GipsProcResult(object):
         return "GipsProcResult(object) repr called!"
 
 
+# TODO this name isn't specific enough (and is too long)
 @pytest.yield_fixture
 def test_file_environment():
     """Provide means to test files created by run & clean them up after."""
@@ -148,6 +147,7 @@ def test_file_environment():
     gtfe.remove_created()
 
 
+# TODO this name is too long
 @pytest.yield_fixture(scope='module')
 def keep_data_repo_clean(request):
     """Keep data repo clean without having to run anything in it.
@@ -157,12 +157,12 @@ def keep_data_repo_clean(request):
     work is done in tfe, the other half in ProcResult."""
     file_env = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     before = file_env._find_files()
-    logger.debug("Generating file env: {}".format(file_env))
+    _log.debug("Generating file env: {}".format(file_env))
     yield file_env
     after = file_env._find_files()
     file_env.proc_result = ProcResult(file_env, ['N/A'], '', '', '', 0, before, after)
     file_env.remove_created()
-    logger.debug("Finalized file env: {}".format(file_env))
+    _log.debug("Finalized file env: {}".format(file_env))
 
 
 @pytest.fixture

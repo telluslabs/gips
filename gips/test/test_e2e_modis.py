@@ -28,8 +28,11 @@ def setup_modis_data(pytestconfig):
                            outcome.std_out, outcome.std_err, outcome)
 
 
+# TODO This isn't actually slow anymore; ~15 sec but needs odd repo circumstance
+# TODO maybe-maybe --setup-repo sets up the repo for the test's individual needs?
+# TODO --with-clean-repo . . . ?
 @slow
-def test_inventory_fetch(test_file_environment, expected):
+def t_inventory_fetch(test_file_environment, expected):
     """Test gips_inventory --fetch; actually contacts data provider."""
     # only get data for one day to save time
     args = ('modis', '-s', NH_SHP_PATH,
@@ -49,7 +52,7 @@ def test_inventory_fetch(test_file_environment, expected):
     assert expected == actual
 
 
-def test_inventory(setup_modis_data, test_file_environment, expected):
+def t_inventory(setup_modis_data, test_file_environment, expected):
     """Test `gips_inventory modis` and confirm recorded output is given.
 
     This is currently the fastest test so if you want to run this file to
@@ -60,7 +63,7 @@ def test_inventory(setup_modis_data, test_file_environment, expected):
     assert expected == actual
 
 
-def test_process(setup_modis_data, test_file_environment, expected):
+def t_process(setup_modis_data, test_file_environment, expected):
     """Test gips_process on modis data."""
     logger.info('starting run')
     actual = test_file_environment.run('gips_process', *STD_ARGS)
@@ -68,13 +71,13 @@ def test_process(setup_modis_data, test_file_environment, expected):
     assert expected == actual
 
 
-def test_info(test_file_environment, expected):
+def t_info(test_file_environment, expected):
     """Test `gips_info modis` and confirm recorded output is given."""
     actual = test_file_environment.run('gips_info', 'modis')
     assert expected == actual
 
 
-def test_project(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_project(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     """Test gips_project modis with warping."""
     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
     logger.info('starting run')
@@ -83,7 +86,7 @@ def test_project(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     assert expected == actual
 
 
-def test_project_two_runs(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_project_two_runs(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     """As test_project, but run twice to confirm idempotence of gips_project.
 
     The data repo is only cleaned up after both runs are complete; this is
@@ -105,7 +108,7 @@ def test_project_two_runs(setup_modis_data, keep_data_repo_clean, output_tfe, ex
     assert 'final test_project run' and expected == actual
 
 
-def test_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     """Test gips_project modis without warping."""
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     logger.info('starting run')
@@ -114,7 +117,7 @@ def test_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe, exp
     assert expected == actual
 
 
-def test_tiles(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_tiles(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     """Test gips_tiles modis with warping."""
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     logger.info('starting run')
@@ -123,7 +126,7 @@ def test_tiles(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     assert expected == actual
 
 
-def test_tiles_copy(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_tiles_copy(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     """Test gips_tiles modis with copying."""
     # doesn't quite use STD_ARGS
     args = ('modis', '-t', 'h12v04', '-d', '2012-12-01,2012-12-03', '-v', '4',
@@ -134,7 +137,7 @@ def test_tiles_copy(setup_modis_data, keep_data_repo_clean, output_tfe, expected
     assert expected == actual
 
 
-def test_stats(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_stats(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     """Test gips_stats on projected files."""
     # generate data needed for stats computation
     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')

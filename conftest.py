@@ -11,7 +11,7 @@ root_streamer = logging.StreamHandler()
 root_streamer.setFormatter(logging.Formatter(log_format))
 root_logger.addHandler(root_streamer)
 
-logger = logging.getLogger(__name__)
+_log = logging.getLogger(__name__)
 
 # pytest_* functions are hooks automatically detected by pytest
 def pytest_addoption(parser):
@@ -20,7 +20,9 @@ def pytest_addoption(parser):
     These set up the data repo & configure log level."""
     help_str = ("Set log level to one of:  'debug', 'info', 'warning', "
                 "'error', or 'critical'.  Default is 'warning'.")
+                # "'error', or 'critical'.  Default is 'warning'.  Setting this also implies `-s`.")
     # TODO also support --ll <level>
+    # TODO setting this should turn on -s by default
     parser.addoption("--log-level", action="store",
                      default="warning", help=help_str)
 
@@ -33,6 +35,8 @@ def pytest_addoption(parser):
 
     parser.addini('output-dir',
                   help="The directory housing output files from test runs.")
+
+    # TODO better explanation and semantics for this -- maybe 'slow-only'?
     parser.addoption("--slow", action="store_true", help="Run slow tests")
 
 
@@ -41,17 +45,17 @@ def pytest_configure(config):
     root_logger.setLevel(config.getoption("log_level").upper())
 
     if config.getoption("setup_repo"):
-        logger.debug("--setup-repo detected; setting up data repo")
+        _log.debug("--setup-repo detected; setting up data repo")
         setup_data_repo()
 
     dr = str(config.getini('data-repo'))
     if not dr:
         raise ValueError("No value specified for 'data-repo' in pytest.ini")
     else:
-        logger.debug("value detected for data-repo: " + dr)
+        _log.debug("value detected for data-repo: " + dr)
 
     if config.getoption("slow"):
-        logger.debug("--slow detected; will run tests marked 'slow'")
+        _log.debug("--slow detected; will run tests marked 'slow'")
 
     set_constants(config)
 
@@ -65,22 +69,25 @@ def setup_data_repo():
     if gcp.status_code != 0:
         raise RuntimeError("config check via `gips_config print` failed",
                            gcp.std_out, gcp.std_err, gcp)
-    logger.debug("`gips_config print` check succeeded.")
+    _log.debug("`gips_config print` check succeeded.")
 
     # set up data root if it isn't there already
     gcp = envoy.run("gips_config env")
     if gcp.status_code != 0:
         raise RuntimeError("data root setup via `gips_config env` failed",
                            gcp.std_out, gcp.std_err, gcp)
-    logger.debug("`gips_config env` succeeded; data repo (possibly) created")
+    _log.debug("`gips_config env` succeeded; data repo (possibly) created")
 
 
+# TODO move this to system/ conftest.py (when there is one)
 def pytest_assertrepr_compare(config, op, left, right):
     """When asserting equality between process results, show detailed differences."""
     checks = (op == '==', isinstance(left, GipsProcResult), isinstance(right, GipsProcResult))
     if not all(checks):
         return
 
+    # TODO doesn't always work right:  Sometimes lines is not [] but there's still a match (lines
+    # may be verbosely telling you that there is a match).
     def header_and_indent(header, lines):
         # note strings with no diff return []
         if lines:

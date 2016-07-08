@@ -6,7 +6,7 @@ def expect(test, **kwargs):
     expectations[test] = dict(kwargs)
 
 
-expect('test_inventory_fetch',
+expect('t_inventory_fetch',
     updated={'modis/stage': None, 'modis/tiles': None},
     created={
         'modis/tiles/h12v04': None,
@@ -18,7 +18,7 @@ expect('test_inventory_fetch',
     },
 )
 
-expect('test_inventory', stdout="""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
+expect('t_inventory', stdout="""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
 Retrieving inventory for site NHseacoast-0
 
 \x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
@@ -33,7 +33,7 @@ Tile Coverage
 """
 )
 
-expect('test_process',
+expect('t_process',
     updated={'modis/tiles/h12v04/2012336': None,
              'modis/tiles/h12v04/2012337': None,
              'modis/tiles/h12v04/2012338': None},
@@ -79,7 +79,7 @@ expect('test_process',
 )
 
 # trailing whitespace and other junk characters are in current output
-expect('test_info', stdout= """\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
+expect('t_info', stdout= """\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
 \x1b[1m
 Modis Products v1.0.0\x1b[0m
 \x1b[1m
@@ -103,7 +103,7 @@ Standard Products
    landcover   MCD Annual Land Cover                   
 """)
 
-expect('test_project', created={
+expect('t_project', created={
     '0': None, # directory
     '0/2012336_MCD_fsnow.tif': -1883071404,
     '0/2012336_MOD-MYD_obstime.tif': 1180170371,
@@ -127,9 +127,9 @@ expect('test_project', created={
     '0/2012338_MOD_clouds.tif': 1789735888,
 })
 
-expect('test_project_two_runs', **expectations['test_project'])
+expect('t_project_two_runs', **expectations['t_project'])
 
-expect('test_project_no_warp', created={
+expect('t_project_no_warp', created={
     '0': None, # directory
     '0/2012336_MCD_fsnow.tif': -232655043,
     '0/2012336_MOD-MYD_obstime.tif': -508398437,
@@ -154,9 +154,9 @@ expect('test_project_no_warp', created={
 })
 
 # TODO there should be something here but nothing is saved here during manual runs.
-expect('test_tiles', created={'h12v04': None})
+expect('t_tiles', created={'h12v04': None})
 
-expect('test_tiles_copy', created={
+expect('t_tiles_copy', created={
     'h12v04': None, # directory
     'h12v04/h12v04_2012336_MCD_fsnow.tif': 1284302156,
     'h12v04/h12v04_2012336_MOD-MYD_obstime.tif': -1094139895,
@@ -180,7 +180,7 @@ expect('test_tiles_copy', created={
     'h12v04/h12v04_2012338_MOD_clouds.tif': -2052728372,
 })
 
-expect('test_stats', created={
+expect('t_stats', created={
     'clouds_stats.txt': -142855826,
     'fsnow_stats.txt': 1649245444,
     'indices_stats.txt': 551916811,
