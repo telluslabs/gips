@@ -3,7 +3,6 @@ import logging, os
 import pytest
 import envoy
 
-from .data import *
 from .util import *
 
 logger = logging.getLogger(__name__)

@@ -2,7 +2,7 @@ import logging
 import envoy
 
 from _pytest.assertion.util import _compare_eq_dict, _diff_text
-from gips.test.util import GipsProcResult, set_constants
+from gips.test.sys.util import GipsProcResult, set_constants
 
 # configure logging (can config in command-line & config file, see below)
 log_format = '%(levelname)-8s %(filename)s:%(lineno)d: %(message)s'
