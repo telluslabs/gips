@@ -20,11 +20,8 @@ def pytest_addoption(parser):
     These set up the data repo & configure log level."""
     help_str = ("Set log level to one of:  'debug', 'info', 'warning', "
                 "'error', or 'critical'.  Default is 'warning'.")
-                # "'error', or 'critical'.  Default is 'warning'.  Setting this also implies `-s`.")
-    # TODO also support --ll <level>
-    # TODO setting this should turn on -s by default
-    parser.addoption("--log-level", action="store",
-                     default="warning", help=help_str)
+    parser.addoption("--log-level", dest='log_level', help=help_str)
+    parser.addoption("--ll",        dest='log_level', help='Alias for --log-level')
 
     help_str = "Set up a test data repo & download data for test purposes."
     parser.addoption("--setup-repo", action="store_true", help=help_str)
@@ -42,7 +39,9 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     """Process user config & command-line options."""
-    root_logger.setLevel(config.getoption("log_level").upper())
+    raw_level = config.getoption("log_level")
+    level = ('warning' if raw_level is None else raw_level).upper()
+    root_logger.setLevel(level)
 
     if config.getoption("setup_repo"):
         _log.debug("--setup-repo detected; setting up data repo")
