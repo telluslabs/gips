@@ -1,10 +1,9 @@
 import logging, os, shutil
+import importlib
 from pprint import pformat
 
 import pytest
 from scripttest import TestFileEnvironment, ProcResult, FoundFile, FoundDir
-
-from . import data
 
 
 _log = logging.getLogger(__name__)
@@ -174,4 +173,8 @@ def output_tfe():
 
 @pytest.fixture
 def expected(request):
-    return GipsProcResult(**data.expectations[request.function.func_name])
+    # construct expectation module name from test module name:
+    # e.g.:  'foo.bar.t_baz' -> 'baz'
+    module_name = request.module.__name__.split('.')[-1].split('_')[-1]
+    module = importlib.import_module('..expected.' + module_name, __name__)
+    return GipsProcResult(**getattr(module, request.function.func_name))

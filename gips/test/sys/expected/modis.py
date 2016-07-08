@@ -1,14 +1,6 @@
-expectations = {}
-
-
-def expect(test, **kwargs):
-    # TODO make this aware of driver; right now there will be test name conflicts
-    expectations[test] = dict(kwargs)
-
-
-expect('t_inventory_fetch',
-    updated={'modis/stage': None, 'modis/tiles': None},
-    created={
+t_inventory_fetch = {
+    'updated': {'modis/stage': None, 'modis/tiles': None},
+    'created': {
         'modis/tiles/h12v04': None,
         'modis/tiles/h12v04/2012336': None,
         'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf': 1588268768,
@@ -16,9 +8,9 @@ expect('t_inventory_fetch',
         'modis/tiles/h12v04/2012336/MYD10A1.A2012336.h12v04.005.2012340031954.hdf': 1810195064,
         'modis/tiles/h12v04/2012336/MYD11A1.A2012336.h12v04.005.2012341040543.hdf': 1579682812,
     },
-)
+}
 
-expect('t_inventory', stdout="""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
+t_inventory = { 'stdout': """\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
 Retrieving inventory for site NHseacoast-0
 
 \x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
@@ -31,13 +23,13 @@ Tile Coverage
 \x1b[1m2012        
 \x1b[0m    336                                               100.0%               100.0%               100.0%               100.0%             \n    337                 100.0%     100.0%     100.0%     100.0%               100.0%     100.0%     100.0%               100.0%             \n    338                                               100.0%               100.0%               100.0%               100.0%             \n\n\n3 files on 3 dates\n\x1b[1m\nSENSORS\x1b[0m\n\x1b[35mMCD: Aqua/Terra Combined\x1b[0m\n\x1b[31mMOD: Terra\x1b[0m\n\x1b[32mMOD-MYD: Aqua/Terra together\x1b[0m\n\x1b[34mMYD: Aqua\x1b[0m
 """
-)
+}
 
-expect('t_process',
-    updated={'modis/tiles/h12v04/2012336': None,
+t_process = {
+    'updated': {'modis/tiles/h12v04/2012336': None,
              'modis/tiles/h12v04/2012337': None,
              'modis/tiles/h12v04/2012338': None},
-    created={
+    'created': {
         # TODO Are these broken or what?  Each None is a broken symlink:
         'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_quality.tif': None,
         'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8td.tif': None,
@@ -76,10 +68,10 @@ expect('t_process',
         'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_temp.tif': 1712906003,
         'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275,
     },
-)
+}
 
 # trailing whitespace and other junk characters are in current output
-expect('t_info', stdout= """\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
+t_info = { 'stdout':  """\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
 \x1b[1m
 Modis Products v1.0.0\x1b[0m
 \x1b[1m
@@ -101,9 +93,9 @@ Terra/Aqua Daily Products
 Standard Products
 \x1b[0m   clouds      Cloud Mask                              
    landcover   MCD Annual Land Cover                   
-""")
+"""}
 
-expect('t_project', created={
+t_project = { 'created': {
     '0': None, # directory
     '0/2012336_MCD_fsnow.tif': -1883071404,
     '0/2012336_MOD-MYD_obstime.tif': 1180170371,
@@ -125,11 +117,11 @@ expect('t_project', created={
     '0/2012338_MCD_snow.tif': -319441628,
     '0/2012338_MOD-MYD_temp.tif': -869467051,
     '0/2012338_MOD_clouds.tif': 1789735888,
-})
+}}
 
-expect('t_project_two_runs', **expectations['t_project'])
+t_project_two_runs = t_project
 
-expect('t_project_no_warp', created={
+t_project_no_warp = { 'created': {
     '0': None, # directory
     '0/2012336_MCD_fsnow.tif': -232655043,
     '0/2012336_MOD-MYD_obstime.tif': -508398437,
@@ -151,12 +143,12 @@ expect('t_project_no_warp', created={
     '0/2012338_MCD_snow.tif': 415741551,
     '0/2012338_MOD-MYD_temp.tif': -566077737,
     '0/2012338_MOD_clouds.tif': -1110899594,
-})
+}}
 
 # TODO there should be something here but nothing is saved here during manual runs.
-expect('t_tiles', created={'h12v04': None})
+t_tiles = { 'created': {'h12v04': None}}
 
-expect('t_tiles_copy', created={
+t_tiles_copy = { 'created': {
     'h12v04': None, # directory
     'h12v04/h12v04_2012336_MCD_fsnow.tif': 1284302156,
     'h12v04/h12v04_2012336_MOD-MYD_obstime.tif': -1094139895,
@@ -178,9 +170,9 @@ expect('t_tiles_copy', created={
     'h12v04/h12v04_2012338_MCD_snow.tif': -1222056036,
     'h12v04/h12v04_2012338_MOD-MYD_temp.tif': 1547257469,
     'h12v04/h12v04_2012338_MOD_clouds.tif': -2052728372,
-})
+}}
 
-expect('t_stats', created={
+t_stats = { 'created': {
     'clouds_stats.txt': -142855826,
     'fsnow_stats.txt': 1649245444,
     'indices_stats.txt': 551916811,
@@ -191,4 +183,4 @@ expect('t_stats', created={
     'temp8td_stats.txt': 2023193464,
     'temp8tn_stats.txt': -1364990917,
     'temp_stats.txt': -1532103523
-})
+}}
