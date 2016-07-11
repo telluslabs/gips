@@ -1,4 +1,4 @@
-import logging
+import logging, os, shutil
 import envoy
 
 from _pytest.assertion.util import _compare_eq_dict, _diff_text
@@ -26,6 +26,10 @@ def pytest_addoption(parser):
     help_str = "Set up a test data repo & download data for test purposes."
     parser.addoption("--setup-repo", action="store_true", help=help_str)
 
+    help_str = ("Replace the data repo with a new empty one before testing begins.  "
+                "Implies --setup-repo.")
+    parser.addoption("--clear-repo", action="store_true", help=help_str)
+
     help_str = ("The directory housing the data repo for testing purposes.  "
                 "MUST match GIPS' configured REPOS setting.")
     parser.addini('data-repo', help=help_str)
@@ -42,20 +46,27 @@ def pytest_configure(config):
     level = ('warning' if raw_level is None else raw_level).upper()
     root_logger.setLevel(level)
 
-    if config.getoption("setup_repo"):
-        _log.debug("--setup-repo detected; setting up data repo")
-        setup_data_repo()
-
     dr = str(config.getini('data-repo'))
     if not dr:
         raise ValueError("No value specified for 'data-repo' in pytest.ini")
     else:
         _log.debug("value detected for data-repo: " + dr)
 
-    if config.getoption("slow"):
-        _log.debug("--slow detected; will run tests marked 'slow'")
-
     set_constants(config)
+
+    if config.getoption("slow"):
+        _log.debug("--slow detected; will not skip @slow tests")
+
+    if config.getoption("clear_repo"):
+        _log.debug("--clear-repo detected; trashing and rebuilding data repo")
+        path = config.getini('data-repo')
+        os.path.lexists(path) and shutil.rmtree(path)
+        setup_data_repo()
+    elif config.getoption("setup_repo"):
+        _log.debug("--setup-repo detected; setting up data repo")
+        setup_data_repo()
+
+
 
 
 def setup_data_repo():

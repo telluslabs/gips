@@ -11,14 +11,14 @@ _log = logging.getLogger(__name__)
 
 def set_constants(config):
     # set constants, mostly places to find various needed files
-    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH, slow
+    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH
     TEST_DATA_DIR  = str(config.rootdir.join('gips/test'))
     DATA_REPO_ROOT = config.getini('data-repo')
     OUTPUT_DIR     = config.getini('output-dir')
     NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
-    slow = pytest.mark.skipif(not config.getoption("slow"),
-                              reason="--slow is required for this test")
 
+slow = pytest.mark.skipif('not config.getoption("slow")',
+                          reason="--slow is required for this test")
 
 def extract_hashes(files):
     """Return a dict of file names and unique hashes of their content.
@@ -126,9 +126,6 @@ class GipsProcResult(object):
         )
         return all(matches)
 
-    def __repr__(self):
-        return "GipsProcResult(object) repr called!"
-
 
 @pytest.yield_fixture
 def repo_env():
@@ -169,7 +166,7 @@ def output_tfe():
 @pytest.fixture
 def expected(request):
     # construct expectation module name from test module name:
-    # e.g.:  'foo.bar.t_baz' -> 'baz'
+    # e.g.:  'foo.bar.t_baz_qux' -> 'baz_qux'
     mod_name = request.module.__name__.split('.')[-1].split('_', 1)[1]
     relative_mod_name = '..expected.' + mod_name
     try:
