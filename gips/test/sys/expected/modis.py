@@ -1,3 +1,5 @@
+"""Known-good outcomes for tests, mostly stdout and created files."""
+
 t_inventory = { 'stdout': """\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
 Retrieving inventory for site NHseacoast-0
 
