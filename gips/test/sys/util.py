@@ -170,6 +170,11 @@ def output_tfe():
 def expected(request):
     # construct expectation module name from test module name:
     # e.g.:  'foo.bar.t_baz' -> 'baz'
-    module_name = request.module.__name__.split('.')[-1].split('_')[-1]
-    module = importlib.import_module('..expected.' + module_name, __name__)
+    mod_name = request.module.__name__.split('.')[-1].split('_', 1)[1]
+    relative_mod_name = '..expected.' + mod_name
+    try:
+        module = importlib.import_module(relative_mod_name, __name__)
+    except ImportError as ie:
+        msg = "Eror importing expectations from {}.".format(relative_mod_name)
+        raise ImportError(msg, ie.args)
     return GipsProcResult(**getattr(module, request.function.func_name))

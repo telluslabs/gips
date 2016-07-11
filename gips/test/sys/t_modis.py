@@ -1,4 +1,4 @@
-import logging, os
+import logging
 
 import pytest
 import envoy
@@ -25,31 +25,6 @@ def setup_modis_data(pytestconfig):
     if outcome.status_code != 0:
         raise RuntimeError("MODIS data setup via `gips_inventory` failed",
                            outcome.std_out, outcome.std_err, outcome)
-
-
-# TODO This isn't actually slow anymore; ~15 sec but needs odd repo circumstance
-# TODO maybe-maybe --setup-repo sets up the repo for the test's individual needs?
-# TODO --with-clean-repo . . . ?
-@slow
-def t_inventory_fetch(repo_env, expected):
-    """Test gips_inventory --fetch; actually contacts data provider."""
-    # only get data for one day to save time
-    args = ('modis', '-s', NH_SHP_PATH,
-            '-d', '2012-12-01,2012-12-01', '-v', '4', '--fetch')
-    # check repo before run to see if it's cleaned out; remove DATA_REPO_ROOT
-    # then run `gips_config env` to clean it (this could be done by the test
-    # but if the user has files that are difficult to replace we don't want to
-    # make assumptions about what we can destroy).
-    before = set(repo_env._find_files().keys())
-    if before & set(expected.created.keys()):
-        # TODO report on specifics
-        raise RuntimeError('Output files found before test; repo '
-                           'may not be clean.')
-    logger.info('starting run')
-    actual = repo_env.run('gips_inventory', *args)
-    logger.info('run complete')
-    assert expected == actual
-
 
 def t_inventory(setup_modis_data, repo_env, expected):
     """Test `gips_inventory modis` and confirm recorded output is given.
@@ -79,6 +54,7 @@ def t_info(repo_env, expected):
 def t_project(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_project modis with warping."""
     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
+    # TODO take out these logs; never useful
     logger.info('starting run')
     actual = output_tfe.run('gips_project', *args)
     logger.info('run complete')

@@ -33,8 +33,7 @@ def pytest_addoption(parser):
     parser.addini('output-dir',
                   help="The directory housing output files from test runs.")
 
-    # TODO better explanation and semantics for this -- maybe 'slow-only'?
-    parser.addoption("--slow", action="store_true", help="Run slow tests")
+    parser.addoption("--slow", action="store_true", help="Do not skip @slow tests.")
 
 
 def pytest_configure(config):
