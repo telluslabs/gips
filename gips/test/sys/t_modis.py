@@ -39,9 +39,7 @@ def t_inventory(setup_modis_data, repo_env, expected):
 
 def t_process(setup_modis_data, repo_env, expected):
     """Test gips_process on modis data."""
-    logger.info('starting run')
     actual = repo_env.run('gips_process', *STD_ARGS)
-    logger.info('run complete')
     assert expected == actual
 
 
@@ -54,10 +52,7 @@ def t_info(repo_env, expected):
 def t_project(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_project modis with warping."""
     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
-    # TODO take out these logs; never useful
-    logger.info('starting run')
     actual = output_tfe.run('gips_project', *args)
-    logger.info('run complete')
     assert expected == actual
 
 
@@ -70,15 +65,10 @@ def t_project_two_runs(setup_modis_data, clean_repo_env, output_tfe, expected):
     args = STD_ARGS + ('--res', '100', '100',
                        '--outdir', OUTPUT_DIR, '--notld')
 
-    logger.info('starting first run: gips_project ' + ' '.join(args))
     actual = output_tfe.run('gips_project', *args)
-    logger.info('first run complete')
     assert 'initial test_project run' and expected == actual
 
-    logger.info('starting second run: gips_project ' + ' '.join(args))
     actual = output_tfe.run('gips_project', *args)
-    logger.info('second run complete')
-
     expected.created = {} # no created files on second run
     assert 'final test_project run' and expected == actual
 
@@ -86,18 +76,14 @@ def t_project_two_runs(setup_modis_data, clean_repo_env, output_tfe, expected):
 def t_project_no_warp(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_project modis without warping."""
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
-    logger.info('starting run')
     actual = output_tfe.run('gips_project', *args)
-    logger.info('run complete')
     assert expected == actual
 
 
 def t_tiles(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_tiles modis with warping."""
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
-    logger.info('starting run')
     actual = output_tfe.run('gips_tiles', *args)
-    logger.info('run complete')
     assert expected == actual
 
 
@@ -106,9 +92,7 @@ def t_tiles_copy(setup_modis_data, clean_repo_env, output_tfe, expected):
     # doesn't quite use STD_ARGS
     args = ('modis', '-t', 'h12v04', '-d', '2012-12-01,2012-12-03', '-v', '4',
             '--outdir', OUTPUT_DIR, '--notld')
-    logger.info('starting run')
     actual = output_tfe.run('gips_tiles', *args)
-    logger.info('run complete')
     assert expected == actual
 
 

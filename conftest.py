@@ -67,13 +67,10 @@ def pytest_configure(config):
         setup_data_repo()
 
 
-
-
 def setup_data_repo():
     """Construct the data repo if it is absent."""
     # confirm the user's done basic config
     # TODO do these checks every run if fast enough
-    # TODO add option to clear the repo before setting it up
     gcp = envoy.run("gips_config print")
     if gcp.status_code != 0:
         raise RuntimeError("config check via `gips_config print` failed",
@@ -88,33 +85,27 @@ def setup_data_repo():
     _log.debug("`gips_config env` succeeded; data repo (possibly) created")
 
 
-# TODO move this to system/ conftest.py (when there is one)
 def pytest_assertrepr_compare(config, op, left, right):
     """When asserting equality between process results, show detailed differences."""
     checks = (op == '==', isinstance(left, GipsProcResult), isinstance(right, GipsProcResult))
     if not all(checks):
         return
 
-    # TODO doesn't always work right:  Sometimes lines is not [] but there's still a match (lines
-    # may be verbosely telling you that there is a match).
     def header_and_indent(header, lines):
-        # note strings with no diff return []
         if lines:
             return [header + ':'] + ['  ' + line for line in lines]
         else:
             return [header + ':  matches']
 
-    verbose = False # TODO get that from 'config'?
+    verbose = config.getoption('verbose')
 
     output = ['GipsProcResult == GipsProcResult:']
 
     oper = {True: '==', False: '!='}[left.exit_status == right.exit_status]
     output += ['exit_status:  {} {} {}'.format(left.exit_status, oper, right.exit_status)]
 
-    # TODO text comparison breaks due to misunderstanding terminal sequences (I think it needs to
-    # esape them)
-    # TODO can't trust a diff to be accurate; have to use own comparison (matches vs. "Omitting 2
-    # identical items, use -v to show").
+    # TODO text diff breaks due to terminal control sequences (I
+    # think it's escaping them wrong or not at all).
     if left.compare_stdout:
         stdout_diff = _diff_text(left.stdout, right.stdout, verbose)
         output += header_and_indent('stdout', stdout_diff)
