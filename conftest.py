@@ -39,6 +39,10 @@ def pytest_addoption(parser):
 
     parser.addoption("--slow", action="store_true", help="Do not skip @slow tests.")
 
+    help_str = ("Do not skip @src_altering tests, which are tests that may "
+                "alter or remove source data in the repo.")
+    parser.addoption("--src-altering", action="store_true", help=help_str)
+
 
 def pytest_configure(config):
     """Process user config & command-line options."""
@@ -62,6 +66,7 @@ def pytest_configure(config):
         path = config.getini('data-repo')
         os.path.lexists(path) and shutil.rmtree(path)
         setup_data_repo()
+        config.option.setup_repo = True
     elif config.getoption("setup_repo"):
         _log.debug("--setup-repo detected; setting up data repo")
         setup_data_repo()

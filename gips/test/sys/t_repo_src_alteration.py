@@ -22,6 +22,10 @@ def careful_repo_env(request, expected):
     gtfe.remove_created()
 
 
+src_altering = pytest.mark.skipif(not pytest.config.getoption("src_altering"),
+                                  reason="--src-altering is required for this test")
+
+@src_altering
 def t_modis_inv_fetch(careful_repo_env, expected):
     """Test gips_inventory --fetch; actually contacts data provider."""
     # only get data for one day to save time
