@@ -31,6 +31,7 @@ t_process = {
              'modis/tiles/h12v04/2012338': None},
     'created': {
         # TODO Are these broken or what?  Each None is a broken symlink:
+        # See https://github.com/Applied-GeoSolutions/gips/issues/54
         'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_quality.tif': None,
         'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8td.tif': None,
         'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8tn.tif': None,
@@ -146,6 +147,7 @@ t_project_no_warp = { 'created': {
 }}
 
 # TODO there should be something here but nothing is saved here during manual runs.
+# See https://github.com/Applied-GeoSolutions/gips/issues/54
 t_tiles = { 'created': {'h12v04': None}}
 
 t_tiles_copy = { 'created': {

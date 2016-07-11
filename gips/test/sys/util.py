@@ -40,22 +40,19 @@ class GipsTestFileEnv(TestFileEnvironment):
 
         Logs in a format suitable for updating known good values when tests
         need to be updated to match code changes."""
-        # TODO no need to extract things that are extracted already elsewhere
-        files_and_hashes = extract_hashes(files)
-        _log.debug("{}: {}".format(description, pformat(files_and_hashes)))
+        _log.debug("{}: {}".format(description, pformat(files)))
 
     def run(self, *args, **kwargs):
         """As super().run but store result & prevent premature exits."""
-        # TODO can remove expect_* & all those assumptions
-        pr = super(GipsTestFileEnv, self).run(
+        self.proc_result = super(GipsTestFileEnv, self).run(
                 *args, expect_error=True, expect_stderr=True, **kwargs)
-        self.proc_result = pr
-        logging.debug("standard output: {}".format(pr.stdout))
-        logging.debug("standard error: {}".format(pr.stderr))
-        self.log_findings("Created files", pr.files_created)
-        self.log_findings("Updated files", pr.files_updated)
-        self.log_findings("Deleted files", pr.files_deleted)
-        return GipsProcResult(pr)
+        self.gips_proc_result = gpr = GipsProcResult(self.proc_result)
+        logging.debug("standard output: {}".format(gpr.stdout))
+        logging.debug("standard error: {}".format(gpr.stderr))
+        self.log_findings("Created files", gpr.created)
+        self.log_findings("Updated files", gpr.updated)
+        self.log_findings("Deleted files", gpr.deleted)
+        return gpr
 
     def remove_created(self, strict=False):
         """Remove files & directories created by test run."""
@@ -133,9 +130,8 @@ class GipsProcResult(object):
         return "GipsProcResult(object) repr called!"
 
 
-# TODO this name isn't specific enough (and is too long)
 @pytest.yield_fixture
-def test_file_environment():
+def repo_env():
     """Provide means to test files created by run & clean them up after."""
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     yield gtfe
@@ -146,9 +142,8 @@ def test_file_environment():
     gtfe.remove_created()
 
 
-# TODO this name is too long
 @pytest.yield_fixture(scope='module')
-def keep_data_repo_clean(request):
+def clean_repo_env(request):
     """Keep data repo clean without having to run anything in it.
 
     This emulates tfe.run()'s checking the directory before and after a run,

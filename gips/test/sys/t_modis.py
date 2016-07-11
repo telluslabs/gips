@@ -31,7 +31,7 @@ def setup_modis_data(pytestconfig):
 # TODO maybe-maybe --setup-repo sets up the repo for the test's individual needs?
 # TODO --with-clean-repo . . . ?
 @slow
-def t_inventory_fetch(test_file_environment, expected):
+def t_inventory_fetch(repo_env, expected):
     """Test gips_inventory --fetch; actually contacts data provider."""
     # only get data for one day to save time
     args = ('modis', '-s', NH_SHP_PATH,
@@ -40,43 +40,43 @@ def t_inventory_fetch(test_file_environment, expected):
     # then run `gips_config env` to clean it (this could be done by the test
     # but if the user has files that are difficult to replace we don't want to
     # make assumptions about what we can destroy).
-    before = set(test_file_environment._find_files().keys())
+    before = set(repo_env._find_files().keys())
     if before & set(expected.created.keys()):
         # TODO report on specifics
         raise RuntimeError('Output files found before test; repo '
                            'may not be clean.')
     logger.info('starting run')
-    actual = test_file_environment.run('gips_inventory', *args)
+    actual = repo_env.run('gips_inventory', *args)
     logger.info('run complete')
     assert expected == actual
 
 
-def t_inventory(setup_modis_data, test_file_environment, expected):
+def t_inventory(setup_modis_data, repo_env, expected):
     """Test `gips_inventory modis` and confirm recorded output is given.
 
     This is currently the fastest test so if you want to run this file to
     confirm its sanity without running a bunch of slow tests, do this:
         $ py.test gips/test/test_e2e_modis.py::test_inventory
     """
-    actual = test_file_environment.run('gips_inventory', *STD_ARGS)
+    actual = repo_env.run('gips_inventory', *STD_ARGS)
     assert expected == actual
 
 
-def t_process(setup_modis_data, test_file_environment, expected):
+def t_process(setup_modis_data, repo_env, expected):
     """Test gips_process on modis data."""
     logger.info('starting run')
-    actual = test_file_environment.run('gips_process', *STD_ARGS)
+    actual = repo_env.run('gips_process', *STD_ARGS)
     logger.info('run complete')
     assert expected == actual
 
 
-def t_info(test_file_environment, expected):
+def t_info(repo_env, expected):
     """Test `gips_info modis` and confirm recorded output is given."""
-    actual = test_file_environment.run('gips_info', 'modis')
+    actual = repo_env.run('gips_info', 'modis')
     assert expected == actual
 
 
-def t_project(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_project(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_project modis with warping."""
     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
     logger.info('starting run')
@@ -85,7 +85,7 @@ def t_project(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     assert expected == actual
 
 
-def t_project_two_runs(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_project_two_runs(setup_modis_data, clean_repo_env, output_tfe, expected):
     """As test_project, but run twice to confirm idempotence of gips_project.
 
     The data repo is only cleaned up after both runs are complete; this is
@@ -107,7 +107,7 @@ def t_project_two_runs(setup_modis_data, keep_data_repo_clean, output_tfe, expec
     assert 'final test_project run' and expected == actual
 
 
-def t_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_project_no_warp(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_project modis without warping."""
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     logger.info('starting run')
@@ -116,7 +116,7 @@ def t_project_no_warp(setup_modis_data, keep_data_repo_clean, output_tfe, expect
     assert expected == actual
 
 
-def t_tiles(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_tiles(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_tiles modis with warping."""
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     logger.info('starting run')
@@ -125,7 +125,7 @@ def t_tiles(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     assert expected == actual
 
 
-def t_tiles_copy(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_tiles_copy(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_tiles modis with copying."""
     # doesn't quite use STD_ARGS
     args = ('modis', '-t', 'h12v04', '-d', '2012-12-01,2012-12-03', '-v', '4',
@@ -136,7 +136,7 @@ def t_tiles_copy(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
     assert expected == actual
 
 
-def t_stats(setup_modis_data, keep_data_repo_clean, output_tfe, expected):
+def t_stats(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_stats on projected files."""
     # generate data needed for stats computation
     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
