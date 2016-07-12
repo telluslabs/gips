@@ -44,6 +44,7 @@ class GipsTestFileEnv(TestFileEnvironment):
 
     def run(self, *args, **kwargs):
         """As super().run but store result & prevent premature exits."""
+        logging.debug("command line: `{}`".format(' '.join(args)))
         self.proc_result = super(GipsTestFileEnv, self).run(
                 *args, expect_error=True, expect_stderr=True, **kwargs)
         self.gips_proc_result = gpr = GipsProcResult(self.proc_result)
