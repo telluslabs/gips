@@ -61,3 +61,43 @@ Standard Products
                  toa: use top of the atmosphere reflectance
    wtemp       Water temperature (atmospherically correct) - valid for water only
 """}
+
+t_inventory = { 'stdout': """\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
+Retrieving inventory for site NHseacoast-0
+fname
+LC80120302015352LGN00.tar.gz
+DN asset
+
+\x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
+\x1b[1m
+Tile Coverage
+\x1b[4m  Tile      % Coverage   % Tile Used\x1b[0m
+  012030      100.0%        6.7%
+  013030        2.4%        0.2%
+
+\x1b[1m\x1b[4m    DATE        DN        SR     Product  \x1b[0m
+\x1b[1m2015        
+\x1b[0m    352       100.0%             
+
+
+1 files on 1 dates
+\x1b[1m
+SENSORS\x1b[0m
+\x1b[35mLC8: Landsat 8\x1b[0m
+\x1b[31mLC8SR: Landsat 8 Surface Reflectance\x1b[0m
+\x1b[32mLE7: Landsat 7\x1b[0m
+\x1b[34mLT5: Landsat 5\x1b[0m
+"""}
+
+t_process = {
+    'updated': {'landsat/tiles/012030/2015352': None},
+    'created': {
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_acca.tif': -1532119925,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_bqashadow.tif': -1566662956,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_ndvi-toa.tif': -204896503,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_rad-toa.tif': 1658217796,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_ref-toa.tif': -1766137404,
+        'landsat/tiles/012030/2015352/LC80120302015352LGN00.tar.gz.index': 1896263933,
+        'landsat/tiles/012030/2015352/LC80120302015352LGN00_MTL.txt': 2084350553,
+    }
+}
