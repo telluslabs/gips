@@ -179,6 +179,7 @@ class Asset(object):
         '': {'description': ''},
     }
     # dictionary of assets
+    # TODO - support regular expressions for patterns
     _assets = {
         '': {
             'pattern': '*',
