@@ -44,6 +44,4 @@ def t_process(setup_landsat_data, repo_env, expected):
     """Test gips_process on landsat data."""
     PROCESS_ARGS = STD_ARGS + product_args
     actual = repo_env.run('gips_process', *PROCESS_ARGS)
-    # can't use `expected == actual`; it emits nondeterministic strings on stderr
-    # TODO make it not do that for normal operations ^^^
-    assert expected.created == actual.created
+    assert expected == actual

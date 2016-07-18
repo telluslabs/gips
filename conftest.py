@@ -109,20 +109,20 @@ def pytest_assertrepr_compare(config, op, left, right):
     oper = {True: '==', False: '!='}[left.exit_status == right.exit_status]
     output += ['exit_status:  {} {} {}'.format(left.exit_status, oper, right.exit_status)]
 
-    # TODO text diff breaks due to terminal control sequences (I
-    # think it's escaping them wrong or not at all).
-    if left.compare_stdout:
-        stdout_diff = _diff_text(left.stdout, right.stdout, verbose)
-        output += header_and_indent('stdout', stdout_diff)
-    else:
-        output += ['stdout:  ignored']
+    for s in ('stdout', 'stderr'):
+        l_compare = getattr(left, 'compare_' + s)
+        r_compare = getattr(right, 'compare_' + s)
+        if l_compare and r_compare:
+            (l_stream, r_stream) = (getattr(left, s), getattr(right, s))
+            # TODO text diff breaks due to terminal control sequences (I
+            # think it's escaping them wrong or not at all).
+            output += header_and_indent(s, _diff_text(l_stream, r_stream, verbose))
+        else:
+            output += [s + ':  ignored']
 
-    stderr_diff  = _diff_text(left.stderr, right.stderr, verbose)
     updated_diff = _compare_eq_dict(left.updated, right.updated, verbose)
     deleted_diff = _compare_eq_dict(left.deleted, right.deleted, verbose)
     created_diff = _compare_eq_dict(left.created, right.created, verbose)
-
-    output += header_and_indent('stderr', stderr_diff)
     output += header_and_indent('updated', updated_diff)
     output += header_and_indent('deleted', deleted_diff)
     output += header_and_indent('created', created_diff)

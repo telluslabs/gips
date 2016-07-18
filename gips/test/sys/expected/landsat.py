@@ -90,6 +90,7 @@ SENSORS\x1b[0m
 """}
 
 t_process = {
+    'compare_stderr': False,
     'updated': {'landsat/tiles/012030/2015352': None},
     'created': {
         'landsat/tiles/012030/2015352/012030_2015352_LC8_acca.tif': -1532119925,
