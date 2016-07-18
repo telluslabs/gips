@@ -127,10 +127,26 @@ t_project_no_warp = {
     }
 }
 
+# TODO this bug rearing its ugly head again?
+# See https://github.com/Applied-GeoSolutions/gips/issues/54
+t_tiles = { 'created': {'012030': None}}
+
+t_tiles_copy = {
+    'compare_stderr': False,
+    'created': {
+        '012030': None,
+	'012030/012030_2015352_LC8_acca.tif': 1593997289,
+	'012030/012030_2015352_LC8_bqashadow.tif': -116702962,
+	'012030/012030_2015352_LC8_ndvi-toa.tif': -1923562909,
+	'012030/012030_2015352_LC8_rad-toa.tif': 525640715,
+	'012030/012030_2015352_LC8_ref-toa.tif': -1287648712,
+    }
+}
+
 t_stats = { 'created': {
     'acca_stats.txt': -789655715,
     'bqashadow_stats.txt': 1501756012,
     'ndvi-toa_stats.txt': -77721729,
     'rad-toa_stats.txt': 1664250177,
-    'ref-toa_stats.txt': 2007199405
+    'ref-toa_stats.txt': 2007199405,
 }}
