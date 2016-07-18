@@ -102,3 +102,35 @@ t_process = {
         'landsat/tiles/012030/2015352/LC80120302015352LGN00_MTL.txt': 2084350553,
     }
 }
+
+t_project = {
+    'compare_stderr': False,
+    'created': {
+        '0': None,
+        '0/2015352_LC8_acca.tif': -1824905460,
+        '0/2015352_LC8_bqashadow.tif': 1603304372,
+        '0/2015352_LC8_ndvi-toa.tif': 844246796,
+        '0/2015352_LC8_rad-toa.tif': -317896577,
+        '0/2015352_LC8_ref-toa.tif': -1496156246,
+    }
+}
+
+t_project_no_warp = {
+    'compare_stderr': False,
+    'created': {
+        '0': None,
+        '0/2015352_LC8_acca.tif': 1288527028,
+        '0/2015352_LC8_bqashadow.tif': -2134364541,
+        '0/2015352_LC8_ndvi-toa.tif': 1466287813,
+        '0/2015352_LC8_rad-toa.tif': 1618019596,
+        '0/2015352_LC8_ref-toa.tif': -614392204,
+    }
+}
+
+t_stats = { 'created': {
+    'acca_stats.txt': -789655715,
+    'bqashadow_stats.txt': 1501756012,
+    'ndvi-toa_stats.txt': -77721729,
+    'rad-toa_stats.txt': 1664250177,
+    'ref-toa_stats.txt': 2007199405
+}}

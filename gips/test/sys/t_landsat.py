@@ -42,6 +42,35 @@ def t_inventory(setup_landsat_data, repo_env, expected):
 @slow
 def t_process(setup_landsat_data, repo_env, expected):
     """Test gips_process on landsat data."""
-    PROCESS_ARGS = STD_ARGS + product_args
-    actual = repo_env.run('gips_process', *PROCESS_ARGS)
+    args = STD_ARGS + product_args
+    actual = repo_env.run('gips_process', *args)
+    assert expected == actual
+
+
+def t_project(setup_landsat_data, clean_repo_env, output_tfe, expected):
+    """Test gips_project landsat with warping."""
+    args = STD_ARGS + product_args + ('--res', '30', '30', '--outdir', OUTPUT_DIR, '--notld')
+    actual = output_tfe.run('gips_project', *args)
+    assert expected == actual
+
+
+def t_project_no_warp(setup_landsat_data, clean_repo_env, output_tfe, expected):
+    """Test gips_project modis without warping."""
+    args = STD_ARGS + product_args + ('--outdir', OUTPUT_DIR, '--notld')
+    actual = output_tfe.run('gips_project', *args)
+    assert expected == actual
+
+
+def t_stats(setup_landsat_data, clean_repo_env, output_tfe, expected):
+    """Test gips_stats on projected files."""
+    # generate data needed for stats computation
+    args = STD_ARGS + product_args + ('--res', '30', '30', '--outdir', OUTPUT_DIR, '--notld')
+    prep_run = output_tfe.run('gips_project', *args)
+    assert prep_run.exit_status == 0 # confirm it worked; not really in the test
+
+    # compute stats
+    gtfe = GipsTestFileEnv(OUTPUT_DIR, start_clear=False)
+    actual = gtfe.run('gips_stats', OUTPUT_DIR)
+
+    # check for correct stats content
     assert expected == actual

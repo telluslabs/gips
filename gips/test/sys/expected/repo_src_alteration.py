@@ -16,6 +16,7 @@ t_landsat_inv_fetch = {
     'created': {
         'landsat/tiles/012030': None,
         'landsat/tiles/012030/2015352': None,
-        'landsat/tiles/012030/2015352/LC80120302015352LGN00.tar.gz': 725162296,
+        'landsat/tiles/012030/2015352/LC80120302015352LGN00.tar.gz':
+            'I cannot be right, see test for details',
     },
 }
