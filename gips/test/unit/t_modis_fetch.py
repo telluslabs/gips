@@ -1,4 +1,8 @@
+"""Unit tests for data.modis.modis.modisAsset.fetch."""
+
+import sys
 import datetime
+import urllib2
 
 import pytest
 
@@ -44,7 +48,6 @@ def fetch_mocks(mocker):
     # called in a loop for items in the listing that match criteria
     urlopen2 = mocker.patch.object(modis.urllib2, 'urlopen')
     conn = urlopen2.return_value
-    # conn.read.return_value = "omnia dicta fortiora si dicta Latina."
     open = mocker.patch.object(modis, 'open')
     file = open.return_value
     return (urlopen, urlopen2, conn, open, file)
@@ -138,12 +141,12 @@ MOD11A1_listing = [
 http_200_params = (
     (('MYD11A1', 'h12v04', dt(2012, 12, 1, 0, 0)),
         'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.005/2012.12.01',
-        MYD11A1_listing, # big damn html listing
+        MYD11A1_listing, # HTML index page
         'MYD11A1.A2012336.h12v04.005.2012341040543.hdf'),
 
     (('MOD11A1', 'h12v04', dt(2012, 12, 1, 0, 0)),
         'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.005/2012.12.01',
-        MOD11A1_listing, # big damn html listing
+        MOD11A1_listing, # HTML index page
         'MOD11A1.A2012336.h12v04.005.2012339180517.hdf'),
 )
 
@@ -178,4 +181,26 @@ def t_match_all_the_things(fetch_mocks, call, listing_url, listing, asset_fn):
         # not checking file.close because its failure is believed to be low-impact.
         file.write.call_count == 1,
         file.write.call_args  == ((conn.read.return_value,), {}),
+    ])
+
+
+@pytest.mark.parametrize("call, listing_url, listing, asset_fn", http_200_params)
+def t_auth_error(fetch_mocks, mocker, call, listing_url, listing, asset_fn):
+    """Confirm auth failures are handled gracefully."""
+    (urlopen, urlopen2, conn, open, file) = fetch_mocks
+    print_mock = mocker.patch.object(modis, 'print') # to confirm user notification is produced
+
+    urlopen.return_value.readlines.return_value = listing # coerce the loop to start
+
+    # rig urllib2.urlopen to explode
+    urlopen2.side_effect = urllib2.HTTPError('http://example.com/', 401, 'Unauthorized', None, None)
+
+    modis.modisAsset.fetch(*call)
+
+    assert all([
+        not open.called, # Confirm short-circuiting by showing open was never called
+        print_mock.call_count == 2,
+        # making sure the errors go to stderr important; precise wording probably isn't
+        print_mock.mock_calls[0][-1] == dict(file=sys.stderr),
+        print_mock.mock_calls[1][-1] == dict(file=sys.stderr),
     ])
