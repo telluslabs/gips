@@ -184,6 +184,9 @@ class modisAsset(Asset):
 
         success = False
         for item in listing:
+            # screen-scrape the content of the page and extract the full name of the needed file
+            # (this step is needed because part of the filename, the creation timestamp, is
+            # effectively random).
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
@@ -199,10 +202,10 @@ class modisAsset(Asset):
                     output.close()
 
                 except urllib2.HTTPError as e:
-                    # keep going even if this fails because . . . TODO actually I don't know of a reason.
                     if e.code == 401:
                         print('Download of', name, 'failed:', e.reason, file=sys.stderr)
                         print('Full URL:', url, file=sys.stderr)
+                    return # might as well stop b/c the rest will probably fail too
                 except Exception:
                     # TODO - implement pre-check to only attempt on valid dates
                     # then uncomment this

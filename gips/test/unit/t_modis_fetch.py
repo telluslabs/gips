@@ -152,7 +152,7 @@ http_200_params = (
 
 
 @pytest.mark.parametrize("call, listing_url, listing, asset_fn", http_200_params)
-def t_match_all_the_things(fetch_mocks, call, listing_url, listing, asset_fn):
+def t_matching_listings(fetch_mocks, call, listing_url, listing, asset_fn):
     """test modisAsset.fetch:  Query server, extract URL, then download it."""
     (urlopen, urlopen2, conn, open, file) = fetch_mocks
 
