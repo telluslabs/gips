@@ -21,7 +21,10 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
+from __future__ import print_function
+
 import os
+import sys
 import re
 import datetime
 import urllib
@@ -166,7 +169,7 @@ class modisAsset(Asset):
         year, month, day = date.timetuple()[:3]
 
         if asset == "MCD12Q1" and (month != 1 or day != 1):
-            print "Land cover data are only available for Jan. 1"
+            print("Land cover data are only available for Jan. 1")
             return
 
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
@@ -195,6 +198,11 @@ class modisAsset(Asset):
                     output.write(connection.read())
                     output.close()
 
+                except urllib2.HTTPError as e:
+                    # keep going even if this fails because . . . TODO actually I don't know of a reason.
+                    if e.code == 401:
+                        print('Download of', name, 'failed:', e.reason, file=sys.stderr)
+                        print('Full URL:', url, file=sys.stderr)
                 except Exception:
                     # TODO - implement pre-check to only attempt on valid dates
                     # then uncomment this
@@ -393,7 +401,7 @@ class modisData(Data):
                 evi[wg] = (2.5*(nirimg[wg] - redimg[wg])) / (nirimg[wg] + 6.0*redimg[wg] - 7.5*bluimg[wg] + 1.0)
 
                 # create output gippy image
-                print "writing", fname
+                print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 6)
 
                 imgout.SetNoData(missing)
@@ -547,7 +555,7 @@ class modisData(Data):
                 fracout[mask] = 0
 
                 if totsnowcover == 0 or totsnowfrac == 0:
-                    print "no snow or ice: skipping", str(self.date), str(self.id), str(missingassets)
+                    print("no snow or ice: skipping", str(self.date), str(self.id), str(missingassets))
 
                 meta['FRACMISSINGCOVERCLEAR'] = fracmissingcoverclear
                 meta['FRACMISSINGCOVERSNOW'] = fracmissingcoversnow
@@ -671,7 +679,7 @@ class modisData(Data):
                 numvalidcover = np.sum(coverout != 127)
 
                 if totsnowcover == 0 or totsnowfrac == 0:
-                    print "no snow or ice: skipping", str(self.date), str(self.id), str(missingassets)
+                    print("no snow or ice: skipping", str(self.date), str(self.id), str(missingassets))
 
                 meta['FRACMISSINGCOVERCLEAR'] = fracmissingcoverclear
                 meta['FRACMISSINGCOVERSNOW'] = fracmissingcoversnow
