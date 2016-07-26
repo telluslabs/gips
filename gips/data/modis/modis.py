@@ -27,16 +27,18 @@ import os
 import sys
 import re
 import datetime
+
 import urllib
 import urllib2
 
 import math
 import numpy as np
+import requests
 
 import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
-from gips.utils import VerboseOut
+from gips.utils import VerboseOut, settings
 
 from pdb import set_trace
 
@@ -70,6 +72,10 @@ class modisAsset(Asset):
         'MCD': {'description': 'Aqua/Terra Combined'},
         'MOD-MYD': {'description': 'Aqua/Terra together'}
     }
+
+
+    # some modis data sources require authorization for access; these do not.
+    _skip_auth = ['MOD10A2', 'MOD10A1', 'MYD10A1', 'MYD10A2']
 
     _assets = {
         'MCD43A4': {
@@ -172,6 +178,11 @@ class modisAsset(Asset):
             print("Land cover data are only available for Jan. 1")
             return
 
+        # if it's going to fail, let's find out early:
+        if asset not in cls._skip_auth:
+            username = cls.Repository.get_setting('username')
+            password = cls.Repository.get_setting('password')
+
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
         cpattern = re.compile(pattern)
@@ -202,9 +213,8 @@ class modisAsset(Asset):
                     output.close()
 
                 except urllib2.HTTPError as e:
-                    if e.code == 401:
-                        print('Download of', name, 'failed:', e.reason, file=sys.stderr)
-                        print('Full URL:', url, file=sys.stderr)
+                    print('Download of', name, 'failed:', e.code, e.reason, file=sys.stderr)
+                    print('Full URL:', url, file=sys.stderr)
                     return # might as well stop b/c the rest will probably fail too
                 except Exception:
                     # TODO - implement pre-check to only attempt on valid dates

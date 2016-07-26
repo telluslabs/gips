@@ -46,17 +46,17 @@ def fetch_mocks(mocker):
     urlopen = mocker.patch.object(modis.urllib, 'urlopen')
 
     # called in a loop for items in the listing that match criteria
-    urlopen2 = mocker.patch.object(modis.urllib2, 'urlopen')
-    conn = urlopen2.return_value
+    get = mocker.patch.object(modis.requests, 'get')
+    response = get.return_value
     open = mocker.patch.object(modis, 'open')
     file = open.return_value
-    return (urlopen, urlopen2, conn, open, file)
+    return (urlopen, get, response, open, file)
 
 
 @pytest.mark.parametrize("call, expected", http_404_params)
 def t_no_matching_listings(fetch_mocks, call, expected):
     """Unit test for modisAsset.fetch for assets that 404."""
-    (urlopen, urlopen2, conn, open, file) = fetch_mocks
+    (urlopen, get, response, open, file) = fetch_mocks
 
     # give the listing from which names of asset files are extracted
     urlopen.return_value.readlines.return_value = model_404
@@ -64,7 +64,7 @@ def t_no_matching_listings(fetch_mocks, call, expected):
     modis.modisAsset.fetch(*call)
 
     # It should skip the I/O code except for fetching the directory listing
-    uncalled_fns = (conn.read, urlopen2, open, file.write, file.close)
+    uncalled_fns = (response.iter_content, get, open, file.write)
     readlines = urlopen.return_value.readlines
     assert not any([f.called for f in uncalled_fns]) and all([
         readlines.call_count == 1,
