@@ -33,3 +33,13 @@ def t_modis_inv_fetch(careful_repo_env, expected):
             '-d', '2012-12-01,2012-12-01', '-v', '4', '--fetch')
     actual = careful_repo_env.run('gips_inventory', *args)
     assert expected == actual
+
+
+@src_altering
+def t_landsat_inv_fetch(careful_repo_env, expected):
+    """Test gips_inventory --fetch; actually contacts data provider."""
+    args = ('landsat', '-s', NH_SHP_PATH, '-d', '2015-352', '-v', '4', '--fetch')
+    actual = careful_repo_env.run('gips_inventory', *args)
+    # can't compare checksums because landsat's checksums are different every time.
+    assert (expected.created.keys() == actual.created.keys() and
+            expected.updated == actual.updated)

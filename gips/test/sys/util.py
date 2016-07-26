@@ -85,14 +85,15 @@ class GipsProcResult(object):
     Can accept scripttest.ProcResult objects at initialization; see __init__.
     """
     attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted', 'created')
-    def __init__(self, proc_result=None, compare_stdout=None, **kwargs):
+    def __init__(self, proc_result=None, compare_stdout=None, compare_stderr=True, **kwargs):
         """Initialize the object using a ProcResult, explicit kwargs, or both.
         
         ProcResults' reports on files (created, deleted, updated) are saved as
         their names and hashes.  compare_stdout is an explicit way to request
         stdout be considered in __eq__; see below.  If it is not set, then
         self.stdout is examined.  If set by the user, it is assumed stdout
-        comparison is desired.
+        comparison is desired.  compare_stderr is less magical:  Do the
+        comparison unless the user specifies otherwise.
         """
         if proc_result is None:
             self.exit_status = 0
@@ -124,19 +125,21 @@ class GipsProcResult(object):
         else:
             self.compare_stdout = self.stdout is not None
         # need a valid value to compare against either way
-        self.stdout = self.stdout or u''
+        #self.stdout = self.stdout or u''
+        self.compare_stderr = compare_stderr
 
     def __eq__(self, other):
-        """To be equal, all attributes must match, except possibly stdout.
+        """Equality means all attributes must match, except possibly stdout & stderr.
 
         Note that the type of other is not considered.
         """
-        # only compare stdout if both parties agree
+        # only compare standard streams if both parties agree
         compare_stdout = self.compare_stdout and other.compare_stdout
+        compare_stderr = self.compare_stderr and other.compare_stderr
         matches = (
             self.exit_status == other.exit_status,
             not compare_stdout or self.stdout == other.stdout,
-            self.stderr == other.stderr,
+            not compare_stderr or self.stderr == other.stderr,
             self.updated == other.updated,
             self.deleted == other.deleted,
             self.created == other.created,

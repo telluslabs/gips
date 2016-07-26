@@ -8,7 +8,6 @@ DATES="-d 2012-256"
 
 ARGS="-s $GIPSTESTPATH/NHseacoast.shp $DATES -v 4 -p acca ref-toa ndvi-toa rad-toa"
 
-gips_info landsat
 gips_inventory landsat $ARGS
 gips_process landsat $ARGS
 

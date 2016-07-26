@@ -26,12 +26,13 @@ import os
 import re
 from datetime import datetime
 import shutil
-import numpy
 import glob
+from fnmatch import fnmatchcase
 import traceback
 from copy import deepcopy
-
 import commands
+
+import numpy
 
 import gippy
 from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
@@ -143,10 +144,9 @@ class landsatAsset(Asset):
     }
 
     # TODO - consider assets and sensors relationship ?
-    # TODO - move patterns from `glob` to `re`
     _assets = {
         'DN': {
-            'pattern': 'L????????????????????.tar.gz',
+            'pattern': 'L' + (20 * '?') + '.tar.gz',
         },
         'SR': {
             'pattern': 'L*-SC*.tar.gz',
@@ -168,12 +168,12 @@ class landsatAsset(Asset):
         doy = fname[13:16]
         self.date = datetime.strptime(year + doy, "%Y%j")
 
-        if "-" in filename:
+        if fnmatchcase(fname, self._assets['SR']['pattern']):
             VerboseOut('SR asset', 2)
             self.asset = 'SR'
             self.sensor = 'LC8SR'
             self.version = int(fname[20:22])
-        else:
+        elif fnmatchcase(fname, self._assets['DN']['pattern']):
             VerboseOut('DN asset', 2)
             self.asset = 'DN'
             self.sensor = fname[0:3]
@@ -194,6 +194,9 @@ class landsatAsset(Asset):
                 }
             self.visbands = [col for col in smeta['colors'] if col[0:4] != "LWIR"]
             self.lwbands = [col for col in smeta['colors'] if col[0:4] == "LWIR"]
+        else:
+            msg = "No matching landsat asset type for '{}'".format(fname)
+            raise RuntimeError(msg, filename)
 
         if self.sensor not in self._sensors.keys():
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))

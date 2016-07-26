@@ -7,9 +7,8 @@ from .util import *
 
 logger = logging.getLogger(__name__)
 
-# changing this will require changes in .data
-STD_ARGS       = ('modis', '-s', NH_SHP_PATH,
-                  '-d', '2012-12-01,2012-12-03', '-v', '4')
+# changing this will require changes in expected/
+STD_ARGS = ('modis', '-s', NH_SHP_PATH, '-d', '2012-12-01,2012-12-03', '-v', '4')
 
 
 @pytest.fixture
