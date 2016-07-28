@@ -4,7 +4,9 @@ import sys
 import datetime
 import urllib2
 
+
 import pytest
+import mock
 
 from ...data.modis import modis
 
@@ -49,7 +51,7 @@ def fetch_mocks(mocker):
     get = mocker.patch.object(modis.requests, 'get')
     response = get.return_value
     open = mocker.patch.object(modis, 'open')
-    file = open.return_value
+    file = open.return_value.__enter__.return_value # context manager
     return (urlopen, get, response, open, file)
 
 
@@ -152,37 +154,51 @@ http_200_params = (
 
 
 @pytest.mark.parametrize("call, listing_url, listing, asset_fn", http_200_params)
-def t_matching_listings(fetch_mocks, call, listing_url, listing, asset_fn):
+def t_matching_listings(mocker, fetch_mocks, call, listing_url, listing, asset_fn):
     """test modisAsset.fetch:  Query server, extract URL, then download it."""
-    (urlopen, urlopen2, conn, open, file) = fetch_mocks
+    (urlopen, get, response, open, file) = fetch_mocks
+
+    # rely on the real one because mocking was too painful
+    user = modis.modisAsset.Repository.get_setting('username')
+    passwd = modis.modisAsset.Repository.get_setting('password')
 
     # give the listing from which names of asset files are extracted
     urlopen.return_value.readlines.return_value = listing
-    conn.read.return_value == ("If you think you understand, you don't.  "
-                               "If you think you don't understand, you still don't.")
+    content = ("If you think you understand, ",
+                    "you don't.  ",
+               "If you think you don't understand, ",
+                    "you still don't.")
+    response.iter_content.return_value = content
+    response.status_code = 200
 
     modis.modisAsset.fetch(*call)
 
     # These assertions are too involved, possibly, because fetch() does too much
-    readlines = urlopen.return_value.readlines
-    (open_fn, open_mode) = open.call_args[0] # [1] is kwargs remember
+    # listing assertions:  urllib.urlopen(mainurl).readlines()
+    urlopen.assert_called_once_with(listing_url)
+    urlopen.return_value.readlines.assert_called_once_with()
+    # request assertions:  response = request.get(...) && response.iter_content()
+    get.assert_called_once_with(listing_url + '/' + asset_fn, auth=(user, passwd), timeout=10)
+    response.iter_content.assert_called_once_with()
+    # file write assertions:  open(...) as fd && fd.write(...)
+    assert open.call_args[0][0].endswith(asset_fn) # did we open the right filename?
+    file.write.assert_has_calls([mock.call(c) for c in content])
+
+
+def t_auth_settings(mocker, fetch_mocks):
+    """Confirm auth settings are only queried when the asset warrants it."""
+    gs_mock = mocker.patch.object(modis.modisAsset.Repository, 'get_setting')
+
+    call = ('MYD11A1', 'h12v04', dt(2012, 12, 1, 0, 0))
+    modis.modisAsset.fetch(*call)
+
+    call = ('MOD10A2', 'h12v04', dt(2012, 12, 1, 0, 0))
+    modis.modisAsset.fetch(*call)
+
     assert all([
-        readlines.call_count == 1,
-        readlines.call_args  == (),
-        urlopen.call_count   == 1,
-        urlopen.call_args    == ((listing_url,), {}), # (args, kwargs)
-        get.call_count  == 1,
-        get.call_args   == ((listing_url + '/' + asset_fn,), {}),
-        open.call_count      == 1,
-        open_fn.endswith(asset_fn),
-        open_mode            == 'wb',
-        # TODO chunk-iteration ---v
-        response.read.call_count == 1,
-        response.read.call_args  == (),
-        # not checking file.close because its failure is believed to be low-impact.
-        file.write.call_count == 1,
-        # TODO chunk-iteration ---v
-        file.write.call_args  == ((response.read.return_value,), {}),
+        gs_mock.call_count == 2,
+        gs_mock.mock_calls[0] == (('username',), {}),
+        gs_mock.mock_calls[1] == (('password',), {}),
     ])
 
 

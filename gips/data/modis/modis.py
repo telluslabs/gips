@@ -211,7 +211,8 @@ class modisAsset(Asset):
                     # cookies / cache auth
 
                     kw = {'timeout': 10}
-                    if asset not in cls._skip_auth: kw['auth'] = (username, password)
+                    if asset not in cls._skip_auth:
+                        kw['auth'] = (username, password)
                     response = requests.get(url, **kw)
 
                     if response.status_code != requests.codes.ok:
@@ -220,7 +221,7 @@ class modisAsset(Asset):
                         return # might as well stop b/c the rest will probably fail too
 
                     with open(outpath, 'wb') as fd:
-                        for chunk in resp.iter_content():
+                        for chunk in response.iter_content():
                             fd.write(chunk)
 
                 except Exception:
