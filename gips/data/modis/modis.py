@@ -206,16 +206,23 @@ class modisAsset(Asset):
                 outpath = os.path.join(cls.Repository.path('stage'), name)
 
                 try:
-                    #urllib.urlretrieve(url, outpath)
-                    connection = urllib2.urlopen(url)
-                    output = open(outpath, 'wb')
-                    output.write(connection.read())
-                    output.close()
+                    # tinkering:
+                    # chunk size & stream=True in req
+                    # cookies / cache auth
 
-                except urllib2.HTTPError as e:
-                    print('Download of', name, 'failed:', e.code, e.reason, file=sys.stderr)
-                    print('Full URL:', url, file=sys.stderr)
-                    return # might as well stop b/c the rest will probably fail too
+                    kw = {'timeout': 10}
+                    if asset not in cls._skip_auth: kw['auth'] = (username, password)
+                    response = requests.get(url, **kw)
+
+                    if response.status_code != requests.codes.ok:
+                        print('Download of', name, 'failed:', response.status_code, response.reason,
+                              '\nFull URL:', url, file=sys.stderr)
+                        return # might as well stop b/c the rest will probably fail too
+
+                    with open(outpath, 'wb') as fd:
+                        for chunk in resp.iter_content():
+                            fd.write(chunk)
+
                 except Exception:
                     # TODO - implement pre-check to only attempt on valid dates
                     # then uncomment this

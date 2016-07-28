@@ -171,36 +171,39 @@ def t_matching_listings(fetch_mocks, call, listing_url, listing, asset_fn):
         readlines.call_args  == (),
         urlopen.call_count   == 1,
         urlopen.call_args    == ((listing_url,), {}), # (args, kwargs)
-        urlopen2.call_count  == 1,
-        urlopen2.call_args   == ((listing_url + '/' + asset_fn,), {}),
+        get.call_count  == 1,
+        get.call_args   == ((listing_url + '/' + asset_fn,), {}),
         open.call_count      == 1,
         open_fn.endswith(asset_fn),
         open_mode            == 'wb',
-        conn.read.call_count == 1,
-        conn.read.call_args  == (),
+        # TODO chunk-iteration ---v
+        response.read.call_count == 1,
+        response.read.call_args  == (),
         # not checking file.close because its failure is believed to be low-impact.
         file.write.call_count == 1,
-        file.write.call_args  == ((conn.read.return_value,), {}),
+        # TODO chunk-iteration ---v
+        file.write.call_args  == ((response.read.return_value,), {}),
     ])
 
 
 @pytest.mark.parametrize("call, listing_url, listing, asset_fn", http_200_params)
 def t_auth_error(fetch_mocks, mocker, call, listing_url, listing, asset_fn):
     """Confirm auth failures are handled gracefully."""
-    (urlopen, urlopen2, conn, open, file) = fetch_mocks
+    (urlopen, get, response, open, file) = fetch_mocks
     print_mock = mocker.patch.object(modis, 'print') # to confirm user notification is produced
 
     urlopen.return_value.readlines.return_value = listing # coerce the loop to start
 
-    # rig urllib2.urlopen to explode
-    urlopen2.side_effect = urllib2.HTTPError('http://example.com/', 401, 'Unauthorized', None, None)
+    # rig requests.get() to fail
+    get.return_value.status_code = 401
+    get.return_value.reason = 'Unauthorized'
+    get.return_value.text = 'HTTP Basic: Access denied.\n'
 
     modis.modisAsset.fetch(*call)
 
     assert all([
         not open.called, # Confirm short-circuiting by showing open was never called
-        print_mock.call_count == 2,
+        print_mock.call_count == 1,
         # making sure the errors go to stderr important; precise wording probably isn't
         print_mock.mock_calls[0][-1] == dict(file=sys.stderr),
-        print_mock.mock_calls[1][-1] == dict(file=sys.stderr),
     ])
