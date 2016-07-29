@@ -210,19 +210,25 @@ class modisAsset(Asset):
                     # chunk size & stream=True in req
                     # cookies / cache auth
 
-                    kw = {'timeout': 10}
-                    if asset not in cls._skip_auth:
-                        kw['auth'] = (username, password)
-                    response = requests.get(url, **kw)
+                    if mainurl[0:3] == 'ftp':
+                        connection = urllib2.urlopen(url)
+                        with open(outpath, 'wb') as fd:
+                            fd.write(connection.read())
 
-                    if response.status_code != requests.codes.ok:
-                        print('Download of', name, 'failed:', response.status_code, response.reason,
-                              '\nFull URL:', url, file=sys.stderr)
-                        return # might as well stop b/c the rest will probably fail too
+                    else: # http
+                        kw = {'timeout': 10}
+                        if asset not in cls._skip_auth:
+                            kw['auth'] = (username, password)
+                        response = requests.get(url, **kw)
 
-                    with open(outpath, 'wb') as fd:
-                        for chunk in response.iter_content():
-                            fd.write(chunk)
+                        if response.status_code != requests.codes.ok:
+                            print('Download of', name, 'failed:', response.status_code, response.reason,
+                                  '\nFull URL:', url, file=sys.stderr)
+                            return # might as well stop b/c the rest will probably fail too
+
+                        with open(outpath, 'wb') as fd:
+                            for chunk in response.iter_content():
+                                fd.write(chunk)
 
                 except Exception:
                     # TODO - implement pre-check to only attempt on valid dates

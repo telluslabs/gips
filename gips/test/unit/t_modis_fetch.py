@@ -56,7 +56,7 @@ def fetch_mocks(mocker):
 
 
 @pytest.mark.parametrize("call, expected", http_404_params)
-def t_no_matching_listings(fetch_mocks, call, expected):
+def t_no_http_matching_listings(fetch_mocks, call, expected):
     """Unit test for modisAsset.fetch for assets that 404."""
     (urlopen, get, response, open, file) = fetch_mocks
 
@@ -154,8 +154,8 @@ http_200_params = (
 
 
 @pytest.mark.parametrize("call, listing_url, listing, asset_fn", http_200_params)
-def t_matching_listings(mocker, fetch_mocks, call, listing_url, listing, asset_fn):
-    """test modisAsset.fetch:  Query server, extract URL, then download it."""
+def t_http_matching_listings(mocker, fetch_mocks, call, listing_url, listing, asset_fn):
+    """Query http server, extract asset URL, then download it."""
     (urlopen, get, response, open, file) = fetch_mocks
 
     # rely on the real one because mocking was too painful
@@ -183,6 +183,102 @@ def t_matching_listings(mocker, fetch_mocks, call, listing_url, listing, asset_f
     # file write assertions:  open(...) as fd && fd.write(...)
     assert open.call_args[0][0].endswith(asset_fn) # did we open the right filename?
     file.write.assert_has_calls([mock.call(c) for c in content])
+
+
+MOD10A1_listing = ['total 184064\r\n',  # drastically foreshortened ftp listing
+    'lrwxrwxrwx  1 7372 90      97 Nov 23  2015 '
+        'BROWSE.MOD10A1.A2012336.h12v02.005.2012339213026.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.04/'
+        'BROWSE.MOD10A1.A2012336.h12v02.005.2012339213026.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Nov 23  2015 '
+        'BROWSE.MOD10A1.A2012336.h12v03.005.2012339212814.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.04/BROWSE.MOD10A1.A2012336.h12v03.005.2012339212814.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Nov 23  2015 '
+        'BROWSE.MOD10A1.A2012336.h12v04.005.2012339213007.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.04/BROWSE.MOD10A1.A2012336.h12v04.005.2012339213007.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Nov 23  2015 '
+        'BROWSE.MOD10A1.A2012336.h12v05.005.2012339213007.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.04/BROWSE.MOD10A1.A2012336.h12v05.005.2012339213007.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Nov 23  2015 '
+        'BROWSE.MOD10A1.A2012336.h12v07.005.2012339212842.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.04/BROWSE.MOD10A1.A2012336.h12v07.005.2012339212842.1.jpg\r\n',
+    '-rw-r--r--  1 7372 90    8711 Jan 15  2013 '
+        'MOD10A1.A2012336.h12v02.005.2012339213026.hdf.xml\r\n',
+    '-rw-r--r--  1 7372 90 1137281 Dec  4  2012 MOD10A1.A2012336.h12v03.005.2012339212814.hdf\r\n',
+    '-rw-r--r--  1 7372 90    8710 Jan 15  2013 '
+        'MOD10A1.A2012336.h12v03.005.2012339212814.hdf.xml\r\n',
+    '-rw-r--r--  1 7372 90  844320 Dec  4  2012 MOD10A1.A2012336.h12v04.005.2012339213007.hdf\r\n',
+    '-rw-r--r--  1 7372 90    7935 Jan 15  2013 '
+        'MOD10A1.A2012336.h12v04.005.2012339213007.hdf.xml\r\n',
+    '-rw-r--r--  1 7372 90  131621 Dec  4  2012 MOD10A1.A2012336.h12v05.005.2012339213007.hdf\r\n',
+]
+
+
+MYD10A1_listing = ['total 184704\r\n', # drastically foreshortened ftp listing
+    'lrwxrwxrwx  1 7372 90      97 Dec  5  2015 '
+        'BROWSE.MYD10A1.A2012336.h12v02.005.2012340031948.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.05/BROWSE.MYD10A1.A2012336.h12v02.005.2012340031948.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Dec  5  2015 '
+        'BROWSE.MYD10A1.A2012336.h12v03.005.2012340032022.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.05/BROWSE.MYD10A1.A2012336.h12v03.005.2012340032022.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Dec  5  2015 '
+        'BROWSE.MYD10A1.A2012336.h12v04.005.2012340031954.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.05/BROWSE.MYD10A1.A2012336.h12v04.005.2012340031954.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Dec  5  2015 '
+        'BROWSE.MYD10A1.A2012336.h12v05.005.2012340032147.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.05/BROWSE.MYD10A1.A2012336.h12v05.005.2012340032147.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Dec  5  2015 '
+        'BROWSE.MYD10A1.A2012336.h12v02.005.2012340031948.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.05/BROWSE.MYD10A1.A2012336.h12v02.005.2012340031948.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Dec  5  2015 '
+        'BROWSE.MYD10A1.A2012336.h12v03.005.2012340032022.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.05/BROWSE.MYD10A1.A2012336.h12v03.005.2012340032022.1.jpg\r\n',
+    'lrwxrwxrwx  1 7372 90      97 Dec  5  2015 '
+        'BROWSE.MYD10A1.A2012336.h12v04.005.2012340031954.1.jpg -> '
+        '../../../../DP0/BRWS/Browse.001/2012.12.05/BROWSE.MYD10A1.A2012336.h12v04.005.2012340031954.1.jpg\r\n',
+    '-rw-r--r--  1 7372 90    8304 Jan 10  2013 MYD10A1.A2012336.h12v03.005.2012340032022.hdf.xml\r\n',
+    '-rw-r--r--  1 7372 90  262727 Dec  4  2012 MYD10A1.A2012336.h12v04.005.2012340031954.hdf\r\n',
+    '-rw-r--r--  1 7372 90    7916 Jan 10  2013 MYD10A1.A2012336.h12v04.005.2012340031954.hdf.xml\r\n',
+    '-rw-r--r--  1 7372 90  164381 Dec  4  2012 MYD10A1.A2012336.h12v05.005.2012340032147.hdf\r\n',
+    '-rw-r--r--  1 7372 90    7920 Jan 10  2013 MYD10A1.A2012336.h12v05.005.2012340032147.hdf.xml\r\n',
+]
+
+
+@pytest.mark.parametrize("call, listing_url, listing, asset_fn", (
+    (('MYD10A1', 'h12v04', dt(2012, 12, 1, 0, 0)),
+        'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A1.005/2012.12.01',
+        MYD10A1_listing, # FTP index page
+        'MYD10A1.A2012336.h12v04.005.2012340031954.hdf'),
+    (('MOD10A1', 'h12v04', dt(2012, 12, 1, 0, 0)),
+        'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A1.005/2012.12.01',
+        MOD10A1_listing, # FTP index page
+        'MOD10A1.A2012336.h12v04.005.2012339213007.hdf'),
+    )
+)
+def t_ftp_matching_listings(mocker, fetch_mocks, call, listing_url, listing, asset_fn):
+    """Query ftp server, extract asset URL, then download it."""
+    (urlopen, get, _, open, file) = fetch_mocks
+
+    # give the listing from which names of asset files are extracted
+    urlopen.return_value.readlines.return_value = listing
+    # content returned by ftp download
+    content = ("If you think you understand, you don't.  \n"
+               "If you think you don't understand, you still don't.")
+    urlopen2 = mocker.patch.object(modis.urllib2, 'urlopen')
+    connection = urlopen2.return_value
+    connection.read.return_value = content
+
+    modis.modisAsset.fetch(*call)
+
+    # listing assertions:  urllib.urlopen(mainurl).readlines()
+    urlopen.assert_called_once_with(listing_url)
+    urlopen.return_value.readlines.assert_called_once_with()
+    # test the way the url was opened
+    get.assert_not_called() # should use urllib2 instead
+    urlopen2.assert_called_once_with(listing_url + '/' + asset_fn)
+    # file write assertions:  open(...) as fd && fd.write(...)
+    assert open.call_args[0][0].endswith(asset_fn) # did we open the right filename?
+    file.write.assert_called_once_with(content)
 
 
 def t_auth_settings(mocker, fetch_mocks):
