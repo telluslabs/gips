@@ -21,8 +21,9 @@ data-repo = /home/your-user-name-here/src/gips/data-repo
 # a directory of your choice, used for output from, e.g., gips_project
 output-dir = /home/your-user-name-here/src/gips/testout
 # These should remain as they are (placing them in a config file is a TODO):
-python_functions =  t_ test_
-python_files =      t_*.py test_*.py
+python_functions =  t_
+python_classes =    T_
+python_files =      t_*.py
 ```
 
 ## Running Automated tests
@@ -30,28 +31,12 @@ python_files =      t_*.py test_*.py
 The test suite is based on pytest:  https://pytest.org/latest/contents.html
 
 ```
-#!bash
-# to run all tests (after activating your virtualenv):
-py.test --setup-repo # only needed for the first run
-py.test --clear-repo # destroy and recreate the repo if it's in a bad state
-py.test              # save time without --setup-repo
-py.test -s           # echo stdout & stderr to console (not shown by default)
+py.test -k unit # to run unit tests (after activating your virtualenv):
+py.test         # run both the system & unit tests (be prepared to wait; note
+                # also that additional configuration may be necessary).
 ```
 
-Select specific tests per usual for pytest:
-
-https://pytest.org/latest/usage.html#specifying-tests-selecting-tests
-
-You can also select tests based on mark (marks are tags for tests):
-
-https://pytest.org/latest/example/markers.html
-
-If you specify the same test file multiple times on the command line (say, to
-specify multiple tests in that file), any module-scoped test fixtures will run
-once for each time the file is listed, which may not be what was expected.
-This is because pytest sees each item on the command line as a separate run of
-the module, even though really it's the same file listed mulitple times.
-Instead, avoid the problem by using `-k` to specify tests.
+For more information see `gips/test/README.md`.
 
 ## Authors and Contributors
 The following have been authors or contributers to GIPS
