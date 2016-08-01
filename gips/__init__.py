@@ -20,4 +20,19 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
-from .version import __version__
+
+from .utils import settings
+
+from . import version
+
+def detect_version():
+    """Emit GIPS' software version.  May be overridden for testing purposes.
+
+    To override version.py, put a desired version string into the setting
+    OVERRIDE_VERSION."""
+    ov = getattr(settings(), 'OVERRIDE_VERSION', None)
+    if ov is not None:
+        return ov
+    return version.__version__
+
+__version__ = detect_version()
