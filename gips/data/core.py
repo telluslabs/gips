@@ -421,7 +421,7 @@ class Asset(object):
             newfilename = os.path.join(tpath, bname)
             if not os.path.exists(newfilename):
                 # check if another asset exists
-                existing = cls.discover(asset.tile, d, asset.asset)                
+                existing = cls.discover(asset.tile, d, asset.asset)
                 if(len(existing) > 0 and
                    (not update or not existing[0].updated(asset))):
                     VerboseOut('%s: other version(s) already exists:' % bname, 1)

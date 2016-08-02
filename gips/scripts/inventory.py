@@ -27,7 +27,6 @@ from gips.core import SpatialExtent, TemporalExtent
 from gips.utils import Colors, VerboseOut, open_vector, import_data_class
 from gips.inventory import DataInventory
 
-from pdb import set_trace
 
 def main():
     title = Colors.BOLD + 'GIPS Data Inventory (v%s)' % gipsversion + Colors.OFF
@@ -45,7 +44,6 @@ def main():
 
         extents = SpatialExtent.factory(cls, args.site, args.key, args.where, 
                                         args.tiles, args.pcov, args.ptile)
-
         for extent in extents:
             inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
             inv.pprint(md=args.md)            

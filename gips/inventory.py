@@ -34,8 +34,6 @@ from gips.utils import VerboseOut, Colors
 from gips.data.core import Data
 from gips.mapreduce import MapReduce
 
-from pdb import set_trace
-
 
 class Inventory(object):
     """ Base class for inventories """
@@ -253,8 +251,6 @@ class DataInventory(Inventory):
         self.products = dataclass.RequestedProducts(products)
 
         self.update = update
-
-        print "datainventory"
 
         if fetch:
             try:
