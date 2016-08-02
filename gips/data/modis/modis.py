@@ -271,7 +271,8 @@ class modisData(Data):
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
-        "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
+        # "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
+        "Terra 8-day": ['temp8tn', 'temp8td'],
     }
     _products = {
         # MCD Products
@@ -305,10 +306,12 @@ class modisData(Data):
             'assets': ['MOD11A1', 'MYD11A1'],
         },
         # Misc
-        'ndvi8': {
-            'description': 'Normalized Difference Vegetation Index: 250m',
-            'assets': ['MOD09Q1'],
-        },
+        # ndvi8 fails and causes errors further down the processing run for a run like this:
+        # gips_process modis -s NHseacoast.shp -d 2012-12-02,2012-12-03 -v 4
+        #'ndvi8': {
+        #    'description': 'Normalized Difference Vegetation Index: 250m',
+        #    'assets': ['MOD09Q1'],
+        #},
         'temp8td': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
@@ -376,6 +379,7 @@ class modisData(Data):
 
 
             if val[0] == "refl":
+                # NOTE this code is unreachable (no refl entry in _products)
                 if versions[asset] != 6:
                     raise Exception('product version not supported')
                 sensor = 'MCD'
@@ -502,6 +506,7 @@ class modisData(Data):
                 meta['VERSION'] = VERSION
                 sensor = 'MOD'
                 fname = '%s_%s_%s' % (bname, sensor, key)
+
 
                 img = gippy.GeoImage(allsds)
 
@@ -942,6 +947,7 @@ class modisData(Data):
             ###################################################################
             # NDVI (8-day) - Terra only
             if val[0] == "ndvi8":
+                # NOTE this code is unreachable currently; see _products above.
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
                 sensor = 'MOD'

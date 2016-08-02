@@ -20,13 +20,13 @@ http_404_params = (
         'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.005/2012.12.01'),  # passed to urlopen
 
     (('MCD43A2', 'h12v04', dt(2012, 12, 1, 0, 0)),
-        'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.005/2012.12.01'),
+        'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006/2012.12.01'),
 
     (('MOD09Q1', 'h12v04', dt(2012, 12, 1, 0, 0)),
         'http://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.005//2012.12.01'),
 
     (('MCD43A4', 'h12v04', dt(2012, 12, 1, 0, 0)),
-        'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.005/2012.12.01'),
+        'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006/2012.12.01'),
 )
 
 
@@ -65,16 +65,11 @@ def t_no_http_matching_listings(fetch_mocks, call, expected):
 
     modis.modisAsset.fetch(*call)
 
+    # assertions:
     # It should skip the I/O code except for fetching the directory listing
-    uncalled_fns = (response.iter_content, get, open, file.write)
-    readlines = urlopen.return_value.readlines
-    assert not any([f.called for f in uncalled_fns]) and all([
-        readlines.call_count == 1,
-        readlines.call_args  == (),
-        urlopen.call_count   == 1,
-        urlopen.call_args    == ((expected,), {}) # (args, kwargs)
-    ])
-
+    [f.assert_not_called() for f in (response.iter_content, get, open, file.write)]
+    urlopen.return_value.readlines.assert_called_once_with()
+    urlopen.assert_called_once_with(expected)
 
 # VERY truncated snippet of an actual listing file
 MYD11A1_listing = [
