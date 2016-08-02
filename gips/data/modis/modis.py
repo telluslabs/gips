@@ -21,19 +21,24 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
+from __future__ import print_function
+
 import os
+import sys
 import re
 import datetime
+
 import urllib
 import urllib2
 
 import math
 import numpy as np
+import requests
 
 import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
-from gips.utils import VerboseOut
+from gips.utils import VerboseOut, settings
 
 from pdb import set_trace
 
@@ -67,6 +72,10 @@ class modisAsset(Asset):
         'MCD': {'description': 'Aqua/Terra Combined'},
         'MOD-MYD': {'description': 'Aqua/Terra together'}
     }
+
+
+    # some modis data sources require authorization for access; these do not.
+    _skip_auth = ['MOD10A2', 'MOD10A1', 'MYD10A1', 'MYD10A2']
 
     _assets = {
         'MCD43A4': {
@@ -166,8 +175,13 @@ class modisAsset(Asset):
         year, month, day = date.timetuple()[:3]
 
         if asset == "MCD12Q1" and (month != 1 or day != 1):
-            print "Land cover data are only available for Jan. 1"
+            print("Land cover data are only available for Jan. 1")
             return
+
+        # if it's going to fail, let's find out early:
+        if asset not in cls._skip_auth:
+            username = cls.Repository.get_setting('username')
+            password = cls.Repository.get_setting('password')
 
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
@@ -181,6 +195,9 @@ class modisAsset(Asset):
 
         success = False
         for item in listing:
+            # screen-scrape the content of the page and extract the full name of the needed file
+            # (this step is needed because part of the filename, the creation timestamp, is
+            # effectively random).
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
@@ -189,11 +206,29 @@ class modisAsset(Asset):
                 outpath = os.path.join(cls.Repository.path('stage'), name)
 
                 try:
-                    #urllib.urlretrieve(url, outpath)
-                    connection = urllib2.urlopen(url)
-                    output = open(outpath, 'wb')
-                    output.write(connection.read())
-                    output.close()
+                    # tinkering:
+                    # chunk size & stream=True in req
+                    # cookies / cache auth
+
+                    if mainurl[0:3] == 'ftp':
+                        connection = urllib2.urlopen(url)
+                        with open(outpath, 'wb') as fd:
+                            fd.write(connection.read())
+
+                    else: # http
+                        kw = {'timeout': 10}
+                        if asset not in cls._skip_auth:
+                            kw['auth'] = (username, password)
+                        response = requests.get(url, **kw)
+
+                        if response.status_code != requests.codes.ok:
+                            print('Download of', name, 'failed:', response.status_code, response.reason,
+                                  '\nFull URL:', url, file=sys.stderr)
+                            return # might as well stop b/c the rest will probably fail too
+
+                        with open(outpath, 'wb') as fd:
+                            for chunk in response.iter_content():
+                                fd.write(chunk)
 
                 except Exception:
                     # TODO - implement pre-check to only attempt on valid dates
@@ -393,7 +428,7 @@ class modisData(Data):
                 evi[wg] = (2.5*(nirimg[wg] - redimg[wg])) / (nirimg[wg] + 6.0*redimg[wg] - 7.5*bluimg[wg] + 1.0)
 
                 # create output gippy image
-                print "writing", fname
+                print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 6)
 
                 imgout.SetNoData(missing)
@@ -547,7 +582,7 @@ class modisData(Data):
                 fracout[mask] = 0
 
                 if totsnowcover == 0 or totsnowfrac == 0:
-                    print "no snow or ice: skipping", str(self.date), str(self.id), str(missingassets)
+                    print("no snow or ice: skipping", str(self.date), str(self.id), str(missingassets))
 
                 meta['FRACMISSINGCOVERCLEAR'] = fracmissingcoverclear
                 meta['FRACMISSINGCOVERSNOW'] = fracmissingcoversnow
@@ -671,7 +706,7 @@ class modisData(Data):
                 numvalidcover = np.sum(coverout != 127)
 
                 if totsnowcover == 0 or totsnowfrac == 0:
-                    print "no snow or ice: skipping", str(self.date), str(self.id), str(missingassets)
+                    print("no snow or ice: skipping", str(self.date), str(self.id), str(missingassets))
 
                 meta['FRACMISSINGCOVERCLEAR'] = fracmissingcoverclear
                 meta['FRACMISSINGCOVERSNOW'] = fracmissingcoversnow
