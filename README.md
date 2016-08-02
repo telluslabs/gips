@@ -10,33 +10,26 @@ which only officially supports recent versions of Ubuntu.  It will use `sudo`
 to install system packages, and may ask for authentication accordingly.  It
 runs apt-get, which may prompt you for confirmation of its actions.
 
-To permit automated testing, create a file named `pytest.ini` in the project
-directory, and use it to set the `data-repo` and `output-dir` settings to full
-paths to the respective directories.
+Afterwards it will show you how to set GIPS settings with `gips_config`.  After
+doing so, if you wish to work with modis data, edit `gips/settings.py` (or
+wherever you choose to save your settings) to alter the `'modis'` entry in the
+REPOS dict:
 
 ```
-[pytest]
-# GIPS' configured data repository:
-data-repo = /home/your-user-name-here/src/gips/data-repo
-# a directory of your choice, used for output from, e.g., gips_project
-output-dir = /home/your-user-name-here/src/gips/testout
-# These should remain as they are (placing them in a config file is a TODO):
-python_functions =  t_
-python_classes =    T_
-python_files =      t_*.py
+'modis': {
+    'repository': 'AS-PREVIOUSLY',         # this may be left unchanged
+    'username': 'YOUR-EARTHDATA-USERNAME',
+    'password': 'YOUR-EARTHDATA-PASSWORD', # Use os.environ to avoid saving
+                                           # a password in a file.
+},
 ```
 
-## Running Automated tests
+This username and password must match your Earthdata credentials; for more
+information on obtaining credentials:
 
-The test suite is based on pytest:  https://pytest.org/latest/contents.html
+https://lpdaac.usgs.gov/about/news_archive/important_changes_lp_daac_data_access
 
-```
-py.test -k unit # to run unit tests (after activating your virtualenv):
-py.test         # run both the system & unit tests (be prepared to wait; note
-                # also that additional configuration may be necessary).
-```
-
-For more information see `gips/test/README.md`.
+For information on setting up automated testing, see `gips/test/README.md`.
 
 ## Authors and Contributors
 The following have been authors or contributers to GIPS

@@ -1,12 +1,37 @@
 GIPS Automated Testing
 ======================
+See the end of this file for a quick-start section, after configuring pytest:
+
+Configuration
+-------------
+Create a file named `pytest.ini` in the project directory, and use it to set
+the `data-repo` and `output-dir` settings to full paths to the respective
+directories.
+
+```
+[pytest]
+# GIPS' configured data repository:
+data-repo = /home/your-user-name-here/src/gips/data-repo
+# a directory of your choice, used for output from, e.g., gips_project
+output-dir = /home/your-user-name-here/src/gips/testout
+# These should remain as they are (placing them in a config file is a TODO):
+python_functions =  t_
+python_classes =    T_
+python_files =      t_*.py
+```
+
+Library Dependencies
+--------------------
 GIPS automated testing uses a few libraries, mainly pytest and mock, and a
-library for gluing them together (pytest-mock).  Where to read about them:
+library for gluing them together (pytest-mock).  These are installed by
+`install.sh`.  Further reading:
 
 * Pytest:  http://docs.pytest.org/en/latest/index.html
 * Mock:  http://www.voidspace.org.uk/python/mock/
 * pytest-mock:  https://pypi.python.org/pypi/pytest-mock
 
+Test selection
+--------------
 Running tests is straightforward, but deselect the system tests to save time:
 
 ```
@@ -184,3 +209,11 @@ If you want to view logger output or `print` statements, or if you want to run
 the debugger (`import pdb; pdb.set_trace()`) you _must_ specify `py.test -s`.
 This is due to pytest's somewhat draconian defaults regarding the brevity of
 test run output by default.
+
+Quick Start
+===========
+```
+py.test -k unit # to run unit tests (after activating your virtualenv):
+py.test         # run both the system & unit tests (be prepared to wait; note
+                # also that additional configuration may be necessary).
+```
