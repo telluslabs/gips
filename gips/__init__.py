@@ -21,18 +21,15 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
-from .utils import settings
+import os
 
 from . import version
 
 def detect_version():
     """Emit GIPS' software version.  May be overridden for testing purposes.
 
-    To override version.py, put a desired version string into the setting
-    OVERRIDE_VERSION."""
-    ov = getattr(settings(), 'OVERRIDE_VERSION', None)
-    if ov is not None:
-        return ov
-    return version.__version__
+    To override version.py, put a desired version string in the environment
+    variable GIPS_OVERRIDE_VERSION."""
+    return os.environ.get('GIPS_OVERRIDE_VERSION', version.__version__)
 
 __version__ = detect_version()

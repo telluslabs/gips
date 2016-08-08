@@ -5,20 +5,23 @@ import sys
 import pytest
 import mock
 
-from ...utils import settings
-
 import gips
 
 def t_version_override(mocker):
-    """Test Data.meta_dict() for correct override of __version__."""
-    settings_fn = mocker.patch.object(gips, 'settings')
-    settings_obj = mock.Mock(spec=['EMAIL']) # nothing but EMAIL is available now
-    settings_fn.return_value = settings_obj
+    """Test gips.__init__.detect_version() for correct override of __version__."""
+    env = mocker.patch.object(gips.os, 'environ')
+    # os.environ.get is called by libs as well as detect_version(); fortunately no harm seems to
+    # come from giving them bad results.
 
-    gips.version.__version__ = 'orig-version' # no mocking, just overwrite
+    # no override requested
+    env.get.side_effect = lambda key, default=None: default # key not found
     version_a = gips.detect_version()
 
-    settings_obj.OVERRIDE_VERSION = 'overridden-version'
+    # override requested
+    env.get.side_effect = lambda key, default=None: 'fancy-new-version'
     version_b = gips.detect_version()
 
-    assert (version_a, version_b) == ('orig-version', 'overridden-version')
+    env.get.assert_has_calls([ # assert two identical calls
+        mock.call('GIPS_OVERRIDE_VERSION', gips.version.__version__) for _ in range(2)
+    ])
+    assert (version_a, version_b) == (gips.version.__version__, 'fancy-new-version')
