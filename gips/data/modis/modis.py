@@ -79,14 +79,14 @@ class modisAsset(Asset):
 
     _assets = {
         'MCD43A4': {
-            'pattern': 'MCD43A4*hdf',
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.005',
+            'pattern': 'MCD43A4.A???????.h??v??.???.?????????????.hdf',
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MCD43A2': {
-            'pattern': 'MCD43A2*hdf',
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.005',
+            'pattern': 'MCD43A2.A???????.h??v??.???.?????????????.hdf',
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
@@ -159,15 +159,23 @@ class modisAsset(Asset):
     def __init__(self, filename):
         """ Inspect a single file and get some metadata """
         super(modisAsset, self).__init__(filename)
+
         bname = os.path.basename(filename)
-        self.asset = bname[0:7]
-        self.tile = bname[17:23]
-        year = bname[9:13]
-        doy = bname[13:16]
+        parts = bname.split('.')
+        
+        self.asset = parts[0]
+        self.tile = parts[2]
+        self.sensor = parts[0][:3]
 
+        year = parts[1][1:5]
+        doy = parts[1][5:8]
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
-        self.sensor = bname[:3]
 
+        collection = int(parts[3])
+        file_version = int(parts[4])
+        self.version = float('{}.{}'.format(collection, file_version))
+
+        
     @classmethod
     def fetch(cls, asset, tile, date):
         #super(modisAsset, cls).fetch(asset, tile, date)
@@ -244,7 +252,16 @@ class modisAsset(Asset):
             #raise Exception('Unable to find remote match for %s at %s' % (pattern, mainurl))
             VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
 
-
+    def updated(self, newasset):
+        '''
+        Compare the version for this to that of newasset.
+        Return true if newasset version is greater.
+        '''
+        return (self.sensor == newasset.sensor and
+                self.tile == newasset.tile and
+                self.date == newasset.date and
+                self.version < newasset.version)
+            
 class modisData(Data):
     """ A tile of data (all assets and products) """
     name = 'Modis'
@@ -254,7 +271,8 @@ class modisData(Data):
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
-        "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
+        # "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
+        "Terra 8-day": ['temp8tn', 'temp8td'],
     }
     _products = {
         # MCD Products
@@ -288,10 +306,12 @@ class modisData(Data):
             'assets': ['MOD11A1', 'MYD11A1'],
         },
         # Misc
-        'ndvi8': {
-            'description': 'Normalized Difference Vegetation Index: 250m',
-            'assets': ['MOD09Q1'],
-        },
+        # ndvi8 fails and causes errors further down the processing run for a run like this:
+        # gips_process modis -s NHseacoast.shp -d 2012-12-02,2012-12-03 -v 4
+        #'ndvi8': {
+        #    'description': 'Normalized Difference Vegetation Index: 250m',
+        #    'assets': ['MOD09Q1'],
+        #},
         'temp8td': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
@@ -327,6 +347,8 @@ class modisData(Data):
             # properly set
             if 'sensor' in locals(): del sensor
 
+            versions = {}
+
             for asset in assets:
                 try:
                     sds = self.assets[asset].datafiles()
@@ -335,6 +357,8 @@ class modisData(Data):
                 else:
                     availassets.append(asset)
                     allsds.extend(sds)
+                    versions[asset] = int(re.findall('M.*\.00(\d)\.\d{13}\.hdf', sds[0])[0])
+
             if not availassets:
                 # some products aren't available for every day but this is trying every day
                 VerboseOut('There are no available assets (%s) on %s for tile %s'
@@ -343,7 +367,6 @@ class modisData(Data):
 
             meta = self.meta_dict()
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
-
 
             if val[0] == "landcover":
                 sensor = 'MCD'
@@ -355,7 +378,28 @@ class modisData(Data):
                 imgout = gippy.GeoImage(fname)
 
 
+            if val[0] == "refl":
+                # NOTE this code is unreachable (no refl entry in _products)
+                if versions[asset] != 6:
+                    raise Exception('product version not supported')
+                sensor = 'MCD'
+                fname = '%s_%s_%s.tif' % (bname, sensor, key)
+                img = gippy.GeoImage(sds[7:])
+                nodata = img[0].NoDataValue()
+                gain = img[0].Gain()
+                offset = img[0].Offset()
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
+                imgout.SetNoData(nodata)
+                imgout.SetOffset(offset)
+                imgout.SetGain(gain)
+                for i in range(6):
+                    data = img[i].Read()
+                    imgout[i].Write(data)
+
+
             if val[0] == "quality":
+                if versions[asset] != 6:
+                    raise Exception('product version not supported')
                 sensor = 'MCD'
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 if os.path.lexists(fname):
@@ -366,22 +410,29 @@ class modisData(Data):
 
             # LAND VEGETATION INDICES PRODUCT
             if val[0] == "indices":
-
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
                 sensor = 'MCD'
                 fname = '%s_%s_%s' % (bname, sensor, key)
-
                 refl = gippy.GeoImage(allsds)
-
                 missing = 32767
 
-                redimg = refl[0].Read()
-                nirimg = refl[1].Read()
-                bluimg = refl[2].Read()
-                grnimg = refl[3].Read()
-                mirimg = refl[5].Read()
-                swrimg = refl[6].Read() # formerly swir2
+                if versions[asset] == 6:
+                    redimg = refl[7].Read()
+                    nirimg = refl[8].Read()
+                    bluimg = refl[9].Read()
+                    grnimg = refl[10].Read()
+                    mirimg = refl[11].Read()
+                    swrimg = refl[12].Read() # formerly swir2
+                elif versions[asset] == 5:
+                    redimg = refl[0].Read()
+                    nirimg = refl[1].Read()
+                    bluimg = refl[2].Read()
+                    grnimg = refl[3].Read()
+                    mirimg = refl[4].Read()
+                    swrimg = refl[5].Read() # formerly swir2
+                else:
+                    raise Exception('product version not supported')
 
                 redimg[redimg < 0.0] = 0.0
                 nirimg[nirimg < 0.0] = 0.0
@@ -455,6 +506,7 @@ class modisData(Data):
                 meta['VERSION'] = VERSION
                 sensor = 'MOD'
                 fname = '%s_%s_%s' % (bname, sensor, key)
+
 
                 img = gippy.GeoImage(allsds)
 
@@ -895,6 +947,7 @@ class modisData(Data):
             ###################################################################
             # NDVI (8-day) - Terra only
             if val[0] == "ndvi8":
+                # NOTE this code is unreachable currently; see _products above.
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
                 sensor = 'MOD'

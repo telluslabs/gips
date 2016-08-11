@@ -81,6 +81,8 @@ class GIPSParser(argparse.ArgumentParser):
         group.add_argument('--%cov', dest='pcov', help='Threshold of %% tile coverage over site', default=0, type=int)
         group.add_argument('--%tile', dest='ptile', help='Threshold of %% tile used', default=0, type=int)
         group.add_argument('--fetch', help='Fetch any missing data (if supported)', default=False, action='store_true')
+        group.add_argument('--update', help='Force fetch and/ or update data (if supported)', default=False, action='store_true')
+
         group.add_argument('-v', '--verbose', help='Verbosity - 0: quiet, 1: normal, 2: debug', default=1, type=int)
         group.add_argument('-p', '--products', help='Requested Products', nargs='*')
         self.parent_parsers.append(parser)
