@@ -199,7 +199,7 @@ class prismData(Data):
             'description': 'Cumulative Precipitate',
             'assets': ['_ppt'],
             'arguments': [
-                'days: temporal window width (default: 5 days) .',
+                'days: temporal window width (default: 3 days) .',
             ]
         },
         'tmin': {
@@ -268,10 +268,10 @@ class prismData(Data):
                     )
                 except IndexError:
                     # no argument provided, use
-                    # default lag of 5 days SB configurable.
-                    lag = 5
+                    # default lag of 3 days SB configurable.
+                    lag = 3
                     fname = re.sub(r'\.tif$', '-{}.tif'.format(lag), fname)
-                    VerboseOut('Using default lag of 5 days.', 2)
+                    VerboseOut('Using default lag of {} days.'.format(lag), 2)
 
                 if os.path.exists(fname):
                     os.remove(fname)
