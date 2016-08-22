@@ -69,19 +69,19 @@ class prismAsset(Asset):
             'pattern': 'PRISM_ppt_*.zip',
             'url': 'ftp://prism.nacse.org/daily/ppt/',
             'startdate': _startdate,
-            'latency': -180
+            'latency': -7
         },
         '_tmin': {
             'pattern': 'PRISM_tmin_*.zip',
             'url': 'ftp://prism.nacse.org/daily/tmax/',
             'startdate': _startdate,
-            'latency': -180
+            'latency': -7
         },
         '_tmax': {
             'pattern': 'PRISM_tmax_*.zip',
             'url': 'ftp://prism.nacse.org/daily/tmin/',
             'startdate': _startdate,
-            'latency': -180
+            'latency': -7
         },
     }
     _stab_score = {
@@ -154,7 +154,7 @@ class prismAsset(Asset):
         scale = re.sub(r'(.+)D[0-9]+', r'\1', scalever)
         version = re.sub(r'.+(D[0-9]+)', r'\1', scalever)
         self.date = datetime.strptime(date, '%Y%m%d')
-        self.products[variable] = filename
+        #self.products[variable] = filename
         self.asset = '_' + variable
         self.sensor = 'prism'
         self.scale = scale
@@ -199,7 +199,7 @@ class prismData(Data):
             'description': 'Cumulative Precipitate',
             'assets': ['_ppt'],
             'arguments': [
-                'days: temporal window width (default: 5 days) .',
+                'days: temporal window width (default: 3 days) .',
             ]
         },
         'tmin': {
@@ -217,7 +217,6 @@ class prismData(Data):
         products = super(prismData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
-
         bname = os.path.join(self.path, self.basename)
 
         for key, val in products.requested.items():
@@ -269,10 +268,10 @@ class prismData(Data):
                     )
                 except IndexError:
                     # no argument provided, use
-                    # default lag of 5 days SB configurable.
-                    lag = 5
+                    # default lag of 3 days SB configurable.
+                    lag = 3
                     fname = re.sub(r'\.tif$', '-{}.tif'.format(lag), fname)
-                    VerboseOut('Using default lag of 5 days.', 2)
+                    VerboseOut('Using default lag of {} days.'.format(lag), 2)
 
                 if os.path.exists(fname):
                     os.remove(fname)
