@@ -57,7 +57,7 @@ setup(
     install_requires=[
         'Py6S>=1.5.0',
         'shapely',
-        'gippy>=0.3.6',
+        'gippy>=0.3.8',
         'python-dateutil',
         'pydap',
         'pysolar==0.6',
