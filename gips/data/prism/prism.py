@@ -73,13 +73,13 @@ class prismAsset(Asset):
         },
         '_tmin': {
             'pattern': 'PRISM_tmin_*.zip',
-            'url': 'ftp://prism.nacse.org/daily/tmax/',
+            'url': 'ftp://prism.nacse.org/daily/tmin/',
             'startdate': _startdate,
             'latency': -7
         },
         '_tmax': {
             'pattern': 'PRISM_tmax_*.zip',
-            'url': 'ftp://prism.nacse.org/daily/tmin/',
+            'url': 'ftp://prism.nacse.org/daily/tmax/',
             'startdate': _startdate,
             'latency': -7
         },
