@@ -77,75 +77,77 @@ class modisAsset(Asset):
     # some modis data sources require authorization for access; these do not.
     _skip_auth = ['MOD10A2', 'MOD10A1', 'MYD10A1', 'MYD10A2']
 
+    _asset_glob_tail = '.A???????.h??v??.???.?????????????.hdf'
+
     _assets = {
         'MCD43A4': {
-            'pattern': 'MCD43A4.A???????.h??v??.???.?????????????.hdf',
+            'pattern': 'MCD43A4' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MCD43A2': {
-            'pattern': 'MCD43A2.A???????.h??v??.???.?????????????.hdf',
+            'pattern': 'MCD43A2' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MOD09Q1': {
-            'pattern': 'MOD09Q1*hdf',
+            'pattern': 'MOD09Q1' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.005/',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -7,
         },
         'MOD10A1': {
-            'pattern': 'MOD10A1*hdf',
+            'pattern': 'MOD10A1' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A1.005',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A1': {
-            'pattern': 'MYD10A1*hdf',
+            'pattern': 'MYD10A1' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A1.005',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
         'MOD11A1': {
-            'pattern': 'MOD11A1*hdf',
+            'pattern': 'MOD11A1' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.005',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -1
         },
         'MYD11A1': {
-            'pattern': 'MYD11A1*hdf',
+            'pattern': 'MYD11A1' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.005',
             'startdate': datetime.date(2002, 7, 8),
             'latency': -1
         },
         'MOD11A2': {
-            'pattern': 'MOD11A2*hdf',
+            'pattern': 'MOD11A2' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.005',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -7
         },
         'MYD11A2': {
-            'pattern': 'MYD11A2*hdf',
+            'pattern': 'MYD11A2' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.005',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -7
         },
         'MOD10A2': {
-            'pattern': 'MOD10A2*hdf',
+            'pattern': 'MOD10A2' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A2.005',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A2': {
-            'pattern': 'MYD10A2*hdf',
+            'pattern': 'MYD10A2' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A2.005',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
         'MCD12Q1': {
-            'pattern': 'MCD12Q1*hdf',
+            'pattern': 'MCD12Q1' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
