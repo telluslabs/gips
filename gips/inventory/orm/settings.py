@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/1.10/ref/settings/
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+# if this file is in /.../outer/inner/, then BASE_DIR = /.../outer
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -20,7 +21,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/1.10/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'i)#c)l-&=iw8e(n%0d2kthx!@plpi$f6x2e9r=6h2=%el1-l6m'
+SECRET_KEY = '---warning-not-actually-set;-using-dummy-value----'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -31,6 +32,8 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'gips.inventory.dbinv.apps.DbinvConfig',
+    # TODO these necessary? vvv
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

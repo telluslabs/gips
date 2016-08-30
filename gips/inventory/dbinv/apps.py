@@ -4,4 +4,4 @@ from django.apps import AppConfig
 
 
 class DbinvConfig(AppConfig):
-    name = 'dbinv'
+    name = 'gips.inventory.dbinv'
