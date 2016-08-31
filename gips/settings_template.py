@@ -36,6 +36,10 @@ DATABASES = {
 #        'HOST': '',
 #        'PORT': '5432',
 #    }
+    'inventory': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': '$TLD/gips-inv-db.sqlite3',
+    },
 }
 
 
