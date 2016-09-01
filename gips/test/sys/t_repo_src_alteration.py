@@ -7,7 +7,10 @@ from .util import *
 
 logger = logging.getLogger(__name__)
 
-pytestmark = sys # skip everything unless --sys
+# skip everything unless --src-altering
+pytestmark = pytest.mark.skipif(not pytest.config.getoption("src_altering"),
+                                reason="--src-altering is required for this test")
+
 
 @pytest.yield_fixture
 def careful_repo_env(request, expected):
@@ -24,12 +27,8 @@ def careful_repo_env(request, expected):
     gtfe.remove_created()
 
 
-src_altering = pytest.mark.skipif(not pytest.config.getoption("src_altering"),
-                                  reason="--src-altering is required for this test")
-
 is_wednesday = datetime.today().date().weekday() == 2
 
-@src_altering
 @pytest.mark.skipif(is_wednesday, reason="Data isn't available on Wednesdays")
 def t_modis_inv_fetch(careful_repo_env, expected):
     """Test gips_inventory --fetch; actually contacts data provider."""

@@ -1,7 +1,7 @@
 """Known-good outcomes for tests, mostly stdout and created files."""
 
 # trailing whitespace and other junk characters are in current output
-t_info = { 'stdout':  """\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
+t_info = { 'stdout':  u"""\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
 \x1b[1m
 Landsat Products v0.9.0\x1b[0m
   Optional qualifiers listed below each product.
@@ -62,7 +62,7 @@ Standard Products
    wtemp       Water temperature (atmospherically correct) - valid for water only
 """}
 
-t_inventory = { 'stdout': """\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
+t_inventory = { 'stdout': u"""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
 Retrieving inventory for site NHseacoast-0
 fname
 LC80120302015352LGN00.tar.gz
