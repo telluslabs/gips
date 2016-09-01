@@ -7,6 +7,8 @@ from .util import *
 
 logger = logging.getLogger(__name__)
 
+pytestmark = sys # skip everything unless --sys
+
 # changing this will require changes in expected/
 STD_ARGS = ('modis', '-s', NH_SHP_PATH, '-d', '2012-12-01,2012-12-03', '-v', '4')
 
@@ -24,6 +26,7 @@ def setup_modis_data(pytestconfig):
     if outcome.status_code != 0:
         raise RuntimeError("MODIS data setup via `gips_inventory` failed",
                            outcome.std_out, outcome.std_err, outcome)
+
 
 def t_inventory(setup_modis_data, repo_env, expected):
     """Test `gips_inventory modis` and confirm recorded output is given.

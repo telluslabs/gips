@@ -7,6 +7,8 @@ from .util import *
 
 logger = logging.getLogger(__name__)
 
+pytestmark = sys # skip everything unless --sys
+
 # changing this will require changes in expected/
 STD_ARGS = ('prism', '-s', NH_SHP_PATH, '-d', '1982-12-01,1982-12-03', '-v', '4')
 

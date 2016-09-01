@@ -1,7 +1,8 @@
 import logging, os, shutil
-import envoy
 
+import envoy
 from _pytest.assertion.util import _compare_eq_dict, _diff_text
+
 from gips.test.sys.util import GipsProcResult, set_constants
 
 # configure logging (can config in command-line & config file, see below)
@@ -42,6 +43,10 @@ def pytest_addoption(parser):
     help_str = ("Do not skip @src_altering tests, which are tests that may "
                 "alter or remove source data in the repo.")
     parser.addoption("--src-altering", action="store_true", help=help_str)
+
+    help_str = ("Do not skip @system tests, which are tests that may "
+                "change elements of the environment as they work.")
+    parser.addoption("--sys", action="store_true", help=help_str)
 
 
 def pytest_configure(config):

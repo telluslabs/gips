@@ -7,6 +7,7 @@ from .util import *
 
 logger = logging.getLogger(__name__)
 
+pytestmark = sys # skip everything unless --sys
 
 @pytest.yield_fixture
 def careful_repo_env(request, expected):
