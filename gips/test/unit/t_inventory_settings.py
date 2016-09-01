@@ -4,6 +4,7 @@ import pytest
 
 import gips.utils
 from gips.inventory.orm import settings
+from gips.inventory.orm import setup
 
 @pytest.yield_fixture
 def override_settings(mocker):
@@ -32,3 +33,18 @@ def t_inventory_settings_melding(override_settings):
     s = settings
     assert (s.DATABASES['default'], s.DEBUG, s.CUSTOM_SETTING) == ('hello!', 'maybe', 3)
     assert getattr(s, 'foo', None) == None  # it shouldn't load non-caps names
+
+
+def t_inventory_setup(mocker):
+    dontcare   = mocker.patch('gips.inventory.orm.os.environ')
+    setup_mock = mocker.patch.object(gips.inventory.orm.django, 'setup')
+
+    gips.inventory.orm.setup_complete = False # in case its been called already
+
+    setup()
+    assert gips.inventory.orm.setup_complete
+    setup_mock.assert_called_once_with()
+
+    setup() # call again and confirm that situation still looks right
+    assert gips.inventory.orm.setup_complete
+    setup_mock.assert_called_once_with()
