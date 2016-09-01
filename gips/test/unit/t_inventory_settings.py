@@ -9,7 +9,7 @@ from gips.inventory.orm import settings
 def override_settings(mocker):
     """Mocks settings with specified values and performs cleanup."""
     class FakeSettings(object):
-        DATABASES = 'hello!'
+        DATABASES = {'inventory': 'hello!'}
         DEBUG = 'maybe'
         CUSTOM_SETTING = 3
         foo = 17
@@ -30,5 +30,5 @@ def t_inventory_settings_melding(override_settings):
     """Confirm GIPS settings make their way into Django ORM settings."""
     # test is already done by fixture, so check outcomes here
     s = settings
-    assert (s.DATABASES, s.DEBUG, s.CUSTOM_SETTING) == ('hello!', 'maybe', 3)
+    assert (s.DATABASES['default'], s.DEBUG, s.CUSTOM_SETTING) == ('hello!', 'maybe', 3)
     assert getattr(s, 'foo', None) == None  # it shouldn't load non-caps names

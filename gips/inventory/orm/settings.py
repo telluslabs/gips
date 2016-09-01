@@ -64,6 +64,18 @@ TEMPLATES = [
 WSGI_APPLICATION = 'orm.wsgi.application'
 
 
+# Database
+# https://docs.djangoproject.com/en/1.10/ref/settings/#databases
+
+DATABASES = {
+    # probably overwritten, see below
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': '/tmp/gips-inv-db.sqlite3',
+    }
+}
+
+
 # Password validation
 # https://docs.djangoproject.com/en/1.10/ref/settings/#auth-password-validators
 
@@ -103,9 +115,15 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 
-# load user-specified GIPS settings
+# load user-specified GIPS settings into Django
 import gips.utils
 gips_settings = gips.utils.settings()
+# load database settings specially:  Use 'inventory' as Django's 'default':
+try:
+    DATABASES['default'] = gips_settings.DATABASES['inventory']
+except KeyError:
+    pass # Silently falling back on default is the desired behavior
+# import other settings
 for s in dir(gips_settings):
-    if s.isupper():
+    if s != 'DATABASES' and s.isupper():
         globals()[s] = getattr(gips_settings, s)
