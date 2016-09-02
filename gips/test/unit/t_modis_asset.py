@@ -31,6 +31,7 @@ at_x_bft = ((at, bft) for at in known_good_filenames.keys() for bft in bad_filen
 
 @pytest.mark.parametrize('asset_type, bad_filename_tail', at_x_bft)
 def t_discover_filename_globs(mocker, asset_type, bad_filename_tail):
+    """Run Asset.discover() to confirm only valid filenames are accepted."""
     repo_prefix = '/dontcare/'
     bad_filename = repo_prefix + asset_type + '.' + bad_filename_tail
 
@@ -49,7 +50,9 @@ def t_discover_filename_globs(mocker, asset_type, bad_filename_tail):
     glob = mocker.patch.object(core.glob, 'glob')
     glob.side_effect = lambda path: [fn for fn in fake_dir_listing if fnmatch.fnmatchcase(fn, path)]
 
+    # run the test
     found = modisAsset.discover('hi mom!', datetime.date(9999, 9, 9))
+
     # order of found Assets depends on unpredictable dict iteration, hence set()
     actual   = set(asset.filename for asset in found)
     expected = set(l for l in fake_dir_listing if asset_type not in l)
