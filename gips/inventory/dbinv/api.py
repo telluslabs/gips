@@ -1,11 +1,30 @@
 import os, glob
+from sys import stderr
+from contextlib import contextmanager
+import traceback
 
 import django
 import django.db.transaction
 
 # TODO put this in scripts/*.py:  gips.orm.setup() # must come before importing models
 import gips.inventory.orm
-from gips.utils import VerboseOut
+from gips.utils import verbose_out
+
+
+@contextmanager
+def std_error_handler(fs_fallback=None):
+    """Handle problems with API code in a unified way.
+
+    Optionally provide a callback to run if the DB API call fails."""
+    try:
+        yield
+    except Exception as e:
+        verbose_out(traceback.format_exc(), 4, stderr)
+        verbose_out("Error in database inventory API: {}".format(e.message), 1, stderr)
+        verbose_out("Falling back to filesystem inventory.", 1, stderr)
+        if fs_fallback is not None:
+            fs_fallback()
+
 
 def rectify(asset_class):
     """Rectify the inventory database against the filesystem archive.
@@ -39,10 +58,10 @@ def rectify(asset_class):
                 touched_rows.append(asset.pk)
                 if created:
                     add_cnt += 1
-                    VerboseOut("Asset added to database:  " + f_name, 4)
+                    verbose_out("Asset added to database:  " + f_name, 4)
                 else:
                     update_cnt += 1
-                    VerboseOut("Asset found in database:  " + f_name, 4)
+                    verbose_out("Asset found in database:  " + f_name, 4)
             # Remove things from DB that are NOT in FS:
             deletia = models.Asset.objects.filter(asset=ak).exclude(pk__in=touched_rows)
             del_cnt = deletia.count()

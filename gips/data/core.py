@@ -40,7 +40,7 @@ import gippy
 from gippy.algorithms import CookieCutter
 from gips import __version__
 from gips.utils import settings, VerboseOut, RemoveFiles, File2List, List2File, Colors, basename, mkdir, open_vector
-from ..inventory.dbinv import list_tiles
+from ..inventory.dbinv import list_tiles, std_error_handler
 
 from pdb import set_trace
 
@@ -88,12 +88,8 @@ class Repository(object):
         Attempt the query by searching the inventory database, and fall
         back to the filesystem otherwise.
         """
-        try:
+        with std_error_handler():
             return list_tiles(cls.name.lower())
-        except Exception as e:
-            VerboseOut(traceback.format_exc(), 4)
-            VerboseOut("Error looking up tiles in inventory database: {}".format(e.message))
-            VerboseOut("Falling back to filesystem inspection.")
         return os.listdir(cls.path('tiles'))
 
     @classmethod
