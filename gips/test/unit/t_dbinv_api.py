@@ -5,7 +5,7 @@ import django.db
 from django.forms.models import model_to_dict
 
 from gips.inventory.dbinv import models
-from gips.inventory.dbinv import rectify
+from gips.inventory.dbinv import rectify, list_tiles
 from gips.data.modis import modisAsset
 
 
@@ -97,3 +97,49 @@ def t_rectify(mocker):
     actual = {r['asset']: r for r in rows} # enforce an order so whims of hashing doesn't ruin test
 
     assert expected == actual
+
+
+# This data isn't entirely valid but is correct enough for the test.  Also unicode isn't super
+# relevant here; it's an artifact of cutpasting
+list_tiles_fixture = [
+    { # basic row in table
+        'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+        'asset':  u'MCD43A2',
+        'date':   datetime.date(2012, 12, 1),
+        'driver': u'modis',
+        'sensor': u'MCD',
+        'tile':   u'h12v04'
+    },
+    { # duplicate tile string to confirm nonrepetition in outcome
+        'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+        'asset':  u'MCD43A2',
+        'date':   datetime.date(2012, 12, 2),
+        'driver': u'modis',
+        'sensor': u'MCD',
+        'tile':   u'h12v04'
+    },
+    { # second tile to confirm multiple tiles will be returned
+        'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+        'asset':  u'MCD43A2',
+        'date':   datetime.date(2012, 12, 2),
+        'driver': u'modis',
+        'sensor': u'MCD',
+        'tile':   u'h13v05'
+    },
+    { # different driver to confirm no cross-driver pollution of results
+        'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+        'asset':  u'MCD43A2',
+        'date':   datetime.date(2012, 12, 1),
+        'driver': u'landsat',
+        'sensor': u'MCD',
+        'tile':   u'trolololo'
+    },
+]
+
+@pytest.mark.django_db
+def t_list_tiles():
+    """Test gips.inventory.dbinv for correctness using a database fixture."""
+    [models.Asset(**f).save() for f in list_tiles_fixture]
+    actual = list_tiles('modis')
+    expected = [u'h13v05', u'h12v04']
+    assert len(actual) == 2 and set(expected) == set(actual)

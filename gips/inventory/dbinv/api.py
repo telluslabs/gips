@@ -50,3 +50,8 @@ def rectify(asset_class):
                 deletia.delete()
             msg = "{} complete, inventory records changed:  {} added, {} updated, {} deleted"
             print msg.format(ak, add_cnt, update_cnt, del_cnt) # no -v for this important data
+
+
+def list_tiles(driver):
+    from .models import Asset
+    return Asset.objects.filter(driver=driver).values_list('tile', flat=True).distinct()

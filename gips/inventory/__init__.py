@@ -31,7 +31,6 @@ from copy import deepcopy
 import gippy
 from gips.tiles import Tiles
 from gips.utils import VerboseOut, Colors
-from gips.data.core import Data
 from gips.mapreduce import MapReduce
 
 
@@ -128,6 +127,8 @@ class ProjectInventory(Inventory):
         product_set = set()
         sensor_set = set()
         try:
+            # can't import Data at module scope due to circular dependencies
+            from gips.data.core import Data
             for dat in Data.discover(self.projdir):
                 self.data[dat.date] = dat
                 # All products and sensors used across all dates
