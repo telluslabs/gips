@@ -5,7 +5,7 @@ import django.db
 from django.forms.models import model_to_dict
 
 from gips.inventory.dbinv import models
-from gips.inventory.dbinv import rectify, list_tiles
+from gips.inventory.dbinv import rectify, list_tiles, add_asset
 from gips.data.modis import modisAsset
 
 
@@ -143,3 +143,22 @@ def t_list_tiles():
     actual = list_tiles('modis')
     expected = [u'h13v05', u'h12v04']
     assert len(actual) == 2 and set(expected) == set(actual)
+
+
+@pytest.mark.django_db
+def t_add_asset():
+    """Confirm that dbinv.add_asset works for saving assets."""
+    values = {
+        'asset':  u'some-asset',
+        'sensor': u'some-sensor',
+        'tile':   u'some-tile',
+        'date':   datetime.date(2099, 12, 31),
+        'name':   u'/some/file/name.hdf',
+        'driver': u'some-driver',
+    }
+    expected = dict(values)
+    expected['id'] = 1
+    a = add_asset(**values)
+    returned_actual = model_to_dict(a)
+    queried_actual = model_to_dict(models.Asset.objects.get(pk=1))
+    assert expected == returned_actual == queried_actual

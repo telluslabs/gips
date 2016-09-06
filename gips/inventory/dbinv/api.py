@@ -55,3 +55,15 @@ def rectify(asset_class):
 def list_tiles(driver):
     from .models import Asset
     return Asset.objects.filter(driver=driver).values_list('tile', flat=True).distinct()
+
+
+def add_asset(**values):
+    """(very) thin convenience method that wraps models.Asset().save().
+
+    Arguments:  asset, sensor, tile, date, name, driver; passed directly
+    into models.Asset().
+    """
+    from .models import Asset
+    a = Asset(**values)
+    a.save()
+    return a # in case the user needs it
