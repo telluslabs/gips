@@ -36,12 +36,15 @@ desired, eg:
     gips_inventory prism --rectify
 """
 
+from __future__ import print_function
+
 import sys
+import traceback
 
 from gips import __version__ as gipsversion
 from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
-from gips.utils import Colors, VerboseOut, open_vector, import_data_class
+from gips.utils import Colors, verbose_out, open_vector, import_data_class
 from gips.inventory import DataInventory
 from gips.inventory import dbinv, orm
 
@@ -62,8 +65,10 @@ def main():
     args = parser0.parse_args()
 
     try:
-        print title
+        print(title)
         cls = import_data_class(args.command)
+        with dbinv.std_error_handler():
+            orm.setup()
 
         if args.rectify:
             for k, v in vars(args).items():
@@ -71,8 +76,7 @@ def main():
                 if v and k not in ('rectify', 'verbose', 'command'):
                     msg = "Option '--{}' is not compatible with --rectify."
                     raise ValueError(msg.format(k))
-            print "Rectifying inventory DB with filesystem archive:"
-            orm.setup()
+            print("Rectifying inventory DB with filesystem archive:")
             dbinv.rectify(cls.Asset)
             return
 
@@ -82,10 +86,9 @@ def main():
             inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
             inv.pprint(md=args.md)            
            
-    except Exception, e:
-        import traceback
-        VerboseOut(traceback.format_exc(), 4)
-        print 'Data inventory error: %s' % e
+    except Exception as e:
+        verbose_out(traceback.format_exc(), 4, sys.stderr)
+        print('Data inventory error: ' + e.message, file=sys.stderr)
         sys.exit(1)
 
 

@@ -417,6 +417,7 @@ class Asset(object):
             VerboseOut('%s -> quarantine (file error): %s' % (filename, e), 2)
             return (None, 0)
 
+        # make an array out of asset.date if it isn't already
         dates = asset.date
         if not hasattr(dates, '__len__'):
             dates = [dates]
@@ -453,6 +454,7 @@ class Asset(object):
                                    .format(tpath))
                     try:
                         os.link(os.path.abspath(filename), newfilename)
+                        asset.archived_filename = newfilename
                         VerboseOut(bname + ' -> ' + newfilename, 2)
                         numlinks = numlinks + 1
                     except Exception, e:
@@ -469,7 +471,7 @@ class Asset(object):
                             raise Exception('Unable to make data directory %s' % tpath)
                     try:
                         os.link(os.path.abspath(filename), newfilename)
-                        #shutil.move(os.path.abspath(f),newfilename)
+                        asset.archived_filename = newfilename
                         VerboseOut(bname + ' -> ' + newfilename, 2)
                         numlinks = numlinks + 1
                     except Exception, e:

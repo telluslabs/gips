@@ -32,6 +32,7 @@ import gippy
 from gips.tiles import Tiles
 from gips.utils import VerboseOut, Colors
 from gips.mapreduce import MapReduce
+from . import dbinv
 
 
 class Inventory(object):
@@ -238,7 +239,7 @@ class DataInventory(Inventory):
     def __init__(self, dataclass, spatial, temporal, products=None, fetch=False, update=False, **kwargs):
         """ Create a new inventory
         :dataclass: The Data class to use (e.g., LandsatData, ModisData)
-        :spatial: The spatial extent requested
+        :spatial: The SpatialExtent requested
         :temporal: The temporal extent requested
         :products: List of requested products of interest
         :fetch: bool indicated if missing data should be downloaded
@@ -258,17 +259,20 @@ class DataInventory(Inventory):
                 dataclass.fetch(self.products.base, self.spatial.tiles, self.temporal, self.update)
             except Exception, e:
                 raise Exception('Error downloading %s: %s' % (dataclass.name, e))
-            dataclass.Asset.archive(Repository.path('stage'), update=self.update)
+            archived_assets = dataclass.Asset.archive(Repository.path('stage'), update=self.update)
+
+            with dbinv.std_error_handler():
+                # save metadata about the fetched assets in the database
+                for a in archived_assets:
+                    dbinv.add_asset(asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
+                                    name=a.archived_filename, driver=dataclass.name.lower())
 
         # find data
         self.data = {}
         for date in self.temporal.prune_dates(self.spatial.available_dates):
-            # try:
             dat = Tiles(dataclass, self.spatial, date, self.products, **kwargs)
             if len(dat) > 0:
                 self.data[date] = dat
-            # except Exception, e:
-            #     raise Exception('DataInventory: Error accessing tiles in %s repository' % dataclass.name)
 
     @property
     def sensor_set(self):
