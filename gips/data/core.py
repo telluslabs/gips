@@ -588,8 +588,11 @@ class Data(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
-    def __init__(self, tile=None, date=None, path=None):
-        """ Find all data and assets for this tile and date """
+    def __init__(self, tile=None, date=None, path=None, search=True):
+        """ Find all data and assets for this tile and date.
+
+        search=False will prevent searching for assets via Asset.discover().
+        """
         self.id = tile
         self.date = date
         self.path = ''
@@ -601,18 +604,24 @@ class Data(object):
             self.path = self.Repository.data_path(tile, date)
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)
             # find all assets
-            for asset in self.Asset.discover(tile, date):
-                self.assets[asset.asset] = asset
-                # products that come automatically with assets
-                for p, val in asset.products.items():
-                    self.filenames[(asset.sensor, p)] = val
-                    self.sensors[p] = asset.sensor
-                self.filenames.update({(asset.sensor, p): val for p, val in asset.products.items()})
-                self.sensors[asset.asset] = asset.sensor
+            if search:
+                [self.add_asset(a) for a in self.Asset.discover(tile, date)]
             # Find products
             self.ParseAndAddFiles()
         elif path is not None:
             self.path = path
+
+    def add_asset(self, asset):
+        """Add an Asset object to self.assets and:
+
+        Look at its products, adding metadata to self accordingly.
+        """
+        self.assets[asset.asset] = asset
+        for p, val in asset.products.items():
+            self.filenames[(asset.sensor, p)] = val
+            self.sensors[p] = asset.sensor
+        self.filenames.update({(asset.sensor, p): val for p, val in asset.products.items()})
+        self.sensors[asset.asset] = asset.sensor
 
     @property
     def Repository(self):
@@ -829,6 +838,7 @@ class Data(object):
                     if not cls.Asset.discover(t, d, a) or update == True:
                         try:
                             cls.Asset.fetch(a, t, d)
+                            # fetched may contain both fetched things and unfetchable things
                             fetched.append((a, t, d))
                         except Exception, e:
                             VerboseOut(traceback.format_exc(), 4)
