@@ -24,6 +24,7 @@
 from gips import __version__ as gipsversion
 from gips.parsers import GIPSParser
 from gips.utils import Colors, VerboseOut, import_data_class
+from gips.inventory import dbinv, orm
 
 
 def main():
@@ -46,6 +47,8 @@ def main():
     try:
         print title
         cls = import_data_class(args.command)
+        with dbinv.std_error_handler():
+            orm.setup()
         cls.Asset.archive(**vars(args))
     except Exception, e:
         import traceback

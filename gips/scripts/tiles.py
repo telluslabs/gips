@@ -27,6 +27,7 @@ from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
 from gips.utils import Colors, VerboseOut, mkdir, open_vector, import_data_class
 from gips.inventory import DataInventory
+from gips.inventory import dbinv, orm
 
 
 def main():
@@ -43,6 +44,8 @@ def main():
     try:
         print title
         cls = import_data_class(args.command)
+        with dbinv.std_error_handler():
+            orm.setup()
 
         # create tld: DATATYPE_tiles_RESOLUTION_SUFFIX
         if args.notld:

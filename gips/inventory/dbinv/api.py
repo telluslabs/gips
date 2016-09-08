@@ -72,6 +72,7 @@ def rectify(asset_class):
 
 
 def list_tiles(driver):
+    """List tiles for which there are extant asset files for the given driver."""
     from .models import Asset
     return Asset.objects.filter(driver=driver).values_list('tile', flat=True).distinct()
 

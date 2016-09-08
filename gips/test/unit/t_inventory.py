@@ -7,7 +7,7 @@ import pytest
 import mock
 from django.forms.models import model_to_dict
 
-from gips.inventory import DataInventory
+from gips.inventory import DataInventory, dbinv
 from gips.data.modis.modis import modisData, modisAsset
 from gips.core import SpatialExtent, TemporalExtent
 
@@ -70,9 +70,9 @@ def t_data_inventory_db_save(di_init_mocks):
     [setattr(asset, 'archived_filename', asset.filename) for asset in assets]
     m_archive.return_value = assets
 
-    # specify spatial & temporal?
+    # specify spatial & temporal
     tiles = ['h12v04', 'h13v05', 'h12v05', 'h13v04']
-    se = SpatialExtent(modisData, tiles=tiles)
+    se = SpatialExtent(modisData, tiles, 0.0, 0.0)
     te = TemporalExtent('2012-12-01,2012-12-03')
     # can ignore rest of **kwargs in constructor due to mocking
     di = DataInventory(modisData, se, te, fetch=True)
@@ -83,3 +83,35 @@ def t_data_inventory_db_save(di_init_mocks):
     actual = {r['asset']: r for r in rows} # enforce an order so whims of hashing doesn't ruin test
 
     assert expected == actual
+
+
+@pytest.mark.django_db
+def t_data_inventory_load_assets():
+    """Confirm DataInventory() loads assets from the inventory DB correctly.
+
+    In particular check the resulting hierarchy of objects for correctness."""
+
+    # mock: dates = self.temporal.prune_dates(spatial.available_dates) . . . ?
+
+    # first load DB with data
+    for asset_fields in expected.values():
+        dbinv.add_asset(**asset_fields)
+
+    # instantiate the class under test
+    tiles = ['h12v04', 'h12v05', 'h13v04', 'h13v05']
+    se = SpatialExtent(modisData, tiles, 0.0, 0.0)
+    te = TemporalExtent('2012-12-01,2012-12-03')
+    di = DataInventory(modisData, se, te)
+
+    # confirm DataInventory object is correct
+    assert len(di.data) == 3
+    for tiles_obj in di.data.values():
+        assert len(tiles_obj.tiles) == 1
+        data_obj = tiles_obj.tiles['h12v04']
+        assert len(data_obj.assets) == 1
+        asset_obj = data_obj.assets.values()[0]
+        # FINALLY compare the objects themselves
+        ea = expected[asset_obj.asset]
+        for field in ('asset', 'date', 'sensor', 'tile'):
+            assert ea[field] == getattr(asset_obj, field)
+        assert ea['name'] == asset_obj.filename

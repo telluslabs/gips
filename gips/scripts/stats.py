@@ -27,6 +27,7 @@ import gippy
 from gips.parsers import GIPSParser
 from gips.inventory import ProjectInventory
 from gips.utils import Colors, VerboseOut, basename
+from gips.inventory import dbinv, orm
 
 __version__ = '0.1.0'
 
@@ -45,6 +46,8 @@ def main():
         print title
         header = ['min', 'max', 'mean', 'sd', 'skew', 'count']
 
+        with dbinv.std_error_handler():
+            orm.setup()
         for projdir in args.projdir:
             VerboseOut('Stats for Project directory: %s' % projdir, 1)
             inv = ProjectInventory(projdir, args.products)

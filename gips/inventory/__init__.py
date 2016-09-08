@@ -267,12 +267,50 @@ class DataInventory(Inventory):
                     dbinv.add_asset(asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
                                     name=a.archived_filename, driver=dataclass.name.lower())
 
-        # find data
+        # populate the object tree under the DataInventory (Tiles, Data, Asset) by querying the DB
+        # quick-like then assigning things we iterate:  The DB is a flat table of data; we have to
+        # hierarchy-ize it.
         self.data = {}
-        for date in self.temporal.prune_dates(self.spatial.available_dates):
-            dat = Tiles(dataclass, self.spatial, date, self.products, **kwargs)
-            if len(dat) > 0:
-                self.data[date] = dat
+        dates = self.temporal.prune_dates(spatial.available_dates)
+        with dbinv.std_error_handler():
+            search_criteria = {
+                'driver': Repository.name.lower(),
+                'tile__in': spatial.tiles,
+                'date__in': dates,
+            }
+            a_models = dbinv.asset_search(**search_criteria).order_by('date', 'tile')
+            assets = [dataclass.Asset(str(am.name)) for am in a_models]
+
+            for a in assets:
+                # find or else make a Tiles object
+                if a.date not in self.data:
+                    self.data[a.date] = Tiles(dataclass, spatial, a.date, self.products, **kwargs)
+                tiles_obj = self.data[a.date]
+
+                # If there is no Data object in the Tiles object, make one
+                if a.tile not in tiles_obj.tiles:
+                    data_obj = dataclass(a.tile, a.date, search=False)
+                    data_obj.add_asset(a)
+                    # if it's kosher, add the new Data object to the Tiles object
+                    if data_obj.valid and data_obj.filter(**kwargs):
+                        tiles_obj.tiles[a.tile] = data_obj
+                else:
+                    # oh, a Data object, great!
+                    tiles_obj.tiles[a.tile].add_asset(a)
+            return # if we get here, prevent fallback to filesystem search
+
+        # fall back to filesystem search:  One Tiles object per date.  Each contains one Data
+        # object.  Data object instantiation results in filesystem search (thanks to search=True).
+        self.data = {} # clear out data dict in case it has partial results
+        for date in dates:
+            tiles_obj = Tiles(dataclass, spatial, date, self.products, **kwargs)
+            for t in spatial.tiles:
+                data_obj = dataclass(t, date, search=True)
+                if data_obj.valid and data_obj.filter(**kwargs):
+                    tiles_obj.tiles[t] = data_obj
+            if len(tiles_obj) > 0:
+                self.data[date] = tiles_obj
+
 
     @property
     def sensor_set(self):

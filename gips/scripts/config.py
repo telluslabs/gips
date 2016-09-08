@@ -32,7 +32,7 @@ import gips
 from gips import __version__ as version
 from gips.parsers import GIPSParser
 from gips.utils import VerboseOut, create_environment_settings, create_user_settings, create_repos
-import gips.inventory.orm
+from gips.inventory import dbinv, orm
 
 
 
@@ -79,8 +79,9 @@ def main():
             sys.exit(1)
 
         print 'Migrating database'
-        gips.inventory.orm.setup()
-        call_command('migrate', interactive=False)
+        with dbinv.std_error_handler():
+            orm.setup()
+            call_command('migrate', interactive=False)
 
     elif args.command == 'user':
         try:

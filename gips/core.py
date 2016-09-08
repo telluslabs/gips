@@ -98,16 +98,12 @@ class SpatialExtent(object):
                 extents.append(cls(dataclass, feature=f, tiles=tiles, pcov=pcov, ptile=ptile))
         return extents
 
-    def __init__(self, dataclass, feature=None, tiles=None, pcov=0.0, ptile=0.0):
+    def __init__(self, dataclass, tiles, pcov, ptile, feature=None):
         """ Create spatial extent with a GeoFeature instance or list of tiles """
         self.repo = dataclass.Asset.Repository
 
         # TODO - try and close this and only open on demand (make site property)
         self.site = feature
-
-        # default to all tiles if none provided
-        if tiles is None and feature is None:
-            tiles = self.repo.find_tiles()
 
         if feature is not None:
             tiles = self.repo.vector2tiles(feature, pcov, ptile, tiles)

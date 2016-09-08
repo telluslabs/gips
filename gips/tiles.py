@@ -28,28 +28,24 @@ import traceback
 
 import gippy
 from gippy.algorithms import CookieCutter
-from gips.core import SpatialExtent
 from gips.utils import VerboseOut, Colors, mosaic, mkdir
 
 
 class Tiles(object):
-    """ Collection of files for single date and multiple regions (tiles) """
+    """ Collection of files for single date and one or more regions (tiles) """
 
-    def __init__(self, dataclass, spatial=None, date=None, products=None, **kwargs):
+    def __init__(self, dataclass, spatial, date=None, products=None, **kwargs):
         """ Locate data matching vector location (or tiles) and date
         self.coverage      dict of tile id: %coverage with site
-        self.tiles              dict of tile id: tile instance
+        self.tiles         mapping of tile IDs to Data instances, eg for modis:
+                           {'h12v04': <modis.modisData object at 0x7fb34ab9e550>}
         """
         self.dataclass = dataclass
-        self.spatial = spatial if spatial is not None else SpatialExtent()
+        self.spatial = spatial
         self.products = products if products is not None else dataclass.RequestedProducts()
         self.date = date
         # For each tile locate files/products
         self.tiles = {}
-        for t in self.spatial.tiles:
-            tile = dataclass(t, self.date)
-            if tile.valid and tile.filter(**kwargs):
-                self.tiles[t] = tile
 
     def __len__(self):
         return len(self.tiles)
