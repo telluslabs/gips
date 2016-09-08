@@ -36,7 +36,7 @@ def t_modis_inv_fetch(careful_repo_env, expected):
     args = ('modis', '-s', NH_SHP_PATH,
             '-d', '2012-12-01,2012-12-01', '-v', '4', '--fetch')
     actual = careful_repo_env.run('gips_inventory', *args)
-    assert expected == actual
+    assert expected.created == actual.created
 
 
 @pytest.mark.timeout(20)
@@ -53,4 +53,4 @@ def t_modis_inv_fetch_on_wednesday(repo_env):
     # TODO some files may be generated; put those in expected/ when they've been identified
     expected = GipsProcResult()
     actual = repo_env.run('gips_inventory', *args)
-    assert expected == actual
+    assert expected.created == actual.created

@@ -22,12 +22,18 @@
 ################################################################################
 
 import os, sys
+import pprint
+import traceback
+
+import django
+from django.core.management import call_command
+
 import gips
 from gips import __version__ as version
 from gips.parsers import GIPSParser
 from gips.utils import VerboseOut, create_environment_settings, create_user_settings, create_repos
-import pprint
-import traceback
+import gips.inventory.orm
+
 
 
 def main():
@@ -70,6 +76,11 @@ def main():
         except Exception, e:
             print traceback.format_exc()
             print 'Could not create environment settings: %s' % e
+            sys.exit(1)
+
+        print 'Migrating database'
+        gips.inventory.orm.setup()
+        call_command('migrate', interactive=False)
 
     elif args.command == 'user':
         try:

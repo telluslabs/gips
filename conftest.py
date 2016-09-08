@@ -67,7 +67,7 @@ def pytest_configure(config):
         _log.debug("--slow detected; will not skip @slow tests")
 
     if config.getoption("clear_repo"):
-        _log.debug("--clear-repo detected; trashing and rebuilding data repo")
+        _log.debug("--clear-repo detected; trashing and rebuilding data repo & inventory DB")
         path = config.getini('data-repo')
         os.path.lexists(path) and shutil.rmtree(path)
         setup_data_repo()
