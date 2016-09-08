@@ -29,13 +29,17 @@ bad_filename_tails = (
 # generator for taking the product of asset types and bad filename tails
 at_x_bft = ((at, bft) for at in known_good_filenames.keys() for bft in bad_filename_tails)
 
+
 @pytest.mark.parametrize('asset_type, bad_filename_tail', at_x_bft)
 def t_discover_filename_globs(mocker, asset_type, bad_filename_tail):
     """Run Asset.discover() to confirm only valid filenames are accepted."""
+    # rig the inventory DB to explode, forcing fallback
+    m_asset_search = mocker.patch('gips.data.core.asset_search')
+    m_asset_search.side_effect = Exception('Earth-shattering ka-boom!')
+
+    # set up mocked repo path and install where needed
     repo_prefix = '/dontcare/'
     bad_filename = repo_prefix + asset_type + '.' + bad_filename_tail
-
-    # use known repo value instead of looking in config
     data_path = mocker.patch.object(modisAsset.Repository, 'data_path')
     data_path.return_value = repo_prefix
 
@@ -57,3 +61,68 @@ def t_discover_filename_globs(mocker, asset_type, bad_filename_tail):
     actual   = set(asset.filename for asset in found)
     expected = set(l for l in fake_dir_listing if asset_type not in l)
     assert expected == actual
+
+
+@pytest.fixture
+def basic_asset_db(db):
+    # This data isn't entirely valid but is correct enough for simple tests.  Also unicode isn't super
+    # relevant here; it's an artifact of cutpasting
+    path_prefix = modisAsset.Repository.data_path()
+    assets = [
+        { # basic row in table
+            'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+            'asset':  u'MCD43A2',
+            'date':   datetime.date(2012, 12, 1),
+            'driver': u'modis',
+            'sensor': u'MCD',
+            'tile':   u'h12v04'
+        },
+        { # duplicate tile string to confirm nonrepetition in outcome
+            'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+            'asset':  u'MCD43A2',
+            'date':   datetime.date(2012, 12, 2),
+            'driver': u'modis',
+            'sensor': u'MCD',
+            'tile':   u'h12v04'
+        },
+        { # second tile to confirm multiple tiles will be returned
+            'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+            'asset':  u'MCD43A2',
+            'date':   datetime.date(2012, 12, 2),
+            'driver': u'modis',
+            'sensor': u'MCD',
+            'tile':   u'h13v05'
+        },
+        { # different driver to confirm no cross-driver pollution of results
+            'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+            'asset':  u'MCD43A2',
+            'date':   datetime.date(2012, 12, 1),
+            'driver': u'landsat',
+            'sensor': u'MCD',
+            'tile':   u'trolololo'
+        },
+    ]
+    from gips.inventory.dbinv import models
+    [models.Asset(**f).save() for f in assets]
+    return assets
+    # TODO put this fn into utils and refactor wrt t_dbinv_api.py
+    # TODO add in some disparate asset types for Asset.discover to chew on (it can return multiple
+    # values if called with asset=None)
+
+
+@pytest.mark.django_db
+def t_discover(basic_asset_db):
+    """Confirm Asset.discover works (with the inventory DB).
+
+    Set up the inventory db with some assets then confirm
+    Asset.discover's return value is correct.
+    """
+    disc_out = modisAsset.discover('h12v04', datetime.date(2012, 12, 1))
+    actual = disc_out[0]
+    expected = modisAsset(basic_asset_db[0]['name'])
+
+    attribs = ('filename', 'asset', 'date', 'tile')
+    expected_d = {a: getattr(expected, a) for a in attribs}
+    actual_d   = {a: getattr(actual, a)   for a in attribs}
+
+    assert len(disc_out) == 1 and expected_d == actual_d

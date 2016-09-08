@@ -40,7 +40,7 @@ import gippy
 from gippy.algorithms import CookieCutter
 from gips import __version__
 from gips.utils import settings, VerboseOut, RemoveFiles, File2List, List2File, Colors, basename, mkdir, open_vector
-from ..inventory.dbinv import list_tiles, std_error_handler
+from ..inventory.dbinv import std_error_handler, list_tiles, asset_search
 
 from pdb import set_trace
 
@@ -282,7 +282,23 @@ class Asset(object):
 
     @classmethod
     def discover(cls, tile, date, asset=None):
-        """ Factory function returns list of Assets for this tile and date """
+        """Factory function returns list of Assets for this tile and date.
+
+        Attempts to use the inventory database for this; failing that it
+        falls back to filesystem search.
+
+        tile:   A tile string suitable for the current class(cls) ie 'h03v19' for modis
+        date:   datetime.date object to limit search in temporal dimension
+        asset:  Asset type string, eg for modis could be 'MCD43A2'
+        """
+        criteria = {'driver': cls.Repository.name.lower(), 'tile': tile, 'date': date}
+        if asset is not None:
+            criteria['asset'] = asset
+        with std_error_handler():
+            # search for ORM Assets to use for making GIPS Assets
+            return [cls(a.name) for a in asset_search(**criteria)]
+
+        # The rest of this fn is a fallback to the filesystem inventory
         tpath = cls.Repository.data_path(tile, date)
         if asset is not None:
             assets = [asset]
