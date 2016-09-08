@@ -5,7 +5,7 @@ import django.db
 from django.forms.models import model_to_dict
 
 from gips.inventory.dbinv import models
-from gips.inventory.dbinv import rectify, list_tiles, add_asset
+from gips.inventory.dbinv import rectify, list_tiles, add_asset, asset_search
 from gips.data.modis import modisAsset
 
 
@@ -99,50 +99,64 @@ def t_rectify(mocker):
     assert expected == actual
 
 
-# This data isn't entirely valid but is correct enough for the test.  Also unicode isn't super
-# relevant here; it's an artifact of cutpasting
-list_tiles_fixture = [
-    { # basic row in table
-        'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
-        'asset':  u'MCD43A2',
-        'date':   datetime.date(2012, 12, 1),
-        'driver': u'modis',
-        'sensor': u'MCD',
-        'tile':   u'h12v04'
-    },
-    { # duplicate tile string to confirm nonrepetition in outcome
-        'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
-        'asset':  u'MCD43A2',
-        'date':   datetime.date(2012, 12, 2),
-        'driver': u'modis',
-        'sensor': u'MCD',
-        'tile':   u'h12v04'
-    },
-    { # second tile to confirm multiple tiles will be returned
-        'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
-        'asset':  u'MCD43A2',
-        'date':   datetime.date(2012, 12, 2),
-        'driver': u'modis',
-        'sensor': u'MCD',
-        'tile':   u'h13v05'
-    },
-    { # different driver to confirm no cross-driver pollution of results
-        'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
-        'asset':  u'MCD43A2',
-        'date':   datetime.date(2012, 12, 1),
-        'driver': u'landsat',
-        'sensor': u'MCD',
-        'tile':   u'trolololo'
-    },
-]
+@pytest.fixture
+def basic_asset_db(db):
+    # This data isn't entirely valid but is correct enough for simple tests.  Also unicode isn't super
+    # relevant here; it's an artifact of cutpasting
+    path_prefix = modisAsset.Repository.data_path()
+    assets = [
+        { # basic row in table
+            'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+            'asset':  u'MCD43A2',
+            'date':   datetime.date(2012, 12, 1),
+            'driver': u'modis',
+            'sensor': u'MCD',
+            'tile':   u'h12v04'
+        },
+        { # duplicate tile string to confirm nonrepetition in outcome
+            'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+            'asset':  u'MCD43A2',
+            'date':   datetime.date(2012, 12, 2),
+            'driver': u'modis',
+            'sensor': u'MCD',
+            'tile':   u'h12v04'
+        },
+        { # second tile to confirm multiple tiles will be returned
+            'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+            'asset':  u'MCD43A2',
+            'date':   datetime.date(2012, 12, 2),
+            'driver': u'modis',
+            'sensor': u'MCD',
+            'tile':   u'h13v05'
+        },
+        { # different driver to confirm no cross-driver pollution of results
+            'name':   path_prefix + '/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
+            'asset':  u'MCD43A2',
+            'date':   datetime.date(2012, 12, 1),
+            'driver': u'landsat',
+            'sensor': u'MCD',
+            'tile':   u'trolololo'
+        },
+    ]
+    [models.Asset(**f).save() for f in assets]
+    return assets
+
 
 @pytest.mark.django_db
-def t_list_tiles():
+def t_list_tiles(basic_asset_db):
     """Test gips.inventory.dbinv for correctness using a database fixture."""
-    [models.Asset(**f).save() for f in list_tiles_fixture]
     actual = list_tiles('modis')
     expected = [u'h13v05', u'h12v04']
     assert len(actual) == 2 and set(expected) == set(actual)
+
+
+@pytest.mark.django_db
+def t_asset_search(basic_asset_db):
+    """Confirm that dbinv.add_asset works for saving assets."""
+    actual = [model_to_dict(a) for a in asset_search(driver='modis', tile='h12v04')]
+    [a.pop('id') for a in actual] # don't care what the keys are
+    expected = [d for d in basic_asset_db if d['tile'] == 'h12v04']
+    assert expected == actual
 
 
 @pytest.mark.django_db

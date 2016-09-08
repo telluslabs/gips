@@ -86,3 +86,13 @@ def add_asset(**values):
     a = Asset(**values)
     a.save()
     return a # in case the user needs it
+
+
+def asset_search(**criteria):
+    """Perform a search for asset models matching the given criteria.
+
+    Under the hood just calls models.Asset.objects.filter(**criteria);
+    see Django ORM docs for more details.
+    """
+    from gips.inventory.dbinv import models
+    return models.Asset.objects.filter(**criteria)
