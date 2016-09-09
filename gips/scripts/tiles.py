@@ -47,7 +47,8 @@ def main():
         with dbinv.std_error_handler():
             orm.setup()
 
-        # create tld: DATATYPE_tiles_RESOLUTION_SUFFIX
+        # create output directory if needed
+        # tld is "{}_tiles_{}_{}".format(DATATYPE, RESOLUTION, SUFFIX)
         if args.notld:
             tld = args.outdir
         else:
@@ -65,7 +66,7 @@ def main():
                 for tid in inv[date].tiles:
                     # make sure back-end tiles are processed
                     inv[date].tiles[tid].process(args.products, overwrite=False)
-                    # warp the tiles
+                    # warp the tiles & copy into place in the output dir
                     inv[date].tiles[tid].copy(tld, args.products, inv.spatial.site,
                                               args.res, args.interpolation, args.crop, args.overwrite, args.tree)
 

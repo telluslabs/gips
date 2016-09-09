@@ -49,6 +49,7 @@ def main():
         cls = import_data_class(args.command)
         with dbinv.std_error_handler():
             orm.setup()
+        # TODO archive accepts limited args, pass them in explicitly
         cls.Asset.archive(**vars(args))
     except Exception, e:
         import traceback
