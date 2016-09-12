@@ -28,30 +28,20 @@ def t_version_override(mocker):
     assert (version_a, version_b) == (gips.version.__version__, 'fancy-new-version')
 
 
-@pytest.fixture
-def m_list_tiles(mocker):
-    return mocker.patch('gips.data.core.list_tiles')
-
-
-def t_repository_find_tiles_normal_case(m_list_tiles):
+def t_repository_find_tiles_normal_case(mocker):
     """Test Repository.find_tiles using landsatRepository as a guinea pig."""
+    m_list_tiles = mocker.patch('gips.data.core.dbinv.list_tiles')
     expected = [u'tile1', u'tile2', u'tile3'] # list_tiles returns unicode
     m_list_tiles.return_value = expected
     actual = landsatRepository.find_tiles()
     assert expected == actual
 
 
-def t_repository_find_tiles_falllback_case(m_list_tiles, mocker):
+def t_repository_find_tiles_error_case(mocker):
     """Confirm Repository.find_tiles falls back to filesystem search."""
-    # intentionally break list_tiles
-    m_list_tiles.side_effect = Exception('AAAAAAAAAAH!')
-
-    # set up fallback to provide data instead
-    m_listdir = mocker.patch('gips.data.core.os.listdir')
-    expected = [u'tile1', u'tile2', u'tile3'] # list_tiles returns unicode
-    m_listdir.return_value = expected
+    m_list_tiles = mocker.patch('gips.data.core.dbinv.list_tiles')
+    m_list_tiles.side_effect = Exception('AAAAAAAAAAH!') # intentionally break list_tiles
 
     # confirm call was still a success via the righ code path
-    actual = landsatRepository.find_tiles()
-    assert expected == actual
-    m_listdir.assert_called_once_with(landsatRepository.path('tiles'))
+    with pytest.raises(SystemExit):
+        landsatRepository.find_tiles()

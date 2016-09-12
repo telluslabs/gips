@@ -40,7 +40,7 @@ import gippy
 from gippy.algorithms import CookieCutter
 from gips import __version__
 from gips.utils import settings, VerboseOut, RemoveFiles, File2List, List2File, Colors, basename, mkdir, open_vector
-from ..inventory.dbinv import std_error_handler, list_tiles, asset_search
+from ..inventory import dbinv, orm
 
 from pdb import set_trace
 
@@ -83,13 +83,10 @@ class Repository(object):
 
     @classmethod
     def find_tiles(cls):
-        """Get list of all available tiles for the current driver.
-
-        Attempt the query by searching the inventory database, and fall
-        back to the filesystem otherwise.
-        """
-        with std_error_handler():
-            return list_tiles(cls.name.lower())
+        """Get list of all available tiles for the current driver."""
+        if orm.use_orm():
+            with orm.std_error_handler():
+                return dbinv.list_tiles(cls.name.lower())
         return os.listdir(cls.path('tiles'))
 
     @classmethod
@@ -294,11 +291,12 @@ class Asset(object):
         criteria = {'driver': cls.Repository.name.lower(), 'tile': tile, 'date': date}
         if asset is not None:
             criteria['asset'] = asset
-        with std_error_handler():
-            # search for ORM Assets to use for making GIPS Assets
-            return [cls(a.name) for a in asset_search(**criteria)]
+        if orm.use_orm():
+            with orm.std_error_handler():
+                # search for ORM Assets to use for making GIPS Assets
+                return [cls(a.name) for a in dbinv.asset_search(**criteria)]
 
-        # The rest of this fn is a fallback to the filesystem inventory
+        # The rest of this fn uses the filesystem inventory
         tpath = cls.Repository.data_path(tile, date)
         if asset is not None:
             assets = [asset]

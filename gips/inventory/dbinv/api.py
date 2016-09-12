@@ -1,29 +1,8 @@
 import os, glob
-from sys import stderr
-from contextlib import contextmanager
-import traceback
 
-import django
 import django.db.transaction
 
-# TODO put this in scripts/*.py:  gips.orm.setup() # must come before importing models
-import gips.inventory.orm
 from gips.utils import verbose_out
-
-
-@contextmanager
-def std_error_handler(fs_fallback=None):
-    """Handle problems with API code in a unified way.
-
-    Optionally provide a callback to run if the DB API call fails."""
-    try:
-        yield
-    except Exception as e:
-        verbose_out(traceback.format_exc(), 4, stderr)
-        verbose_out("Error in database inventory API: {}".format(e.message), 1, stderr)
-        verbose_out("Falling back to filesystem inventory.", 1, stderr)
-        if fs_fallback is not None:
-            fs_fallback()
 
 
 def rectify(asset_class):

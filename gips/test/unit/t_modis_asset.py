@@ -33,9 +33,10 @@ at_x_bft = ((at, bft) for at in known_good_filenames.keys() for bft in bad_filen
 @pytest.mark.parametrize('asset_type, bad_filename_tail', at_x_bft)
 def t_discover_filename_globs(mocker, asset_type, bad_filename_tail):
     """Run Asset.discover() to confirm only valid filenames are accepted."""
-    # rig the inventory DB to explode, forcing fallback
-    m_asset_search = mocker.patch('gips.data.core.asset_search')
-    m_asset_search.side_effect = Exception('Earth-shattering ka-boom!')
+    # fake out config so it goes to FS inventory
+    m_use_orm = mocker.patch('gips.data.core.orm.use_orm', return_value=False)
+    # to confirm it wasn't called
+    m_asset_search = mocker.patch('gips.data.core.dbinv.asset_search')
 
     # set up mocked repo path and install where needed
     repo_prefix = '/dontcare/'

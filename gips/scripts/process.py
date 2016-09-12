@@ -26,7 +26,7 @@ from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
 from gips.utils import Colors, VerboseOut, open_vector, import_data_class
 from gips.inventory import DataInventory
-from gips.inventory import dbinv, orm
+from gips.inventory import orm
 
 
 def main():
@@ -41,8 +41,7 @@ def main():
     try:
         print title
         cls = import_data_class(args.command)
-        with dbinv.std_error_handler():
-            orm.setup()
+        orm.setup()
 
         extents = SpatialExtent.factory(
             cls, args.site, args.key, args.where, args.tiles, args.pcov,

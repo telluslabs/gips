@@ -67,8 +67,7 @@ def main():
     try:
         print(title)
         cls = import_data_class(args.command)
-        with dbinv.std_error_handler():
-            orm.setup()
+        orm.setup()
 
         if args.rectify:
             for k, v in vars(args).items():
@@ -77,7 +76,8 @@ def main():
                     msg = "Option '--{}' is not compatible with --rectify."
                     raise ValueError(msg.format(k))
             print("Rectifying inventory DB with filesystem archive:")
-            dbinv.rectify(cls.Asset)
+            with orm.std_error_handler():
+                dbinv.rectify(cls.Asset)
             return
 
         extents = SpatialExtent.factory(cls, args.site, args.key, args.where, 
