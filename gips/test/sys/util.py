@@ -113,7 +113,8 @@ class GipsProcResult(object):
             self.deleted = extract_hashes(proc_result.files_deleted)
             self.created = extract_hashes(proc_result.files_created)
 
-        input_fields = set(kwargs.keys())
+        # special keys are permitted if they begin with an underscore
+        input_fields = set(k for k in kwargs.keys() if k[0] != '_')
         if not input_fields.issubset(set(self.attribs)):
             raise ValueError('Unknown attributes for GipsProcResult',
                              list(input_fields - set(self.attribs)))

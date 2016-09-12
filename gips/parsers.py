@@ -58,7 +58,8 @@ class GIPSParser(argparse.ArgumentParser):
             parser = GIPSParser(add_help=False)
         else:
             parser = self
-        parser.add_argument('-v', '--verbose', help='Verbosity - 0: quiet, 1: normal, 2: debug', default=1, type=int)
+        parser.add_argument('-v', '--verbose', help='Verbosity - 0: quiet, 1: normal, 2: debug',
+                            default=1, type=int)
         self.parent_parsers.append(parser)
         return parser
 
