@@ -6,6 +6,7 @@ from django.forms.models import model_to_dict
 
 from gips.inventory.dbinv import models
 from gips.inventory.dbinv import rectify, list_tiles, add_asset, asset_search
+from gips.inventory import dbinv
 from gips.data.modis import modisAsset
 
 
@@ -65,7 +66,6 @@ expected = {
 
 @pytest.mark.django_db
 def t_rectify(mocker):
-    from gips.inventory.dbinv import models
     # construct plausible file listing & mock it into glob outcome
     path = modisAsset.Repository.data_path()
     rubbish_full_fns = [os.path.join(path, fn) for fn in rubbish_filenames]
@@ -160,8 +160,9 @@ def t_asset_search(basic_asset_db):
 
 
 @pytest.mark.django_db
-def t_add_asset():
-    """Confirm that dbinv.add_asset works for saving assets."""
+@pytest.mark.parametrize('call', (dbinv.add_asset, dbinv.update_or_add_asset))
+def t_insert_new_asset(call):
+    """Confirm that add_asset and update_or_add_asset work for saving assets."""
     values = {
         'asset':  u'some-asset',
         'sensor': u'some-sensor',
@@ -172,7 +173,29 @@ def t_add_asset():
     }
     expected = dict(values)
     expected['id'] = 1
-    a = add_asset(**values)
+    a = call(**values)
     returned_actual = model_to_dict(a)
     queried_actual = model_to_dict(models.Asset.objects.get(pk=1))
+    assert expected == returned_actual == queried_actual
+
+
+@pytest.mark.django_db
+def t_update_existing_asset(basic_asset_db):
+    """Test create_or_add_asset when it updates an existing model."""
+    values = {
+        # unique-together fields need to be the same
+        'driver': u'landsat',
+        'asset':  u'MCD43A2',
+        'date':   datetime.date(2012, 12, 1),
+        'tile':   u'trolololo',
+        # fields that can vary
+        'sensor': u'some-cool-sensor',
+        'name':   u'new-version-of-the-awesome.hdf',
+    }
+    expected = dict(values)
+    primary_key = 4
+    expected['id'] = primary_key
+    a = dbinv.update_or_add_asset(**values)
+    returned_actual = model_to_dict(a)
+    queried_actual = model_to_dict(models.Asset.objects.get(pk=primary_key))
     assert expected == returned_actual == queried_actual

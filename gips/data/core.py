@@ -443,13 +443,14 @@ class Asset(object):
             if not os.path.exists(newfilename):
                 # check if another asset exists
                 existing = cls.discover(asset.tile, d, asset.asset)
-                if(len(existing) > 0 and
-                   (not update or not existing[0].updated(asset))):
+                if len(existing) > 0 and (not update or not existing[0].updated(asset)):
+                    # gatekeeper case:  No action taken because existing assets are in the way
                     VerboseOut('%s: other version(s) already exists:' % bname, 1)
                     for ef in existing:
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
                     otherversions = True
                 elif len(existing) > 0 and update:
+                    # update case:  Remove existing outdated assets and install the new one
                     VerboseOut('%s: removing other version(s):' % bname, 1)
                     for ef in existing:
                         assert ef.updated(asset), 'Asset is not updated version'
@@ -476,6 +477,7 @@ class Asset(object):
                         raise Exception('Problem adding {} to archive: {}'
                                         .format(filename, e))
                 else:
+                    # 'normal' case:  Just add the asset to the archive; no other work needed
                     try:
                         os.makedirs(tpath)
                     except OSError as exc:

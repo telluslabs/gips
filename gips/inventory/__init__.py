@@ -265,8 +265,9 @@ class DataInventory(Inventory):
                 with orm.std_error_handler():
                     # save metadata about the fetched assets in the database
                     for a in archived_assets:
-                        dbinv.add_asset(asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-                                        name=a.archived_filename, driver=dataclass.name.lower())
+                        dbinv.update_or_add_asset(
+                                asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
+                                name=a.archived_filename, driver=dataclass.name.lower())
 
         # Build up the inventory:  One Tiles object per date.  Each contains one Data object.  Each
         # of those contain one or more Asset objects.

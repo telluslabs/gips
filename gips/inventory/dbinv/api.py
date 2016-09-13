@@ -5,6 +5,15 @@ import django.db.transaction
 from gips.utils import verbose_out
 
 
+"""API for the DB inventory for GIPS.
+
+Provides a clean interface layer for GIPS callers to do CRUD ops on the
+inventory DB, mostly by interfacing with dbinv.models.  Due to Django
+bootstrapping weirdness, some imports have to be done in each function's
+body.
+"""
+
+
 def rectify(asset_class):
     """Rectify the inventory database against the filesystem archive.
 
@@ -66,6 +75,24 @@ def add_asset(**values):
     a = Asset(**values)
     a.save()
     return a # in case the user needs it
+
+
+def update_or_add_asset(driver, asset, tile, date, sensor, name):
+    """Update an existing model or create it if it's not found.
+
+    Convenience method that wraps update_or_create.  The first four
+    arguments are used to make a unique key to search for a matching model.
+    """
+    from . import models
+    query_vals = {
+        'driver': driver,
+        'asset':  asset,
+        'tile':   tile,
+        'date':   date,
+    }
+    update_vals = {'sensor': sensor, 'name': name}
+    (asset, created) = models.Asset.objects.update_or_create(defaults=update_vals, **query_vals)
+    return asset # in case the user needs it
 
 
 def asset_search(**criteria):

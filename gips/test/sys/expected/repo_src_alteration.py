@@ -12,12 +12,7 @@ t_modis_inv_fetch = {
 }
 
 t_modis_archive = {
-    'updated': {
-	'modis/stage': None,
-	'modis/tiles': None,
-    },
     'created' : {
-	'modis/tiles/h12v04': None,
 	'modis/tiles/h12v04/2012336': None,
 	'modis/tiles/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf': 1675397841,
 	'modis/tiles/h12v04/2012336/MCD43A4.A2012336.h12v04.006.2016112010833.hdf': 916843457,
@@ -33,7 +28,6 @@ t_modis_archive = {
 	'modis/tiles/h12v04/2012337/MOD11A2.A2012337.h12v04.005.2012346152330.hdf': 1824973107,
 	'modis/tiles/h12v04/2012337/MYD10A1.A2012337.h12v04.005.2012340112013.hdf': -666113329,
 	'modis/tiles/h12v04/2012337/MYD11A1.A2012337.h12v04.005.2012341072847.hdf': 873200589,
-	'modis/tiles/h12v04/2012338': None,
 	'modis/tiles/h12v04/2012338/MCD43A2.A2012338.h12v04.006.2016112020013.hdf': -1644294368,
 	'modis/tiles/h12v04/2012338/MCD43A4.A2012338.h12v04.006.2016112020013.hdf': -930648528,
 	'modis/tiles/h12v04/2012338/MOD10A1.A2012338.h12v04.005.2012341091201.hdf': 410135112,
@@ -42,6 +36,7 @@ t_modis_archive = {
 	'modis/tiles/h12v04/2012338/MYD11A1.A2012338.h12v04.005.2012341075802.hdf': -1419706597,
     },
     'deleted' : {
+	'modis/tiles/h12v04/2012338/MCD43A4.A2012338.h12v04.005.2012120921015.hdf': -1419706597,
 	'modis/stage/MCD43A2.A2012336.h12v04.006.2016112010833.hdf': 1675397841,
 	'modis/stage/MCD43A2.A2012337.h12v04.006.2016112013509.hdf': 1606447855,
 	'modis/stage/MCD43A2.A2012338.h12v04.006.2016112020013.hdf': -1644294368,

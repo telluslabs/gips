@@ -55,8 +55,8 @@ def main():
         if orm.use_orm():
             with orm.std_error_handler():
                 for a in archived_assets:
-                    dbinv.add_asset(asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-                                    name=a.archived_filename, driver=cls.name.lower())
+                    dbinv.update_or_add_asset(asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
+                                              name=a.archived_filename, driver=cls.name.lower())
 
     except Exception, e:
         import traceback
