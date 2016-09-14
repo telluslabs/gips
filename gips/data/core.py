@@ -281,10 +281,11 @@ class Asset(object):
     def discover(cls, tile, date, asset=None):
         """Factory function returns list of Assets for this tile and date.
 
-        Attempts to use the inventory database for this; failing that it
-        falls back to filesystem search.
+        Looks in the inventory for this, either the database or the
+        filesystem depending on configuration.
 
-        tile:   A tile string suitable for the current class(cls) ie 'h03v19' for modis
+        tile:   A tile string suitable for the current class(cls) ie
+                'h03v19' for modis
         date:   datetime.date object to limit search in temporal dimension
         asset:  Asset type string, eg for modis could be 'MCD43A2'
         """
