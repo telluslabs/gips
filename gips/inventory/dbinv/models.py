@@ -7,7 +7,8 @@ from django.db import models
 class Asset(models.Model):
     """Inventory for assets, which are downloaded files from data sources.
 
-    Assets undergo little or no processing.  GIPS generates products from assets.
+    Assets undergo little or no processing.  GIPS generates products
+    from assets.
     """
     # max_length chosen somewhat arbitrarily since neither of our expected DB backends care (django
     # ORM is a stickler for no discernible reason).

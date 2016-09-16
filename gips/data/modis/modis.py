@@ -269,7 +269,6 @@ class modisData(Data):
     name = 'Modis'
     version = '1.0.0'
     Asset = modisAsset
-    _pattern = '*.tif'
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],

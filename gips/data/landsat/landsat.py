@@ -250,7 +250,6 @@ class landsatData(Data):
 
     Asset = landsatAsset
 
-    _prodpattern = '*.tif'
     # Group products belong to ('Standard' if not specified)
     _productgroups = {
         'Index': ['bi', 'evi', 'lswi', 'msavi2', 'ndsi', 'ndvi', 'ndwi', 'satvi'],
@@ -788,7 +787,11 @@ class landsatData(Data):
                 pass
 
     def filter(self, pclouds=100, sensors=None, **kwargs):
-        """ Check if tile passes filter """
+        """Check if Data object passes filter.
+
+        User can't enter pclouds, but can pass in --sensors.  kwargs
+        isn't used.
+        """
         if pclouds < 100:
             self.meta()
             if self.metadata['clouds'] > pclouds:
@@ -968,6 +971,7 @@ class landsatData(Data):
 
     @classmethod
     def extra_arguments(cls):
+        # TODO this can't be called ever?
         return {
             '--%clouds': {
                 'dest': 'pclouds',

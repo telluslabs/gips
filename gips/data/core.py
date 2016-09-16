@@ -568,7 +568,11 @@ class Data(object):
         VerboseOut('%s tile %s: %s files %s' % (self.date, self.id, len(products.requested), procstr))
 
     def filter(self, **kwargs):
-        """ Check if tile passes filter - autofail if there are no assets or products """
+        """Permit child classes to implement filtering.
+
+        If data.filter() returns False, the Data object will be left out
+        of the inventory during DataInventory instantiation.
+        """
         return True
 
     @classmethod
@@ -578,7 +582,11 @@ class Data(object):
         }
 
     def find_files(self):
-        """ Search path for non-asset files """
+        """Search path for non-asset files, usually product files.
+
+        These must match the shell glob in self._pattern, and must not
+        be assets, index files, nor xml files.
+        """
         filenames = glob.glob(os.path.join(self.path, self._pattern))
         assetnames = [a.filename for a in self.assets.values()]
         badexts = ['.index', '.xml']
@@ -597,7 +605,7 @@ class Data(object):
         self.id = tile
         self.date = date
         self.path = ''
-        self.basename = ''
+        self.basename = ''              # this is used by child classes
         self.assets = {}                # dict of asset name: Asset instance
         self.filenames = {}             # dict of (sensor, product): filename
         self.sensors = {}               # dict of asset/product: sensor
@@ -675,7 +683,7 @@ class Data(object):
     def ParseAndAddFiles(self, filenames=None):
         """ Parse and Add filenames to existing filenames """
         if filenames is None:
-            filenames = self.find_files()
+            filenames = self.find_files() # find *product* files actually
         datedir = self.Repository._datedir
         for f in filenames:
             bname = basename(f)
@@ -800,6 +808,7 @@ class Data(object):
         func = lambda x: datetime.strptime(basename(x).split('_')[sind], datedir).date()
         for date, fnames in groupby(sorted(files), func):
             dat = cls(path=path)
+            # TODO needs edit
             dat.ParseAndAddFiles(list(fnames))
             datas.append(dat)
 
