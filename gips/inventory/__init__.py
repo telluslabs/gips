@@ -278,30 +278,48 @@ class DataInventory(Inventory):
             # DB quick-like then assigning things we iterate:  The DB is a flat table of data; we
             # have to hierarchy-ize it.
             with orm.std_error_handler():
-                search_criteria = {
+                # set up a temporary collection of objects for populating Data objects: the
+                # collection is basically a simple version of the complicated hierarchy that GIPS
+                # constructs on its own:
+                #   collection = {
+                #       (tile, date): {'a': [asset, asset, asset],
+                #                      'p': [product, product, product]},
+                #       (tile, date): {'a': [asset, asset, asset],
+                #                      'p': [product, product, product]},
+                #   }
+                collection = {} # TODO use ordereddict if perf isn't good enough
+                def add_to_collection(date, tile, kind, item):
+                    key = (date, str(tile)) # str() to avoid possible unicode trouble
+                    if key not in collection:
+                        collection[key] = {'a': [], 'p': []}
+                    collection[key][kind].append(item)
+
+                search_criteria = { # same for both Assets and Products
                     'driver': Repository.name.lower(),
                     'tile__in': spatial.tiles,
                     'date__in': dates,
                 }
-                a_models = dbinv.asset_search(**search_criteria).order_by('date', 'tile')
-                assets = [dataclass.Asset(str(am.name)) for am in a_models]
+                # TODO move with-block to this spot
+                for p in dbinv.product_search(**search_criteria).order_by('date', 'tile'):
+                    add_to_collection(p.date, p.tile, 'p', str(p.name))
+                for a in dbinv.asset_search(**search_criteria).order_by('date', 'tile'):
+                    add_to_collection(a.date, a.tile, 'a', str(a.name))
 
-                for a in assets:
+                for k, v in collection.items():
+                    (date, tile) = k
                     # find or else make a Tiles object
-                    if a.date not in self.data:
-                        self.data[a.date] = Tiles(dataclass, spatial, a.date, self.products, **kwargs)
-                    tiles_obj = self.data[a.date]
-
-                    # If there is no Data object in the Tiles object, make one
-                    if a.tile not in tiles_obj.tiles:
-                        data_obj = dataclass(a.tile, a.date, search=False)
-                        data_obj.add_asset(a)
-                        # if it's kosher, add the new Data object to the Tiles object
-                        if data_obj.valid and data_obj.filter(**kwargs):
-                            tiles_obj.tiles[a.tile] = data_obj
-                    else:
-                        # oh, a Data object, great!
-                        tiles_obj.tiles[a.tile].add_asset(a)
+                    if date not in self.data:
+                        self.data[date] = Tiles(dataclass, spatial, date, self.products, **kwargs)
+                    tiles_obj = self.data[date]
+                    # add a Data object (should not be in tiles_obj.tiles already)
+                    assert tile not in tiles_obj.tiles # sanity check
+                    data_obj = dataclass(tile, date, search=False)
+                    # add assets and products
+                    [data_obj.add_asset(dataclass.Asset(a)) for a in v['a']]
+                    data_obj.ParseAndAddFiles(v['p'])
+                    # add the new Data object to the Tiles object if it checks out
+                    if data_obj.valid and data_obj.filter(**kwargs):
+                        tiles_obj.tiles[tile] = data_obj
             return
 
         # Perform filesystem search since user wants that.  Data object instantiation results

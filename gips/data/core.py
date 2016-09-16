@@ -615,8 +615,9 @@ class Data(object):
             # find all assets
             if search:
                 [self.add_asset(a) for a in self.Asset.discover(tile, date)]
-            # Find products
-            self.ParseAndAddFiles()
+                # Find products
+                self.ParseAndAddFiles()
+        # TODO change path default to '' then set it above & eliminate this clause
         elif path is not None:
             self.path = path
 

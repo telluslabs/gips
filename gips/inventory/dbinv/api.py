@@ -77,6 +77,18 @@ def add_asset(**values):
     return a # in case the user needs it
 
 
+def add_product(**values):
+    """(very) thin convenience method that wraps models.Product().save().
+
+    Arguments:  driver, product, sensor, tile, date, name; passed
+    directly into models.Product().
+    """
+    from .models import Product
+    p = Product(**values)
+    p.save()
+    return p # in case the user needs it
+
+
 def update_or_add_asset(driver, asset, tile, date, sensor, name):
     """Update an existing model or create it if it's not found.
 
@@ -93,6 +105,16 @@ def update_or_add_asset(driver, asset, tile, date, sensor, name):
     update_vals = {'sensor': sensor, 'name': name}
     (asset, created) = models.Asset.objects.update_or_create(defaults=update_vals, **query_vals)
     return asset # in case the user needs it
+
+
+def product_search(**criteria):
+    """Perform a search for asset models matching the given criteria.
+
+    Under the hood just calls models.Asset.objects.filter(**criteria);
+    see Django ORM docs for more details.
+    """
+    from gips.inventory.dbinv import models
+    return models.Product.objects.filter(**criteria)
 
 
 def asset_search(**criteria):
