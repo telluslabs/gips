@@ -607,7 +607,7 @@ class Data(object):
         self.path = ''
         self.basename = ''              # this is used by child classes
         self.assets = {}                # dict of asset name: Asset instance
-        self.filenames = {}             # dict of (sensor, product): filename
+        self.filenames = {}             # dict of (sensor, product): product filename
         self.sensors = {}               # dict of asset/product: sensor
         if tile is not None and date is not None:
             self.path = self.Repository.data_path(tile, date)
@@ -682,7 +682,10 @@ class Data(object):
         return list(set(self.products))
 
     def ParseAndAddFiles(self, filenames=None):
-        """ Parse and Add filenames to existing filenames """
+        """Parse and Add filenames to existing filenames.
+
+        If no filenames are provided, a list from find_files() is used
+        instead."""
         if filenames is None:
             filenames = self.find_files() # find *product* files actually
         datedir = self.Repository._datedir
@@ -704,17 +707,28 @@ class Data(object):
                         raise Exception('Mismatched dates: %s' % ' '.join(filenames))
                 sensor = parts[1 + offset]
                 product = parts[2 + offset]
-                self.AddFile(sensor, product, f)
+                self.AddFile(sensor, product, f, add_to_db=False)
             except Exception:
                 # This was just a bad file
                 VerboseOut('Unrecognizable file: %s' % f, 3)
                 continue
 
-    def AddFile(self, sensor, product, filename):
-        """ Add products (dictionary  (sensor, product): filename) to instance """
+    def AddFile(self, sensor, product, filename, add_to_db=True):
+        """Add named file to this object, taking note of its metadata.
+
+        Optionally, also add a listing for the product file to the
+        inventory database.
+        """
         self.filenames[(sensor, product)] = filename
         # TODO - currently assumes single sensor for each product
         self.sensors[product] = sensor
+        if add_to_db and orm.use_orm(): # update inventory DB if such is requested
+            with orm.std_error_handler():
+                dbinv.add_product(driver=self.name.lower(), product=product, sensor=sensor,
+                                  tile=self.id, date=self.date, name=filename)
+
+
+
 
     def asset_filenames(self, product):
         assets = self._products[product]['assets']
@@ -784,7 +798,10 @@ class Data(object):
     ##########################################################################
     @classmethod
     def discover(cls, path):
-        """ Find products in path and return Data object for each date """
+        """Find products in path and return Data object for each date.
+
+        Does not interact with inventory DB as only caller is
+        ProjectInventory which needs to read form the filesystem."""
         files = []
         datedir = cls.Asset.Repository._datedir
         for root, dirs, filenames in os.walk(path):
@@ -809,7 +826,6 @@ class Data(object):
         func = lambda x: datetime.strptime(basename(x).split('_')[sind], datedir).date()
         for date, fnames in groupby(sorted(files), func):
             dat = cls(path=path)
-            # TODO needs edit
             dat.ParseAndAddFiles(list(fnames))
             datas.append(dat)
 
