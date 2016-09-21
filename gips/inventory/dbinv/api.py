@@ -1,8 +1,8 @@
-import os, glob
+import os, glob, sys, traceback, datetime
 
 import django.db.transaction
 
-from gips.utils import verbose_out
+from gips.utils import verbose_out, basename
 
 
 """API for the DB inventory for GIPS.
@@ -14,6 +14,7 @@ body.
 """
 
 
+# TODO rename to rectify_assets and change docstring
 def rectify(asset_class):
     """Rectify the inventory database against the filesystem archive.
 
@@ -21,6 +22,7 @@ def rectify(asset_class):
     and ensure it has an entry in the inventory database.  Also
     remove any database entries that match no archived files.
     """
+    # TODO report that ASSETS are being done here with print() stmts
     # can't load this at module compile time because django initialization is crazytown
     from . import models
     # this assumes this directory layout:  /path-to-repo/tiles/*/*/
@@ -57,6 +59,85 @@ def rectify(asset_class):
                 deletia.delete()
             msg = "{} complete, inventory records changed:  {} added, {} updated, {} deleted"
             print msg.format(ak, add_cnt, update_cnt, del_cnt) # no -v for this important data
+
+
+def rectify_products(data_class):
+    """Rectify the product inventory against the filesystem archive.
+
+    For the current driver, go through each product in the filesystem
+    and ensure it has an entry in the inventory database.  Also
+    remove any database entries that match no extant file.  Attempt to
+    follow the process in Data() closely, in particular find_files and
+    ParseAndAddFiles.
+    """
+    # for now don't support SAR*, TODO to support SAR*, filter these files:
+    #   files that match assets from data_class.Asset._assets[*]['pattern']
+    #   *.index, *.xml, and *.hdr files
+    if data_class.name in ('SAR', 'SARAnnual'):
+        msg = "DB Inventory does not support driver '{}'.".format(data_class.name)
+        raise RuntimeError(msg)
+
+    # can't load this at module compile time because django initialization is crazytown
+    from . import models
+    # search_glob for supported drivers:  /path-to-repo/tiles/*/*/*.tif
+    search_glob = os.path.join(data_class.Asset.Repository.data_path(),
+                               '*', '*', data_class._pattern)
+    assert search_glob[-1] not in ('*', '?') # sanity check in case new drivers don't conform
+    file_iter = glob.iglob(search_glob)
+
+    def match_failure_report(f_name, reason):
+        msg = "Product file match failure:  '{}'\nReason:  {}"
+        verbose_out(msg.format(f_name, reason), 2, sys.stderr)
+
+    touched_rows = [] # for removing entries that don't match the filesystem
+    add_cnt = 0
+    update_cnt = 0
+    # TODO break up transaction into manageable sizes?  This is going to get LARGE.
+    # maybe google 'python chunk iterator'.
+    with django.db.transaction.atomic():
+        for full_fn in file_iter:
+            base_fn = basename(full_fn)
+            bfn_parts = base_fn.split('_')
+            if not len(bfn_parts) == 4:
+                match_failure_report(full_fn,
+                        "Failure to parse:  Wrong number of '_'-delimited substrings.")
+                continue
+                # TODO support products whose len(parts) == 3
+
+            # extract metadata about the file
+            (tile, date_str, sensor, product) = bfn_parts
+            date_pattern = data_class.Asset.Repository._datedir
+            try:
+                date = datetime.datetime.strptime(date_str, date_pattern).date()
+            except Exception:
+                verbose_out(traceback.format_exc(), 4, sys.stderr)
+                msg = "Failure to parse date:  '{}' didn't adhere to pattern '{}'."
+                match_failure_report(full_fn, msg.format(date_str, date_pattern))
+                continue
+
+            (product, created) = models.Product.objects.update_or_create(
+                product=product,
+                sensor=sensor,
+                tile=tile,
+                date=date,
+                name=full_fn,
+                driver=data_class.name.lower(),
+            )
+            product.save()
+            touched_rows.append(product.pk)
+            if created:
+                add_cnt += 1
+                verbose_out("Product added to database:  " + full_fn, 4)
+            else:
+                update_cnt += 1
+                verbose_out("Product found in database:  " + full_fn, 4)
+        # Remove things from DB that are NOT in FS:
+        deletia = models.Product.objects.exclude(pk__in=touched_rows)
+        del_cnt = deletia.count()
+        if del_cnt > 0:
+            deletia.delete()
+        msg = "Products complete, inventory records changed:  {} added, {} updated, {} deleted"
+        print msg.format(add_cnt, update_cnt, del_cnt) # no -v for this important data
 
 
 def list_tiles(driver):

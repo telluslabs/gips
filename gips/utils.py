@@ -109,6 +109,11 @@ def RemoveFiles(filenames, extensions=['']):
 
 
 def basename(str):
+    """Return the input string, stripped of directories and extensions.
+
+    So, basename('/home/al-haytham/book-of-optics.pdf') returns
+    'book-of-optics'.
+    """
     return os.path.splitext(os.path.basename(str))[0]
 
 

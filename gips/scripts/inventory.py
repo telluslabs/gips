@@ -78,6 +78,7 @@ def main():
             print("Rectifying inventory DB with filesystem archive:")
             with orm.std_error_handler():
                 dbinv.rectify(cls.Asset)
+                dbinv.rectify_products(cls)
             return
 
         extents = SpatialExtent.factory(cls, args.site, args.key, args.where, 

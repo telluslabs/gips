@@ -612,11 +612,9 @@ class Data(object):
         if tile is not None and date is not None:
             self.path = self.Repository.data_path(tile, date)
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)
-            # find all assets
             if search:
-                [self.add_asset(a) for a in self.Asset.discover(tile, date)]
-                # Find products
-                self.ParseAndAddFiles()
+                [self.add_asset(a) for a in self.Asset.discover(tile, date)] # Find all assets
+                self.ParseAndAddFiles() # Find products
         # TODO change path default to '' then set it above & eliminate this clause
         elif path is not None:
             self.path = path
@@ -698,6 +696,7 @@ class Data(object):
                 continue
             offset = 1 if len(parts) == 4 else 0
             try:
+                # only admit product files matching a single date
                 if self.date is None:
                     # First time through
                     self.date = datetime.strptime(parts[0 + offset], datedir).date()
