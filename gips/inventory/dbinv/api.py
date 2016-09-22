@@ -1,4 +1,4 @@
-import os, glob, sys, traceback, datetime
+import os, glob, sys, traceback, datetime, time
 
 import django.db.transaction
 
@@ -94,8 +94,14 @@ def rectify_products(data_class):
     update_cnt = 0
     # TODO break up transaction into manageable sizes?  This is going to get LARGE.
     # maybe google 'python chunk iterator'.
+    iter_cnt = 0
+    start_time = time.time()
     with django.db.transaction.atomic():
         for full_fn in file_iter:
+            # after each chunk of work, report on progress & elapsed time
+            iter_cnt += 1
+            if iter_cnt % 1000 == 0:
+                print "{} files scanned; total elapsed time {:0.2f}".format(iter_cnt, time.time() - start_time)
             base_fn = basename(full_fn)
             bfn_parts = base_fn.split('_')
             if not len(bfn_parts) == 4:
@@ -131,11 +137,14 @@ def rectify_products(data_class):
             else:
                 update_cnt += 1
                 verbose_out("Product found in database:  " + full_fn, 4)
-        # Remove things from DB that are NOT in FS:
-        deletia = models.Product.objects.exclude(pk__in=touched_rows)
-        del_cnt = deletia.count()
+
+    with django.db.transaction.atomic():
+        # Remove things from DB that are NOT in FS; do it in a loop to avoid an explosion.
+        deletia_keys = set(models.Product.objects.values_list('id', flat=True)) - set(touched_rows)
+        del_cnt = len(deletia_keys)
         if del_cnt > 0:
-            deletia.delete()
+            for key in deletia_keys:
+                models.Product.get(pk=key).delete()
         msg = "Products complete, inventory records changed:  {} added, {} updated, {} deleted"
         print msg.format(add_cnt, update_cnt, del_cnt) # no -v for this important data
 
