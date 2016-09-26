@@ -383,5 +383,8 @@ class DataInventory(Inventory):
             self.spatial.print_tile_coverage()
             print
         else:
-            print Colors.BOLD + 'Asset Holdings' + Colors.OFF
+            if len(self.spatial.tiles) > 1:
+                raise RuntimeError('Expected 1 tile but got ' + repr(self.spatial.tiles))
+            print Colors.BOLD + 'Asset Holdings for tile ' + self.spatial.tiles[0] + Colors.OFF
         super(DataInventory, self).pprint(**kwargs)
+
