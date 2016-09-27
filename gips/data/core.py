@@ -92,6 +92,9 @@ class Repository(object):
     @classmethod
     def find_dates(cls, tile):
         """ Get list of dates available in repository for a tile """
+        if orm.use_orm():
+            with orm.std_error_handler():
+                return dbinv.list_dates(cls.name.lower(), tile)
         tdir = cls.data_path(tile=tile)
         if os.path.exists(tdir):
             return sorted([datetime.strptime(os.path.basename(d), cls._datedir).date() for d in os.listdir(tdir)])

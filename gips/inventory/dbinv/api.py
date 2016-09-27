@@ -156,6 +156,13 @@ def list_tiles(driver):
             'tile', flat=True).distinct().order_by('tile')
 
 
+def list_dates(driver, tile):
+    """For the given driver & tile, list dates for which assets exist."""
+    from .models import Asset
+    return Asset.objects.filter(driver=driver, tile=tile).values_list(
+            'date', flat=True).distinct().order_by('date')
+
+
 def add_asset(**values):
     """(very) thin convenience method that wraps models.Asset().save().
 
