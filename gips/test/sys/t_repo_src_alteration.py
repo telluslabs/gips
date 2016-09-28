@@ -15,6 +15,11 @@ pytestmark = pytest.mark.skipif(not pytest.config.getoption("src_altering"),
 # only one day for most of these tests (to save time), and note --fetch:
 STD_ARGS = ('modis', '-s', NH_SHP_PATH, '-d', '2012-12-01,2012-12-01', '-v', '4', '--fetch')
 
+# will need to support changing the driver on a per-test basis; one idea is to have the test set
+# the driver on the fixture, then have the fixture inspect it when needed
+driver = 'modis'
+
+
 @pytest.yield_fixture
 def careful_repo_env(request, expected):
     """Carefully provides access to the data repo.
