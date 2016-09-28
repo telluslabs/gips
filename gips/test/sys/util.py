@@ -151,7 +151,7 @@ class GipsProcResult(object):
 
 
 @pytest.yield_fixture
-def repo_env():
+def repo_env(request):
     """Provide means to test files created by run & clean them up after."""
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     yield gtfe
@@ -160,6 +160,8 @@ def repo_env():
     # Maybe add self-healing by having setup_modis_data run in a TFE and
     # detecting which files are present when it starts.
     gtfe.remove_created()
+    # ensure inv DB matches files on disk
+    gtfe.run('gips_inventory', request.module.driver, '--rectify')
 
 
 @pytest.yield_fixture(scope='module')
@@ -176,6 +178,8 @@ def clean_repo_env(request):
     after = file_env._find_files()
     file_env.proc_result = ProcResult(file_env, ['N/A'], '', '', '', 0, before, after)
     file_env.remove_created()
+    # ensure inv DB matches files on disk
+    file_env.run('gips_inventory', request.module.driver, '--rectify')
     _log.debug("Finalized file env: {}".format(file_env))
 
 

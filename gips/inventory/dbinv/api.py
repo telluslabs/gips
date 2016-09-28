@@ -144,7 +144,7 @@ def rectify_products(data_class):
         del_cnt = len(deletia_keys)
         if del_cnt > 0:
             for key in deletia_keys:
-                models.Product.get(pk=key).delete()
+                models.Product.objects.get(pk=key).delete()
         msg = "Products complete, inventory records changed:  {} added, {} updated, {} deleted"
         print msg.format(add_cnt, update_cnt, del_cnt) # no -v for this important data
 
