@@ -88,6 +88,7 @@ def rectify_products(data_class):
         msg = "Product file match failure:  '{}'\nReason:  {}"
         verbose_out(msg.format(f_name, reason), 2, sys.stderr)
 
+    driver = data_class.name.lower()
     touched_rows = [] # for removing entries that don't match the filesystem
     add_cnt = 0
     update_cnt = 0
@@ -126,7 +127,7 @@ def rectify_products(data_class):
                 tile=tile,
                 date=date,
                 name=full_fn,
-                driver=data_class.name.lower(),
+                driver=driver,
             )
             product.save()
             touched_rows.append(product.pk)
@@ -139,7 +140,8 @@ def rectify_products(data_class):
 
     with django.db.transaction.atomic():
         # Remove things from DB that are NOT in FS; do it in a loop to avoid an explosion.
-        deletia_keys = set(models.Product.objects.values_list('id', flat=True)) - set(touched_rows)
+        query = models.Product.objects.filter(driver=driver)
+        deletia_keys = set(query.values_list('id', flat=True)) - set(touched_rows)
         del_cnt = len(deletia_keys)
         if del_cnt > 0:
             for key in deletia_keys:

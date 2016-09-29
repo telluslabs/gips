@@ -4,55 +4,40 @@ import pytest
 import django.db
 from django.forms.models import model_to_dict
 
-from .data import asset_filenames, expected_assets, expected_products
+from .data import asset_filenames, product_filenames, expected_assets, expected_products
 
 from gips.inventory.dbinv import models
 from gips.inventory.dbinv import (rectify_assets, rectify_products, list_tiles, add_asset,
         asset_search)
 from gips.inventory import dbinv
-from gips.data.modis import modisAsset
-
-
-### rectify_assets() test setup
-stale_file_names = [ # these should be removed during rectify_assets()
-    'h12v04/2012338/MCD43A4.A2012338.h12v04.006.2016112020013.hdf',
-    'h12v04/2012337/MCD43A4.A2012337.h12v04.006.2016112013509.hdf',
-    'h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf',
-]
-
-rubbish_filenames = [
-    # landsat is wrong obviously; shouldn't show up in results
-    '012030/2015352/012030_2015352_LC8_rad-toa.tif',
-    '012030/2015352/012030_2015352_LC8_bqashadow.tif',
-    '012030/2015352/012030_2015352_LC8_acca.tif',
-    '012030/2015352/LC80120302015352LGN00_MTL.txt',
-    # erroneous assets
-    'h12v04/2012338/A2003266.h12v09.005.hdf',  # missing generation stamp per issue #79
-    'h12v04/2012338/bork.hdf',                 # not enough period-delimited substrings
-    'h12v04/2012338/_2004001._02_06.051.2014287173613.hdf', # try to trip it up with wrong characters
-]
-
-proper_filenames = [
-    'h12v04/2012338/MYD11A1.A2012338.h12v04.005.2012341075802.hdf',
-    'h12v04/2012337/MOD10A1.A2012337.h12v04.005.2012340033542.hdf',
-    'h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf',
-]
-
-expected = expected_assets
+from gips.data.modis import modisAsset, modisData
 
 
 @pytest.mark.django_db
 def t_rectify_assets(mocker):
     # construct plausible file listing & mock it into glob outcome
     path = modisAsset.Repository.data_path()
-    rubbish_full_fns = [os.path.join(path, fn) for fn in rubbish_filenames]
-    proper_full_fns  = [os.path.join(path, fn) for fn in proper_filenames]
-    full_fns = rubbish_full_fns + proper_full_fns
+    rubbish_filenames = [os.path.join(path, fn) for fn in (
+        # landsat is wrong obviously; shouldn't show up in results
+        '012030/2015352/012030_2015352_LC8_rad-toa.tif',
+        '012030/2015352/012030_2015352_LC8_bqashadow.tif',
+        '012030/2015352/012030_2015352_LC8_acca.tif',
+        '012030/2015352/LC80120302015352LGN00_MTL.txt',
+        # erroneous assets
+        'h12v04/2012338/A2003266.h12v09.005.hdf',  # missing generation stamp per issue #79
+        'h12v04/2012338/bork.hdf',                 # not enough period-delimited substrings
+        'h12v04/2012338/_2004001._02_06.051.2014287173613.hdf', # try to trip it up with bad chars
+    )]
+    all_filenames = product_filenames + rubbish_filenames + asset_filenames # it should skip assets
+    # simulate iglob() - match against artificial filenames
     mock_iglob = mocker.patch('gips.inventory.dbinv.glob.iglob')
-    mock_iglob.side_effect = lambda pat: [fn for fn in full_fns if fnmatch.fnmatchcase(fn, pat)]
+    mock_iglob.side_effect = lambda pat: [fn for fn in all_filenames if fnmatch.fnmatchcase(fn, pat)]
 
-    # preload stale data to confirm stale things get deleted
-    for fn in stale_file_names:
+    # items that are stale (in the DB but no longer in the filesystem) should be deleted; test this
+    # by preloading stale data into the DB; these should be deleted during rectify_assets() call:
+    for fn in ('h12v04/2012338/MCD43A4.A2012338.h12v04.006.2016112020013.hdf',
+               'h12v04/2012337/MCD43A4.A2012337.h12v04.006.2016112013509.hdf',
+               'h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf'):
         full_fn = os.path.join(path, fn)
         ma = modisAsset(full_fn)
         asset = models.Asset(
@@ -73,7 +58,7 @@ def t_rectify_assets(mocker):
     [a.pop('id') for a in rows] # don't care what the keys are
     actual = {r['asset']: r for r in rows} # enforce an order so whims of hashing doesn't ruin test
 
-    assert expected == actual
+    assert expected_assets == actual
 
 
 @pytest.fixture

@@ -38,6 +38,12 @@ expected_assets = {
     },
 }
 
+product_filenames = [
+    path_prefix + '/h12v04/2012336/h12v04_2012336_MCD_quality.tif',
+    path_prefix + '/h12v04/2012337/h12v04_2012337_MOD_temp8td.tif',
+    path_prefix + '/h12v04/2012338/h12v04_2012338_MCD_fsnow.tif',
+]
+
 expected_products = {
     'quality': {
         'driver':   u'modis',
