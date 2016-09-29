@@ -58,7 +58,53 @@ def t_rectify_assets(mocker):
     [a.pop('id') for a in rows] # don't care what the keys are
     actual = {r['asset']: r for r in rows} # enforce an order so whims of hashing doesn't ruin test
 
-    assert expected_assets == actual
+    assert len(expected_assets) == len(rows) and expected_assets == actual
+
+
+@pytest.mark.django_db
+def t_rectify_products(mocker):
+    # construct plausible file listing & mock it into glob outcome
+    path = modisAsset.Repository.data_path()
+    rubbish_filenames = [os.path.join(path, fn) for fn in (
+        '012030/2015352/LC80120302015352LGN00_MTL.txt',         # not a tiff
+        'h12v04/2012337/h12v04_2012337_MOD_temp8td.not-a-tif',  # also not a tiff
+        'h12v04/2012336/h12v04_20_12_336_MCD_quality.tif',      # too many _-delimited tokens
+        'h12v04/2012338/h12v04_2012338_MCD.tif',                # not enough _-delimited tokens
+    )]
+    all_filenames = rubbish_filenames + asset_filenames + product_filenames
+    # simulate iglob() - match against artificial filenames
+    mock_iglob = mocker.patch('gips.inventory.dbinv.glob.iglob')
+    mock_iglob.side_effect = lambda pat: [fn for fn in all_filenames if fnmatch.fnmatchcase(fn, pat)]
+
+    # handle staleness of DB entries similarly to t_rectify_assets:
+    for fn in ('h09v09/2012336/h09v09_2012336_MCD_quality.tif', # just product_filenames
+               'h09v09/2012337/h09v09_2012337_MOD_temp8td.tif', # but with a different tile
+               'h09v09/2012338/h09v09_2012338_MCD_fsnow.tif'):
+        full_fn = os.path.join(path, fn)
+        md = modisData(search=False)
+        md.ParseAndAddFiles([full_fn])
+        # sanity check, not part of the test
+        assert len(md.filenames) == 1 and md.name.lower() == 'modis'
+        (sensor, product) = md.filenames.keys()[0] # only one so it must be the right one
+        product = models.Product(
+            product=product,
+            sensor =sensor,
+            tile   ='h09v09',
+            date   =md.date,
+            name   =full_fn,
+            driver ='modis',
+        )
+        product.save()
+
+    # run the function under test
+    rectify_products(modisData)
+
+    # load data for inspection
+    rows = [model_to_dict(po) for po in models.Product.objects.all()]
+    [a.pop('id') for a in rows] # don't care what the keys are
+    actual = {r['product']: r for r in rows} # enforce an order so whims of hashing doesn't ruin test
+
+    assert len(expected_products) == len(rows) and expected_products == actual
 
 
 @pytest.fixture
