@@ -923,7 +923,3 @@ class Data(object):
             print "  Optional qualifiers listed below each product."
             print "  Specify by appending '-option' to product (e.g., ref-toa)"
         sys.stdout.write(txt)
-
-    @classmethod
-    def extra_arguments(cls):
-        return {}

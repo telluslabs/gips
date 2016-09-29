@@ -16,6 +16,8 @@ product_args = tuple('-p acca bqashadow ref-toa ndvi-toa rad-toa'.split())
 
 STD_PROD_ARGS = STD_ARGS + product_args
 
+driver = 'landsat'
+
 @pytest.fixture
 def setup_landsat_data(pytestconfig):
     """Use gips_inventory to ensure presence of MODIS data in the data repo."""

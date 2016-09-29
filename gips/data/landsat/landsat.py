@@ -968,15 +968,3 @@ class landsatData(Data):
 
         VerboseOut('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image
-
-    @classmethod
-    def extra_arguments(cls):
-        # TODO this can't be called ever?
-        return {
-            '--%clouds': {
-                'dest': 'pclouds',
-                'help': 'Threshold of max %% cloud cover',
-                'default': 100,
-                'type': int
-            },
-        }
