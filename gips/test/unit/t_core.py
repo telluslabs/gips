@@ -1,12 +1,14 @@
 """Unit tests for core functions, such as those found in gips.core and gips.data.core."""
 
 import sys
+from datetime import datetime
 
 import pytest
 import mock
 
 import gips
-from gips.data.landsat.landsat import landsatRepository
+from gips.data.landsat.landsat import landsatRepository, landsatData
+from gips.inventory import dbinv
 
 def t_version_override(mocker):
     """Test gips.__init__.detect_version() for correct override of __version__."""
@@ -45,3 +47,24 @@ def t_repository_find_tiles_error_case(mocker):
     # confirm call was still a success via the righ code path
     with pytest.raises(SystemExit):
         landsatRepository.find_tiles()
+
+
+@pytest.mark.django_db
+def t_Data_AddFile_repeat(mocker):
+    """Confirm that adding a file twice results in overwriting the original."""
+    m_use_orm = mocker.patch('gips.data.core.orm.use_orm')
+    m_use_orm.return_value = True
+    t_tile      = 'test-tile'
+    t_date      = datetime(1955, 11, 5)
+    t_sensor    = 'test-sensor'
+    t_product   = 'test-product'
+    t_filename  = 'test-filename.tif'
+    t_new_filename = 'test-new-filename.tif'
+    lsd = landsatData(search=False) # heh
+    lsd.id = t_tile
+    lsd.date = t_date
+    lsd.AddFile(t_sensor, t_product, t_filename) # should work
+    lsd.AddFile(t_sensor, t_product, t_new_filename) # should also work, overwriting the old one
+    # confirm overwrite happens both in the Data object and in the database
+    assert (t_new_filename == lsd.filenames[(t_sensor, t_product)] and
+            t_new_filename == dbinv.models.Product.objects.get(tile=t_tile, date=t_date).name)

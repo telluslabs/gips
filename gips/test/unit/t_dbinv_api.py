@@ -153,14 +153,22 @@ def basic_asset_db(db):
 @pytest.mark.django_db
 def t_list_tiles(basic_asset_db):
     """Test gips.inventory.dbinv for correctness using a database fixture."""
-    actual = list_tiles('modis')
-    expected = [u'h13v05', u'h12v04']
-    assert len(actual) == 2 and set(expected) == set(actual)
+    actual = list(list_tiles('modis'))
+    expected = [u'h12v04', u'h13v05']
+    assert expected == actual
+
+
+@pytest.mark.django_db
+def t_list_dates(basic_asset_db):
+    """Test gips.inventory.dbinv for correctness using a database fixture."""
+    actual = list(dbinv.list_dates('modis', 'h12v04'))
+    expected = [datetime.date(2012, 12, 1), datetime.date(2012, 12, 2)]
+    assert expected == actual
 
 
 @pytest.mark.django_db
 def t_asset_search(basic_asset_db):
-    """Confirm that dbinv.add_asset works for saving assets."""
+    """Confirm that dbinv.asset_search works for querying assets."""
     actual = [model_to_dict(a) for a in asset_search(driver='modis', tile='h12v04')]
     [a.pop('id') for a in actual] # don't care what the keys are
     expected = [d for d in basic_asset_db if d['tile'] == 'h12v04']
