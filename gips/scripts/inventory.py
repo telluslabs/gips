@@ -77,7 +77,9 @@ def main():
                     raise ValueError(msg.format(k))
             print("Rectifying inventory DB with filesystem archive:")
             with orm.std_error_handler():
-                dbinv.rectify(cls.Asset)
+                print("Rectifying assets:")
+                dbinv.rectify_assets(cls.Asset)
+                print("Rectifying products:")
                 dbinv.rectify_products(cls)
             return
 

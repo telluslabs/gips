@@ -7,13 +7,14 @@ from django.forms.models import model_to_dict
 from .data import asset_filenames, expected_assets, expected_products
 
 from gips.inventory.dbinv import models
-from gips.inventory.dbinv import rectify, list_tiles, add_asset, asset_search
+from gips.inventory.dbinv import (rectify_assets, rectify_products, list_tiles, add_asset,
+        asset_search)
 from gips.inventory import dbinv
 from gips.data.modis import modisAsset
 
 
-### rectify() test setup
-stale_file_names = [ # these should be removed during rectify()
+### rectify_assets() test setup
+stale_file_names = [ # these should be removed during rectify_assets()
     'h12v04/2012338/MCD43A4.A2012338.h12v04.006.2016112020013.hdf',
     'h12v04/2012337/MCD43A4.A2012337.h12v04.006.2016112013509.hdf',
     'h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf',
@@ -41,7 +42,7 @@ expected = expected_assets
 
 
 @pytest.mark.django_db
-def t_rectify(mocker):
+def t_rectify_assets(mocker):
     # construct plausible file listing & mock it into glob outcome
     path = modisAsset.Repository.data_path()
     rubbish_full_fns = [os.path.join(path, fn) for fn in rubbish_filenames]
@@ -65,7 +66,7 @@ def t_rectify(mocker):
         asset.save()
 
     # run the function under test
-    rectify(modisAsset)
+    rectify_assets(modisAsset)
 
     # load data for inspection
     rows = [model_to_dict(ao) for ao in models.Asset.objects.all()]

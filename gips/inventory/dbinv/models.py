@@ -23,7 +23,6 @@ class Asset(models.Model):
         unique_together = ('driver', 'asset', 'tile', 'date')
 
 
-# TODO NEEDS UNIT TEST
 class Product(models.Model):
     """Inventory for products, which GIPS generates from Assets.
 

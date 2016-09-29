@@ -15,14 +15,13 @@ body.
 
 
 # TODO rename to rectify_assets and change docstring
-def rectify(asset_class):
-    """Rectify the inventory database against the filesystem archive.
+def rectify_assets(asset_class):
+    """Rectify the asset inventory database against the filesystem archive.
 
     For the current driver, go through each asset in the filesystem
     and ensure it has an entry in the inventory database.  Also
     remove any database entries that match no archived files.
     """
-    # TODO report that ASSETS are being done here with print() stmts
     # can't load this at module compile time because django initialization is crazytown
     from . import models
     # this assumes this directory layout:  /path-to-repo/tiles/*/*/
@@ -62,7 +61,7 @@ def rectify(asset_class):
 
 
 def rectify_products(data_class):
-    """Rectify the product inventory against the filesystem archive.
+    """Rectify the product inventory database against the filesystem archive.
 
     For the current driver, go through each product in the filesystem
     and ensure it has an entry in the inventory database.  Also
