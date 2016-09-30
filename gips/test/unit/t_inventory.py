@@ -27,7 +27,6 @@ def di_init_mocks(mocker):
 @pytest.mark.django_db
 def t_data_inventory_db_save(di_init_mocks):
     """Confirm DataInventory() saves to the inventory DB on fetch."""
-    # TODO add products
     from gips.inventory.dbinv import models
     (m_fetch, m_archive, m_add_asset) = di_init_mocks
     # need some filenames . . .

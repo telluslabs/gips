@@ -40,13 +40,33 @@ def t_repository_find_tiles_normal_case(mocker):
 
 
 def t_repository_find_tiles_error_case(mocker):
-    """Confirm Repository.find_tiles falls back to filesystem search."""
+    """Confirm Repository.find_tiles quits on error."""
     m_list_tiles = mocker.patch('gips.data.core.dbinv.list_tiles')
     m_list_tiles.side_effect = Exception('AAAAAAAAAAH!') # intentionally break list_tiles
 
     # confirm call was still a success via the righ code path
     with pytest.raises(SystemExit):
         landsatRepository.find_tiles()
+
+
+def t_repository_find_dates_normal_case(mocker):
+    """Test Repository.find_dates using landsatRepository as a guinea pig."""
+    m_list_dates = mocker.patch('gips.data.core.dbinv.list_dates')
+    dt = datetime
+    expected = [dt(1900, 1, 1), dt(1950, 10, 10), dt(2000, 12, 12)]
+    m_list_dates.return_value = expected
+    actual = landsatRepository.find_dates('some-tile')
+    assert expected == actual
+
+
+def t_repository_find_dates_error_case(mocker):
+    """Confirm Repository.find_dates quits on error."""
+    m_list_dates = mocker.patch('gips.data.core.dbinv.list_dates')
+    m_list_dates.side_effect = Exception('AAAAAAAAAAH!') # intentionally break list_dates
+
+    # confirm call was still a success via the righ code path
+    with pytest.raises(SystemExit):
+        landsatRepository.find_dates('some-tile')
 
 
 @pytest.mark.django_db
