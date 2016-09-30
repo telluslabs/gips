@@ -176,42 +176,81 @@ def t_asset_search(basic_asset_db):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize('call', (dbinv.add_asset, dbinv.update_or_add_asset))
-def t_insert_new_asset(call):
-    """Confirm that add_asset and update_or_add_asset work for saving assets."""
+def t_product_search():
+    """Test dbinv.product_search."""
+    # set up a few items in the DB
+    base_vals = {
+        'product': u'some-product',
+        'sensor':   u'some-sensor',
+        'tile':     u'some-tile',
+        'date':     datetime.date(2099, 12, 31),
+        'name':     u'/some/file/name.xtn',
+        'driver':   u'some-driver',
+    }
+    for n in range(3):
+        vals = dict(base_vals)
+        vals['tile'] = 'tile-' + str(n)
+        models.Product(**vals).save()
+
+    # perform the query & extract results for inspection
+    actual = model_to_dict(dbinv.product_search(driver='some-driver', tile='tile-2')[0])
+
+    # set up for assertions
+    actual.pop('id') # don't care what the key is
+    expected = dict(base_vals)
+    expected['tile'] = 'tile-2'
+    assert expected == actual
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize('mtype, call', (('asset',   dbinv.add_asset),
+                                         ('product', dbinv.add_product),
+                                         ('asset',   dbinv.update_or_add_asset),
+                                         ('product', dbinv.update_or_add_product)))
+def t_insert_new_model(mtype, call):
+    """Confirm that several functions in the API save new content correctly."""
     values = {
-        'asset':  u'some-asset',
+        mtype:    u'some-' + mtype,
         'sensor': u'some-sensor',
         'tile':   u'some-tile',
         'date':   datetime.date(2099, 12, 31),
-        'name':   u'/some/file/name.hdf',
+        'name':   u'/some/file/name.xtn',
         'driver': u'some-driver',
     }
     expected = dict(values)
     expected['id'] = 1
     a = call(**values)
     returned_actual = model_to_dict(a)
-    queried_actual = model_to_dict(models.Asset.objects.get(pk=1))
+    model = {'asset': models.Asset, 'product': models.Product}[mtype]
+    queried_actual = model_to_dict(model.objects.get(pk=1))
     assert expected == returned_actual == queried_actual
 
 
 @pytest.mark.django_db
-def t_update_existing_asset(basic_asset_db):
+@pytest.mark.parametrize('mtype, call', (('asset',   dbinv.update_or_add_asset),
+                                         ('product', dbinv.update_or_add_product)))
+def t_update_existing_model(mtype, call):
     """Test create_or_add_asset when it updates an existing model."""
+    primary_key = 1
     values = {
         # unique-together fields need to be the same
+        mtype:    u'some-' + mtype,
         'driver': u'landsat',
-        'asset':  u'MCD43A2',
         'date':   datetime.date(2012, 12, 1),
         'tile':   u'trolololo',
         # fields that can vary
         'sensor': u'some-cool-sensor',
-        'name':   u'new-version-of-the-awesome.hdf',
+        'name':   u'original-file-name.xtn',
     }
-    expected = dict(values)
-    primary_key = 4
+
+    # exercise code under test
+    call(**values) # call once to set up
+    values['name'] = 'new-file-name.xtn' # alter a value to force an update
+    returned_actual = model_to_dict(call(**values)) # run the update
+    model = {'asset': models.Asset, 'product': models.Product}[mtype]
+    queried_actual = model_to_dict(model.objects.get(pk=primary_key))
+
+    # perform assertions
+    expected = dict(values) # now carries replaced filename
     expected['id'] = primary_key
-    a = dbinv.update_or_add_asset(**values)
-    returned_actual = model_to_dict(a)
-    queried_actual = model_to_dict(models.Asset.objects.get(pk=primary_key))
     assert expected == returned_actual == queried_actual
