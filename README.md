@@ -8,20 +8,23 @@ necessarily current.
 After cloning this git repo & changing to its directory, run `install.sh`,
 which only officially supports recent versions of Ubuntu.  It will use `sudo`
 to install system packages, and may ask for authentication accordingly.  It
-runs apt-get, which may prompt you for confirmation of its actions.
+runs apt-get, which may prompt you for confirmation of its actions.  
+Finally, the script will show you how to set GIPS system settings with `gips_config`.  
 
-Afterwards it will show you how to set GIPS settings with `gips_config`.  After
-doing so, if you wish to work with modis data, edit `gips/settings.py` (or
-wherever you choose to save your settings) to alter the `'modis'` entry in the
-REPOS dict:
+### MODIS configuration note
+If you wish to work with modis data, edit `~/.gips/settings.py` (if 
+that file doesn't exist, run `gips_config user` to create it) and
+alter the `'modis'` entry in the `REPOS` dict by adding the following
+to the end of that file:
 
 ```
-'modis': {
-    'repository': 'AS-PREVIOUSLY',         # this may be left unchanged
-    'username': 'YOUR-EARTHDATA-USERNAME',
-    'password': 'YOUR-EARTHDATA-PASSWORD', # Use os.environ to avoid saving
+REPOS['modis'].update(
+    {
+        'username': 'YOUR-EARTHDATA-USERNAME',
+        'password': 'YOUR-EARTHDATA-PASSWORD', # Use os.environ to avoid saving
                                            # a password in a file.
-},
+    }
+)
 ```
 
 This username and password must match your Earthdata credentials; for more
