@@ -205,7 +205,7 @@ class landsatAsset(Asset):
     def fetch(cls, asset, tile, date):
         paths_rows = tile[:3] + "," + tile[3:]
         fdate = date.strftime('%Y-%m-%d')
-        # why is asset an empty string?
+
         s = search.Search()
         response = s.search(paths_rows=paths_rows, start_date=fdate, end_date=fdate, cloud_max=90)
         if response['status'] == 'SUCCESS':
