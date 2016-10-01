@@ -203,6 +203,10 @@ class landsatAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
+
+        # 'SR' not fetchable at the moment
+        if asset == 'SR':
+            return
         paths_rows = tile[:3] + "," + tile[3:]
         fdate = date.strftime('%Y-%m-%d')
 
