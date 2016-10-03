@@ -35,6 +35,7 @@ def use_orm():
 
 
 setup_complete = False
+driver_for_dbinv_feature_toggle = 'unspecified'
 
 def setup():
     """Set settings module default and run django.setup().
@@ -44,6 +45,10 @@ def setup():
     if setup_complete:
         return
     if use_orm():
+        if driver_for_dbinv_feature_toggle in ('sar', 'sarannual', 'modaod'):
+            msg = ("Inventory database does not support '{}'.  "
+                   "Set GIPS_ORM=false to use the filesystem inventory instead.")
+            raise Exception(msg.format(driver_for_dbinv_feature_toggle))
         with std_error_handler():
             os.environ.setdefault("DJANGO_SETTINGS_MODULE", "gips.inventory.orm.settings")
             django.setup()

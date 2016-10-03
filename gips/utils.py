@@ -256,6 +256,9 @@ def import_data_class(clsname):
     """ Get clsnameData class object """
     mod = import_data_module(clsname)
     exec('repo = mod.%sData' % clsname)
+    # prevent use of database inventory for certain incompatible drivers
+    from gips.inventory import orm
+    orm.driver_for_dbinv_feature_toggle = repo.name.lower()
     return repo
 
 
