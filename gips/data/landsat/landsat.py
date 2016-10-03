@@ -206,6 +206,7 @@ class landsatAsset(Asset):
 
         # 'SR' not fetchable at the moment
         if asset == 'SR':
+            VerboseOut('SR assets are never fetchable', 4)
             return
         paths_rows = tile[:3] + "," + tile[3:]
         fdate = date.strftime('%Y-%m-%d')
