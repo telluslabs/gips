@@ -56,17 +56,32 @@ def t_data_inventory_load():
 
     In particular check the resulting hierarchy of objects for correctness."""
 
-    # first load DB with data
+    # first load DB with data - start with values that should make it through to assertions
     for asset_fields in expected_assets.values():
         dbinv.add_asset(**asset_fields)
     for product_fields in expected_products.values():
         dbinv.add_product(**product_fields)
 
+    # load more data, intentionally putting some 'misses' into the DB:
+    # wrong driver
+    dbinv.add_asset(**dict(expected_assets['MYD11A1'], driver='prism'))
+    dbinv.add_product(**dict(expected_products['quality'], driver='merra'))
+    # wrong date
+    wrong_date = datetime.datetime(2012, 12, 4)
+    dbinv.add_asset(**dict(expected_assets['MYD11A1'], date=wrong_date))
+    dbinv.add_product(**dict(expected_products['quality'], date=wrong_date))
+    # wrong tile
+    dbinv.add_asset(**dict(expected_assets['MYD11A1'], tile='h12v03'))
+    dbinv.add_product(**dict(expected_products['quality'], tile='h12v03'))
+    # wrong product (DataInventory(products=foo))
+    dbinv.add_product(**dict(expected_products['quality'], product='clouds'))
+
     # instantiate the class under test
     tiles = ['h12v04', 'h12v05', 'h13v04', 'h13v05']
+    products = ['fsnow', 'temp8td', 'quality', 'landcover']
     se = SpatialExtent(modisData, tiles, 0.0, 0.0)
     te = TemporalExtent('2012-12-01,2012-12-03')
-    di = DataInventory(modisData, se, te)
+    di = DataInventory(modisData, se, te, products)
 
     # confirm DataInventory object is correct
     assert len(di.data) == 3
