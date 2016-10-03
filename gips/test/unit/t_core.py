@@ -70,7 +70,7 @@ def t_repository_find_dates_error_case(mocker):
 
 
 @pytest.mark.django_db
-def t_Data_AddFile_repeat(mocker):
+def t_data_addfile_repeat(mocker):
     """Confirm that adding a file twice results in overwriting the original."""
     m_use_orm = mocker.patch('gips.data.core.orm.use_orm')
     m_use_orm.return_value = True
@@ -88,3 +88,22 @@ def t_Data_AddFile_repeat(mocker):
     # confirm overwrite happens both in the Data object and in the database
     assert (t_new_filename == lsd.filenames[(t_sensor, t_product)] and
             t_new_filename == dbinv.models.Product.objects.get(tile=t_tile, date=t_date).name)
+
+
+@pytest.mark.parametrize('search', (False, True))
+def t_data_init_search(mocker, search):
+    """Confirm Data.__init__ searches the FS only when told to.
+
+    Do this by instantiating landsatData."""
+    # set up mocks:  prevent it from doing I/O and use for assertions below
+    mocker.patch.object(landsatData.Asset, 'discover')
+    mocker.patch.object(landsatData, 'ParseAndAddFiles')
+
+    lsd = landsatData(tile='t', date=datetime(9999, 1, 1), search=search) # call-under-test
+
+    # assert normal activity & entry of search block
+    assert (lsd.id == 't'
+            and lsd.date == datetime(9999, 1, 1)
+            and '' not in (lsd.path, lsd.basename)
+            and lsd.assets == lsd.filenames == lsd.sensors == {}
+            and lsd.ParseAndAddFiles.called == lsd.Asset.discover.called == search)

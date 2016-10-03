@@ -600,14 +600,14 @@ class Data(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
-    def __init__(self, tile=None, date=None, path=None, search=True):
+    def __init__(self, tile=None, date=None, path='', search=True):
         """ Find all data and assets for this tile and date.
 
         search=False will prevent searching for assets via Asset.discover().
         """
         self.id = tile
         self.date = date
-        self.path = ''
+        self.path = path
         self.basename = ''              # this is used by child classes
         self.assets = {}                # dict of asset name: Asset instance
         self.filenames = {}             # dict of (sensor, product): product filename
@@ -618,9 +618,6 @@ class Data(object):
             if search:
                 [self.add_asset(a) for a in self.Asset.discover(tile, date)] # Find all assets
                 self.ParseAndAddFiles() # Find products
-        # TODO change path default to '' then set it above & eliminate this clause
-        elif path is not None:
-            self.path = path
 
     def add_asset(self, asset):
         """Add an Asset object to self.assets and:
