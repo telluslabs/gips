@@ -69,11 +69,35 @@ def t_repository_find_dates_error_case(mocker):
         landsatRepository.find_dates('some-tile')
 
 
+@pytest.mark.parametrize('add_to_db', (False, True))
+def t_data_add_file(mocker, add_to_db):
+    """Basic test for Data.AddFile; calls it once then tests its state."""
+    mocker.patch('gips.data.core.orm.use_orm', return_value=True)
+    m_uoap = mocker.patch('gips.data.core.dbinv.update_or_add_product')
+    t_sensor    = 'test-sensor'
+    t_product   = 'test-product'
+    t_filename  = 'test-filename.tif'
+    lsd = landsatData('test-tile', datetime(1955, 11, 5), search=False)
+
+    lsd.AddFile(t_sensor, t_product, t_filename, add_to_db)
+
+    # alas, cleanest to make multiple assertions for this test
+    if add_to_db:
+        m_uoap.assert_called_once_with(driver='landsat', product=t_product, sensor=t_sensor,
+                                       tile=lsd.id, date=lsd.date, name=t_filename)
+    else:
+        m_uoap.assert_not_called()
+    assert (lsd.filenames == {(t_sensor, t_product): t_filename}
+            and lsd.sensors == {t_product: t_sensor})
+
+
 @pytest.mark.django_db
-def t_data_addfile_repeat(mocker):
-    """Confirm that adding a file twice results in overwriting the original."""
-    m_use_orm = mocker.patch('gips.data.core.orm.use_orm')
-    m_use_orm.return_value = True
+def t_data_add_file_repeat(mocker):
+    """Confirm that calling Data.AddFile twice results in overwrite.
+
+    Thus, confirm it's possible to replace file entries with new versions.
+    """
+    mocker.patch('gips.data.core.orm.use_orm', return_value=True)
     t_tile      = 'test-tile'
     t_date      = datetime(1955, 11, 5)
     t_sensor    = 'test-sensor'
@@ -83,8 +107,8 @@ def t_data_addfile_repeat(mocker):
     lsd = landsatData(search=False) # heh
     lsd.id = t_tile
     lsd.date = t_date
-    lsd.AddFile(t_sensor, t_product, t_filename) # should work
-    lsd.AddFile(t_sensor, t_product, t_new_filename) # should also work, overwriting the old one
+    lsd.AddFile(t_sensor, t_product, t_filename)
+    lsd.AddFile(t_sensor, t_product, t_new_filename) # should overwrite the old one
     # confirm overwrite happens both in the Data object and in the database
     assert (t_new_filename == lsd.filenames[(t_sensor, t_product)] and
             t_new_filename == dbinv.models.Product.objects.get(tile=t_tile, date=t_date).name)
