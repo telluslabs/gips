@@ -86,10 +86,10 @@ class GipsProcResult(object):
     Standard output is handled specially for equality comparison; see __eq__.
     Can accept scripttest.ProcResult objects at initialization; see __init__.
     """
-    attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted', 'created')
+    attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted', 'created', 'ignored')
     def __init__(self, proc_result=None, compare_stdout=None, compare_stderr=True, **kwargs):
         """Initialize the object using a ProcResult, explicit kwargs, or both.
-        
+
         ProcResults' reports on files (created, deleted, updated) are saved as
         their names and hashes.  compare_stdout is an explicit way to request
         stdout be considered in __eq__; see below.  If it is not set, then
@@ -113,6 +113,8 @@ class GipsProcResult(object):
             self.deleted = extract_hashes(proc_result.files_deleted)
             self.created = extract_hashes(proc_result.files_created)
 
+        self.ignored = [] # list of filenames to ignore for comparison purposes
+
         # special keys are permitted if they begin with an underscore
         input_fields = set(k for k in kwargs.keys() if k[0] != '_')
         if not input_fields.issubset(set(self.attribs)):
@@ -131,6 +133,14 @@ class GipsProcResult(object):
         #self.stdout = self.stdout or u''
         self.compare_stderr = compare_stderr
 
+    def strip_ignored(self, d):
+        """Return a copy of dict d but strip out items in self.ignored.
+
+        If self.ignored = ['a', 'b'] then
+        strip_ignored({'a': 1, 'b': 2, 'c': 2}) returns {'c': 2}.
+        """
+        return {k: v for k, v in d.items() if k not in self.ignored}
+
     def __eq__(self, other):
         """Equality means all attributes must match, except possibly stdout & stderr.
 
@@ -143,9 +153,9 @@ class GipsProcResult(object):
             self.exit_status == other.exit_status,
             not compare_stdout or self.stdout == other.stdout,
             not compare_stderr or self.stderr == other.stderr,
-            self.updated == other.updated,
-            self.deleted == other.deleted,
-            self.created == other.created,
+            self.strip_ignored(self.updated) == self.strip_ignored(other.updated),
+            self.strip_ignored(self.deleted) == self.strip_ignored(other.deleted),
+            self.strip_ignored(self.created) == self.strip_ignored(other.created),
         )
         return all(matches)
 

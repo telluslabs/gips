@@ -125,11 +125,18 @@ def pytest_assertrepr_compare(config, op, left, right):
         else:
             output += [s + ':  ignored']
 
-    updated_diff = _compare_eq_dict(left.updated, right.updated, verbose)
-    deleted_diff = _compare_eq_dict(left.deleted, right.deleted, verbose)
-    created_diff = _compare_eq_dict(left.created, right.created, verbose)
+    updated_diff = _compare_eq_dict(left.strip_ignored( left.updated),
+                                    left.strip_ignored(right.updated),
+                                    verbose)
+    deleted_diff = _compare_eq_dict(left.strip_ignored( left.deleted),
+                                    left.strip_ignored(right.deleted),
+                                    verbose)
+    created_diff = _compare_eq_dict(left.strip_ignored( left.created),
+                                    left.strip_ignored(right.created),
+                                    verbose)
     output += header_and_indent('updated', updated_diff)
     output += header_and_indent('deleted', deleted_diff)
     output += header_and_indent('created', created_diff)
+    output += header_and_indent('ignored', left.ignored)
 
     return output
