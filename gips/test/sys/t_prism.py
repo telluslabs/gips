@@ -44,8 +44,7 @@ def t_process(setup_prism_data, repo_env, expected):
     """Test gips_process on prism data."""
     process_actual = repo_env.run('gips_process', *STD_ARGS)
     inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
-    assert expected == process_actual
-    assert inventory_actual.std_out == expected._inv_stdout
+    assert expected == process_actual and inventory_actual.std_out == expected._inv_stdout
 
 
 # def t_info(repo_env, expected):
