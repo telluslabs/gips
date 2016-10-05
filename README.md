@@ -31,6 +31,13 @@ https://lpdaac.usgs.gov/about/news_archive/important_changes_lp_daac_data_access
 
 For information on setting up automated testing, see `gips/test/README.md`.
 
+## Environment
+
+`GIPS_ORM` controls whether or not the GIPS ORM is activated.  The ORM is
+enabled by default, and if `GIPS_ORM` is set to either "true" (regardless of
+case) or any non-zero number.  Setting it to "false", 0, or any other value
+disables the ORM.
+
 ## Authors and Contributors
 The following have been authors or contributers to GIPS
 
