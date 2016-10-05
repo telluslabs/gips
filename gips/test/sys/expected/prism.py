@@ -42,6 +42,7 @@ t_process = {
         'prism/tiles/CONUS/19821203/CONUS_19821203_prism_pptsum-3.tif': -1313341182,
     },
     'ignored': [
+        'gips-inv-db.sqlite3',
         'prism/tiles/CONUS/19821201/PRISM_ppt_stable_4kmD2_19821201_bil.zip.index',
         'prism/tiles/CONUS/19821201/PRISM_tmax_stable_4kmD1_19821201_bil.zip.index',
         'prism/tiles/CONUS/19821202/PRISM_ppt_stable_4kmD2_19821202_bil.zip.index',

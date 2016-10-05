@@ -9,6 +9,9 @@ t_modis_inv_fetch = {
         'modis/tiles/h12v04/2012336/MYD10A1.A2012336.h12v04.005.2012340031954.hdf': 1810195064,
         'modis/tiles/h12v04/2012336/MYD11A1.A2012336.h12v04.005.2012341040543.hdf': 1579682812,
     },
+    'ignored': [
+        'gips-inv-db.sqlite3',
+    ]
 }
 
 t_modis_archive = {
@@ -57,6 +60,9 @@ t_modis_archive = {
 	'modis/stage/MYD11A1.A2012337.h12v04.005.2012341072847.hdf': 873200589,
 	'modis/stage/MYD11A1.A2012338.h12v04.005.2012341075802.hdf': -1419706597,
     },
+    'ignored': [
+        'gips-inv-db.sqlite3',
+    ]
 }
 
 t_modis_archive['_post_archive_inv_stdout'] = u"""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m

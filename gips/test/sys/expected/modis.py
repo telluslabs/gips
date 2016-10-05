@@ -60,6 +60,7 @@ t_process = {
         'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif': 296967275,
     },
     'ignored': [ # contain site-specific data not applicable across users/configurations
+        'gips-inv-db.sqlite3',
         'modis/tiles/h12v04/2012336/MCD43A2.A2012336.h12v04.006.2016112010833.hdf.index',
         'modis/tiles/h12v04/2012336/MCD43A4.A2012336.h12v04.006.2016112010833.hdf.index',
         'modis/tiles/h12v04/2012336/MOD10A1.A2012336.h12v04.005.2012339213007.hdf.index',

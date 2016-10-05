@@ -100,7 +100,10 @@ t_process = {
         'landsat/tiles/012030/2015352/012030_2015352_LC8_ref-toa.tif': -1766137404,
         'landsat/tiles/012030/2015352/LC80120302015352LGN00.tar.gz.index': 1896263933,
         'landsat/tiles/012030/2015352/LC80120302015352LGN00_MTL.txt': 2084350553,
-    }
+    },
+    'ignored': [
+        'gips-inv-db.sqlite3',
+    ]
 }
 
 t_project = {
