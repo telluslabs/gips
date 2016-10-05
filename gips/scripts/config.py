@@ -35,6 +35,15 @@ from gips.utils import VerboseOut, create_environment_settings, create_user_sett
 from gips.inventory import orm
 
 
+def migrate_database():
+    """Migrate the database if the ORM is turned on."""
+    if not orm.use_orm():
+        return
+    print 'Migrating database'
+    orm.setup()
+    with orm.std_error_handler():
+        call_command('migrate', interactive=False)
+
 
 def main():
     import gips
@@ -73,15 +82,11 @@ def main():
             print 'Environment settings file: %s' % cfgfile
             print 'Creating repository directories'
             create_repos()
+            migrate_database()
         except Exception, e:
             print traceback.format_exc()
             print 'Could not create environment settings: %s' % e
             sys.exit(1)
-
-        print 'Migrating database'
-        orm.setup()
-        with orm.std_error_handler():
-            call_command('migrate', interactive=False)
 
     elif args.command == 'user':
         try:
@@ -95,8 +100,12 @@ def main():
             print 'User settings file: %s' % cfgfile
             print 'Creating repository directories'
             create_repos()
+            migrate_database()
         except Exception as e:
+            print traceback.format_exc()
             print 'Could not create repository directories'
+            sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
