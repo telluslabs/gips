@@ -62,7 +62,6 @@ class Colors():
     _WHITE  = _c + '47m'
 
 
-
 def verbose_out(obj, level=1, stream=sys.stdout):
     """print(obj) but only if the user's chosen verbosity level warrants it.
 
@@ -70,6 +69,9 @@ def verbose_out(obj, level=1, stream=sys.stdout):
     if the obj is a list or tuple, print each contained object consecutively on
     separate lines.
     """
+    #TODO: Add real documentation of rules regarding levels used within
+    #      GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
+    #      "let me see everything" level.
     if gippy.Options.Verbose() >= level:
         if not isinstance(obj, (list, tuple)):
             obj = [obj]

@@ -213,7 +213,10 @@ class prismData(Data):
     }
 
     def process(self, *args, **kwargs):
-        """ Make sure all products exist and return those that need processing """
+        """Make sure all products exist and return those that need processing.
+
+        (docstring cribbed from super.)
+        """
         products = super(prismData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
