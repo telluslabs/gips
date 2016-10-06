@@ -1,0 +1,8 @@
+sudo apt-get update
+sudo apt-get install git
+git clone https://github.com/Applied-GeoSolutions/gips.git
+cd gips
+
+[install script]
+
+gips_config env -r /data/gips
