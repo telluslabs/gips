@@ -21,19 +21,24 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
+from __future__ import print_function
+
 import os
+import sys
 import re
 import datetime
+
 import urllib
 import urllib2
 
 import math
 import numpy as np
+import requests
 
 import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
-from gips.utils import VerboseOut
+from gips.utils import VerboseOut, settings
 
 from pdb import set_trace
 
@@ -68,75 +73,81 @@ class modisAsset(Asset):
         'MOD-MYD': {'description': 'Aqua/Terra together'}
     }
 
+
+    # some modis data sources require authorization for access; these do not.
+    _skip_auth = ['MOD10A2', 'MOD10A1', 'MYD10A1', 'MYD10A2']
+
+    _asset_glob_tail = '.A???????.h??v??.???.?????????????.hdf'
+
     _assets = {
         'MCD43A4': {
-            'pattern': 'MCD43A4*hdf',
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.005',
+            'pattern': 'MCD43A4' + _asset_glob_tail,
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MCD43A2': {
-            'pattern': 'MCD43A2*hdf',
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.005',
+            'pattern': 'MCD43A2' + _asset_glob_tail,
+            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MOD09Q1': {
-            'pattern': 'MOD09Q1*hdf',
+            'pattern': 'MOD09Q1' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.005/',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -7,
         },
         'MOD10A1': {
-            'pattern': 'MOD10A1*hdf',
+            'pattern': 'MOD10A1' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A1.005',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A1': {
-            'pattern': 'MYD10A1*hdf',
+            'pattern': 'MYD10A1' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A1.005',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
         'MOD11A1': {
-            'pattern': 'MOD11A1*hdf',
+            'pattern': 'MOD11A1' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.005',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -1
         },
         'MYD11A1': {
-            'pattern': 'MYD11A1*hdf',
+            'pattern': 'MYD11A1' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.005',
             'startdate': datetime.date(2002, 7, 8),
             'latency': -1
         },
         'MOD11A2': {
-            'pattern': 'MOD11A2*hdf',
+            'pattern': 'MOD11A2' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.005',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -7
         },
         'MYD11A2': {
-            'pattern': 'MYD11A2*hdf',
+            'pattern': 'MYD11A2' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.005',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -7
         },
         'MOD10A2': {
-            'pattern': 'MOD10A2*hdf',
+            'pattern': 'MOD10A2' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A2.005',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A2': {
-            'pattern': 'MYD10A2*hdf',
+            'pattern': 'MYD10A2' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A2.005',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
         'MCD12Q1': {
-            'pattern': 'MCD12Q1*hdf',
+            'pattern': 'MCD12Q1' + _asset_glob_tail,
             'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
@@ -150,15 +161,23 @@ class modisAsset(Asset):
     def __init__(self, filename):
         """ Inspect a single file and get some metadata """
         super(modisAsset, self).__init__(filename)
+
         bname = os.path.basename(filename)
-        self.asset = bname[0:7]
-        self.tile = bname[17:23]
-        year = bname[9:13]
-        doy = bname[13:16]
+        parts = bname.split('.')
+        
+        self.asset = parts[0]
+        self.tile = parts[2]
+        self.sensor = parts[0][:3]
 
+        year = parts[1][1:5]
+        doy = parts[1][5:8]
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
-        self.sensor = bname[:3]
 
+        collection = int(parts[3])
+        file_version = int(parts[4])
+        self.version = float('{}.{}'.format(collection, file_version))
+
+        
     @classmethod
     def fetch(cls, asset, tile, date):
         #super(modisAsset, cls).fetch(asset, tile, date)
@@ -166,8 +185,13 @@ class modisAsset(Asset):
         year, month, day = date.timetuple()[:3]
 
         if asset == "MCD12Q1" and (month != 1 or day != 1):
-            print "Land cover data are only available for Jan. 1"
+            print("Land cover data are only available for Jan. 1")
             return
+
+        # if it's going to fail, let's find out early:
+        if asset not in cls._skip_auth:
+            username = cls.Repository.get_setting('username')
+            password = cls.Repository.get_setting('password')
 
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
@@ -181,6 +205,9 @@ class modisAsset(Asset):
 
         success = False
         for item in listing:
+            # screen-scrape the content of the page and extract the full name of the needed file
+            # (this step is needed because part of the filename, the creation timestamp, is
+            # effectively random).
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
@@ -189,11 +216,29 @@ class modisAsset(Asset):
                 outpath = os.path.join(cls.Repository.path('stage'), name)
 
                 try:
-                    #urllib.urlretrieve(url, outpath)
-                    connection = urllib2.urlopen(url)
-                    output = open(outpath, 'wb')
-                    output.write(connection.read())
-                    output.close()
+                    # tinkering:
+                    # chunk size & stream=True in req
+                    # cookies / cache auth
+
+                    if mainurl[0:3] == 'ftp':
+                        connection = urllib2.urlopen(url)
+                        with open(outpath, 'wb') as fd:
+                            fd.write(connection.read())
+
+                    else: # http
+                        kw = {'timeout': 10}
+                        if asset not in cls._skip_auth:
+                            kw['auth'] = (username, password)
+                        response = requests.get(url, **kw)
+
+                        if response.status_code != requests.codes.ok:
+                            print('Download of', name, 'failed:', response.status_code, response.reason,
+                                  '\nFull URL:', url, file=sys.stderr)
+                            return # might as well stop b/c the rest will probably fail too
+
+                        with open(outpath, 'wb') as fd:
+                            for chunk in response.iter_content():
+                                fd.write(chunk)
 
                 except Exception:
                     # TODO - implement pre-check to only attempt on valid dates
@@ -209,7 +254,16 @@ class modisAsset(Asset):
             #raise Exception('Unable to find remote match for %s at %s' % (pattern, mainurl))
             VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
 
-
+    def updated(self, newasset):
+        '''
+        Compare the version for this to that of newasset.
+        Return true if newasset version is greater.
+        '''
+        return (self.sensor == newasset.sensor and
+                self.tile == newasset.tile and
+                self.date == newasset.date and
+                self.version < newasset.version)
+            
 class modisData(Data):
     """ A tile of data (all assets and products) """
     name = 'Modis'
@@ -219,7 +273,8 @@ class modisData(Data):
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
-        "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
+        # "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
+        "Terra 8-day": ['temp8tn', 'temp8td'],
     }
     _products = {
         # MCD Products
@@ -253,10 +308,12 @@ class modisData(Data):
             'assets': ['MOD11A1', 'MYD11A1'],
         },
         # Misc
-        'ndvi8': {
-            'description': 'Normalized Difference Vegetation Index: 250m',
-            'assets': ['MOD09Q1'],
-        },
+        # ndvi8 fails and causes errors further down the processing run for a run like this:
+        # gips_process modis -s NHseacoast.shp -d 2012-12-02,2012-12-03 -v 4
+        #'ndvi8': {
+        #    'description': 'Normalized Difference Vegetation Index: 250m',
+        #    'assets': ['MOD09Q1'],
+        #},
         'temp8td': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
@@ -292,6 +349,8 @@ class modisData(Data):
             # properly set
             if 'sensor' in locals(): del sensor
 
+            versions = {}
+
             for asset in assets:
                 try:
                     sds = self.assets[asset].datafiles()
@@ -300,6 +359,8 @@ class modisData(Data):
                 else:
                     availassets.append(asset)
                     allsds.extend(sds)
+                    versions[asset] = int(re.findall('M.*\.00(\d)\.\d{13}\.hdf', sds[0])[0])
+
             if not availassets:
                 # some products aren't available for every day but this is trying every day
                 VerboseOut('There are no available assets (%s) on %s for tile %s'
@@ -308,7 +369,6 @@ class modisData(Data):
 
             meta = self.meta_dict()
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
-
 
             if val[0] == "landcover":
                 sensor = 'MCD'
@@ -320,7 +380,28 @@ class modisData(Data):
                 imgout = gippy.GeoImage(fname)
 
 
+            if val[0] == "refl":
+                # NOTE this code is unreachable (no refl entry in _products)
+                if versions[asset] != 6:
+                    raise Exception('product version not supported')
+                sensor = 'MCD'
+                fname = '%s_%s_%s.tif' % (bname, sensor, key)
+                img = gippy.GeoImage(sds[7:])
+                nodata = img[0].NoDataValue()
+                gain = img[0].Gain()
+                offset = img[0].Offset()
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
+                imgout.SetNoData(nodata)
+                imgout.SetOffset(offset)
+                imgout.SetGain(gain)
+                for i in range(6):
+                    data = img[i].Read()
+                    imgout[i].Write(data)
+
+
             if val[0] == "quality":
+                if versions[asset] != 6:
+                    raise Exception('product version not supported')
                 sensor = 'MCD'
                 fname = '%s_%s_%s.tif' % (bname, sensor, key)
                 if os.path.lexists(fname):
@@ -331,22 +412,29 @@ class modisData(Data):
 
             # LAND VEGETATION INDICES PRODUCT
             if val[0] == "indices":
-
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
                 sensor = 'MCD'
                 fname = '%s_%s_%s' % (bname, sensor, key)
-
                 refl = gippy.GeoImage(allsds)
-
                 missing = 32767
 
-                redimg = refl[0].Read()
-                nirimg = refl[1].Read()
-                bluimg = refl[2].Read()
-                grnimg = refl[3].Read()
-                mirimg = refl[5].Read()
-                swrimg = refl[6].Read() # formerly swir2
+                if versions[asset] == 6:
+                    redimg = refl[7].Read()
+                    nirimg = refl[8].Read()
+                    bluimg = refl[9].Read()
+                    grnimg = refl[10].Read()
+                    mirimg = refl[11].Read()
+                    swrimg = refl[12].Read() # formerly swir2
+                elif versions[asset] == 5:
+                    redimg = refl[0].Read()
+                    nirimg = refl[1].Read()
+                    bluimg = refl[2].Read()
+                    grnimg = refl[3].Read()
+                    mirimg = refl[4].Read()
+                    swrimg = refl[5].Read() # formerly swir2
+                else:
+                    raise Exception('product version not supported')
 
                 redimg[redimg < 0.0] = 0.0
                 nirimg[nirimg < 0.0] = 0.0
@@ -393,7 +481,7 @@ class modisData(Data):
                 evi[wg] = (2.5*(nirimg[wg] - redimg[wg])) / (nirimg[wg] + 6.0*redimg[wg] - 7.5*bluimg[wg] + 1.0)
 
                 # create output gippy image
-                print "writing", fname
+                print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 6)
 
                 imgout.SetNoData(missing)
@@ -420,6 +508,7 @@ class modisData(Data):
                 meta['VERSION'] = VERSION
                 sensor = 'MOD'
                 fname = '%s_%s_%s' % (bname, sensor, key)
+
 
                 img = gippy.GeoImage(allsds)
 
@@ -547,7 +636,7 @@ class modisData(Data):
                 fracout[mask] = 0
 
                 if totsnowcover == 0 or totsnowfrac == 0:
-                    print "no snow or ice: skipping", str(self.date), str(self.id), str(missingassets)
+                    print("no snow or ice: skipping", str(self.date), str(self.id), str(missingassets))
 
                 meta['FRACMISSINGCOVERCLEAR'] = fracmissingcoverclear
                 meta['FRACMISSINGCOVERSNOW'] = fracmissingcoversnow
@@ -671,7 +760,7 @@ class modisData(Data):
                 numvalidcover = np.sum(coverout != 127)
 
                 if totsnowcover == 0 or totsnowfrac == 0:
-                    print "no snow or ice: skipping", str(self.date), str(self.id), str(missingassets)
+                    print("no snow or ice: skipping", str(self.date), str(self.id), str(missingassets))
 
                 meta['FRACMISSINGCOVERCLEAR'] = fracmissingcoverclear
                 meta['FRACMISSINGCOVERSNOW'] = fracmissingcoversnow
@@ -860,6 +949,7 @@ class modisData(Data):
             ###################################################################
             # NDVI (8-day) - Terra only
             if val[0] == "ndvi8":
+                # NOTE this code is unreachable currently; see _products above.
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
                 sensor = 'MOD'

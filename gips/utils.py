@@ -61,6 +61,11 @@ class Colors():
 
 
 def VerboseOut(obj, level=1):
+    '''
+    TODO: Add real documentation of rules regarding levels used within
+          GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
+          "let me see everything" level.
+    '''
     if gippy.Options.Verbose() >= level:
         #pprint.PrettyPrinter().pprint(obj)
         if not isinstance(obj, (list, tuple)):

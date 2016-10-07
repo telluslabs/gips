@@ -8,50 +8,31 @@ necessarily current.
 After cloning this git repo & changing to its directory, run `install.sh`,
 which only officially supports recent versions of Ubuntu.  It will use `sudo`
 to install system packages, and may ask for authentication accordingly.  It
-runs apt-get, which may prompt you for confirmation of its actions.
+runs apt-get, which may prompt you for confirmation of its actions.  
+Finally, the script will show you how to set GIPS system settings with `gips_config`.  
 
-To permit automated testing, create a file named `pytest.ini` in the project
-directory, and use it to set the `data-repo` and `output-dir` settings to full
-paths to the respective directories.
-
-```
-[pytest]
-# GIPS' configured data repository:
-data-repo = /home/your-user-name-here/src/gips/data-repo
-# a directory of your choice, used for output from, e.g., gips_project
-output-dir = /home/your-user-name-here/src/gips/testout
-# These should remain as they are (placing them in a config file is a TODO):
-python_functions =  t_ test_
-python_files =      t_*.py test_*.py
-```
-
-## Running Automated tests
-
-The test suite is based on pytest:  https://pytest.org/latest/contents.html
+### MODIS configuration note
+If you wish to work with modis data, edit `~/.gips/settings.py` (if 
+that file doesn't exist, run `gips_config user` to create it) and
+alter the `'modis'` entry in the `REPOS` dict by adding the following
+to the end of that file:
 
 ```
-#!bash
-# to run all tests (after activating your virtualenv):
-py.test --setup-repo # only needed for the first run
-py.test --clear-repo # destroy and recreate the repo if it's in a bad state
-py.test              # save time without --setup-repo
-py.test -s           # echo stdout & stderr to console (not shown by default)
+REPOS['modis'].update(
+    {
+        'username': 'YOUR-EARTHDATA-USERNAME',
+        'password': 'YOUR-EARTHDATA-PASSWORD', # Use os.environ to avoid saving
+                                           # a password in a file.
+    }
+)
 ```
 
-Select specific tests per usual for pytest:
+This username and password must match your Earthdata credentials; for more
+information on obtaining credentials:
 
-https://pytest.org/latest/usage.html#specifying-tests-selecting-tests
+https://lpdaac.usgs.gov/about/news_archive/important_changes_lp_daac_data_access
 
-You can also select tests based on mark (marks are tags for tests):
-
-https://pytest.org/latest/example/markers.html
-
-If you specify the same test file multiple times on the command line (say, to
-specify multiple tests in that file), any module-scoped test fixtures will run
-once for each time the file is listed, which may not be what was expected.
-This is because pytest sees each item on the command line as a separate run of
-the module, even though really it's the same file listed mulitple times.
-Instead, avoid the problem by using `-k` to specify tests.
+For information on setting up automated testing, see `gips/test/README.md`.
 
 ## Authors and Contributors
 The following have been authors or contributers to GIPS
@@ -59,7 +40,7 @@ The following have been authors or contributers to GIPS
     Matthew Hanson, matt.a.hanson@gmail.com
     Bobby Braswell (Rob), rbraswell@appliedgeosolutions.com
     Ian Cooke, icooke@appliedgeosolutions.com
-    Pavel Dorovskoy, pavel@appliedgeosolutions.com
+    Tom Olson, tolson@appliedgeosolutions.com
 
 ## License (GPL v2)
 

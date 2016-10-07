@@ -179,6 +179,7 @@ class Asset(object):
         '': {'description': ''},
     }
     # dictionary of assets
+    # TODO - support regular expressions for patterns
     _assets = {
         '': {
             'pattern': '*',
@@ -792,16 +793,16 @@ class Data(object):
         return set(assets)
 
     @classmethod
-    def fetch(cls, products, tiles, textent):
-        """ Download data for tiles and add to archive """
+    def fetch(cls, products, tiles, textent, update=False):
+        """ Download data for tiles and add to archive. update forces fetch """
         assets = cls.products2assets(products)
         fetched = []
         for a in assets:
             for t in tiles:
                 asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                 for d in asset_dates:
-                    # if we don't have it already
-                    if not cls.Asset.discover(t, d, a):
+                    # if we don't have it already, or if update (force) flag
+                    if not cls.Asset.discover(t, d, a) or update == True:
                         try:
                             cls.Asset.fetch(a, t, d)
                             fetched.append((a, t, d))
