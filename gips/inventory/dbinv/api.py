@@ -14,7 +14,6 @@ body.
 """
 
 
-# TODO rename to rectify_assets and change docstring
 def rectify_assets(asset_class):
     """Rectify the asset inventory database against the filesystem archive.
 
@@ -27,13 +26,29 @@ def rectify_assets(asset_class):
     # this assumes this directory layout:  /path-to-repo/tiles/*/*/
     path_glob = os.path.join(asset_class.Repository.data_path(), '*', '*')
 
+    iter_cnt = 0
+    chunk_start_time = start_time = time.time()
     for (ak, av) in asset_class._assets.items():
+        print "Starting on {} assets at {:0.2f}s".format(ak, time.time() - start_time)
         file_iter = glob.iglob(os.path.join(path_glob, av['pattern']))
         touched_rows = [] # for removing entries that don't match the filesystem
-        with django.db.transaction.atomic():
+        import contextlib
+        @contextlib.contextmanager
+        def null():
+            yield
+        #with django.db.transaction.atomic():
+        with null():
             add_cnt = 0
             update_cnt = 0
             for f_name in file_iter:
+                iter_cnt += 1
+                if iter_cnt % 1000 == 0:
+                    new_chunk_start_time = time.time()
+                    print "{} files scanned; chunk time {:0.2f}s, total time {:0.2f}s".format(
+                            iter_cnt, 
+                            new_chunk_start_time - chunk_start_time,
+                            new_chunk_start_time - start_time)
+                    chunk_start_time = new_chunk_start_time
                 a = asset_class(f_name)
                 (asset, created) = models.Asset.objects.update_or_create(
                     asset=a.asset,
