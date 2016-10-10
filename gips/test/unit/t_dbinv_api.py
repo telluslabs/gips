@@ -218,12 +218,12 @@ def t_insert_new_model(mtype, call):
         'driver': u'some-driver',
     }
     expected = dict(values)
-    expected['id'] = 1
     a = call(**values)
     returned_actual = model_to_dict(a)
     model = {'asset': models.Asset, 'product': models.Product}[mtype]
-    queried_actual = model_to_dict(model.objects.get(pk=1))
-    assert expected == returned_actual == queried_actual
+    queried_actual = model_to_dict(model.objects.get())
+    expected['id'] = queried_actual['id'] # intentional small deviation from ideal test practice
+    assert expected == returned_actual == queried_actual and model.objects.count() == 1
 
 
 @pytest.mark.django_db
@@ -248,9 +248,9 @@ def t_update_existing_model(mtype, call):
     values['name'] = 'new-file-name.xtn' # alter a value to force an update
     returned_actual = model_to_dict(call(**values)) # run the update
     model = {'asset': models.Asset, 'product': models.Product}[mtype]
-    queried_actual = model_to_dict(model.objects.get(pk=primary_key))
+    queried_actual = model_to_dict(model.objects.get())
 
     # perform assertions
     expected = dict(values) # now carries replaced filename
-    expected['id'] = primary_key
-    assert expected == returned_actual == queried_actual
+    expected['id'] = queried_actual['id'] # intentional small deviation from ideal test practice
+    assert expected == returned_actual == queried_actual and model.objects.count() == 1
