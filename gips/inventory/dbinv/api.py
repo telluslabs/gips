@@ -1,4 +1,4 @@
-import os, glob, sys, traceback, datetime, time
+import os, glob, sys, traceback, datetime, time, itertools
 
 import django.db.transaction
 
@@ -14,6 +14,36 @@ body.
 """
 
 
+def _grouper(iterable, n, fillvalue=None):
+    """Collect data into fixed-length chunks or blocks.
+
+    e.g.:  grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    Taken nearly verbatim from the python itertools docs:
+    https://docs.python.org/2/library/itertools.html"""
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
+
+
+def _chunky_transaction(iterable, function, chunk_sz=1000, item_desc="items"):
+    """Iterate over items in chunks; each chunk is 1 database transaction."""
+    iter_cnt = 0
+    chunk_start_time = start_time = time.time()
+    for chunk in _grouper(iterable, chunk_sz):
+        with django.db.transaction.atomic():
+            for item in chunk:
+                if item is None:
+                    break # need this due to izip_longest padding chunks with Nones
+                function(item)
+        # after each chunk report stats
+        iter_cnt += chunk_sz
+        new_chunk_start_time = time.time()
+        print "{} {} scanned; chunk time {:0.2f}s, total time {:0.2f}s".format(
+                iter_cnt, item_desc,
+                new_chunk_start_time - chunk_start_time,
+                new_chunk_start_time - start_time)
+        chunk_start_time = new_chunk_start_time
+
+
 def rectify_assets(asset_class):
     """Rectify the asset inventory database against the filesystem archive.
 
@@ -23,56 +53,49 @@ def rectify_assets(asset_class):
     """
     # can't load this at module compile time because django initialization is crazytown
     from . import models
+    mao = models.Asset.objects
+    driver = asset_class.Repository.name.lower()
     # this assumes this directory layout:  /path-to-repo/tiles/*/*/
     path_glob = os.path.join(asset_class.Repository.data_path(), '*', '*')
 
-    iter_cnt = 0
-    chunk_start_time = start_time = time.time()
+    def rectify_asset(f_name): # work function for _chunky_transaction()
+        a = asset_class(f_name)
+        (asset, created) = mao.update_or_create(
+                asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
+                name=f_name, driver=driver)
+        asset.save()
+        touched_rows.add(asset.pk)
+        if created:
+            counts['add'] += 1
+            verbose_out("Asset added to database:  " + f_name, 4)
+        else:
+            counts['update'] += 1
+            verbose_out("Asset found in database:  " + f_name, 4)
+
+    start_time = time.time()
     for (ak, av) in asset_class._assets.items():
         print "Starting on {} assets at {:0.2f}s".format(ak, time.time() - start_time)
-        file_iter = glob.iglob(os.path.join(path_glob, av['pattern']))
-        touched_rows = [] # for removing entries that don't match the filesystem
-        import contextlib
-        @contextlib.contextmanager
-        def null():
-            yield
-        #with django.db.transaction.atomic():
-        with null():
-            add_cnt = 0
-            update_cnt = 0
-            for f_name in file_iter:
-                iter_cnt += 1
-                if iter_cnt % 1000 == 0:
-                    new_chunk_start_time = time.time()
-                    print "{} files scanned; chunk time {:0.2f}s, total time {:0.2f}s".format(
-                            iter_cnt, 
-                            new_chunk_start_time - chunk_start_time,
-                            new_chunk_start_time - start_time)
-                    chunk_start_time = new_chunk_start_time
-                a = asset_class(f_name)
-                (asset, created) = models.Asset.objects.update_or_create(
-                    asset=a.asset,
-                    sensor=a.sensor,
-                    tile=a.tile,
-                    date=a.date,
-                    name=f_name,
-                    driver=asset_class.Repository.name.lower(),
-                )
-                asset.save()
-                touched_rows.append(asset.pk)
-                if created:
-                    add_cnt += 1
-                    verbose_out("Asset added to database:  " + f_name, 4)
-                else:
-                    update_cnt += 1
-                    verbose_out("Asset found in database:  " + f_name, 4)
-            # Remove things from DB that are NOT in FS:
-            deletia = models.Asset.objects.filter(asset=ak).exclude(pk__in=touched_rows)
-            del_cnt = deletia.count()
-            if del_cnt > 0:
-                deletia.delete()
-            msg = "{} complete, inventory records changed:  {} added, {} updated, {} deleted"
-            print msg.format(ak, add_cnt, update_cnt, del_cnt) # no -v for this important data
+        counts = {'add': 0, 'update': 0} # A flaw in python scoping makes this necessary
+        touched_rows = set() # for removing entries that don't match the filesystem
+        # little optimization to make deleting stale records go faster:
+        starting_keys = set(mao.filter(driver=driver, asset=ak).values_list('id', flat=True))
+
+        _chunky_transaction(glob.iglob(os.path.join(path_glob, av['pattern'])), rectify_asset)
+
+        # Remove things from DB that are NOT in FS:
+        print "Deleting stale asset records . . . "
+        delete_start_time = time.time()
+        deletia_keys = starting_keys - touched_rows
+        _chunky_transaction(deletia_keys, lambda key: mao.get(pk=key).delete())
+        delete_time = time.time() - delete_start_time
+
+        del_cnt = len(deletia_keys)
+        if del_cnt > 0:
+            print "Deleted {} stale asset records in {:0.2f}s.".format(del_cnt, delete_time)
+        else:
+            print "No stale asset records found; search time {:0.2f}s".format(delete_time)
+        msg = "{} complete, inventory records changed:  {} added, {} updated, {} deleted"
+        print msg.format(ak, counts['add'], counts['update'], del_cnt) # no -v for this important data
 
 
 def rectify_products(data_class):
