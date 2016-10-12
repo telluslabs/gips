@@ -28,7 +28,7 @@ def t_rectify_assets(mocker):
         'h12v04/2012338/bork.hdf',                 # not enough period-delimited substrings
         'h12v04/2012338/_2004001._02_06.051.2014287173613.hdf', # try to trip it up with bad chars
     )]
-    all_filenames = product_filenames + rubbish_filenames + asset_filenames # it should skip assets
+    all_filenames = product_filenames + rubbish_filenames + asset_filenames # should skip products
     # simulate iglob() - match against artificial filenames
     mock_iglob = mocker.patch('gips.inventory.dbinv.glob.iglob')
     mock_iglob.side_effect = lambda pat: [fn for fn in all_filenames if fnmatch.fnmatchcase(fn, pat)]

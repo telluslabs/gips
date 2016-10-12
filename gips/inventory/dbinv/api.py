@@ -33,9 +33,9 @@ def _chunky_transaction(iterable, function, chunk_sz=1000, item_desc="items"):
             for item in chunk:
                 if item is None:
                     break # need this due to izip_longest padding chunks with Nones
+                iter_cnt += 1
                 function(item)
         # after each chunk report stats
-        iter_cnt += chunk_sz
         new_chunk_start_time = time.time()
         print "{} {} scanned; chunk time {:0.2f}s, total time {:0.2f}s".format(
                 iter_cnt, item_desc,
@@ -67,10 +67,10 @@ def rectify_assets(asset_class):
         touched_rows.add(asset.pk)
         if created:
             counts['add'] += 1
-            verbose_out("Asset added to database:  " + f_name, 4)
+            verbose_out("Asset added to database:  " + f_name, 5)
         else:
             counts['update'] += 1
-            verbose_out("Asset found in database:  " + f_name, 4)
+            verbose_out("Asset found in database:  " + f_name, 5)
 
     start_time = time.time()
     for (ak, av) in asset_class._assets.items():
@@ -90,12 +90,15 @@ def rectify_assets(asset_class):
         delete_time = time.time() - delete_start_time
 
         del_cnt = len(deletia_keys)
-        if del_cnt > 0:
-            print "Deleted {} stale asset records in {:0.2f}s.".format(del_cnt, delete_time)
-        else:
-            print "No stale asset records found; search time {:0.2f}s".format(delete_time)
+        print "Deleted {} stale asset records in {:0.2f}s.".format(del_cnt, delete_time)
         msg = "{} complete, inventory records changed:  {} added, {} updated, {} deleted"
         print msg.format(ak, counts['add'], counts['update'], del_cnt) # no -v for this important data
+
+
+def _match_failure_report(f_name, reason):
+    """Used by rectify_products to report problems during product search."""
+    msg = "Product file match failure:  '{}'\nReason:  {}"
+    verbose_out(msg.format(f_name, reason), 2, sys.stderr)
 
 
 def rectify_products(data_class):
@@ -107,85 +110,70 @@ def rectify_products(data_class):
     follow the process in Data() closely, in particular find_files and
     ParseAndAddFiles.
     """
-    # for now don't support SAR*, TODO to support SAR*, filter these files:
-    #   files that match assets from data_class.Asset._assets[*]['pattern']
-    #   *.index, *.xml, and *.hdr files
-    if data_class.name in ('SAR', 'SARAnnual'):
-        msg = "DB Inventory does not support driver '{}'.".format(data_class.name)
-        raise RuntimeError(msg)
-
     # can't load this at module compile time because django initialization is crazytown
     from . import models
     # search_glob for supported drivers:  /path-to-repo/tiles/*/*/*.tif
     search_glob = os.path.join(data_class.Asset.Repository.data_path(),
                                '*', '*', data_class._pattern)
     assert search_glob[-1] not in ('*', '?') # sanity check in case new drivers don't conform
-    file_iter = glob.iglob(search_glob)
 
-    def match_failure_report(f_name, reason):
-        msg = "Product file match failure:  '{}'\nReason:  {}"
-        verbose_out(msg.format(f_name, reason), 2, sys.stderr)
-
+    mpo = models.Product.objects
     driver = data_class.name.lower()
-    touched_rows = [] # for removing entries that don't match the filesystem
-    add_cnt = 0
-    update_cnt = 0
-    # TODO break up transaction into manageable sizes?  This is going to get LARGE.
-    # maybe google 'python chunk iterator'.
-    iter_cnt = 0
-    start_time = time.time()
-    with django.db.transaction.atomic():
-        for full_fn in file_iter:
-            # after each chunk of work, report on progress & elapsed time
-            iter_cnt += 1
-            if iter_cnt % 1000 == 0:
-                print "{} files scanned; total elapsed time {:0.2f}".format(iter_cnt, time.time() - start_time)
-            base_fn = basename(full_fn)
-            bfn_parts = base_fn.split('_')
-            if not len(bfn_parts) == 4:
-                match_failure_report(full_fn,
-                        "Failure to parse:  Wrong number of '_'-delimited substrings.")
-                continue
-                # TODO support products whose len(parts) == 3
+    touched_rows = set() # for removing entries that don't match the filesystem
+    counts = {'add': 0, 'update': 0}
+    # TODO may need an outer loop like assets; if this explodes for big drivers, split it up by date
+    # or chunk somehow
+    starting_keys = set(mpo.filter(driver=driver).values_list('id', flat=True))
 
-            # extract metadata about the file
-            (tile, date_str, sensor, product) = bfn_parts
-            date_pattern = data_class.Asset.Repository._datedir
-            try:
-                date = datetime.datetime.strptime(date_str, date_pattern).date()
-            except Exception:
-                verbose_out(traceback.format_exc(), 4, sys.stderr)
-                msg = "Failure to parse date:  '{}' didn't adhere to pattern '{}'."
-                match_failure_report(full_fn, msg.format(date_str, date_pattern))
-                continue
+    def rectify_product(full_fn):
+        # TODO if data_class.name == 'Daymet':
+        #   # Daymet assets & products are the same, so use Asset parsing to make Products
+        #   daymet_asset = data_class.Asset(full_fn)
+        #   # extract metadata here
+        #   # save deets as usual
+        bfn_parts = basename(full_fn).split('_')
+        if not len(bfn_parts) == 4: # TODO support products whose len(parts) == 3
+            _match_failure_report(full_fn,
+                    "Failure to parse:  Wrong number of '_'-delimited substrings.")
+            return
 
-            (product, created) = models.Product.objects.update_or_create(
-                product=product,
-                sensor=sensor,
-                tile=tile,
-                date=date,
-                name=full_fn,
-                driver=driver,
-            )
-            product.save()
-            touched_rows.append(product.pk)
-            if created:
-                add_cnt += 1
-                verbose_out("Product added to database:  " + full_fn, 4)
-            else:
-                update_cnt += 1
-                verbose_out("Product found in database:  " + full_fn, 4)
+        # extract metadata about the file
+        (tile, date_str, sensor, product) = bfn_parts
+        date_pattern = data_class.Asset.Repository._datedir
+        try:
+            date = datetime.datetime.strptime(date_str, date_pattern).date()
+        except Exception:
+            verbose_out(traceback.format_exc(), 4, sys.stderr)
+            msg = "Failure to parse date:  '{}' didn't adhere to pattern '{}'."
+            _match_failure_report(full_fn, msg.format(date_str, date_pattern))
+            return
 
-    with django.db.transaction.atomic():
-        # Remove things from DB that are NOT in FS; do it in a loop to avoid an explosion.
-        query = models.Product.objects.filter(driver=driver)
-        deletia_keys = set(query.values_list('id', flat=True)) - set(touched_rows)
-        del_cnt = len(deletia_keys)
-        if del_cnt > 0:
-            for key in deletia_keys:
-                models.Product.objects.get(pk=key).delete()
-        msg = "Products complete, inventory records changed:  {} added, {} updated, {} deleted"
-        print msg.format(add_cnt, update_cnt, del_cnt) # no -v for this important data
+        (product, created) = mpo.update_or_create(
+                product=product, sensor=sensor, tile=tile, date=date,
+                driver=driver, name=full_fn)
+        product.save()
+        # TODO can subtract this item from starting_keys each time and possibly save some memory and time
+        touched_rows.add(product.pk)
+        if created:
+            counts['add'] += 1
+            verbose_out("Product added to database:  " + full_fn, 5)
+        else:
+            counts['update'] += 1
+            verbose_out("Product found in database:  " + full_fn, 5)
+
+    _chunky_transaction(glob.iglob(search_glob), rectify_product)
+
+    # Remove things from DB that are NOT in FS; do it in a loop to avoid an explosion.
+    print "Deleting stale product records . . . "
+    delete_start_time = time.time()
+    deletia_keys = starting_keys - touched_rows
+    _chunky_transaction(deletia_keys, lambda key: mpo.get(pk=key).delete())
+    delete_time = time.time() - delete_start_time
+
+    del_cnt = len(deletia_keys)
+    print "Deleted {} stale product records in {:0.2f}s.".format(del_cnt, delete_time)
+    msg = "{} complete, inventory records changed:  {} added, {} updated, {} deleted"
+    print msg.format(driver, counts['add'], counts['update'], del_cnt)
 
 
 def list_tiles(driver):
