@@ -70,6 +70,9 @@ def main():
         orm.setup()
 
         if args.rectify:
+            if not orm.use_orm():
+                verbose_out("--rectify can only be used if GIPS_ORM=true.", 1, sys.stderr)
+                sys.exit(1)
             for k, v in vars(args).items():
                 # don't give the user false expectations about rectification
                 if v and k not in ('rectify', 'verbose', 'command'):

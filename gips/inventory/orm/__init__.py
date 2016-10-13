@@ -45,7 +45,8 @@ def setup():
     if setup_complete:
         return
     if use_orm():
-        if driver_for_dbinv_feature_toggle in ('sar', 'sarannual', 'modaod', 'merra', 'daymet'):
+        busted_drivers = ('sar', 'sarannual', 'modaod', 'merra', 'daymet', 'cdl')
+        if driver_for_dbinv_feature_toggle in busted_drivers:
             msg = ("Inventory database does not support '{}'.  "
                    "Set GIPS_ORM=false to use the filesystem inventory instead.")
             raise Exception(msg.format(driver_for_dbinv_feature_toggle))
