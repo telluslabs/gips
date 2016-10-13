@@ -1,101 +1,88 @@
 #!/usr/bin/env python
 
+""" Compile comprehensive tabular database of ASTER scenes """
+
 import os
 import re
 import datetime
-import urllib, urllib2
+import time
+import random
+
+import wget
 import xml.etree.ElementTree as ET
 
 import fiona
 from shapely.geometry import Polygon
-
 from functools import partial
 import pyproj
 from shapely.ops import transform
-
 
 from pdb import set_trace
 
 
 ROOTURL = "http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003"
-# http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003/2013.10.03/AST_L1T_00310032013031653_20150618010058_108124.hdf
-# http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003/2013.10.03/AST_L1T_00310032013031653_20150618010058_108124.hdf.xml
-
-STARTDATE = datetime.date(2003, 1, 1)
-ENDDATE = datetime.date(2015, 12, 31)
-
-MODISTILES = "/home/braswell/gips/gips/data/modis/tiles.shp"
-TILEID = "h12v03"
-PROJ = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +no_defs"
+STARTDATE = datetime.date(2000, 3, 6)
+ENDDATE = datetime.date(2016, 6, 30)
+OUTDIR = "/data/aster/db"
+TIMEOUT = 60
+SLEEP = 0.1
+AUTH = ('bobbyhbraswell', 'Coffeedog_1')
 
 
-def gettile(tileid):
-    collection = fiona.open(MODISTILES)
-    for feature in collection:
-        if feature['properties']['tileid'] == tileid:
-            return Polygon(feature['geometry']['coordinates'][0])
-        
-        
 def main():
 
-    tilepoly = gettile(TILEID)
-    project = partial(
-        pyproj.transform,
-        pyproj.Proj(init='epsg:4326'),
-        pyproj.Proj(PROJ))
-
-    ndays = (ENDDATE - STARTDATE).days
-
+    ndays = (ENDDATE - STARTDATE).days + 1
     for nday in range(ndays):
         date = STARTDATE + datetime.timedelta(nday)
-
         datestr = date.strftime('%Y.%m.%d')
-        
+        outpath = os.path.join(OUTDIR, datestr + ".csv")
+        if os.path.exists(outpath):
+            continue
         mainurl = ROOTURL + "/" + datestr
-
-        pattern = '(AST_L1T_\d{17}_\d{14}_\d{6}.hdf)'
+        pattern = '(AST_L1T_\d{17}_\d{14}_\d+.hdf)'
         cpattern = re.compile(pattern)
-                                
-        listing = urllib.urlopen(mainurl).readlines()
-        
-        for item in listing:
 
+        listing = wget.get(mainurl, auth=AUTH).split('\n')
+        if listing == '':
+            continue
+
+        opened = False
+        for item in listing:            
             if cpattern.search(item):
-
                 if 'xml' not in item:
 
                     name = cpattern.findall(item)[0]
-                    outpath = os.path.join('/data/aster', name)
-                    if os.path.exists(outpath):
-                        print "skipping"
-                        continue
-
+                    url = mainurl + "/" + name
                     xmlname = name + ".xml"
                     xmlurl = mainurl + "/" + xmlname
-                    connection = urllib2.urlopen(xmlurl) 
-
-                    data = connection.read()
-                    root = ET.fromstring(data)
+                    print xmlname, xmlurl
                     
+                    data = wget.get(xmlurl, auth=AUTH)                    
+
+                    root = ET.fromstring(data)
                     boundary = root.findall('./GranuleURMetaData/SpatialDomainContainer/HorizontalSpatialDomainContainer/GPolygon/Boundary')
                     coords = []
                     for point in boundary[0].findall('Point'):                        
                         coords.append((float(point.find('PointLongitude').text), float(point.find('PointLatitude').text)))
-
                     poly = Polygon(coords)
+                    polystr = "'%s'" % poly.wkt                    
+                    daynight = root.findall('GranuleURMetaData/ECSDataGranule/DayNightFlag')[0].text
+                    psas = root.findall('GranuleURMetaData/PSAs/PSA')
+                    for psa in psas:
+                        if psa.find('PSAName').text == "UTMZoneNumber":
+                            utmzone = psa.find('PSAValue').text
+                            break
+                    outstr =  ','.join([url, polystr, daynight, utmzone])
 
-                    polysin = transform(project, poly)
-                    
-                    if polysin.intersects(tilepoly):
-                        print xmlname                    
+                    print outstr
 
-                        url = mainurl + "/" + name
-                        connection = urllib2.urlopen(url)
+                    if opened == False:
+                        outfile = open(outpath, 'w')
+                        opened = True
+                    outfile.write(outstr+'\n')
 
-                        output = open(outpath, 'wb')
-                        output.write(connection.read())
-                        output.close()
-
-
+        if opened == True:
+            outfile.close()
+        
 if __name__ == "__main__":
     main()
