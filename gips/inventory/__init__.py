@@ -27,6 +27,7 @@ from datetime import datetime as dt
 import traceback
 import numpy
 from copy import deepcopy
+from collections import defaultdict
 
 import gippy
 from gips.tiles import Tiles
@@ -287,11 +288,9 @@ class DataInventory(Inventory):
                 #       (tile, date): {'a': [asset, asset, asset],
                 #                      'p': [product, product, product]},
                 #   }
-                collection = {} # TODO use ordereddict if perf isn't good enough
+                collection = defaultdict(lambda: {'a': [], 'p': []})
                 def add_to_collection(date, tile, kind, item):
                     key = (date, str(tile)) # str() to avoid possible unicode trouble
-                    if key not in collection:
-                        collection[key] = {'a': [], 'p': []}
                     collection[key][kind].append(item)
 
                 search_criteria = { # same for both Assets and Products
@@ -383,8 +382,9 @@ class DataInventory(Inventory):
             self.spatial.print_tile_coverage()
             print
         else:
+            # constructor makes it safe to assume there is only one tile when
+            # self.spatial.site is None, but raise an error anyway just in case
             if len(self.spatial.tiles) > 1:
                 raise RuntimeError('Expected 1 tile but got ' + repr(self.spatial.tiles))
             print Colors.BOLD + 'Asset Holdings for tile ' + self.spatial.tiles[0] + Colors.OFF
         super(DataInventory, self).pprint(**kwargs)
-

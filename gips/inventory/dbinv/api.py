@@ -132,7 +132,7 @@ def rectify_products(data_class):
         #   # extract metadata here
         #   # save deets as usual
         bfn_parts = basename(full_fn).split('_')
-        if not len(bfn_parts) == 4: # TODO support products whose len(parts) == 3
+        if not len(bfn_parts) == 4:
             _match_failure_report(full_fn,
                     "Failure to parse:  Wrong number of '_'-delimited substrings.")
             return

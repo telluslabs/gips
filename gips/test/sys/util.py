@@ -163,6 +163,7 @@ class GipsProcResult(object):
 @pytest.yield_fixture
 def repo_env(request):
     """Provide means to test files created by run & clean them up after."""
+    os.environ['GIPS_ORM'] = 'true'
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     yield gtfe
     # This step isn't effective if DATA_REPO_ROOT isn't right; in that case it
@@ -181,6 +182,7 @@ def clean_repo_env(request):
     This emulates tfe.run()'s checking the directory before and after a run,
     then working out how the directory has changed.  Unfortunately half the
     work is done in tfe, the other half in ProcResult."""
+    os.environ['GIPS_ORM'] = 'true'
     file_env = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     before = file_env._find_files()
     _log.debug("Generating file env: {}".format(file_env))

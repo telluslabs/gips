@@ -95,7 +95,6 @@ def t_modis_archive(careful_repo_env, repo_env, expected):
     careful_repo_env.run('gips_inventory', 'modis', '--rectify') # put the stale file in the DB
 
     # run the test
-    os.environ['GIPS_ORM'] = 'false'
     stage_dir = os.path.join(DATA_REPO_ROOT, 'modis/stage')
     actual = careful_repo_env.run('gips_archive', 'modis', '--update', cwd=stage_dir)
     inv_actual = repo_env.run('gips_inventory', 'modis')
