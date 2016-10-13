@@ -151,7 +151,7 @@ py.test --sys --clear-repo # delete the entire repo, then fetch data files,
                            # then run tests
 # a more realistic system test run, with several useful options specified:
 # (see py.test --help for details; several are GIPS-custom options):
-py.test --sys --ll debug -s -x -vv --sys --setup-repo -k prism
+py.test --ll debug -s -x -vv --sys --setup-repo -k prism
 ```
 
 Also some specially-marked tests are skipped unless command-line options are
@@ -248,9 +248,9 @@ Quick Start
 py.test # run unit tests (after activating your virtualenv)
 
 # realistically, a system test run for a specific driver looks like this:
-py.test --sys --ll debug -s -x -vv --sys --setup-repo -k prism
+py.test --ll debug -s -x -vv --sys --setup-repo -k prism
 
 # the help message for pytest includes help for custom options, such as
-# --sys, --ll, --sys, and --setup-repo:
+# --ll, --sys, and --setup-repo:
 py.test --help
 ```
