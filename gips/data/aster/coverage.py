@@ -22,7 +22,7 @@ from pdb import set_trace
 
 ROOTURL = "http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003"
 STARTDATE = datetime.date(2000, 3, 6)
-ENDDATE = datetime.date(2016, 6, 30)
+ENDDATE = datetime.date(2016, 10, 15)
 OUTDIR = "/data/aster/db"
 TIMEOUT = 60
 SLEEP = 0.1
@@ -59,7 +59,19 @@ def main():
                     
                     data = wget.get(xmlurl, auth=AUTH)                    
 
-                    root = ET.fromstring(data)
+                    tries = 0
+                    done = False
+                    while not done:
+                        try:
+                            root = ET.fromstring(data)
+                            done = True
+                        except:
+                            print "failed to read from", xmlurl
+                            tries += 1
+                            time.sleep(5)
+                        if tries > 9:
+                            done = True
+
                     boundary = root.findall('./GranuleURMetaData/SpatialDomainContainer/HorizontalSpatialDomainContainer/GPolygon/Boundary')
                     coords = []
                     for point in boundary[0].findall('Point'):                        
