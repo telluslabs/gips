@@ -38,6 +38,11 @@ import numpy
 from gips.utils import List2File, VerboseOut
 from gips.data.merra import merraData
 from gips.data.aod import aodData
+
+# since Py6S pulls in matplotlib, we need to shut down all that gui business
+import matplotlib as mpl
+mpl.use('Agg')
+
 from Py6S import SixS, Geometry, AeroProfile, Altitudes, Wavelength, GroundReflectance, AtmosCorr, SixSHelpers
 
 
