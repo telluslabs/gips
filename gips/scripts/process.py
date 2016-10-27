@@ -52,7 +52,8 @@ def main():
             batchargs += ' --format ' + str(args.format)
             if args.overwrite:
                 batchargs += ' --overwrite '
-            batchargs += ' -p ' + ' '.join(args.products)
+            if args.products:
+                batchargs += ' -p ' + ' '.join(args.products)
 
         for extent in extents:
             inv = DataInventory(
