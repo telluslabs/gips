@@ -60,15 +60,18 @@ def main():
                 TemporalExtent(args.dates, args.days), **vars(args)
             )
             if args.batchout:
-                tdl += reduce(
+                tdl = reduce(
                     list.__add__,
                     map(
-                        lambda tiles: [args.command + ' -t ' + str(tile) +
-                                       ' -d ' + str(tiles.date) + ' ' +
-                                       batchargs + '\n'
-                                       for tile in tiles.tiles.keys()],
-                        inv.data.values()
-                    )
+                        lambda tiles: [
+                            args.command + ' -t ' + str(tile) +
+                            ' -d ' + str(tiles.date) + ' ' +
+                            batchargs + '\n'
+                            for tile in tiles.tiles.keys()
+                        ],
+                        inv.data.values(),
+                    ),
+                    tdl
                 )
 
             else:
