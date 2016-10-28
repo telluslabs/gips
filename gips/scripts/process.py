@@ -52,7 +52,8 @@ def main():
             batchargs += ' --format ' + str(args.format)
             if args.overwrite:
                 batchargs += ' --overwrite '
-            batchargs += ' -p ' + ' '.join(args.products)
+            if args.products:
+                batchargs += ' -p ' + ' '.join(args.products)
 
         for extent in extents:
             inv = DataInventory(
@@ -60,15 +61,18 @@ def main():
                 TemporalExtent(args.dates, args.days), **vars(args)
             )
             if args.batchout:
-                tdl += reduce(
+                tdl = reduce(
                     list.__add__,
                     map(
-                        lambda tiles: [args.command + ' -t ' + str(tile) +
-                                       ' -d ' + str(tiles.date) + ' ' +
-                                       batchargs + '\n'
-                                       for tile in tiles.tiles.keys()],
-                        inv.data.values()
-                    )
+                        lambda tiles: [
+                            args.command + ' -t ' + str(tile) +
+                            ' -d ' + str(tiles.date) + ' ' +
+                            batchargs + '\n'
+                            for tile in tiles.tiles.keys()
+                        ],
+                        inv.data.values(),
+                    ),
+                    tdl
                 )
 
             else:
