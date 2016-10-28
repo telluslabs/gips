@@ -1,7 +1,8 @@
 import logging, os, shutil
-import envoy
 
+import envoy
 from _pytest.assertion.util import _compare_eq_dict, _diff_text
+
 from gips.test.sys.util import GipsProcResult, set_constants
 
 # configure logging (can config in command-line & config file, see below)
@@ -43,6 +44,10 @@ def pytest_addoption(parser):
                 "alter or remove source data in the repo.")
     parser.addoption("--src-altering", action="store_true", help=help_str)
 
+    help_str = ("Do not skip @system tests, which are tests that may "
+                "change elements of the environment as they work.")
+    parser.addoption("--sys", action="store_true", help=help_str)
+
 
 def pytest_configure(config):
     """Process user config & command-line options."""
@@ -62,7 +67,7 @@ def pytest_configure(config):
         _log.debug("--slow detected; will not skip @slow tests")
 
     if config.getoption("clear_repo"):
-        _log.debug("--clear-repo detected; trashing and rebuilding data repo")
+        _log.debug("--clear-repo detected; trashing and rebuilding data repo & inventory DB")
         path = config.getini('data-repo')
         os.path.lexists(path) and shutil.rmtree(path)
         setup_data_repo()
@@ -120,11 +125,18 @@ def pytest_assertrepr_compare(config, op, left, right):
         else:
             output += [s + ':  ignored']
 
-    updated_diff = _compare_eq_dict(left.updated, right.updated, verbose)
-    deleted_diff = _compare_eq_dict(left.deleted, right.deleted, verbose)
-    created_diff = _compare_eq_dict(left.created, right.created, verbose)
+    updated_diff = _compare_eq_dict(left.strip_ignored( left.updated),
+                                    left.strip_ignored(right.updated),
+                                    verbose)
+    deleted_diff = _compare_eq_dict(left.strip_ignored( left.deleted),
+                                    left.strip_ignored(right.deleted),
+                                    verbose)
+    created_diff = _compare_eq_dict(left.strip_ignored( left.created),
+                                    left.strip_ignored(right.created),
+                                    verbose)
     output += header_and_indent('updated', updated_diff)
     output += header_and_indent('deleted', deleted_diff)
     output += header_and_indent('created', created_diff)
+    output += header_and_indent('ignored', left.ignored)
 
     return output

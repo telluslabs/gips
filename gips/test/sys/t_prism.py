@@ -7,9 +7,12 @@ from .util import *
 
 logger = logging.getLogger(__name__)
 
+pytestmark = sys # skip everything unless --sys
+
 # changing this will require changes in expected/
 STD_ARGS = ('prism', '-s', NH_SHP_PATH, '-d', '1982-12-01,1982-12-03', '-v', '4')
 
+driver = 'prism'
 
 @pytest.fixture
 def setup_prism_data(pytestconfig):
@@ -39,8 +42,9 @@ def t_inventory(setup_prism_data, repo_env, expected):
 
 def t_process(setup_prism_data, repo_env, expected):
     """Test gips_process on prism data."""
-    actual = repo_env.run('gips_process', *STD_ARGS)
-    assert expected == actual
+    process_actual = repo_env.run('gips_process', *STD_ARGS)
+    inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
+    assert expected == process_actual and inventory_actual.std_out == expected._inv_stdout
 
 
 # def t_info(repo_env, expected):

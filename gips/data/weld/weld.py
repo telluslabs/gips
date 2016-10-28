@@ -139,7 +139,6 @@ class weldData(Data):
     name = 'WELD'
     version = '0.1.0'
     Asset = weldAsset
-    _pattern = '*.tif'
     _productgroups = {
         "indices": ['ndsi', 'ndvi', 'brgt'],
     }

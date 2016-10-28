@@ -20,7 +20,9 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
+from __future__ import print_function
 
+import sys
 import os
 import errno
 import gippy
@@ -60,18 +62,23 @@ class Colors():
     _WHITE  = _c + '47m'
 
 
-def VerboseOut(obj, level=1):
-    '''
-    TODO: Add real documentation of rules regarding levels used within
-          GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
-          "let me see everything" level.
-    '''
+def verbose_out(obj, level=1, stream=sys.stdout):
+    """print(obj) but only if the user's chosen verbosity level warrants it.
+
+    Print to stdout by default, but select any stream the user wishes.  Finally
+    if the obj is a list or tuple, print each contained object consecutively on
+    separate lines.
+    """
+    #TODO: Add real documentation of rules regarding levels used within
+    #      GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
+    #      "let me see everything" level.
     if gippy.Options.Verbose() >= level:
-        #pprint.PrettyPrinter().pprint(obj)
         if not isinstance(obj, (list, tuple)):
             obj = [obj]
         for o in obj:
-            print o
+            print(o, file=stream)
+
+VerboseOut = verbose_out # TODO deprecate then remove
 
 ##############################################################################
 # Filesystem functions
@@ -104,6 +111,11 @@ def RemoveFiles(filenames, extensions=['']):
 
 
 def basename(str):
+    """Return the input string, stripped of directories and extensions.
+
+    So, basename('/home/al-haytham/book-of-optics.pdf') returns
+    'book-of-optics'.
+    """
     return os.path.splitext(os.path.basename(str))[0]
 
 
@@ -191,7 +203,7 @@ def create_repos():
     try:
         repos = settings().REPOS
     except:
-        print traceback.format_exc()
+        print(traceback.format_exc())
         raise Exception('Problem reading repository...check settings files')
     for key in repos.keys():
         repo = import_repository_class(key)
@@ -217,7 +229,7 @@ def data_sources():
         else:
             raise Exception('ERROR: archive %s is not a directory or is not available' % key)
     if not found:
-        print "There are no available data sources!"
+        print("There are no available data sources!")
     return sources
 
 
@@ -232,7 +244,7 @@ def import_data_module(clsname):
         mod = imp.load_module(clsname, *fmtup)
         return mod
     except:
-        print traceback.format_exc()
+        print(traceback.format_exc())
 
 
 def import_repository_class(clsname):
@@ -246,6 +258,9 @@ def import_data_class(clsname):
     """ Get clsnameData class object """
     mod = import_data_module(clsname)
     exec('repo = mod.%sData' % clsname)
+    # prevent use of database inventory for certain incompatible drivers
+    from gips.inventory import orm
+    orm.driver_for_dbinv_feature_toggle = repo.name.lower()
     return repo
 
 

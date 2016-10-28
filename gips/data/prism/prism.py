@@ -213,14 +213,16 @@ class prismData(Data):
     }
 
     def process(self, *args, **kwargs):
-        """
-        Cribbed from super: 
-        Make sure all products exist and return those that need processing.
+        """Make sure all products exist and return those that need processing.
+
+        (docstring cribbed from super.)
         """
         products = super(prismData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
         bname = os.path.join(self.path, self.basename)
+        assert len(prismAsset._sensors) == 1 # sanity check to force this code to stay current
+        sensor = prismAsset._sensors.keys()[0]
 
         for key, val in products.requested.items():
             start = datetime.now()
@@ -319,6 +321,7 @@ class prismData(Data):
                 #oimg = None
                 print('nih')
                 products.requested.pop(key)
+            self.AddFile(sensor, key, fname) # add product to inventory
         return products
 
     # def __init__(self, tile=None, date=None, path=None):

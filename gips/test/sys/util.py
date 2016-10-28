@@ -19,6 +19,8 @@ def set_constants(config):
 
 slow = pytest.mark.skipif('not config.getoption("slow")',
                           reason="--slow is required for this test")
+sys = pytest.mark.skipif('not config.getoption("sys")', reason="--sys is required for this test")
+
 
 def extract_hashes(files):
     """Return a dict of file names and unique hashes of their content.
@@ -84,10 +86,10 @@ class GipsProcResult(object):
     Standard output is handled specially for equality comparison; see __eq__.
     Can accept scripttest.ProcResult objects at initialization; see __init__.
     """
-    attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted', 'created')
+    attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted', 'created', 'ignored')
     def __init__(self, proc_result=None, compare_stdout=None, compare_stderr=True, **kwargs):
         """Initialize the object using a ProcResult, explicit kwargs, or both.
-        
+
         ProcResults' reports on files (created, deleted, updated) are saved as
         their names and hashes.  compare_stdout is an explicit way to request
         stdout be considered in __eq__; see below.  If it is not set, then
@@ -111,7 +113,10 @@ class GipsProcResult(object):
             self.deleted = extract_hashes(proc_result.files_deleted)
             self.created = extract_hashes(proc_result.files_created)
 
-        input_fields = set(kwargs.keys())
+        self.ignored = [] # list of filenames to ignore for comparison purposes
+
+        # special keys are permitted if they begin with an underscore
+        input_fields = set(k for k in kwargs.keys() if k[0] != '_')
         if not input_fields.issubset(set(self.attribs)):
             raise ValueError('Unknown attributes for GipsProcResult',
                              list(input_fields - set(self.attribs)))
@@ -128,6 +133,14 @@ class GipsProcResult(object):
         #self.stdout = self.stdout or u''
         self.compare_stderr = compare_stderr
 
+    def strip_ignored(self, d):
+        """Return a copy of dict d but strip out items in self.ignored.
+
+        If self.ignored = ['a', 'b'] then
+        strip_ignored({'a': 1, 'b': 2, 'c': 2}) returns {'c': 2}.
+        """
+        return {k: v for k, v in d.items() if k not in self.ignored}
+
     def __eq__(self, other):
         """Equality means all attributes must match, except possibly stdout & stderr.
 
@@ -140,16 +153,17 @@ class GipsProcResult(object):
             self.exit_status == other.exit_status,
             not compare_stdout or self.stdout == other.stdout,
             not compare_stderr or self.stderr == other.stderr,
-            self.updated == other.updated,
-            self.deleted == other.deleted,
-            self.created == other.created,
+            self.strip_ignored(self.updated) == self.strip_ignored(other.updated),
+            self.strip_ignored(self.deleted) == self.strip_ignored(other.deleted),
+            self.strip_ignored(self.created) == self.strip_ignored(other.created),
         )
         return all(matches)
 
 
 @pytest.yield_fixture
-def repo_env():
+def repo_env(request):
     """Provide means to test files created by run & clean them up after."""
+    os.environ['GIPS_ORM'] = 'true'
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     yield gtfe
     # This step isn't effective if DATA_REPO_ROOT isn't right; in that case it
@@ -157,6 +171,8 @@ def repo_env():
     # Maybe add self-healing by having setup_modis_data run in a TFE and
     # detecting which files are present when it starts.
     gtfe.remove_created()
+    # ensure inv DB matches files on disk
+    gtfe.run('gips_inventory', request.module.driver, '--rectify')
 
 
 @pytest.yield_fixture(scope='module')
@@ -166,6 +182,7 @@ def clean_repo_env(request):
     This emulates tfe.run()'s checking the directory before and after a run,
     then working out how the directory has changed.  Unfortunately half the
     work is done in tfe, the other half in ProcResult."""
+    os.environ['GIPS_ORM'] = 'true'
     file_env = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     before = file_env._find_files()
     _log.debug("Generating file env: {}".format(file_env))
@@ -173,6 +190,8 @@ def clean_repo_env(request):
     after = file_env._find_files()
     file_env.proc_result = ProcResult(file_env, ['N/A'], '', '', '', 0, before, after)
     file_env.remove_created()
+    # ensure inv DB matches files on disk
+    file_env.run('gips_inventory', request.module.driver, '--rectify')
     _log.debug("Finalized file env: {}".format(file_env))
 
 

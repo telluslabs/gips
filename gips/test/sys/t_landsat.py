@@ -7,12 +7,16 @@ from .util import *
 
 logger = logging.getLogger(__name__)
 
+pytestmark = sys # skip everything unless --sys
+
 # changing this will require changes in expected/
 STD_ARGS = ('landsat', '-s', NH_SHP_PATH, '-d', '2015-352', '-v', '4')
 
 product_args = tuple('-p acca bqashadow ref-toa ndvi-toa rad-toa'.split())
 
 STD_PROD_ARGS = STD_ARGS + product_args
+
+driver = 'landsat'
 
 @pytest.fixture
 def setup_landsat_data(pytestconfig):
