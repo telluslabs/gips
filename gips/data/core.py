@@ -40,6 +40,7 @@ import gippy
 from gippy.algorithms import CookieCutter
 from gips import __version__
 from gips.utils import settings, VerboseOut, RemoveFiles, File2List, List2File, Colors, basename, mkdir, open_vector
+from gips import utils
 from ..inventory import dbinv, orm
 
 from pdb import set_trace
@@ -85,8 +86,7 @@ class Repository(object):
     def find_tiles(cls):
         """Get list of all available tiles for the current driver."""
         if orm.use_orm():
-            with orm.std_error_handler():
-                return dbinv.list_tiles(cls.name.lower())
+            return dbinv.list_tiles(cls.name.lower())
         return os.listdir(cls.path('tiles'))
 
     @classmethod
@@ -862,13 +862,12 @@ class Data(object):
                 for d in asset_dates:
                     # if we don't have it already, or if update (force) flag
                     if not cls.Asset.discover(t, d, a) or update == True:
-                        try:
+                        date_str = d.strftime("%y-%m-%d")
+                        msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
+                        with utils.error_handler(continuable=True, msg_prefix=msg_prefix):
                             cls.Asset.fetch(a, t, d)
                             # fetched may contain both fetched things and unfetchable things
                             fetched.append((a, t, d))
-                        except Exception, e:
-                            VerboseOut(traceback.format_exc(), 4)
-                            VerboseOut('Problem fetching asset: %s' % e, 3)
         return fetched
 
     @classmethod

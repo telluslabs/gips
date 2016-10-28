@@ -7,6 +7,7 @@ import django
 from gips.utils import verbose_out
 
 
+# TODO probably deprecate and delete
 @contextmanager
 def std_error_handler():
     """Handle problems with ORM code in a unified way."""

@@ -25,14 +25,14 @@ from __future__ import print_function
 import sys
 import os
 import errno
-import gippy
-from gippy import GeoVector
+from contextlib import contextmanager
 import tempfile
 import commands
 import shutil
 import traceback
 
-from pdb import set_trace
+import gippy
+from gippy import GeoVector
 
 
 class Colors():
@@ -377,14 +377,75 @@ def mosaic(images, outfile, vector):
     return crop2vector(imgout, vector)
 
 
-# old code utilizing shared memory array
-# Chunk it up
-# chunksz = int(data.shape[0] / nproc)
-# extra = data.shape[0] - chunksz * nproc
-# chunks = [chunksz] * (nproc - extra) + [chunksz + 1] * extra
+_traceback_verbosity = 4    # only print a traceback if the user selects this verbosity or higher
+_accumulated_errors = []    # used for tracking success/failure & doing final error reporting when
+                            # GIPS is running as a command-line application
+_stop_on_error = False      # TODO set by cmd-line option
 
-# queue = multiprocessing.Queue()
-# from agspy.contrib import shmarray
-# classmap = shmarray.create_copy(classmap)
-# tmp = numpy.ctypeslib.as_ctypes(classmap)
-# cmap = sharedctypes.Array(tmp._type_, tmp, lock=False)
+
+def set_error_handler(handler):
+    """Set the active error handler (generally for entire life of process)."""
+    global error_handler
+    error_handler = handler
+
+
+def report_error(error, msg_prefix):
+    """Print an error report on stderr, respecting verbosity."""
+    if gippy.Options.Verbose() >= _traceback_verbosity:
+        verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
+        traceback.print_exc()
+    else:
+        verbose_out(msg_prefix + ': ' + str(error), 1, stream=sys.stderr)
+
+
+@contextmanager
+def lib_error_handler(continuable=False, msg_prefix='Error'):
+    """Handle errors appropriately for GIPS running as a library."""
+    try:
+        yield
+    except Exception as e:
+        if continuable and not _stop_on_error:
+            report_error(e, msg_prefix)
+        else:
+            raise
+
+
+error_handler = lib_error_handler # set this so gips code can use the right error handler
+
+
+def gips_exit():
+    """Deliver an error report if needed, then exit."""
+    if len(_accumulated_errors) == 0:
+        sys.exit(0)
+    verbose_out("Fatal: {} error(s) occurred:".format(len(_accumulated_errors)), 1, sys.stderr)
+    [report_error(error, error.msg_prefix) for error in _accumulated_errors]
+    sys.exit(1)
+
+
+@contextmanager
+def cli_error_handler(continuable=False, msg_prefix='Error'):
+    """Context manager for uniform error handling for command-line users.
+
+    Exceptions are caught and reported to stderr; _gips_exit() is called
+    if halt is indicated.
+    """
+    try:
+        yield
+    except Exception as e:
+        e.msg_prefix = msg_prefix # for use by gips_exit
+        _accumulated_errors.append(e)
+        if continuable and not _stop_on_error:
+            report_error(e, msg_prefix)
+        else:
+            gips_exit()
+
+
+def gips_script_setup(driver_string, data_class=True, orm=True):
+    """Run this at the beginning of a GIPS CLI program to do setup."""
+    from gips.inventory import orm # avoids a circular import
+    set_error_handler(cli_error_handler)
+    with error_handler():
+        if orm:
+            orm.setup()
+        if data_class:
+            return import_data_class(driver_string)

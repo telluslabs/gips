@@ -45,6 +45,7 @@ from gips import __version__ as gipsversion
 from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
 from gips.utils import Colors, verbose_out, open_vector, import_data_class
+from gips import utils
 from gips.inventory import DataInventory
 from gips.inventory import dbinv, orm
 
@@ -64,26 +65,24 @@ def main():
                        default=False)
     args = parser0.parse_args()
 
-    try:
+    cls = utils.gips_script_setup(args.command)
+
+    with utils.error_handler():
         print(title)
-        cls = import_data_class(args.command)
-        orm.setup()
 
         if args.rectify:
             if not orm.use_orm():
-                verbose_out("--rectify can only be used if GIPS_ORM=true.", 1, sys.stderr)
-                sys.exit(1)
+                raise ValueError("--rectify can only be used if GIPS_ORM=true.")
             for k, v in vars(args).items():
                 # don't give the user false expectations about rectification
                 if v and k not in ('rectify', 'verbose', 'command'):
                     msg = "Option '--{}' is not compatible with --rectify."
                     raise ValueError(msg.format(k))
             print("Rectifying inventory DB with filesystem archive:")
-            with orm.std_error_handler():
-                print("Rectifying assets:")
-                dbinv.rectify_assets(cls.Asset)
-                print("Rectifying products:")
-                dbinv.rectify_products(cls)
+            print("Rectifying assets:")
+            dbinv.rectify_assets(cls.Asset)
+            print("Rectifying products:")
+            dbinv.rectify_products(cls)
             return
 
         extents = SpatialExtent.factory(cls, args.site, args.key, args.where, 
@@ -91,12 +90,6 @@ def main():
         for extent in extents:
             inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
             inv.pprint(md=args.md)            
-           
-    except Exception as e:
-        verbose_out(traceback.format_exc(), 4, sys.stderr)
-        print('Data inventory error: ' + e.message, file=sys.stderr)
-        sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

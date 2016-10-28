@@ -32,6 +32,7 @@ from collections import defaultdict
 import gippy
 from gips.tiles import Tiles
 from gips.utils import VerboseOut, Colors
+from gips import utils
 from gips.mapreduce import MapReduce
 from . import dbinv, orm
 
@@ -256,19 +257,15 @@ class DataInventory(Inventory):
         self.update = update
 
         if fetch:
-            try:
-                dataclass.fetch(self.products.base, self.spatial.tiles, self.temporal, self.update)
-            except Exception, e:
-                raise Exception('Error downloading %s: %s' % (dataclass.name, e))
+            dataclass.fetch(self.products.base, self.spatial.tiles, self.temporal, self.update)
             archived_assets = dataclass.Asset.archive(Repository.path('stage'), update=self.update)
 
             if orm.use_orm():
-                with orm.std_error_handler():
-                    # save metadata about the fetched assets in the database
-                    for a in archived_assets:
-                        dbinv.update_or_add_asset(
-                                asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-                                name=a.archived_filename, driver=dataclass.name.lower())
+                # save metadata about the fetched assets in the database
+                for a in archived_assets:
+                    dbinv.update_or_add_asset(
+                            asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
+                            name=a.archived_filename, driver=dataclass.name.lower())
 
         # Build up the inventory:  One Tiles object per date.  Each contains one Data object.  Each
         # of those contain one or more Asset objects.
@@ -277,48 +274,46 @@ class DataInventory(Inventory):
         if orm.use_orm():
             # populate the object tree under the DataInventory (Tiles, Data, Asset) by querying the
             # DB quick-like then assigning things we iterate:  The DB is a flat table of data; we
-            # have to hierarchy-ize it.
-            with orm.std_error_handler():
-                # set up a temporary collection of objects for populating Data objects: the
-                # collection is basically a simple version of the complicated hierarchy that GIPS
-                # constructs on its own:
-                #   collection = {
-                #       (tile, date): {'a': [asset, asset, asset],
-                #                      'p': [product, product, product]},
-                #       (tile, date): {'a': [asset, asset, asset],
-                #                      'p': [product, product, product]},
-                #   }
-                collection = defaultdict(lambda: {'a': [], 'p': []})
-                def add_to_collection(date, tile, kind, item):
-                    key = (date, str(tile)) # str() to avoid possible unicode trouble
-                    collection[key][kind].append(item)
+            # have to hierarchy-ize it.  Do this by setting up a temporary collection of objects
+            # for populating Data instances: the collection is basically a simple version of the
+            # complicated hierarchy that GIPS constructs on its own:
+            #   collection = {
+            #       (tile, date): {'a': [asset, asset, asset],
+            #                      'p': [product, product, product]},
+            #       (tile, date): {'a': [asset, asset, asset],
+            #                      'p': [product, product, product]},
+            #   }
+            collection = defaultdict(lambda: {'a': [], 'p': []})
+            def add_to_collection(date, tile, kind, item):
+                key = (date, str(tile)) # str() to avoid possible unicode trouble
+                collection[key][kind].append(item)
 
-                search_criteria = { # same for both Assets and Products
-                    'driver': Repository.name.lower(),
-                    'tile__in': spatial.tiles,
-                    'date__in': dates,
-                }
-                # TODO move with-block to this spot
-                for p in dbinv.product_search(**search_criteria).order_by('date', 'tile'):
-                    add_to_collection(p.date, p.tile, 'p', str(p.name))
-                for a in dbinv.asset_search(**search_criteria).order_by('date', 'tile'):
-                    add_to_collection(a.date, a.tile, 'a', str(a.name))
+            search_criteria = { # same for both Assets and Products
+                'driver': Repository.name.lower(),
+                'tile__in': spatial.tiles,
+                'date__in': dates,
+            }
+            for p in dbinv.product_search(**search_criteria).order_by('date', 'tile'):
+                add_to_collection(p.date, p.tile, 'p', str(p.name))
+            for a in dbinv.asset_search(**search_criteria).order_by('date', 'tile'):
+                add_to_collection(a.date, a.tile, 'a', str(a.name))
 
-                for k, v in collection.items():
-                    (date, tile) = k
-                    # find or else make a Tiles object
-                    if date not in self.data:
-                        self.data[date] = Tiles(dataclass, spatial, date, self.products, **kwargs)
-                    tiles_obj = self.data[date]
-                    # add a Data object (should not be in tiles_obj.tiles already)
-                    assert tile not in tiles_obj.tiles # sanity check
-                    data_obj = dataclass(tile, date, search=False)
-                    # add assets and products
-                    [data_obj.add_asset(dataclass.Asset(a)) for a in v['a']]
-                    data_obj.ParseAndAddFiles(v['p'])
-                    # add the new Data object to the Tiles object if it checks out
-                    if data_obj.valid and data_obj.filter(**kwargs):
-                        tiles_obj.tiles[tile] = data_obj
+            # the collection is now copmlete so use it to populate the GIPS object hierarchy
+            for k, v in collection.items():
+                (date, tile) = k
+                # find or else make a Tiles object
+                if date not in self.data:
+                    self.data[date] = Tiles(dataclass, spatial, date, self.products, **kwargs)
+                tiles_obj = self.data[date]
+                # add a Data object (should not be in tiles_obj.tiles already)
+                assert tile not in tiles_obj.tiles # sanity check
+                data_obj = dataclass(tile, date, search=False)
+                # add assets and products
+                [data_obj.add_asset(dataclass.Asset(a)) for a in v['a']]
+                data_obj.ParseAndAddFiles(v['p'])
+                # add the new Data object to the Tiles object if it checks out
+                if data_obj.valid and data_obj.filter(**kwargs):
+                    tiles_obj.tiles[tile] = data_obj
             return
 
         # Perform filesystem search since user wants that.  Data object instantiation results

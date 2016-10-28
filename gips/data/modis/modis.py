@@ -39,6 +39,7 @@ import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, settings
+from gips import utils
 
 from pdb import set_trace
 
@@ -197,11 +198,12 @@ class modisAsset(Asset):
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
         cpattern = re.compile(pattern)
 
-        try:
+        if datetime.datetime.today().date().weekday() == 2:
+            err_msg = "Error downloading on a Wednesday; possible planned MODIS provider downtime"
+        else:
+            err_msg = "Error downloading"
+        with utils.error_handler(err_msg):
             listing = urllib.urlopen(mainurl).readlines()
-        except Exception:
-            # MODIS servers do maintenance on wednesday
-            raise Exception("Unable to access %s --- is it Wednesday?" % mainurl)
 
         success = False
         for item in listing:
@@ -215,7 +217,7 @@ class modisAsset(Asset):
                 url = ''.join([mainurl, '/', name])
                 outpath = os.path.join(cls.Repository.path('stage'), name)
 
-                try:
+                with utils.error_handler(continuable=True, err_msg="Asset fetch error"):
                     # tinkering:
                     # chunk size & stream=True in req
                     # cookies / cache auth
@@ -239,19 +241,10 @@ class modisAsset(Asset):
                         with open(outpath, 'wb') as fd:
                             for chunk in response.iter_content():
                                 fd.write(chunk)
-
-                except Exception:
-                    # TODO - implement pre-check to only attempt on valid dates
-                    # then uncomment this
-                    #raise Exception('Unable to retrieve %s from %s' % (name, url))
-                    pass
-                else:
-                    VerboseOut('Retrieved %s' % name, 2)
+                    utils.verbose_out('Retrieved %s' % name, 2)
                     success = True
 
         if not success:
-            # TODO - implement pre-check to only attempt on valid dates then uncomment below
-            #raise Exception('Unable to find remote match for %s at %s' % (pattern, mainurl))
             VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
 
     def updated(self, newasset):
