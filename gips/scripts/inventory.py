@@ -65,7 +65,8 @@ def main():
                        default=False)
     args = parser0.parse_args()
 
-    cls = utils.gips_script_setup(args.command)
+    cls = utils.gips_script_setup(args.command, args.stop_on_error)
+
 
     with utils.error_handler():
         print(title)
@@ -90,6 +91,8 @@ def main():
         for extent in extents:
             inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
             inv.pprint(md=args.md)            
+
+    utils.gips_exit() # produce a summary error report then quit with a proper exit status
 
 if __name__ == "__main__":
     main()

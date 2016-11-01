@@ -380,7 +380,7 @@ def mosaic(images, outfile, vector):
 _traceback_verbosity = 4    # only print a traceback if the user selects this verbosity or higher
 _accumulated_errors = []    # used for tracking success/failure & doing final error reporting when
                             # GIPS is running as a command-line application
-_stop_on_error = False      # TODO set by cmd-line option
+_stop_on_error = False      # should GIPS try to recover from errors?  Set by gips_script_setup
 
 
 def set_error_handler(handler):
@@ -440,12 +440,14 @@ def cli_error_handler(continuable=False, msg_prefix='Error'):
             gips_exit()
 
 
-def gips_script_setup(driver_string, data_class=True, orm=True):
+def gips_script_setup(driver_string=None, stop_on_error=False, orm=True):
     """Run this at the beginning of a GIPS CLI program to do setup."""
-    from gips.inventory import orm # avoids a circular import
+    global _stop_on_error
+    _stop_on_error = stop_on_error
     set_error_handler(cli_error_handler)
+    from gips.inventory import orm # avoids a circular import
     with error_handler():
         if orm:
             orm.setup()
-        if data_class:
+        if driver_string is not None:
             return import_data_class(driver_string)
