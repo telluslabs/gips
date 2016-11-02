@@ -70,6 +70,7 @@ def main():
                                               args.res, args.interpolation, args.crop, args.overwrite, args.tree)
 
     except Exception, e:
+        # TODO error-handling-fix: standard script-level handler
         import traceback
         VerboseOut(traceback.format_exc(), 4)
         print 'Warp Tiles error: %s' % e

@@ -72,6 +72,7 @@ def main():
                     print v
                     exec('pprint.pprint(s.%s)' % v)
         except Exception as e:
+            # TODO error-handling-fix: standard script-level handler
             # print traceback.format_exc()
             print 'Unable to access settings: {}'.format(e)
             sys.exit(1)
@@ -84,6 +85,7 @@ def main():
             create_repos()
             migrate_database()
         except Exception, e:
+            # TODO error-handling-fix: standard script-level handler
             print traceback.format_exc()
             print 'Could not create environment settings: %s' % e
             sys.exit(1)
@@ -94,6 +96,7 @@ def main():
             import gips.settings
             cfgfile = create_user_settings()
         except ImportError:
+            # TODO error-handling-fix: standard script-level handler
             print 'Could not create user settings: %s' % e
 
         try:
@@ -102,6 +105,7 @@ def main():
             create_repos()
             migrate_database()
         except Exception as e:
+            # TODO error-handling-fix: standard script-level handler
             print traceback.format_exc()
             print 'Could not create repository directories'
             sys.exit(1)

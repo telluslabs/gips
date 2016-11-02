@@ -98,6 +98,8 @@ class Tiles(object):
                     else:
                         mosaic(images, fout, self.spatial.site)
                 except Exception, e:
+                    # TODO error-handling-fix: let the exception propagate AND have the callers handle it instead
+                    # TODO error-handling-fix: note call is in gips/inventory/__init__.py: self.data[d].mosaic(dout, **kwargs)
                     VerboseOut(traceback.format_exc(), 4)
                     VerboseOut("Error mosaicking %s: %s" % (fout, e))
         t = datetime.now() - start

@@ -82,6 +82,7 @@ def main():
                     2,
                 )
     except Exception as e:
+        # TODO error-handling-fix: standard script-level handler
         import traceback
         VerboseOut(traceback.format_exc(), 4)
         print 'Data Project error: %s' % e

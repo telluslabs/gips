@@ -37,6 +37,7 @@ def main():
         cls = import_data_class(args.command)
         cls.print_products()
     except Exception, e:
+        # TODO error-handling-fix: standard script-level handler
         import traceback
         VerboseOut(traceback.format_exc(), 4)
         print 'GIPS Data Repository error: %s' % e

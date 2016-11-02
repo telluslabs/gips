@@ -129,12 +129,14 @@ class prismAsset(Asset):
                 ftp.retrbinary('RETR %s' % filename, ofile.write)
             ftp.close()
         except Exception, e:
+            # TODO error-handling-fix: with handler BUT mind the else
             raise Exception("Error downloading: %s" % e)
         else:
             assets = cls.archive(stagedir)
         try:
             os.remove(ofilename)
         except OSError as ose:
+            # TODO error-handling-fix: change to 'raise'
             if ose.errno != 2:
                 raise ose
         os.rmdir(stagedir)
@@ -245,6 +247,7 @@ class prismData(Data):
                 try:
                     bil = get_bil_file(self, asset)
                 except KeyError:
+                    # TODO error-handling-fix: this doesn't have to be a try/except; use a conditional
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)
@@ -268,6 +271,9 @@ class prismData(Data):
                 try:
                     lag = int(val[1])
                 except ValueError, TypeError:
+                    # TODO error-handling-fix:
+                    #   refactor IndexError to be a conditional
+                    #   use with handler for other types
                     raise Exception(
                         'pptsum argument format error (given: {}).'
                     )

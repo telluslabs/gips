@@ -248,6 +248,7 @@ class Asset(object):
             else:
                 return [self.filename]
         except Exception as e:
+            # TODO error-handling-fix: use with handler() instead
             raise Exception('Problem accessing asset(s) in {}\n ({})'
                             .format(self.filename, e))
 
@@ -271,6 +272,7 @@ class Asset(object):
                 if not os.path.isdir(fname):
                     os.chmod(fname, 0664)
             except:
+                # TODO error-handling-fix:  continuable handler
                 pass
             extracted_files.append(fname)
         return extracted_files
@@ -357,7 +359,7 @@ class Asset(object):
     @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
-        raise Exception("Fetch not supported for this data source")
+        raise NotImplementedError("Fetch not supported for this data source")
 
     @classmethod
     def fetch_ftp(cls, asset, tile, date):
@@ -383,6 +385,7 @@ class Asset(object):
                 ftp.retrbinary('RETR %s' % f, open(os.path.join(cls.Repository.path('stage'), f), "wb").write)
             ftp.close()
         except Exception, e:
+            # TODO error-handling-fix: use with handler() instead
             VerboseOut(traceback.format_exc(), 4)
             raise Exception("Error downloading: %s" % e)
 
@@ -428,6 +431,10 @@ class Asset(object):
             asset = cls(filename)
         except Exception, e:
             # if problem with inspection, move to quarantine
+            # TODO error-handling-fix:
+            #   use verbosity 1 for verbose_outs
+            #   remedial action is needed so keep that
+            #   then re-raise & possibly handle-continuable at higher-level
             VerboseOut(traceback.format_exc(), 3)
             qname = os.path.join(cls.Repository.path('quarantine'), bname)
             if not os.path.exists(qname):
@@ -462,6 +469,7 @@ class Asset(object):
                         try:
                             os.remove(ef.filename)
                         except Exception as e:
+                            # TODO error-handling-fix: use with handler() instead
                             raise Exception('Unable to remove old version {}'
                                             .format(ef.filename))
                     files = glob.glob(os.path.join(tpath, '*'))
@@ -469,6 +477,7 @@ class Asset(object):
                         for f in set(files).difference([ef.filename]):
                             os.remove(f)
                     except OSError as exc:
+                        # TODO error-handling-fix: use with handler() instead
                         VerboseOut('Unable to remove all products from {}'
                                    .format(tpath))
                     try:
@@ -477,11 +486,13 @@ class Asset(object):
                         VerboseOut(bname + ' -> ' + newfilename, 2)
                         numlinks = numlinks + 1
                     except Exception, e:
+                        # TODO error-handling-fix: use with handler() instead
                         VerboseOut(traceback.format_exc(), 3)
                         raise Exception('Problem adding {} to archive: {}'
                                         .format(filename, e))
                 else:
                     # 'normal' case:  Just add the asset to the archive; no other work needed
+                    # TODO error-handling-fix: refactor this whole clause
                     try:
                         os.makedirs(tpath)
                     except OSError as exc:
@@ -534,7 +545,18 @@ class Data(object):
         pass
 
     def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False, overwrite=False, tree=False):
-        """ Copy products to new directory, warp to projection if given site """
+        """ Copy products to new directory, warp to projection if given site.
+
+        Arguments
+        =========
+        dout:       output or destination directory; mkdir(dout) is done if needed.
+        products:   which products to copy (passed to self.RequestedProducts())
+
+
+        """
+        # TODO error-handling-fix: only caller of this method seems to be:
+        # gips/scripts/tiles.py:69:  inv[date].tiles[tid].copy(tld, args.products, inv.spatial.site,
+        # so refactor away?  Or otherwise attempt to simplify
         # TODO - allow hard and soft linking options
         if res is None:
             res = self.Asset._defaultresolution
@@ -709,6 +731,7 @@ class Data(object):
                 self.AddFile(sensor, product, f, add_to_db=False)
             except Exception:
                 # This was just a bad file
+                # TODO error-handling-fix: use continuable handler
                 VerboseOut('Unrecognizable file: %s' % f, 3)
                 continue
 
@@ -748,6 +771,7 @@ class Data(object):
             return gippy.GeoImage(fname)
 
         except Exception as e:
+            # TODO error-handling-fix: use with handler() instead
             raise Exception('error reading product (%s, %s, %s)' % (sensor, product, e))
 
     def open_assets(self, product):
@@ -813,6 +837,7 @@ class Data(object):
                         datetime.strptime(parts[len(parts) - 3], datedir)
                         files.append(f)
                     except:
+                        # TODO error-handling-fix: continuable handler
                         pass
 
         datas = []

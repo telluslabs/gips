@@ -14,8 +14,10 @@ def std_error_handler():
     try:
         yield
     except Exception as e:
+        # TODO error-handling-fix: remove this after removing all its users
         verbose_out(traceback.format_exc(), 4, sys.stderr)
         verbose_out("Error processing database inventory: {}".format(e.message), 1, sys.stderr)
+        # no exit here, raise it!
         sys.exit(1)
 
 

@@ -347,6 +347,7 @@ class modisData(Data):
                 try:
                     sds = self.assets[asset].datafiles()
                 except Exception:
+                    # TODO error-handling-fix: leave as literal try-except but add standard reporting
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)
@@ -875,6 +876,7 @@ class modisData(Data):
                         #hourmax = hour.max()
                         # print "hour.min(), hour.mean(), hour.max()", hour.min(), hour.mean(), hour.max()
                     except:
+                        # TODO error-handling-fix:  use 0 as default value above continuable handler
                         hourmean = 0
 
                     metaname = "MEANOVERPASSTIME_%s_%s" % (dayornight, platform)

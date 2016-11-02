@@ -109,9 +109,11 @@ class Inventory(object):
         print Colors.BOLD + '\nSENSORS' + Colors.OFF
         for key in sorted(self.sensor_set):
             try:
+                # revise but leave in place
                 desc = self.dataclass.Asset._sensors[key]['description']
                 scode = key + ': ' if key != '' else ''
             except:
+                # TODO error-handling-fix: no exception needed here
                 desc = ''
                 scode = key
             print self.color(key) + '%s%s' % (scode, desc) + Colors.OFF
@@ -143,6 +145,7 @@ class ProjectInventory(Inventory):
             self.requested_products = products
             self.sensors = sensor_set
         except:
+            # TODO error-handling-fix: with handler
             VerboseOut(traceback.format_exc(), 4)
             raise Exception("%s does not appear to be a GIPS project directory" % self.projdir)
 
@@ -210,6 +213,7 @@ class ProjectInventory(Inventory):
                 try:
                     filepaths[date][product] = self.data[date][product]
                 except:
+                    # TODO error-handling-fix: no exception needed
                     filepaths[date] = {product: self.data[date][product]}
         return filepaths
 
@@ -344,6 +348,7 @@ class DataInventory(Inventory):
                 try:
                     self.data[date].process(*args, **kwargs)
                 except:
+                    # TODO error-handling-fix: continuable handler
                     VerboseOut(traceback.format_exc(), 4)
         if len(self.products.composite) > 0:
             self.dataclass.process_composites(self, self.products.composite, **kwargs)
@@ -362,6 +367,7 @@ class DataInventory(Inventory):
         for d in self.dates:
             if tree:
                 dout = os.path.join(datadir, d.strftime('%Y%j'))
+            # TODO error-handling-fix: handle tiles.Tiles.mosaic exception here
             self.data[d].mosaic(dout, **kwargs)
 
         VerboseOut('Completed mosaic project in %s' % (dt.now() - start), 2)

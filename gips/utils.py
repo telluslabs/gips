@@ -100,6 +100,15 @@ def List2File(lst, filename):
 
 
 def RemoveFiles(filenames, extensions=['']):
+    """Remove the given filenames with os.remove.
+
+    Pass in a list of extensions to treat each filename as a prefix and
+    extensions as suffixes, and remove all possible combinations.
+    """
+    # TODO error-handling-fix: this whole function looks strange:
+    #   when extensions is [''], same filename is tried twice
+    #   don't use a mutable type as a default argument
+    #   why give up on all files once one extension fails?
     for f in filenames:
         for ext in ([''] + extensions):
             try:
@@ -144,6 +153,7 @@ def link(src, dst, hard=False):
 
 def settings():
     """ Retrieve GIPS settings - first from user, then from system """
+    # TODO error-handling-fix: reconsider this whole function
     import imp
     try:
         # import user settings first
@@ -162,6 +172,8 @@ def settings():
 
 def create_environment_settings(repos_path, email=''):
     """ Create settings file and data directory """
+    # TODO error-handling-fix: this is called only once, in gips/scripts/config.py
+    # TODO error-handling-fix: consider refactoring it away
     from gips.settings_template import __file__ as src
     cfgpath = os.path.dirname(__file__)
     cfgfile = os.path.join(cfgpath, 'settings.py')
@@ -176,7 +188,8 @@ def create_environment_settings(repos_path, email=''):
         return cfgfile
     except OSError:
         # no permissions, so no environment level config installed
-        #print traceback.format_exc()
+        #print traceback.format_exck()
+        # TODO error-handling-fix: continuable handler
         return None
 
 
@@ -203,6 +216,7 @@ def create_repos():
     try:
         repos = settings().REPOS
     except:
+        # TODO error-handling-fix: with handler
         print(traceback.format_exc())
         raise Exception('Problem reading repository...check settings files')
     for key in repos.keys():
@@ -215,6 +229,8 @@ def create_repos():
 
 def data_sources():
     """ Get enabled data sources (and verify) from settings """
+    # TODO error-handling-fix: called once by gips/parsers.py, refactor to over there?
+    # TODO error-handling-fix: also there's something odd about the for-if-try, sort it out
     sources = {}
     repos = settings().REPOS
     found = False
@@ -244,6 +260,7 @@ def import_data_module(clsname):
         mod = imp.load_module(clsname, *fmtup)
         return mod
     except:
+        # TODO error-handling-fix: no try-except needed; GIPS can't proceed if this fails
         print(traceback.format_exc())
 
 
@@ -286,6 +303,7 @@ def open_vector(fname, key="", where=''):
             vector.SetPrimaryKey(key)
 
         except Exception as e:
+            # TODO error-handling-fix: can't open a vector = done working, so let it raise
             VerboseOut(traceback.format_exc(), 4)
     if where != '':
         # return array of features

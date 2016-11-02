@@ -77,6 +77,7 @@ def main():
                 files[f].close()
 
     except Exception, e:
+        # TODO error-handling-fix: standard script-level handler
         import traceback
         VerboseOut(traceback.format_exc(), 4)
         print 'Error: %s' % e

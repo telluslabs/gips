@@ -515,6 +515,7 @@ class landsatData(Data):
             try:
                 img = self._readraw()
             except Exception, e:
+                # TODO error-handling-fix: with handler
                 VerboseOut(traceback.format_exc(), 5)
                 raise Exception('Error reading %s: %s' % (basename(self.assets['DN'].filename), e))
 
@@ -539,6 +540,7 @@ class landsatData(Data):
                     md["AOD Source"] = str(atm6s.aod[0])
                     md["AOD Value"] = str(atm6s.aod[1])
                 except Exception, e:
+                    # TODO error-handling-fix: with handler
                     VerboseOut(traceback.format_exc(), 4)
                     raise Exception('Problem running 6S atmospheric model: %s' % e)
 
@@ -573,6 +575,7 @@ class landsatData(Data):
                             dilation = int(val[2]) if len(val) > 2 else 10
                             cloudheight = int(val[3]) if len(val) > 3 else 4000
                         except:
+                            # TODO error-handling-fix: refactor; no try-except needed
                             erosion = 5
                             dilation = 10
                             cloudheight = 4000
@@ -593,6 +596,7 @@ class landsatData(Data):
                             tolerance = int(val[1]) if len(val) > 1 else 3
                             dilation = int(val[2]) if len(val) > 2 else 5
                         except:
+                            # TODO error-handling-fix: refactor; no try-except needed
                             tolerance = 3
                             dilation = 5
                         imgout = Fmask(reflimg, fname, tolerance, dilation)
@@ -733,6 +737,7 @@ class landsatData(Data):
                             dilation = int(val[2]) if len(val) > 2 else 10
                             cloudheight = int(val[3]) if len(val) > 3 else 4000
                         except:
+                            # TODO error-handling-fix: refactor; no try-except needed
                             erosion = 5
                             dilation = 10
                             cloudheight = 4000
@@ -749,6 +754,7 @@ class landsatData(Data):
                     self.AddFile(sensor, key, fname)
                     VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.now() - start), 1)
                 except Exception, e:
+                    # TODO error-handling-fix: continuable handler
                     VerboseOut('Error creating product %s for %s: %s' % (key, basename(self.assets['DN'].filename), e), 2)
                     VerboseOut(traceback.format_exc(), 3)
 
@@ -788,6 +794,7 @@ class landsatData(Data):
                             RemoveFiles(files)
                 shutil.rmtree(os.path.join(self.path, 'modtran'))
             except:
+                # TODO error-handling-fix: continuable handler
                 # VerboseOut(traceback.format_exc(), 4)
                 pass
 
@@ -827,6 +834,7 @@ class landsatData(Data):
         try:
             text = open(mtlfilename, 'r').read()
         except IOError as e:
+            # TODO error-handling-fix: with handler
             raise Exception('({})'.format(e))
         if len(text) < 10:
             raise Exception('MTL file is too short. {}'.format(mtlfilename))
@@ -872,6 +880,7 @@ class landsatData(Data):
         try:
             clouds = float(mtl['CLOUD_COVER'])
         except:
+            # TODO error-handling-fix: no try-except needed
             clouds = 0
 
         filenames = []
@@ -900,6 +909,7 @@ class landsatData(Data):
         try:
             qafilename = [f for f in datafiles if '_BQA.TIF' in f][0]
         except Exception:
+            # TODO error-handling-fix: no try-except needed
             qafilename = None
 
         self.metadata = {
