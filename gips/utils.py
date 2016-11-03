@@ -458,14 +458,14 @@ def cli_error_handler(msg_prefix='Error', continuable=False):
             gips_exit()
 
 
-def gips_script_setup(driver_string=None, stop_on_error=False, orm=True):
+def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
     """Run this at the beginning of a GIPS CLI program to do setup."""
     global _stop_on_error
     _stop_on_error = stop_on_error
     set_error_handler(cli_error_handler)
     from gips.inventory import orm # avoids a circular import
     with error_handler():
-        if orm:
+        if setup_orm:
             orm.setup()
         if driver_string is not None:
             return import_data_class(driver_string)
