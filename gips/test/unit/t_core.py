@@ -42,10 +42,9 @@ def t_repository_find_tiles_normal_case(mocker):
 def t_repository_find_tiles_error_case(mocker):
     """Confirm Repository.find_tiles quits on error."""
     m_list_tiles = mocker.patch('gips.data.core.dbinv.list_tiles')
-    m_list_tiles.side_effect = Exception('AAAAAAAAAAH!') # intentionally break list_tiles
+    m_list_tiles.side_effect = RuntimeError('AAAAAAAAAAH!') # intentionally break list_tiles
 
-    # confirm call was still a success via the righ code path
-    with pytest.raises(SystemExit):
+    with pytest.raises(RuntimeError):
         landsatRepository.find_tiles()
 
 

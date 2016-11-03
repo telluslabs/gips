@@ -889,7 +889,7 @@ class Data(object):
                     if not cls.Asset.discover(t, d, a) or update == True:
                         date_str = d.strftime("%y-%m-%d")
                         msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
-                        with utils.error_handler(continuable=True, msg_prefix=msg_prefix):
+                        with utils.error_handler(msg_prefix, continuable=True):
                             cls.Asset.fetch(a, t, d)
                             # fetched may contain both fetched things and unfetchable things
                             fetched.append((a, t, d))

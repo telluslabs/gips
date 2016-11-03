@@ -154,7 +154,7 @@ class TemporalExtent(object):
             days = days.split(',')
             days = (int(days[0]), int(days[1]))
 
-        with utils.error_handler(msg_prefix='Bad date specification'):
+        with utils.error_handler('Bad date specification'):
             if ',' not in dates:
                 dates = (self._parse_date(dates), self._parse_date(dates, True))
             else:

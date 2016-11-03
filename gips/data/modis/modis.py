@@ -217,7 +217,7 @@ class modisAsset(Asset):
                 url = ''.join([mainurl, '/', name])
                 outpath = os.path.join(cls.Repository.path('stage'), name)
 
-                with utils.error_handler(continuable=True, err_msg="Asset fetch error"):
+                with utils.error_handler("Asset fetch error", continuable=True):
                     # tinkering:
                     # chunk size & stream=True in req
                     # cookies / cache auth

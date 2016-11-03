@@ -417,7 +417,7 @@ def report_error(error, msg_prefix):
 
 
 @contextmanager
-def lib_error_handler(continuable=False, msg_prefix='Error'):
+def lib_error_handler(msg_prefix='Error', continuable=False):
     """Handle errors appropriately for GIPS running as a library."""
     try:
         yield
@@ -441,7 +441,7 @@ def gips_exit():
 
 
 @contextmanager
-def cli_error_handler(continuable=False, msg_prefix='Error'):
+def cli_error_handler(msg_prefix='Error', continuable=False):
     """Context manager for uniform error handling for command-line users.
 
     Exceptions are caught and reported to stderr; _gips_exit() is called

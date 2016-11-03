@@ -34,7 +34,6 @@ def main():
     title = Colors.BOLD + 'GIPS Image Statistics (v%s)' % __version__ + Colors.OFF
 
     parser0 = GIPSParser(datasources=False, description=title)
-    parser0.add_default_parser()
     parser0.add_projdir_parser()
     group = parser0.add_argument_group('masking options')
     args = parser0.parse_args()
