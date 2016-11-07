@@ -150,24 +150,26 @@ def link(src, dst, hard=False):
 # Settings functions
 ##############################################################################
 
+loaded_settings = None
 
 def settings():
     """ Retrieve GIPS settings - first from user, then from system """
-    # TODO error-handling-fix: reconsider this whole function
+    global loaded_settings
+    if loaded_settings is not None:
+        return loaded_settings
+
     import imp
-    try:
-        # import user settings first
-        src = imp.load_source(
-            'settings',
-            os.path.expanduser('~/.gips/settings.py')
-        )
-        return src
-    except (ImportError, IOError) as e:
-        try:
-            import gips.settings
-            return gips.settings
-        except ImportError:
-            raise ImportError('No settings found...did you run gips_config?')
+    user_settings_path = '~/.gips/settings.py'
+    msg_prefix = "Falling back to global settings; couldn't load {}".format(user_settings_path)
+    with error_handler(msg_prefix, continuable=True):
+        # attempt to import user settings first, falling back to global settings otherwise
+        loaded_settings = imp.load_source('settings', os.path.expanduser(user_settings_path))
+        return loaded_settings
+
+    with error_handler("Couldn't load global settings"):
+        import gips.settings
+        loaded_settings = gips.settings
+        return loaded_settings
 
 
 def create_environment_settings(repos_path, email=''):
