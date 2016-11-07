@@ -59,6 +59,7 @@ def t_repository_find_dates_normal_case(mocker):
     assert expected == actual
 
 
+@pytest.mark.skip(reason="Letting exception bubble up for now; if that changes un-skip this test.")
 def t_repository_find_dates_error_case(mocker):
     """Confirm Repository.find_dates quits on error."""
     m_list_dates = mocker.patch('gips.data.core.dbinv.list_dates')

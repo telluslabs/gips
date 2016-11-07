@@ -41,8 +41,7 @@ def migrate_database():
         return
     print 'Migrating database'
     orm.setup()
-    with orm.std_error_handler():
-        call_command('migrate', interactive=False)
+    call_command('migrate', interactive=False)
 
 
 def main():

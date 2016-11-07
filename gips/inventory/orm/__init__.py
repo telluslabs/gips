@@ -4,21 +4,7 @@ import traceback
 
 import django
 
-from gips.utils import verbose_out
-
-
-# TODO probably deprecate and delete
-@contextmanager
-def std_error_handler():
-    """Handle problems with ORM code in a unified way."""
-    try:
-        yield
-    except Exception as e:
-        # TODO error-handling-fix: remove this after removing all its users
-        verbose_out(traceback.format_exc(), 4, sys.stderr)
-        verbose_out("Error processing database inventory: {}".format(e.message), 1, sys.stderr)
-        # no exit here, raise it!
-        sys.exit(1)
+from gips.utils import verbose_out, error_handler
 
 
 def use_orm():
@@ -53,7 +39,7 @@ def setup():
             msg = ("Inventory database does not support '{}'.  "
                    "Set GIPS_ORM=false to use the filesystem inventory instead.")
             raise Exception(msg.format(driver_for_dbinv_feature_toggle))
-        with std_error_handler():
+        with error_handler("Error initializing Django ORM"):
             os.environ.setdefault("DJANGO_SETTINGS_MODULE", "gips.inventory.orm.settings")
             django.setup()
     setup_complete = True

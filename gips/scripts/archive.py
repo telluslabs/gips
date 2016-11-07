@@ -53,10 +53,9 @@ def main():
 
         # if DB inventory is enabled, update it to contain the newly archived assets
         if orm.use_orm():
-            with orm.std_error_handler():
-                for a in archived_assets:
-                    dbinv.update_or_add_asset(asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-                                              name=a.archived_filename, driver=cls.name.lower())
+            for a in archived_assets:
+                dbinv.update_or_add_asset(asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
+                                          name=a.archived_filename, driver=cls.name.lower())
 
     except Exception, e:
         # TODO error-handling-fix: standard script-level handler

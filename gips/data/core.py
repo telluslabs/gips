@@ -93,8 +93,7 @@ class Repository(object):
     def find_dates(cls, tile):
         """ Get list of dates available in repository for a tile """
         if orm.use_orm():
-            with orm.std_error_handler():
-                return dbinv.list_dates(cls.name.lower(), tile)
+            return dbinv.list_dates(cls.name.lower(), tile)
         tdir = cls.data_path(tile=tile)
         if os.path.exists(tdir):
             return sorted([datetime.strptime(os.path.basename(d), cls._datedir).date() for d in os.listdir(tdir)])
@@ -298,9 +297,8 @@ class Asset(object):
         if asset is not None:
             criteria['asset'] = asset
         if orm.use_orm():
-            with orm.std_error_handler():
-                # search for ORM Assets to use for making GIPS Assets
-                return [cls(a.name) for a in dbinv.asset_search(**criteria)]
+            # search for ORM Assets to use for making GIPS Assets
+            return [cls(a.name) for a in dbinv.asset_search(**criteria)]
 
         # The rest of this fn uses the filesystem inventory
         tpath = cls.Repository.data_path(tile, date)
@@ -745,9 +743,8 @@ class Data(object):
         # TODO - currently assumes single sensor for each product
         self.sensors[product] = sensor
         if add_to_db and orm.use_orm(): # update inventory DB if such is requested
-            with orm.std_error_handler():
-                dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
-                                            tile=self.id, date=self.date, name=filename)
+            dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
+                                        tile=self.id, date=self.date, name=filename)
 
 
 
