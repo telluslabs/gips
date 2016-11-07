@@ -7,6 +7,7 @@ import pytest
 import mock
 
 import gips
+from gips import core
 from gips.data.landsat.landsat import landsatRepository, landsatData
 from gips.inventory import dbinv
 
@@ -130,3 +131,28 @@ def t_data_init_search(mocker, search):
             and '' not in (lsd.path, lsd.basename)
             and lsd.assets == lsd.filenames == lsd.sensors == {}
             and lsd.ParseAndAddFiles.called == lsd.Asset.discover.called == search)
+
+
+@pytest.fixture
+def df_mocks(mocker):
+    """Mocks for testing Data.fetch below."""
+    mocker.patch.object(landsatData.Asset, 'discover', return_value=False)
+    return mocker.patch.object(landsatData.Asset, 'fetch')
+
+# useful constant for the following tests
+df_args = (['rad', 'ndvi', 'bqashadow'], ['012030'], core.TemporalExtent('2012-12-01'))
+
+def t_data_fetch_base_case(df_mocks):
+    """Test base case of data.core.Data.fetch.
+
+    It should return data about the fetch on success, and shouldn't
+    raise an exception."""
+    assert landsatData.fetch(*df_args) == [('DN', '012030', datetime(2012, 12, 1, 0, 0))]
+
+
+def t_data_fetch_error_case(df_mocks):
+    """Test error case of data.core.Data.fetch.
+
+    It should return [], and shouldn't raise an exception."""
+    df_mocks.side_effect = RuntimeError('aaah!')
+    assert landsatData.fetch(*df_args) == []
