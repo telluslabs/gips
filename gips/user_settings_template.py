@@ -23,12 +23,15 @@
 
 # GIPS user settings file
 
-# this will try to read in an environment (e.g., system-level or virtual)
+# this block will try to read in an environment (e.g., system-level or virtual)
 # settings file so that individual settings can be changed
-import gips.settings
-execfile(gips.settings.__file__.rstrip('c'))
+try:
+    import gips.settings
+    execfile(gips.settings.__file__.rstrip('c'))
+except:
+    # TODO error-handling-fix: with handler
+    raise Exception('There are no environment-level GIPS settings!')
 
-# place user settings here or below:
 
 # change email used for FTP
 #EMAIL = ''
