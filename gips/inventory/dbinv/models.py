@@ -3,6 +3,12 @@ from __future__ import unicode_literals
 from django.db import models
 
 
+class Status(models.Model):
+    """Status of asset or product"""
+
+    status = models.TextField()
+
+
 class Asset(models.Model):
     """Inventory for assets, which are downloaded files from data sources.
 
@@ -17,6 +23,7 @@ class Asset(models.Model):
     tile   = models.TextField(db_index=True)   # 'h12v04'
     date   = models.DateField(db_index=True)   # of observation, not production
     name   = models.TextField()                # file name including full path
+    status = models.ForeignKey(Status)         # 
 
     class Meta:
         # These four columns uniquely identify an asset file
@@ -37,7 +44,9 @@ class Product(models.Model):
     tile    = models.TextField(db_index=True)   # 'h12v04'
     date    = models.DateField(db_index=True)   # of observation, not production
     name    = models.TextField()                # file name including full path
+    status  = models.ForeignKey(Status)         # 
 
     class Meta:
         # These four columns uniquely identify an asset file
         unique_together = ('driver', 'product', 'tile', 'date')
+

@@ -268,7 +268,7 @@ class DataInventory(Inventory):
                     for a in archived_assets:
                         dbinv.update_or_add_asset(
                                 asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-                                name=a.archived_filename, driver=dataclass.name.lower())
+                                name=a.archived_filename, driver=dataclass.name.lower(), status='complete')
 
         # Build up the inventory:  One Tiles object per date.  Each contains one Data object.  Each
         # of those contain one or more Asset objects.
@@ -297,6 +297,7 @@ class DataInventory(Inventory):
                     'driver': Repository.name.lower(),
                     'tile__in': spatial.tiles,
                     'date__in': dates,
+                    'status'  : dbinv.models.Status.objects.get(status='complete')
                 }
                 # TODO move with-block to this spot
                 for p in dbinv.product_search(**search_criteria).order_by('date', 'tile'):

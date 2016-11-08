@@ -724,7 +724,7 @@ class Data(object):
         if add_to_db and orm.use_orm(): # update inventory DB if such is requested
             with orm.std_error_handler():
                 dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
-                                            tile=self.id, date=self.date, name=filename)
+                                            tile=self.id, date=self.date, name=filename, status='complete')
 
 
 

@@ -178,15 +178,15 @@ def rectify_products(data_class):
 
 def list_tiles(driver):
     """List tiles for which there are extant asset files for the given driver."""
-    from .models import Asset
-    return Asset.objects.filter(driver=driver).values_list(
+    from .models import Asset, Status
+    return Asset.objects.filter(driver=driver, status=Status.objects.get(status='complete')).values_list(
             'tile', flat=True).distinct().order_by('tile')
 
 
 def list_dates(driver, tile):
     """For the given driver & tile, list dates for which assets exist."""
-    from .models import Asset
-    return Asset.objects.filter(driver=driver, tile=tile).values_list(
+    from .models import Asset, Status
+    return Asset.objects.filter(driver=driver, tile=tile, status=Status.objects.get(status='complete')).values_list(
             'date', flat=True).distinct().order_by('date')
 
 
@@ -214,7 +214,7 @@ def add_product(**values):
     return p # in case the user needs it
 
 
-def update_or_add_asset(driver, asset, tile, date, sensor, name):
+def update_or_add_asset(driver, asset, tile, date, sensor, name, status):
     """Update an existing model or create it if it's not found.
 
     Convenience method that wraps update_or_create.  The first four
@@ -226,13 +226,14 @@ def update_or_add_asset(driver, asset, tile, date, sensor, name):
         'asset':  asset,
         'tile':   tile,
         'date':   date,
+        'status': models.Status.objects.get(status=status),
     }
     update_vals = {'sensor': sensor, 'name': name}
     (asset, created) = models.Asset.objects.update_or_create(defaults=update_vals, **query_vals)
     return asset # in case the user needs it
 
 
-def update_or_add_product(driver, product, tile, date, sensor, name):
+def update_or_add_product(driver, product, tile, date, sensor, name, status):
     """Update an existing model or create it if it's not found.
 
     Convenience method that wraps update_or_create.  The first four
@@ -244,6 +245,7 @@ def update_or_add_product(driver, product, tile, date, sensor, name):
         'product':  product,
         'tile':     tile,
         'date':     date,
+        'status':   models.Status.objects.get(status=status),
     }
     update_vals = {'sensor': sensor, 'name': name}
     (asset, created) = models.Product.objects.update_or_create(defaults=update_vals, **query_vals)
