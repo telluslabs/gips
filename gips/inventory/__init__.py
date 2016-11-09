@@ -107,13 +107,12 @@ class Inventory(object):
 
     def print_legend(self):
         print Colors.BOLD + '\nSENSORS' + Colors.OFF
+        _sensors = self.dataclass.Asset._sensors
         for key in sorted(self.sensor_set):
-            try:
-                # revise but leave in place
-                desc = self.dataclass.Asset._sensors[key]['description']
+            if key in _sensors:
+                desc = _sensors[key]['description']
                 scode = key + ': ' if key != '' else ''
-            except:
-                # TODO error-handling-fix: no exception needed here
+            else:
                 desc = ''
                 scode = key
             print self.color(key) + '%s%s' % (scode, desc) + Colors.OFF
@@ -131,7 +130,7 @@ class ProjectInventory(Inventory):
         self.data = {}
         product_set = set()
         sensor_set = set()
-        try:
+        with utils.error_handler("Project directory error for " + self.projdir):
             # can't import Data at module scope due to circular dependencies
             from gips.data.core import Data
             for dat in Data.discover(self.projdir):
@@ -144,10 +143,6 @@ class ProjectInventory(Inventory):
                 products = list(product_set)
             self.requested_products = products
             self.sensors = sensor_set
-        except:
-            # TODO error-handling-fix: with handler
-            VerboseOut(traceback.format_exc(), 4)
-            raise Exception("%s does not appear to be a GIPS project directory" % self.projdir)
 
     def products(self, date=None):
         """ Intersection of available products and requested products for this date """
@@ -204,18 +199,6 @@ class ProjectInventory(Inventory):
         data = self.data[self.dates[0]]
         location = os.path.split(os.path.split(data.filenames.values()[0])[0])[1]
         return location
-
-    def get_filepaths(self):
-        filepaths = {}
-        for date in self.dates:
-            products = list(set(self.data[date].products).intersection(set(self.requested_products)))
-            for product in products:
-                try:
-                    filepaths[date][product] = self.data[date][product]
-                except:
-                    # TODO error-handling-fix: no exception needed
-                    filepaths[date] = {product: self.data[date][product]}
-        return filepaths
 
     def get_timeseries(self, product='', dates=None):
         """ Read all files as time series """
@@ -345,11 +328,8 @@ class DataInventory(Inventory):
         VerboseOut('Processing [%s] on %s dates (%s files)' % (self.products, len(self.dates), self.numfiles), 3)
         if len(self.products.standard) > 0:
             for date in self.dates:
-                try:
+                with utils.error_handler(continuable=True):
                     self.data[date].process(*args, **kwargs)
-                except:
-                    # TODO error-handling-fix: continuable handler
-                    VerboseOut(traceback.format_exc(), 4)
         if len(self.products.composite) > 0:
             self.dataclass.process_composites(self, self.products.composite, **kwargs)
         VerboseOut('Processing completed in %s' % (dt.now() - start), 2)
@@ -367,7 +347,6 @@ class DataInventory(Inventory):
         for d in self.dates:
             if tree:
                 dout = os.path.join(datadir, d.strftime('%Y%j'))
-            # TODO error-handling-fix: handle tiles.Tiles.mosaic exception here
             self.data[d].mosaic(dout, **kwargs)
 
         VerboseOut('Completed mosaic project in %s' % (dt.now() - start), 2)

@@ -29,6 +29,7 @@ import traceback
 import gippy
 from gippy.algorithms import CookieCutter
 from gips.utils import VerboseOut, Colors, mosaic, mkdir
+from gips import utils
 
 
 class Tiles(object):
@@ -73,7 +74,9 @@ class Tiles(object):
 
     def mosaic(self, datadir, res=None, interpolation=0, crop=False,
                overwrite=False, alltouch=False):
-        """ Combine tiles into a single mosaic, warp if res provided """
+        """For each product, combine its tiles into a single mosaic.
+
+        Warp if res provided."""
         if self.spatial.site is None:
             raise Exception('Site required for creating mosaics')
         start = datetime.now()
@@ -87,7 +90,7 @@ class Tiles(object):
             # TODO - this is assuming a tif file.  Use gippy FileExtension function when it is exposed
             fout = os.path.join(datadir, '%s_%s_%s' % (bname, sensor, product)) + '.tif'
             if not os.path.exists(fout) or overwrite:
-                try:
+                with utils.error_handler("Error mosaicking " + fout, continuable=True):
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
                     if self.spatial.site is not None and res is not None:
@@ -97,11 +100,6 @@ class Tiles(object):
                         )
                     else:
                         mosaic(images, fout, self.spatial.site)
-                except Exception, e:
-                    # TODO error-handling-fix: let the exception propagate AND have the callers handle it instead
-                    # TODO error-handling-fix: note call is in gips/inventory/__init__.py: self.data[d].mosaic(dout, **kwargs)
-                    VerboseOut(traceback.format_exc(), 4)
-                    VerboseOut("Error mosaicking %s: %s" % (fout, e))
         t = datetime.now() - start
         VerboseOut('%s: created project files for %s tiles in %s' % (self.date, len(self.tiles), t), 2)
 
