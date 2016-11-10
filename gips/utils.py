@@ -229,23 +229,14 @@ def create_repos():
 
 def data_sources():
     """ Get enabled data sources (and verify) from settings """
-    # TODO error-handling-fix: called once by gips/parsers.py, refactor to over there?
-    # TODO error-handling-fix: also there's something odd about the for-if-try, sort it out
     sources = {}
     repos = settings().REPOS
-    found = False
     for key in sorted(repos.keys()):
-        if os.path.isdir(repos[key]['repository']):
-            try:
-                repo = import_repository_class(key)
-                sources[key] = repo.description
-                found = True
-            except:
-                VerboseOut(traceback.format_exc(), 1)
-        else:
+        if not os.path.isdir(repos[key]['repository']):
             raise Exception('ERROR: archive %s is not a directory or is not available' % key)
-    if not found:
-        print("There are no available data sources!")
+        with error_handler(continuable=True):
+            repo = import_repository_class(key)
+            sources[key] = repo.description
     return sources
 
 
@@ -255,13 +246,10 @@ def import_data_module(clsname):
     path = settings().REPOS[clsname].get('driver', '')
     if path == '':
         path = os.path.join( os.path.dirname(__file__), 'data', clsname)
-    try:
+    with error_handler('Error loading driver ' + clsname):
         fmtup = imp.find_module(clsname, [path])
         mod = imp.load_module(clsname, *fmtup)
         return mod
-    except:
-        # TODO error-handling-fix: no try-except needed; GIPS can't proceed if this fails
-        print(traceback.format_exc())
 
 
 def import_repository_class(clsname):

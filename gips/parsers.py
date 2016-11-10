@@ -24,7 +24,7 @@
 import sys
 import argparse
 
-from gips.utils import data_sources
+from gips.utils import data_sources, verbose_out
 import gippy
 
 
@@ -163,7 +163,10 @@ class GIPSParser(argparse.ArgumentParser):
     def add_data_sources(self):
         """ Adds data sources to parser """
         subparser = self.add_subparsers(dest='command')
-        for src, desc in data_sources().items():
+        sources = data_sources()
+        if len(sources) == 0:
+            verbose_out("There are no available data sources!", 1, sys.stderr)
+        for src, desc in sources.items():
             subparser.add_parser(src, help=desc, parents=self.parent_parsers)
 
 
