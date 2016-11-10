@@ -227,7 +227,7 @@ class Asset(object):
             datafiles = File2List(indexfile)
             if len(datafiles) > 0:
                 return datafiles
-        try:
+        with utils.error_handler('Problem accessing asset(s) in ' + self.filename):
             if tarfile.is_tarfile(self.filename):
                 tfile = tarfile.open(self.filename)
                 tfile = tarfile.open(self.filename)
@@ -246,10 +246,7 @@ class Asset(object):
                 return datafiles
             else:
                 return [self.filename]
-        except Exception as e:
-            # TODO error-handling-fix: use with handler() instead
-            raise Exception('Problem accessing asset(s) in {}\n ({})'
-                            .format(self.filename, e))
+
 
     def extract(self, filenames=[]):
         """ Extract filenames from asset (if archive file) """
@@ -266,13 +263,10 @@ class Asset(object):
             if not os.path.exists(fname):
                 VerboseOut("Extracting %s" % f, 3)
                 tfile.extract(f, path)
-            try:
+            with utils.error_handler('Error processing ' + fname, continuable=True):
                 # this ensures we have permissions on extracted files
                 if not os.path.isdir(fname):
                     os.chmod(fname, 0664)
-            except:
-                # TODO error-handling-fix:  continuable handler
-                pass
             extracted_files.append(fname)
         return extracted_files
 
@@ -429,15 +423,10 @@ class Asset(object):
             asset = cls(filename)
         except Exception, e:
             # if problem with inspection, move to quarantine
-            # TODO error-handling-fix:
-            #   use verbosity 1 for verbose_outs
-            #   remedial action is needed so keep that
-            #   then re-raise & possibly handle-continuable at higher-level
-            VerboseOut(traceback.format_exc(), 3)
+            utils.report_error(e, 'File error, quarantining ' + filename)
             qname = os.path.join(cls.Repository.path('quarantine'), bname)
             if not os.path.exists(qname):
                 os.link(os.path.abspath(filename), qname)
-            VerboseOut('%s -> quarantine (file error): %s' % (filename, e), 2)
             return (None, 0)
 
         # make an array out of asset.date if it isn't already
@@ -464,48 +453,29 @@ class Asset(object):
                     for ef in existing:
                         assert ef.updated(asset), 'Asset is not updated version'
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
-                        try:
+                        with utils.error_handler('Unable to remove old version ' + ef.filename):
                             os.remove(ef.filename)
-                        except Exception as e:
-                            # TODO error-handling-fix: use with handler() instead
-                            raise Exception('Unable to remove old version {}'
-                                            .format(ef.filename))
                     files = glob.glob(os.path.join(tpath, '*'))
-                    try:
-                        for f in set(files).difference([ef.filename]):
+                    for f in set(files).difference([ef.filename]):
+                        msg = 'Unable to remove product {} from {}'.format(f, tpath)
+                        with utils.error_handler(msg, continuable=True):
                             os.remove(f)
-                    except OSError as exc:
-                        # TODO error-handling-fix: use with handler() instead
-                        VerboseOut('Unable to remove all products from {}'
-                                   .format(tpath))
-                    try:
+                    with utils.error_handler('Problem adding {} to archive'.format(filename)):
                         os.link(os.path.abspath(filename), newfilename)
                         asset.archived_filename = newfilename
                         VerboseOut(bname + ' -> ' + newfilename, 2)
                         numlinks = numlinks + 1
-                    except Exception, e:
-                        # TODO error-handling-fix: use with handler() instead
-                        VerboseOut(traceback.format_exc(), 3)
-                        raise Exception('Problem adding {} to archive: {}'
-                                        .format(filename, e))
+
                 else:
                     # 'normal' case:  Just add the asset to the archive; no other work needed
-                    # TODO error-handling-fix: refactor this whole clause
-                    try:
-                        os.makedirs(tpath)
-                    except OSError as exc:
-                        if exc.errno == errno.EEXIST and os.path.isdir(tpath):
-                            pass
-                        else:
-                            raise Exception('Unable to make data directory %s' % tpath)
-                    try:
+                    if not os.path.exists(tpath):
+                        with utils.error_handler('Unable to make data directory ' + tpath):
+                            os.makedirs(tpath)
+                    with utils.error_handler('Problem adding {} to archive'.format(filename)):
                         os.link(os.path.abspath(filename), newfilename)
                         asset.archived_filename = newfilename
                         VerboseOut(bname + ' -> ' + newfilename, 2)
                         numlinks = numlinks + 1
-                    except Exception, e:
-                        VerboseOut(traceback.format_exc(), 3)
-                        raise Exception('Problem adding %s to archive: %s' % (filename, e))
             else:
                 VerboseOut('%s already in archive' % filename, 2)
         if otherversions and numlinks == 0:
@@ -552,9 +522,6 @@ class Data(object):
 
 
         """
-        # TODO error-handling-fix: only caller of this method seems to be:
-        # gips/scripts/tiles.py:69:  inv[date].tiles[tid].copy(tld, args.products, inv.spatial.site,
-        # so refactor away?  Or otherwise attempt to simplify
         # TODO - allow hard and soft linking options
         if res is None:
             res = self.Asset._defaultresolution
@@ -573,7 +540,7 @@ class Data(object):
             fin = self.filenames[(sensor, p)]
             fout = os.path.join(dout, "%s_%s_%s.tif" % (bname, sensor, p))
             if not os.path.exists(fout) or overwrite:
-                try:
+                with utils.error_handler('Problem creating ' + fout, continuable=True):
                     if site is not None:
                         # warp just this tile
                         resampler = ['near', 'bilinear', 'cubic']
@@ -584,9 +551,6 @@ class Data(object):
                     else:
                         gippy.GeoImage(fin).Process(fout)
                         #shutil.copyfile(fin, fout)
-                except Exception:
-                    VerboseOut(traceback.format_exc(), 4)
-                    VerboseOut("Problem creating %s" % fout)
         procstr = 'copied' if site is None else 'warped'
         VerboseOut('%s tile %s: %s files %s' % (self.date, self.id, len(products.requested), procstr))
 
@@ -715,7 +679,7 @@ class Data(object):
                 VerboseOut('Unrecognizable file: %s' % f, 3)
                 continue
             offset = 1 if len(parts) == 4 else 0
-            try:
+            with utils.error_handler('Unrecognizable file ' + f, continuable=True):
                 # only admit product files matching a single date
                 if self.date is None:
                     # First time through
@@ -727,11 +691,6 @@ class Data(object):
                 sensor = parts[1 + offset]
                 product = parts[2 + offset]
                 self.AddFile(sensor, product, f, add_to_db=False)
-            except Exception:
-                # This was just a bad file
-                # TODO error-handling-fix: use continuable handler
-                VerboseOut('Unrecognizable file: %s' % f, 3)
-                continue
 
     def AddFile(self, sensor, product, filename, add_to_db=True):
         """Add named file to this object, taking note of its metadata.
@@ -763,13 +722,10 @@ class Data(object):
         """ Open and return a GeoImage """
         if sensor is None:
             sensor = self.sensors[product]
-        try:
+        with utils.error_handler('Error reading product ({}, {})'.format(sensor, product)):
             fname = self.filenames[(sensor, product)]
             return gippy.GeoImage(fname)
 
-        except Exception as e:
-            # TODO error-handling-fix: use with handler() instead
-            raise Exception('error reading product (%s, %s, %s)' % (sensor, product, e))
 
     def open_assets(self, product):
         """ Open and return a GeoImage of the assets """
@@ -830,12 +786,9 @@ class Data(object):
                 VerboseOut(f, 2)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
-                    try:
+                    with utils.error_handler('Error parsing product date', continuable=True):
                         datetime.strptime(parts[len(parts) - 3], datedir)
                         files.append(f)
-                    except:
-                        # TODO error-handling-fix: continuable handler
-                        pass
 
         datas = []
         if len(files) == 0:
