@@ -31,20 +31,16 @@ def main():
     title = Colors.BOLD + 'GIPS Data Repositories (v%s)' % (gipsversion) + Colors.OFF
 
     # argument parsing
-    try:
-        parser = GIPSParser(description=title)
-        args = parser.parse_args()
 
-        cls = utils.gips_script_setup(args.command, args.stop_on_error)
+    parser = GIPSParser(description=title)
+    args = parser.parse_args()
 
-        print title
-        cls = import_data_class(args.command)
+    cls = utils.gips_script_setup(args.command, args.stop_on_error)
+
+    print title
+
+    with utils.error_handler():
         cls.print_products()
-    except Exception, e:
-        # TODO error-handling-fix: standard script-level handler
-        import traceback
-        VerboseOut(traceback.format_exc(), 4)
-        print 'GIPS Data Repository error: %s' % e
 
     utils.gips_exit() # produce a summary error report then quit with a proper exit status
 

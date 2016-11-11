@@ -39,11 +39,11 @@ def main():
     group = parser0.add_argument_group('masking options')
     args = parser0.parse_args()
 
-    cls = utils.gips_script_setup(stop_on_error=args.stop_on_error)
+    utils.gips_script_setup(stop_on_error=args.stop_on_error)
 
     # TODO - check that at least 1 of filemask or pmask is supplied
 
-    try:
+    with utils.error_handler():
         print title
         header = ['min', 'max', 'mean', 'sd', 'skew', 'count']
 
@@ -77,12 +77,6 @@ def main():
                     img = None
             for f in files:
                 files[f].close()
-
-    except Exception, e:
-        # TODO error-handling-fix: standard script-level handler
-        import traceback
-        VerboseOut(traceback.format_exc(), 4)
-        print 'Error: %s' % e
 
     utils.gips_exit() # produce a summary error report then quit with a proper exit status
 

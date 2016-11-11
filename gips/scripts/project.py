@@ -43,11 +43,9 @@ def main():
     args = parser0.parse_args()
 
     cls = utils.gips_script_setup(args.command, args.stop_on_error)
+    print title
 
-    try:
-        print title
-        cls = import_data_class(args.command)
-        orm.setup()
+    with utils.error_handler():
         extents = SpatialExtent.factory(
             cls, args.site, args.key, args.where, args.tiles, args.pcov,
             args.ptile
@@ -84,11 +82,6 @@ def main():
                     .format(str(t_extent), str(t_extent)),
                     2,
                 )
-    except Exception as e:
-        # TODO error-handling-fix: standard script-level handler
-        import traceback
-        VerboseOut(traceback.format_exc(), 4)
-        print 'Data Project error: %s' % e
 
     utils.gips_exit() # produce a summary error report then quit with a proper exit status
 

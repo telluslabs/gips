@@ -103,19 +103,6 @@ class Inventory(object):
             oldyear = date.year
         if self.numfiles != 0:
             VerboseOut("\n\n%s files on %s dates" % (self.numfiles, len(self.dates)), 1)
-            self.print_legend()
-
-    def print_legend(self):
-        print Colors.BOLD + '\nSENSORS' + Colors.OFF
-        _sensors = self.dataclass.Asset._sensors
-        for key in sorted(self.sensor_set):
-            if key in _sensors:
-                desc = _sensors[key]['description']
-                scode = key + ': ' if key != '' else ''
-            else:
-                desc = ''
-                scode = key
-            print self.color(key) + '%s%s' % (scode, desc) + Colors.OFF
 
 
 class ProjectInventory(Inventory):
@@ -367,4 +354,16 @@ class DataInventory(Inventory):
             if len(self.spatial.tiles) > 1:
                 raise RuntimeError('Expected 1 tile but got ' + repr(self.spatial.tiles))
             print Colors.BOLD + 'Asset Holdings for tile ' + self.spatial.tiles[0] + Colors.OFF
+
         super(DataInventory, self).pprint(**kwargs)
+
+        print Colors.BOLD + '\nSENSORS' + Colors.OFF
+        _sensors = self.dataclass.Asset._sensors
+        for key in sorted(self.sensor_set):
+            if key in _sensors:
+                desc = _sensors[key]['description']
+                scode = key + ': ' if key != '' else ''
+            else:
+                desc = ''
+                scode = key
+            print self.color(key) + '%s%s' % (scode, desc) + Colors.OFF
