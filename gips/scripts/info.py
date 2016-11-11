@@ -24,6 +24,7 @@
 from gips import __version__ as gipsversion
 from gips.parsers import GIPSParser
 from gips.utils import Colors, VerboseOut, import_data_class
+from gips import utils
 
 
 def main():
@@ -33,6 +34,9 @@ def main():
     try:
         parser = GIPSParser(description=title)
         args = parser.parse_args()
+
+        cls = utils.gips_script_setup(args.command, args.stop_on_error)
+
         print title
         cls = import_data_class(args.command)
         cls.print_products()
@@ -41,6 +45,8 @@ def main():
         import traceback
         VerboseOut(traceback.format_exc(), 4)
         print 'GIPS Data Repository error: %s' % e
+
+    utils.gips_exit() # produce a summary error report then quit with a proper exit status
 
 
 if __name__ == "__main__":

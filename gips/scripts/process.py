@@ -25,6 +25,7 @@ from gips import __version__
 from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
 from gips.utils import Colors, VerboseOut, open_vector, import_data_class
+from gips import utils
 from gips.inventory import DataInventory
 from gips.inventory import orm
 
@@ -37,6 +38,8 @@ def main():
     parser0.add_inventory_parser()
     parser0.add_process_parser()
     args = parser0.parse_args()
+
+    cls = utils.gips_script_setup(args.command, args.stop_on_error)
 
     try:
         print title
@@ -88,6 +91,8 @@ def main():
         import traceback
         VerboseOut(traceback.format_exc(), 4)
         print 'Data processing error: %s' % e
+
+    utils.gips_exit() # produce a summary error report then quit with a proper exit status
 
 
 if __name__ == "__main__":
