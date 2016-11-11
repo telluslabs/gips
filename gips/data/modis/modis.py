@@ -344,10 +344,14 @@ class modisData(Data):
             versions = {}
 
             for asset in assets:
+                # many asset types won't be found for the current date/spatial constraint
+                if asset not in self.assets:
+                    missingassets.append(asset)
+                    continue
                 try:
                     sds = self.assets[asset].datafiles()
-                except Exception:
-                    # TODO error-handling-fix: leave as literal try-except but add standard reporting
+                except Exception as e:
+                    utils.report_error(e, 'Error reading datafiles for ' + asset)
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)
@@ -870,14 +874,10 @@ class modisData(Data):
                     hournodatavalue = hourbands[iband].NoDataValue()
                     hour = hourbands[iband].Read()
                     hour = hour[hour != hournodatavalue]
-                    try:
-                        #hourmin = hour.min()
+                    hourmean = 0
+                    with utils.error_handler("Couldn't compute hour mean for " + fname,
+                                             continuable=True):
                         hourmean = hour.mean()
-                        #hourmax = hour.max()
-                        # print "hour.min(), hour.mean(), hour.max()", hour.min(), hour.mean(), hour.max()
-                    except:
-                        # TODO error-handling-fix:  use 0 as default value above continuable handler
-                        hourmean = 0
 
                     metaname = "MEANOVERPASSTIME_%s_%s" % (dayornight, platform)
                     metaname = metaname.upper()
