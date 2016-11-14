@@ -395,9 +395,12 @@ def set_error_handler(handler):
     error_handler = handler
 
 
-def report_error(error, msg_prefix):
-    """Print an error report on stderr, respecting verbosity."""
-    if gippy.Options.Verbose() >= _traceback_verbosity:
+def report_error(error, msg_prefix, show_tb=True):
+    """Print an error report on stderr, possibly including a traceback.
+
+    Caller can suppress the traceback with show_tb.  The user can suppress
+    it via the GIPS global verbosity setting."""
+    if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
         verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
         traceback.print_exc()
     else:
@@ -424,7 +427,7 @@ def gips_exit():
     if len(_accumulated_errors) == 0:
         sys.exit(0)
     verbose_out("Fatal: {} error(s) occurred:".format(len(_accumulated_errors)), 1, sys.stderr)
-    [report_error(error, error.msg_prefix) for error in _accumulated_errors]
+    [report_error(error, error.msg_prefix, show_tb=False) for error in _accumulated_errors]
     sys.exit(1)
 
 
