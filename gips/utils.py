@@ -25,14 +25,14 @@ from __future__ import print_function
 import sys
 import os
 import errno
-import gippy
-from gippy import GeoVector
+from contextlib import contextmanager
 import tempfile
 import commands
 import shutil
 import traceback
 
-from pdb import set_trace
+import gippy
+from gippy import GeoVector
 
 
 class Colors():
@@ -100,6 +100,15 @@ def List2File(lst, filename):
 
 
 def RemoveFiles(filenames, extensions=['']):
+    """Remove the given filenames with os.remove.
+
+    Pass in a list of extensions to treat each filename as a prefix and
+    extensions as suffixes, and remove all possible combinations.
+    """
+    # TODO error-handling-fix: this whole function looks strange:
+    #   when extensions is [''], same filename is tried twice
+    #   don't use a mutable type as a default argument
+    #   why give up on all files once one extension fails?
     for f in filenames:
         for ext in ([''] + extensions):
             try:
@@ -144,6 +153,7 @@ def link(src, dst, hard=False):
 
 def settings():
     """ Retrieve GIPS settings - first from user, then from system """
+    # TODO error-handling-fix: reconsider this whole function
     import imp
     try:
         # import user settings first
@@ -162,6 +172,8 @@ def settings():
 
 def create_environment_settings(repos_path, email=''):
     """ Create settings file and data directory """
+    # TODO error-handling-fix: this is called only once, in gips/scripts/config.py
+    # TODO error-handling-fix: consider refactoring it away
     from gips.settings_template import __file__ as src
     cfgpath = os.path.dirname(__file__)
     cfgfile = os.path.join(cfgpath, 'settings.py')
@@ -176,7 +188,8 @@ def create_environment_settings(repos_path, email=''):
         return cfgfile
     except OSError:
         # no permissions, so no environment level config installed
-        #print traceback.format_exc()
+        #print traceback.format_exck()
+        # TODO error-handling-fix: continuable handler
         return None
 
 
@@ -203,6 +216,7 @@ def create_repos():
     try:
         repos = settings().REPOS
     except:
+        # TODO error-handling-fix: with handler
         print(traceback.format_exc())
         raise Exception('Problem reading repository...check settings files')
     for key in repos.keys():
@@ -217,19 +231,12 @@ def data_sources():
     """ Get enabled data sources (and verify) from settings """
     sources = {}
     repos = settings().REPOS
-    found = False
     for key in sorted(repos.keys()):
-        if os.path.isdir(repos[key]['repository']):
-            try:
-                repo = import_repository_class(key)
-                sources[key] = repo.description
-                found = True
-            except:
-                VerboseOut(traceback.format_exc(), 1)
-        else:
+        if not os.path.isdir(repos[key]['repository']):
             raise Exception('ERROR: archive %s is not a directory or is not available' % key)
-    if not found:
-        print("There are no available data sources!")
+        with error_handler(continuable=True):
+            repo = import_repository_class(key)
+            sources[key] = repo.description
     return sources
 
 
@@ -239,12 +246,10 @@ def import_data_module(clsname):
     path = settings().REPOS[clsname].get('driver', '')
     if path == '':
         path = os.path.join( os.path.dirname(__file__), 'data', clsname)
-    try:
+    with error_handler('Error loading driver ' + clsname):
         fmtup = imp.find_module(clsname, [path])
         mod = imp.load_module(clsname, *fmtup)
         return mod
-    except:
-        print(traceback.format_exc())
 
 
 def import_repository_class(clsname):
@@ -286,6 +291,7 @@ def open_vector(fname, key="", where=''):
             vector.SetPrimaryKey(key)
 
         except Exception as e:
+            # TODO error-handling-fix: can't open a vector = done working, so let it raise
             VerboseOut(traceback.format_exc(), 4)
     if where != '':
         # return array of features
@@ -377,14 +383,80 @@ def mosaic(images, outfile, vector):
     return crop2vector(imgout, vector)
 
 
-# old code utilizing shared memory array
-# Chunk it up
-# chunksz = int(data.shape[0] / nproc)
-# extra = data.shape[0] - chunksz * nproc
-# chunks = [chunksz] * (nproc - extra) + [chunksz + 1] * extra
+_traceback_verbosity = 4    # only print a traceback if the user selects this verbosity or higher
+_accumulated_errors = []    # used for tracking success/failure & doing final error reporting when
+                            # GIPS is running as a command-line application
+_stop_on_error = False      # should GIPS try to recover from errors?  Set by gips_script_setup
 
-# queue = multiprocessing.Queue()
-# from agspy.contrib import shmarray
-# classmap = shmarray.create_copy(classmap)
-# tmp = numpy.ctypeslib.as_ctypes(classmap)
-# cmap = sharedctypes.Array(tmp._type_, tmp, lock=False)
+
+def set_error_handler(handler):
+    """Set the active error handler (generally for entire life of process)."""
+    global error_handler
+    error_handler = handler
+
+
+def report_error(error, msg_prefix, show_tb=True):
+    """Print an error report on stderr, possibly including a traceback.
+
+    Caller can suppress the traceback with show_tb.  The user can suppress
+    it via the GIPS global verbosity setting."""
+    if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
+        verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
+        traceback.print_exc()
+    else:
+        verbose_out(msg_prefix + ': ' + str(error), 1, stream=sys.stderr)
+
+
+@contextmanager
+def lib_error_handler(msg_prefix='Error', continuable=False):
+    """Handle errors appropriately for GIPS running as a library."""
+    try:
+        yield
+    except Exception as e:
+        if continuable and not _stop_on_error:
+            report_error(e, msg_prefix)
+        else:
+            raise
+
+
+error_handler = lib_error_handler # set this so gips code can use the right error handler
+
+
+def gips_exit():
+    """Deliver an error report if needed, then exit."""
+    if len(_accumulated_errors) == 0:
+        sys.exit(0)
+    verbose_out("Fatal: {} error(s) occurred:".format(len(_accumulated_errors)), 1, sys.stderr)
+    [report_error(error, error.msg_prefix, show_tb=False) for error in _accumulated_errors]
+    sys.exit(1)
+
+
+@contextmanager
+def cli_error_handler(msg_prefix='Error', continuable=False):
+    """Context manager for uniform error handling for command-line users.
+
+    Exceptions are caught and reported to stderr; _gips_exit() is called
+    if halt is indicated.
+    """
+    try:
+        yield
+    except Exception as e:
+        e.msg_prefix = msg_prefix # for use by gips_exit
+        _accumulated_errors.append(e)
+        if continuable and not _stop_on_error:
+            report_error(e, msg_prefix)
+        else:
+            gips_exit()
+
+
+def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
+    """Run this at the beginning of a GIPS CLI program to do setup."""
+    global _stop_on_error
+    _stop_on_error = stop_on_error
+    set_error_handler(cli_error_handler)
+    from gips.inventory import orm # avoids a circular import
+    with error_handler():
+        if setup_orm:
+            orm.setup()
+        if driver_string is not None:
+            return import_data_class(driver_string)

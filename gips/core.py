@@ -23,6 +23,7 @@
 
 import datetime
 import calendar
+from gips import utils
 from gips.utils import Colors, open_vector
 
 
@@ -153,14 +154,12 @@ class TemporalExtent(object):
             days = days.split(',')
             days = (int(days[0]), int(days[1]))
 
-        try:
+        with utils.error_handler('Bad date specification'):
             if ',' not in dates:
                 dates = (self._parse_date(dates), self._parse_date(dates, True))
             else:
                 (d1, d2) = dates.replace(',', ' ').split()
                 dates = (self._parse_date(d1), self._parse_date(d2, True))
-        except ValueError as ve:
-            raise Exception('Bad date specification ({}: {}): {}'.format(type(ve), str(ve), dates))
 
         self.datebounds = dates
         self.daybounds = days
