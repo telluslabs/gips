@@ -10,8 +10,11 @@ echo === install system deps ===
 # TODO are these needed?
 # innstall UbuntuGIS repository
 # sudo apt-get install python-software-properties
-# sudo add-apt-repository ppa:ubuntugis/ubuntugis-unstable
-# sudo apt-get update
+
+# this is needed
+sudo apt-get update
+
+# sudo add-apt-repository ppa:ubuntugis/ppa # ubuntugis/unstable moved to GDAL2.0
 
 # TODO I doubt *ALL* the boost libs are needed and there are MANY of them;
 # would be great to reduce the bulk

@@ -101,6 +101,7 @@ class weldAsset(Asset):
         try:
             listing = urllib.urlopen(mainurl).readlines()
         except Exception:
+            # TODO error-handling-fix: standard handle
             raise Exception("Unable to access %s" % mainurl)
         pattern = '(%s.week\d{2}.%s.%s.doy\d{3}to\d{3}.v1.5.hdf)' % (asset, str(year), tile)
         cpattern = re.compile(pattern)
@@ -120,6 +121,7 @@ class weldAsset(Asset):
                     output.write(connection.read())
                     output.close()
                 except Exception:
+                    # TODO error-handling-fix: continuable handler but mind the else
                     # TODO - implement pre-check to only attempt on valid dates
                     # then uncomment this
                     #raise Exception('Unable to retrieve %s from %s' % (name, url))
@@ -179,6 +181,7 @@ class weldData(Data):
                 try:
                     sds = self.assets[asset].datafiles()
                 except Exception:
+                    # TODO error-handling-fix: continuable handler but mind the else
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)

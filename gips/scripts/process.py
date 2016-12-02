@@ -25,6 +25,7 @@ from gips import __version__
 from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
 from gips.utils import Colors, VerboseOut, open_vector, import_data_class
+from gips import utils
 from gips.inventory import DataInventory
 from gips.inventory import orm
 
@@ -38,11 +39,10 @@ def main():
     parser0.add_process_parser()
     args = parser0.parse_args()
 
-    try:
-        print title
-        cls = import_data_class(args.command)
-        orm.setup()
+    cls = utils.gips_script_setup(args.command, args.stop_on_error)
+    print title
 
+    with utils.error_handler():
         extents = SpatialExtent.factory(
             cls, args.site, args.key, args.where, args.tiles, args.pcov,
             args.ptile
@@ -54,7 +54,8 @@ def main():
             batchargs += ' --format ' + str(args.format)
             if args.overwrite:
                 batchargs += ' --overwrite '
-            batchargs += ' -p ' + ' '.join(args.products)
+            if args.products:
+                batchargs += ' -p ' + ' '.join(args.products)
 
         for extent in extents:
             inv = DataInventory(
@@ -62,15 +63,18 @@ def main():
                 TemporalExtent(args.dates, args.days), **vars(args)
             )
             if args.batchout:
-                tdl += reduce(
+                tdl = reduce(
                     list.__add__,
                     map(
-                        lambda tiles: [args.command + ' -t ' + str(tile) +
-                                       ' -d ' + str(tiles.date) + ' ' +
-                                       batchargs + '\n'
-                                       for tile in tiles.tiles.keys()],
-                        inv.data.values()
-                    )
+                        lambda tiles: [
+                            args.command + ' -t ' + str(tile) +
+                            ' -d ' + str(tiles.date) + ' ' +
+                            batchargs + '\n'
+                            for tile in tiles.tiles.keys()
+                        ],
+                        inv.data.values(),
+                    ),
+                    tdl
                 )
 
             else:
@@ -79,10 +83,7 @@ def main():
             with open(args.batchout, 'w') as ofile:
                 ofile.writelines(tdl)
 
-    except Exception, e:
-        import traceback
-        VerboseOut(traceback.format_exc(), 4)
-        print 'Data processing error: %s' % e
+    utils.gips_exit() # produce a summary error report then quit with a proper exit status
 
 
 if __name__ == "__main__":

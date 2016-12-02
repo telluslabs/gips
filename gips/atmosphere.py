@@ -38,6 +38,11 @@ import numpy
 from gips.utils import List2File, VerboseOut
 from gips.data.merra import merraData
 from gips.data.aod import aodData
+
+# since Py6S pulls in matplotlib, we need to shut down all that gui business
+import matplotlib as mpl
+mpl.use('Agg')
+
 from Py6S import SixS, Geometry, AeroProfile, Altitudes, Wavelength, GroundReflectance, AtmosCorr, SixSHelpers
 
 
@@ -136,6 +141,7 @@ class SIXS():
                     s.run()
                     outputs.append(s.outputs)
         except Exception, e:
+            # TODO error-handling-fix: add existing exception to the new one; see notes for technique AND TROLOLOLOLO
             sys.stdout = stdout
             raise AtmCorrException("Error running 6S: %s" % e)
 
@@ -208,6 +214,7 @@ class MODTRAN():
             self.output = self.readoutput(bandnum)
             VerboseOut('MODTRAN Output: %s' % ' '.join([str(s) for s in self.output]), 4)
         except:
+            # TODO error-handling-fix: add existing exception to the new one; see notes for technique
             VerboseOut(modout, 4)
             raise AtmCorrException("Error running MODTRAN")
 
@@ -219,6 +226,7 @@ class MODTRAN():
         shutil.rmtree(tmpdir)
 
     def readoutput(self, bandnum):
+        # TODO error-handling-fix: this is used once (in this file) sort out what for & refactor as needed (blech)
         try:
             f = open('band' + str(bandnum) + '.chn')
             lines = f.readlines()
@@ -237,6 +245,7 @@ class MODTRAN():
                 # Convert channel radiance to spectral radiance
                 Ld = (float(data[59:72]) * 10000) / bandwidth
             except Exception:
+                # TODO error-handling-fix: confirm this is correct behavior
                 #print 'No downwelled radiance run'
                 Ld = 0.0
             return [trans, Lu, Ld]

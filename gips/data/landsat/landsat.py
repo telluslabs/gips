@@ -39,6 +39,7 @@ from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMas
 from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
 from gips.utils import VerboseOut, RemoveFiles, basename, settings
+from gips import utils
 
 from landsat_util import search, downloader
 
@@ -512,11 +513,8 @@ class landsatData(Data):
             self.basename = self.basename + '_' + self.sensors[asset]
 
             # Read the assets
-            try:
+            with utils.error_handler('Error reading ' + basename(self.assets['DN'].filename)):
                 img = self._readraw()
-            except Exception, e:
-                VerboseOut(traceback.format_exc(), 5)
-                raise Exception('Error reading %s: %s' % (basename(self.assets['DN'].filename), e))
 
             meta = self.assets['DN'].meta
             visbands = self.assets['DN'].visbands
@@ -532,15 +530,12 @@ class landsatData(Data):
 
                 if not settings().REPOS[self.Repository.name.lower()]['6S']:
                     raise Exception('6S is required for atmospheric correction')
-                try:
+                with utils.error_handler('Problem running 6S atmospheric model'):
                     wvlens = [(meta[b]['wvlen1'], meta[b]['wvlen2']) for b in visbands]
                     geo = self.metadata['geometry']
                     atm6s = SIXS(visbands, wvlens, geo, self.metadata['datetime'], sensor=self.sensor_set[0])
                     md["AOD Source"] = str(atm6s.aod[0])
                     md["AOD Value"] = str(atm6s.aod[1])
-                except Exception, e:
-                    VerboseOut(traceback.format_exc(), 4)
-                    raise Exception('Problem running 6S atmospheric model: %s' % e)
 
             # Break down by group
             groups = products.groups()
@@ -563,7 +558,9 @@ class landsatData(Data):
                 # TODO - update if no atmos desired for others
                 toa = self._products[val[0]].get('toa', False) or 'toa' in val
                 # Create product
-                try:
+                with utils.error_handler('Error creating product {} for {}'.format(
+                                                key, basename(self.assets['DN'].filename),
+                                         continuable=True)):
                     fname = os.path.join(self.path, self.basename + '_' + key)
                     if val[0] == 'acca':
                         s_azim = self.metadata['geometry']['solarazimuth']
@@ -573,6 +570,7 @@ class landsatData(Data):
                             dilation = int(val[2]) if len(val) > 2 else 10
                             cloudheight = int(val[3]) if len(val) > 3 else 4000
                         except:
+                            # TODO error-handling-fix: refactor; no try-except needed
                             erosion = 5
                             dilation = 10
                             cloudheight = 4000
@@ -593,6 +591,7 @@ class landsatData(Data):
                             tolerance = int(val[1]) if len(val) > 1 else 3
                             dilation = int(val[2]) if len(val) > 2 else 5
                         except:
+                            # TODO error-handling-fix: refactor; no try-except needed
                             tolerance = 3
                             dilation = 5
                         imgout = Fmask(reflimg, fname, tolerance, dilation)
@@ -733,6 +732,7 @@ class landsatData(Data):
                             dilation = int(val[2]) if len(val) > 2 else 10
                             cloudheight = int(val[3]) if len(val) > 3 else 4000
                         except:
+                            # TODO error-handling-fix: refactor; no try-except needed
                             erosion = 5
                             dilation = 10
                             cloudheight = 4000
@@ -748,9 +748,6 @@ class landsatData(Data):
                     imgout = None
                     self.AddFile(sensor, key, fname)
                     VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.now() - start), 1)
-                except Exception, e:
-                    VerboseOut('Error creating product %s for %s: %s' % (key, basename(self.assets['DN'].filename), e), 2)
-                    VerboseOut(traceback.format_exc(), 3)
 
             # Process Indices
             indices0 = dict(groups['Index'], **groups['Tillage'])
@@ -788,6 +785,7 @@ class landsatData(Data):
                             RemoveFiles(files)
                 shutil.rmtree(os.path.join(self.path, 'modtran'))
             except:
+                # TODO error-handling-fix: continuable handler
                 # VerboseOut(traceback.format_exc(), 4)
                 pass
 
@@ -824,13 +822,10 @@ class landsatData(Data):
         if not os.path.exists(mtlfilename):
             mtlfilename = self.assets['DN'].extract([mtlfilename])[0]
         # Read MTL file
-        try:
+        with utils.error_handler('Error reading metadata file ' + mtlfilename):
             text = open(mtlfilename, 'r').read()
-        except IOError as e:
-            raise Exception('({})'.format(e))
         if len(text) < 10:
             raise Exception('MTL file is too short. {}'.format(mtlfilename))
-
 
         sensor = self.assets['DN'].sensor
         smeta = self.assets['DN']._sensors[sensor]
@@ -872,6 +867,7 @@ class landsatData(Data):
         try:
             clouds = float(mtl['CLOUD_COVER'])
         except:
+            # TODO error-handling-fix: no try-except needed
             clouds = 0
 
         filenames = []
@@ -900,6 +896,7 @@ class landsatData(Data):
         try:
             qafilename = [f for f in datafiles if '_BQA.TIF' in f][0]
         except Exception:
+            # TODO error-handling-fix: no try-except needed
             qafilename = None
 
         self.metadata = {

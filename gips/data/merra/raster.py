@@ -7,6 +7,7 @@ def write_raster(fname, data, proj, geo, meta, bandnames=[], gcps=None, nodata=N
     try:
         (nband, ny, nx) = data.shape
     except:
+        # TODO error-handling-fix: leave as-is but report the error
         nband = 1
         (ny, nx) = data.shape
         data = data.reshape(1, ny, nx)

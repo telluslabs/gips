@@ -241,8 +241,10 @@ class merraAsset(Asset):
                 with Timeout(30):
                     dataset = open_url(loc)
             except Timeout.Timeout:
+                # change to verbose_out()
                 print "Timeout"
             except Exception,e:
+                # TODO error-handling-fix: refactor the whole method to use sensible error reporting
                 pass
             else:
                 success = True
@@ -278,6 +280,8 @@ class merraAsset(Asset):
         try:
             dataset = cls.opendap_fetch(asset, date)
         except Exception:
+            # TODO error-handling-fix:  permit this exception to bubble up; 
+            # use continuable handler in caller
             print "Fetch: data not available", asset, tile, date
             return
 
@@ -477,6 +481,7 @@ class merraData(Data):
             try:
                 assets = self.asset_filenames(val[0])
             except:
+                # TODO error-handling-fix: leave as literal try-except but report on error
                 # Required assets unavailable, continue to next product
                 continue
             fout = os.path.join(self.path, self.basename + "_merra_" + key)
