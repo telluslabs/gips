@@ -214,12 +214,13 @@ class modisAsset(Asset):
                 basename = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', basename])
                 available.append({'basename': basename, 'url': url})
-        return avalable
+        return available
 
 
     @classmethod
     def fetch(cls, asset, tile, date):
         available_assets = cls.query_service(asset, tile, date)
+        success = True
         for asset_info in available_assets:
             basename = asset_info['basename']
             url = asset_info['url']
