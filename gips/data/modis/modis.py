@@ -178,11 +178,9 @@ class modisAsset(Asset):
         file_version = int(parts[4])
         self.version = float('{}.{}'.format(collection, file_version))
 
-        
-    @classmethod
-    def fetch(cls, asset, tile, date):
-        #super(modisAsset, cls).fetch(asset, tile, date)
 
+    @classmethod
+    def query_service(cls, asset, tile, date):
         year, month, day = date.timetuple()[:3]
 
         if asset == "MCD12Q1" and (month != 1 or day != 1):
@@ -205,7 +203,7 @@ class modisAsset(Asset):
         with utils.error_handler(err_msg):
             listing = urllib.urlopen(mainurl).readlines()
 
-        success = False
+        available = []
         for item in listing:
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
@@ -213,36 +211,49 @@ class modisAsset(Asset):
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
-                name = cpattern.findall(item)[0]
-                url = ''.join([mainurl, '/', name])
-                outpath = os.path.join(cls.Repository.path('stage'), name)
+                basename = cpattern.findall(item)[0]
+                url = ''.join([mainurl, '/', basename])
+                available.append({'basename': basename, 'url': url})
+        return avalable
 
-                with utils.error_handler("Asset fetch error", continuable=True):
-                    # tinkering:
-                    # chunk size & stream=True in req
-                    # cookies / cache auth
 
-                    if mainurl[0:3] == 'ftp':
-                        connection = urllib2.urlopen(url)
-                        with open(outpath, 'wb') as fd:
-                            fd.write(connection.read())
+    @classmethod
+    def fetch(cls, asset, tile, date):
+        available_assets = cls.query_service(asset, tile, date)
+        for asset_info in available_assets:
+            basename = asset_info['basename']
+            url = asset_info['url']
+            outpath = os.path.join(cls.Repository.path('stage'), basename)
 
-                    else: # http
-                        kw = {'timeout': 10}
-                        if asset not in cls._skip_auth:
-                            kw['auth'] = (username, password)
-                        response = requests.get(url, **kw)
+            with utils.error_handler("Asset fetch error", continuable=True):
+                # tinkering:
+                # chunk size & stream=True in req
+                # cookies / cache auth
 
-                        if response.status_code != requests.codes.ok:
-                            print('Download of', name, 'failed:', response.status_code, response.reason,
-                                  '\nFull URL:', url, file=sys.stderr)
-                            return # might as well stop b/c the rest will probably fail too
+                # was if mainurl[0:3] == 'ftp':
+                if url.startswith('ftp'):
+                    connection = urllib2.urlopen(url)
+                    with open(outpath, 'wb') as fd:
+                        fd.write(connection.read())
 
-                        with open(outpath, 'wb') as fd:
-                            for chunk in response.iter_content():
-                                fd.write(chunk)
-                    utils.verbose_out('Retrieved %s' % name, 2)
-                    success = True
+                else: # http
+                    kw = {'timeout': 10}
+                    if asset not in cls._skip_auth:
+                        username = cls.Repository.get_setting('username')
+                        password = cls.Repository.get_setting('password')
+                        kw['auth'] = (username, password)
+                    response = requests.get(url, **kw)
+
+                    if response.status_code != requests.codes.ok:
+                        print('Download of', basename, 'failed:', response.status_code, response.reason,
+                              '\nFull URL:', url, file=sys.stderr)
+                        return # might as well stop b/c the rest will probably fail too
+
+                    with open(outpath, 'wb') as fd:
+                        for chunk in response.iter_content():
+                            fd.write(chunk)
+                utils.verbose_out('Retrieved %s' % basename, 2)
+                success = True
 
         if not success:
             VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
