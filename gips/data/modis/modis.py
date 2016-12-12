@@ -205,6 +205,7 @@ class modisAsset(Asset):
         with utils.error_handler(err_msg):
             listing = urllib.urlopen(mainurl).readlines()
 
+        retrieved_filenames = []
         success = False
         for item in listing:
             # screen-scrape the content of the page and extract the full name of the needed file
@@ -242,10 +243,13 @@ class modisAsset(Asset):
                             for chunk in response.iter_content():
                                 fd.write(chunk)
                     utils.verbose_out('Retrieved %s' % name, 2)
+                    retrieved_filenames.append(outpath)
                     success = True
 
         if not success:
             VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
+        return retrieved_filenames
+
 
     def updated(self, newasset):
         '''

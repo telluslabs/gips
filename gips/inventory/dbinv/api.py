@@ -13,6 +13,10 @@ bootstrapping weirdness, some imports have to be done in each function's
 body.
 """
 
+def _status(status_string):
+    """Converts a string into the corresponding Status object."""
+    from gips.inventory.dbinv import models
+    return models.Status.objects.get(status=status_string)
 
 def _grouper(iterable, n, fillvalue=None):
     """Collect data into fixed-length chunks or blocks.
@@ -179,6 +183,7 @@ def rectify_products(data_class):
 def list_tiles(driver):
     """List tiles for which there are extant asset files for the given driver."""
     from .models import Asset, Status
+    # TODO _status
     return Asset.objects.filter(driver=driver, status=Status.objects.get(status='complete')).values_list(
             'tile', flat=True).distinct().order_by('tile')
 
@@ -186,6 +191,7 @@ def list_tiles(driver):
 def list_dates(driver, tile):
     """For the given driver & tile, list dates for which assets exist."""
     from .models import Asset, Status
+    # TODO _status
     return Asset.objects.filter(driver=driver, tile=tile, status=Status.objects.get(status='complete')).values_list(
             'date', flat=True).distinct().order_by('date')
 
@@ -214,7 +220,7 @@ def add_product(**values):
     return p # in case the user needs it
 
 
-def update_or_add_asset(driver, asset, tile, date, sensor, name, status):
+def update_or_add_asset(driver, asset, tile, date, sensor, name, status='requested'):
     """Update an existing model or create it if it's not found.
 
     Convenience method that wraps update_or_create.  The first four
@@ -226,9 +232,13 @@ def update_or_add_asset(driver, asset, tile, date, sensor, name, status):
         'asset':  asset,
         'tile':   tile,
         'date':   date,
-        'status': models.Status.objects.get(status=status),
     }
-    update_vals = {'sensor': sensor, 'name': name}
+    # TODO _status
+    s = models.Status.objects.get(status=status)
+    update_vals = {'sensor': sensor,
+                   'name':   name,
+                   'status': s,
+                  }
     (asset, created) = models.Asset.objects.update_or_create(defaults=update_vals, **query_vals)
     return asset # in case the user needs it
 
@@ -245,6 +255,7 @@ def update_or_add_product(driver, product, tile, date, sensor, name, status):
         'product':  product,
         'tile':     tile,
         'date':     date,
+        # TODO _status
         'status':   models.Status.objects.get(status=status),
     }
     update_vals = {'sensor': sensor, 'name': name}
@@ -252,21 +263,21 @@ def update_or_add_product(driver, product, tile, date, sensor, name, status):
     return asset # in case the user needs it
 
 
-def product_search(**criteria):
+def product_search(status='complete', **criteria):
     """Perform a search for asset models matching the given criteria.
 
     Under the hood just calls models.Asset.objects.filter(**criteria);
     see Django ORM docs for more details.
     """
     from gips.inventory.dbinv import models
-    return models.Product.objects.filter(**criteria)
+    return models.Product.objects.filter(status=_status(status), **criteria)
 
 
-def asset_search(**criteria):
+def asset_search(status='complete', **criteria):
     """Perform a search for asset models matching the given criteria.
 
     Under the hood just calls models.Asset.objects.filter(**criteria);
     see Django ORM docs for more details.
     """
     from gips.inventory.dbinv import models
-    return models.Asset.objects.filter(**criteria)
+    return models.Asset.objects.filter(status=_status(status), **criteria)
