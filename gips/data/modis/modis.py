@@ -221,7 +221,7 @@ class modisAsset(Asset):
                 .format(pattern, mainurl),
                 4
             )
-return available
+        return available
 
 
     @classmethod
