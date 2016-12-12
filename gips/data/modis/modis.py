@@ -214,7 +214,14 @@ class modisAsset(Asset):
                 basename = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', basename])
                 available.append({'basename': basename, 'url': url})
-        return available
+
+        if len(available) == 0:
+            VerboseOut(
+                'Unable to find remote match for {} at {}'
+                .format(pattern, mainurl),
+                4
+            )
+return available
 
 
     @classmethod
@@ -258,8 +265,6 @@ class modisAsset(Asset):
                 retrieved_filenames.append(outpath)
                 success = True
 
-        if not success:
-            VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
         return retrieved_filenames
 
 
