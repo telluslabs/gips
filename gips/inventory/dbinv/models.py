@@ -6,6 +6,8 @@ from django.db import models
 class Status(models.Model):
     """Status of asset or product"""
 
+    # present valid status values (taken from fixtures/dbinv_status.json):
+    # requested, in-progress, complete, failed
     status = models.TextField()
 
 

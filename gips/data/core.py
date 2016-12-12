@@ -472,6 +472,7 @@ class Asset(object):
                         with utils.error_handler('Unable to make data directory ' + tpath):
                             os.makedirs(tpath)
                     with utils.error_handler('Problem adding {} to archive'.format(filename)):
+                        # needs full path
                         os.link(os.path.abspath(filename), newfilename)
                         asset.archived_filename = newfilename
                         VerboseOut(bname + ' -> ' + newfilename, 2)

@@ -416,6 +416,7 @@ def lib_error_handler(msg_prefix='Error', continuable=False):
         if continuable and not _stop_on_error:
             report_error(e, msg_prefix)
         else:
+            report_error(e, msg_prefix, show_tb=False)
             raise
 
 

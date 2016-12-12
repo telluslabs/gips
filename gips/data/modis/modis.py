@@ -220,7 +220,8 @@ class modisAsset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         available_assets = cls.query_service(asset, tile, date)
-        success = True
+        success = False
+        retrieved_filenames = []
         for asset_info in available_assets:
             basename = asset_info['basename']
             url = asset_info['url']
@@ -254,10 +255,13 @@ class modisAsset(Asset):
                         for chunk in response.iter_content():
                             fd.write(chunk)
                 utils.verbose_out('Retrieved %s' % basename, 2)
+                retrieved_filenames.append(outpath)
                 success = True
 
         if not success:
             VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
+        return retrieved_filenames
+
 
     def updated(self, newasset):
         '''
