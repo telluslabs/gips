@@ -31,14 +31,14 @@ from django.core.management import call_command
 import gips
 from gips import __version__ as version
 from gips.parsers import GIPSParser
-from gips.utils import ( VerboseOut, create_environment_settings,
+from gips.utils import (VerboseOut, create_environment_settings,
     create_user_settings, create_repos, get_data_variables)
 from gips.inventory import orm
 
 
 def migrate_database():
     """Migrate the database if the ORM is turned on."""
-if not orm.use_orm():
+    if not orm.use_orm():
         return
     print 'Migrating database'
     orm.setup()
