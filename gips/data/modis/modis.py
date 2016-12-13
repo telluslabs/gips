@@ -294,48 +294,70 @@ class modisData(Data):
         'indices': {
             'description': 'Land indices',
             'assets': ['MCD43A4'],
+            'bands': ['NDVI', 'LSWI', 'VARI', 'BRGT', 'SATVI', 'EVI'],
         },
         'quality': {
             'description': 'MCD Product Quality',
             'assets': ['MCD43A2'],
+            'bands': ['quality']
         },
         'landcover': {
             'description': 'MCD Annual Land Cover',
             'assets': ['MCD12Q1'],
+            'bands': ['landcover'],
         },
         # Daily
         'fsnow': {
             'description': 'Fractional snow cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
+            'bands': ['Fractional Snow Cover'],
         },
         'snow': {
             'description': 'Snow and ice cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
+            'bands': ['Snow Cover', 'Fractional Snow Cover'],
         },
         'temp': {
             'description': 'Surface temperature data',
             'assets': ['MOD11A1', 'MYD11A1'],
+            'bands': [
+                'Temperature Daytime Terra',
+                'Temperature Nighttime Terra',
+                'Temperature Daytime Aqua',
+                'Temperature Nighttime Aqua',
+                'Temperature Best Quality',
+            ],
         },
         'obstime': {
             'description': 'MODIS Terra/Aqua overpass time',
             'assets': ['MOD11A1', 'MYD11A1'],
+            'bands': [
+                'Observation Time Daytime Terra',
+                'Observation Time Nighttime Terra',
+                'Observation Time Daytime Aqua',
+                'Observation Time Nighttime Aqua'
+            ],
         },
         # Misc
         'ndvi8': {
             'description': 'Normalized Difference Vegetation Index: 250m',
             'assets': ['MOD09Q1'],
+            'bands': ['RED', 'NIR'],
         },
         'temp8td': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
+            'bands': ['temp8td'],
         },
         'temp8tn': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
+            'bands': ['temp8tn'],
         },
         'clouds': {
             'description': 'Cloud Mask',
-            'assets': ['MOD10A1']
+            'assets': ['MOD10A1'],
+            'bands': ['Cloud Cover'],
         }
     }
 
