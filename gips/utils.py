@@ -30,6 +30,7 @@ import tempfile
 import commands
 import shutil
 import traceback
+import itertools
 
 import gippy
 from gippy import GeoVector
@@ -407,6 +408,16 @@ def mosaic(images, outfile, vector):
         imgout[b].CopyMeta(images[0][b])
     imgout.CopyColorTable(images[0])
     return crop2vector(imgout, vector)
+
+
+def grouper(iterable, n, fillvalue=None):
+    """Collect data into fixed-length chunks or blocks.
+
+    e.g.:  grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    Taken nearly verbatim from the python itertools docs:
+    https://docs.python.org/2/library/itertools.html"""
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
 
 
 _traceback_verbosity = 4    # only print a traceback if the user selects this verbosity or higher

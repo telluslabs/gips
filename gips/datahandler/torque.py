@@ -33,7 +33,7 @@ gippy.Options.SetVerbose(4) # substantial verbosity for testing purposes
 orm.setup()
 """
 
-def generate_script(operation, args):
+def generate_script(operation, args_batch):
     if operation != 'fetch':
         raise NotImplementedError('only fetch is supported')
     if operation not in ('fetch', 'process', 'export', 'postprocess'):
@@ -47,7 +47,8 @@ def generate_script(operation, args):
     lines.append(setup_block)   # config & setup code
 
     # star of the show, the actual fetch
-    lines.append("worker.{}({}, {}, {}, {})".format(operation, *[repr(i) for i in args]))
+    for args in args_batch:
+        lines.append("worker.{}({}, {}, {}, {})".format(operation, *[repr(i) for i in args]))
 
     return '\n'.join(lines) # stitch into single string & return
 
@@ -70,19 +71,27 @@ def submit(operation, args_ioi, batch_size=None):
                    "'fetch', 'process', 'export', and 'postprocess')".format(operation))
         raise ValueError(err_msg)
 
-    # TODO loop starts here - wire in chunking here
+    if batch_size is None:
+        chunks = [args_ioi]
+    else:
+        chunks = list(utils.grouper(args_ioi, batch_size))
 
-    # Open a pipe to the qsub command.
-    proc = Popen('qsub', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+    # clean last chunk:  needed due to izip_longest padding chunks with Nones:
+    chunks.append([i for i in chunks.pop() if i is not None])
 
-    job_script = generate_script(operation, args_ioi[0])
+    outcomes = []
 
-    # Send job_string to qsub
-    proc.stdin.write(job_script)
-    out, err = proc.communicate()
+    for chunk in chunks:
+        job_script = generate_script(operation, chunk)
+
+        # open a pipe to the qsub command, then end job_string to it
+        proc = Popen('qsub', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+        proc.stdin.write(job_script)
+        out, err = proc.communicate()
+        outcomes.append((proc.returncode, out, err))
 
     # TODO confirm qsub exited 0 (raise otherwise)
     # TODO return best thing for checking on status
     # TODO log err someplace
 
-    return [(proc.returncode, out, err)]
+    return outcomes

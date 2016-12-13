@@ -3,6 +3,7 @@ import os, glob, sys, traceback, datetime, time, itertools
 import django.db.transaction
 
 from gips.utils import verbose_out, basename
+from gips import utils
 
 
 """API for the DB inventory for GIPS.
@@ -18,21 +19,12 @@ def _status(status_string):
     from gips.inventory.dbinv import models
     return models.Status.objects.get(status=status_string)
 
-def _grouper(iterable, n, fillvalue=None):
-    """Collect data into fixed-length chunks or blocks.
-
-    e.g.:  grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
-    Taken nearly verbatim from the python itertools docs:
-    https://docs.python.org/2/library/itertools.html"""
-    args = [iter(iterable)] * n
-    return itertools.izip_longest(fillvalue=fillvalue, *args)
-
 
 def _chunky_transaction(iterable, function, chunk_sz=1000, item_desc="items"):
     """Iterate over items in chunks; each chunk is 1 database transaction."""
     iter_cnt = 0
     chunk_start_time = start_time = time.time()
-    for chunk in _grouper(iterable, chunk_sz):
+    for chunk in utils.grouper(iterable, chunk_sz):
         with django.db.transaction.atomic():
             for item in chunk:
                 if item is None:
