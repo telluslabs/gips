@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
-from django.db import models
+from django.contrib.gis.db import models
+from django.contrib.postgres.fields import HStoreField
 
 
 class Status(models.Model):
@@ -25,7 +26,7 @@ class Asset(models.Model):
     tile   = models.TextField(db_index=True)   # 'h12v04'
     date   = models.DateField(db_index=True)   # of observation, not production
     name   = models.TextField()                # file name including full path
-    status = models.ForeignKey(Status)         # 
+    status = models.ForeignKey(Status)         #
 
     class Meta:
         # These four columns uniquely identify an asset file
@@ -46,9 +47,55 @@ class Product(models.Model):
     tile    = models.TextField(db_index=True)   # 'h12v04'
     date    = models.DateField(db_index=True)   # of observation, not production
     name    = models.TextField()                # file name including full path
-    status  = models.ForeignKey(Status)         # 
+    status  = models.ForeignKey(Status)         #
 
     class Meta:
         # These four columns uniquely identify an asset file
         unique_together = ('driver', 'product', 'tile', 'date')
 
+
+class Vector(models.Model):
+    geom       = models.GeometryField()
+    name       = models.CharField(max_length=255)
+    attributes = HStoreField()
+    site       = models.CharField(max_length=255, null=True, blank=True)
+    source     = models.CharField(max_length=255)
+    type       = models.CharField(max_length=255)
+    fid        = models.IntegerField()
+
+    class Meta:
+        unique_together = ('fid', 'source')
+
+
+class DataVariable(models.Model):
+    """Inventory of Data Variables.
+
+    Data variables are individual product bands specified by the driver
+    """
+
+    name        = models.CharField(max_length=255, unique=True)
+    description = models.CharField(max_length=255)
+    driver      = models.CharField(max_length=255)
+    product     = models.CharField(max_length=255)
+    band        = models.CharField(max_length=255)
+    band_number = models.IntegerField(default=0)
+
+
+class Result(models.Model):
+    """Results from spatial aggregation operations."""
+
+    feature_set = models.CharField(max_length=255)
+    count       = models.IntegerField(blank=True, null=True)
+    date        = models.DateField()
+    maximum     = models.FloatField(null=True, blank=True)
+    mean        = models.FloatField(null=True, blank=True)
+    skew        = models.FloatField(null=True, blank=True)
+    minimum     = models.FloatField(null=True, blank=True)
+    product     = models.ForeignKey(DataVariable)
+    sd          = models.FloatField(null=True, blank=True)
+    fid         = models.IntegerField()
+    site        = models.CharField(max_length=255)
+    vector      = models.ForeignKey(Vector)
+
+    class Meta:
+        unique_together = ('feature_set', 'date', 'product', 'site')
