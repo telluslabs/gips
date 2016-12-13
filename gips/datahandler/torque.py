@@ -19,56 +19,70 @@ pbs_directives = [
     '-l nodes=1:ppn=1',
 ]
 
-test_job_string = """
-# from gips.datahandler import worker
-
-iterations = 20
-
-def backslash_breeder(n, v=''):
-    if n <= 1:
-        return repr(v)
-    else:
-        return repr(backslash_breeder(n - 1, v))
-
-print len(backslash_breeder(iterations))
+import_block = """
+import os
+import datetime
+import gippy
+from gips.inventory import dbinv, orm
+from gips.datahandler import worker
 """
 
-def submit(operation, args, batch_size=None):
+setup_block = """
+os.environ['GIPS_ORM'] = 'true'
+gippy.Options.SetVerbose(4) # substantial verbosity for testing purposes
+orm.setup()
+"""
+
+def generate_script(operation, args):
+    if operation != 'fetch':
+        raise NotImplementedError('only fetch is supported')
+    if operation not in ('fetch', 'process', 'export', 'postprocess'):
+        err_msg = ("'{}' is an invalid operation (valid operations are "
+                   "'fetch', 'process', 'export', and 'postprocess')".format(operation))
+        raise ValueError(err_msg)
+    lines = []
+    lines.append('#!' + utils.settings().REMOTE_PYTHON) # shebang
+    lines += ['#PBS ' + d for d in pbs_directives]      # #PBS directives
+    lines.append(import_block)  # python imports, std lib, 3rd party, and gips
+    lines.append(setup_block)   # config & setup code
+
+    # star of the show, the actual fetch
+    lines.append("worker.{}({}, {}, {}, {})".format(operation, *[repr(i) for i in args]))
+
+    return '\n'.join(lines) # stitch into single string & return
+
+
+def submit(operation, args_ioi, batch_size=None):
     """Submit jobs to the configured Torque system.
 
     operation:  Defines which function will be performed, and must be one of
         'fetch', 'process', 'export', or 'postprocess'.
-    args:  An iterable of tuples; each tuple represents the arguments to
-        one call to the chosen function.
+    args_ioi:  An iterable of iterables; each inner iterable gives the
+        arguments to one call to the chosen function.
     batch_size:  The work is divided among torque jobs; each job receives
         batch_size function calls to perform in a loop.  Leave None for one job
         that works the whole batch.
     """
+    if operation != 'fetch':
+        raise NotImplementedError('only fetch is supported')
     if operation not in ('fetch', 'process', 'export', 'postprocess'):
         err_msg = ("'{}' is an invalid operation (valid operations are "
                    "'fetch', 'process', 'export', and 'postprocess')".format(operation))
         raise ValueError(err_msg)
 
-    # TODO type & arity checking of args
+    # TODO loop starts here - wire in chunking here
 
     # Open a pipe to the qsub command.
     proc = Popen('qsub', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
 
-    remote_python = utils.settings().REMOTE_PYTHON
-    job_string = '\n'.join(['#!' + remote_python] + ['#PBS ' + d for d in pbs_directives])
-
-    # TODO wire in operation/args/batch_size here
-
-    job_string += test_job_string
+    job_script = generate_script(operation, args_ioi[0])
 
     # Send job_string to qsub
-    proc.stdin.write(job_string)
+    proc.stdin.write(job_script)
     out, err = proc.communicate()
 
-    # Print your job and the system response to the screen as it's submitted
-    print "SCRIPT TEXT (job_string):"
-    print job_string
-    print "OUT:"
-    print out
-    print "ERR:"
-    print err
+    # TODO confirm qsub exited 0 (raise otherwise)
+    # TODO return best thing for checking on status
+    # TODO log err someplace
+
+    return [(proc.returncode, out, err)]
