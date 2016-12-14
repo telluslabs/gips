@@ -19,56 +19,79 @@ pbs_directives = [
     '-l nodes=1:ppn=1',
 ]
 
-test_job_string = """
-# from gips.datahandler import worker
-
-iterations = 20
-
-def backslash_breeder(n, v=''):
-    if n <= 1:
-        return repr(v)
-    else:
-        return repr(backslash_breeder(n - 1, v))
-
-print len(backslash_breeder(iterations))
+import_block = """
+import os
+import datetime
+import gippy
+from gips.inventory import dbinv, orm
+from gips.datahandler import worker
 """
 
-def submit(operation, args, batch_size=None):
+setup_block = """
+os.environ['GIPS_ORM'] = 'true'
+gippy.Options.SetVerbose(4) # substantial verbosity for testing purposes
+orm.setup()
+"""
+
+def generate_script(operation, args_batch):
+    if operation != 'fetch':
+        raise NotImplementedError('only fetch is supported')
+    if operation not in ('fetch', 'process', 'export', 'postprocess'):
+        err_msg = ("'{}' is an invalid operation (valid operations are "
+                   "'fetch', 'process', 'export', and 'postprocess')".format(operation))
+        raise ValueError(err_msg)
+    lines = []
+    lines.append('#!' + utils.settings().REMOTE_PYTHON) # shebang
+    lines += ['#PBS ' + d for d in pbs_directives]      # #PBS directives
+    lines.append(import_block)  # python imports, std lib, 3rd party, and gips
+    lines.append(setup_block)   # config & setup code
+
+    # star of the show, the actual fetch
+    for args in args_batch:
+        lines.append("worker.{}({}, {}, {}, {})".format(operation, *[repr(i) for i in args]))
+
+    return '\n'.join(lines) # stitch into single string & return
+
+
+def submit(operation, args_ioi, batch_size=None):
     """Submit jobs to the configured Torque system.
 
     operation:  Defines which function will be performed, and must be one of
         'fetch', 'process', 'export', or 'postprocess'.
-    args:  An iterable of tuples; each tuple represents the arguments to
-        one call to the chosen function.
+    args_ioi:  An iterable of iterables; each inner iterable gives the
+        arguments to one call to the chosen function.
     batch_size:  The work is divided among torque jobs; each job receives
         batch_size function calls to perform in a loop.  Leave None for one job
         that works the whole batch.
     """
+    if operation != 'fetch':
+        raise NotImplementedError('only fetch is supported')
     if operation not in ('fetch', 'process', 'export', 'postprocess'):
         err_msg = ("'{}' is an invalid operation (valid operations are "
                    "'fetch', 'process', 'export', and 'postprocess')".format(operation))
         raise ValueError(err_msg)
 
-    # TODO type & arity checking of args
+    if batch_size is None:
+        chunks = [args_ioi]
+    else:
+        chunks = list(utils.grouper(args_ioi, batch_size))
 
-    # Open a pipe to the qsub command.
-    proc = Popen('qsub', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+    # clean last chunk:  needed due to izip_longest padding chunks with Nones:
+    chunks.append([i for i in chunks.pop() if i is not None])
 
-    remote_python = utils.settings().REMOTE_PYTHON
-    job_string = '\n'.join(['#!' + remote_python] + ['#PBS ' + d for d in pbs_directives])
+    outcomes = []
 
-    # TODO wire in operation/args/batch_size here
+    for chunk in chunks:
+        job_script = generate_script(operation, chunk)
 
-    job_string += test_job_string
+        # open a pipe to the qsub command, then end job_string to it
+        proc = Popen('qsub', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+        proc.stdin.write(job_script)
+        out, err = proc.communicate()
+        outcomes.append((proc.returncode, out, err))
 
-    # Send job_string to qsub
-    proc.stdin.write(job_string)
-    out, err = proc.communicate()
+    # TODO confirm qsub exited 0 (raise otherwise)
+    # TODO return best thing for checking on status
+    # TODO log err someplace
 
-    # Print your job and the system response to the screen as it's submitted
-    print "SCRIPT TEXT (job_string):"
-    print job_string
-    print "OUT:"
-    print out
-    print "ERR:"
-    print err
+    return outcomes
