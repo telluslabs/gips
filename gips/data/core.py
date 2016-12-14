@@ -349,6 +349,11 @@ class Asset(object):
         return dates
 
     @classmethod
+    def query_service(cls, asset, tile, date):
+        """ Fetch stub """
+        raise NotImplementedError("Fetch not supported for this data source")
+
+    @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
         raise NotImplementedError("Fetch not supported for this data source")
@@ -826,7 +831,56 @@ class Data(object):
         return set(assets)
 
     @classmethod
+    def query_service(cls, products, tiles, textent, force=False):
+        """
+        query data service for tiles and add to archive.
+        """
+        response  = []
+        for p in products:
+            assets = cls.products2assets([p])
+            for t in tiles:
+                for a in assets:
+                    sensor = cls.Asset._sensor[a]
+                    asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
+                    for d in asset_dates:
+                        # if we don't have it already, or if update (force) flag
+                        local_assets = cls.Asset.discover(t, d, a)
+                        if len(local_assets) == 0 or force:
+                            date_str = d.strftime("%F")
+                            msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
+                            with utils.error_handler(msg_prefix, continuable=True):
+                                resp = cls.Asset.query_service(a, t, d)
+                                response.append(
+                                    {
+                                        'product': p, 'sensor': s, 'tile': t,
+                                        'asset': a, 'date': d, 'response': resp
+                                    }
+                                )
+        return response
+
+    @classmethod
     def fetch(cls, products, tiles, textent, update=False):
+        available_assets = query_service(
+            cls, products, tiles, textent, force=update
+        )
+        for asset_info in available_assets:
+            asset = asset_info['asset']
+            tile = asset_info['tile']
+            date = asset_info['date']
+            msg_prefix = (
+                'Problem fetching asset for {}, {}, {}'
+                .format(asset, tile, str(date))
+            )
+            with utils.error_handler(msg_prefix, continuable=True):
+                filenames = cls.Asset.fetch(asset, tile, date)
+                # fetched may contain both fetched things and unfetchable things
+                if len(filenames) == 1:
+                    fetched.append((asset, tile, date))
+
+        return fetched
+
+    @classmethod
+    def old_fetch(cls, products, tiles, textent, update=False):
         """ Download data for tiles and add to archive. update forces fetch """
         assets = cls.products2assets(products)
         fetched = []
