@@ -32,7 +32,7 @@ def fetch(driver, asset_type, tile, date):
     # update DB now that the work is done; no need for an atomic transaction
     # because the only critical action is Model.save(), which is already atomic
     asset.refresh_from_db()
-    if asset.status.status is not 'in-progress':
+    if asset.status.status != 'in-progress':
         # sanity check; have to keep going but do whine about it
         err_msg = "Expected Asset status to be 'in-progress' but got '{}'"
         utils.verbose_out(err_msg.format(asset.status.status), 1)
