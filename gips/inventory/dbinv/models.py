@@ -95,7 +95,7 @@ class Result(models.Model):
     sd          = models.FloatField(null=True, blank=True)
     fid         = models.IntegerField()
     site        = models.CharField(max_length=255)
-    vector      = models.ForeignKey(Vector)
+    vector      = models.ForeignKey(Vector, null=True, blank=True)
 
     class Meta:
         unique_together = ('feature_set', 'date', 'product', 'site')
