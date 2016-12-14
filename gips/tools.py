@@ -9,33 +9,33 @@ from gips.utils import VerboseOut
 
 def cookie_cutter_worker(args):
     """Default pool worker to cut apart rasters."""
-        try:
-            inimg = GeoImage(args['tif'])
-            if args['no_data']:
-                inimg.SetNoData(args['no_data'])
+    try:
+        inimg = GeoImage(args['tif'])
+        if args['no_data']:
+            inimg.SetNoData(args['no_data'])
 
-            gv = GeoVector(args['shp'])
-            feat = gv[args['index']]
-            
-            at = False
-            if args['alltouch']:
-                at = True
+        gv = GeoVector(args['shp'])
+        feat = gv[args['index']]
+        
+        at = False
+        if args['alltouch']:
+            at = True
 
-            CookieCutter(
-                GeoImages([args['tif']]),
-                feat,
-                args['new_name'],
-                abs(inimg.Affine()[1]),
-                abs(inimg.Affine()[5]),
-                True,
-                1,
-                {},
-                at
-            )
-        except Exception as e:
-            if not args['coe']:
-                print "Error cutting FID {}".format(args['index'])
-                raise e
+        CookieCutter(
+            GeoImages([args['tif']]),
+            feat,
+            args['new_name'],
+            abs(inimg.Affine()[1]),
+            abs(inimg.Affine()[5]),
+            True,
+            1,
+            {},
+            at
+        )
+    except Exception as e:
+        if not args['coe']:
+            VerboseOut("Error cutting FID {}".format(args['index']))
+            raise e
 
 
 def stats_worker(args):
@@ -68,7 +68,7 @@ def stats_worker(args):
         band_name_list = []
         for i in range(img.NumBands()):
             band = img[i]
-            if len(bands) > 0 and str(i) not in bands:
+            if len(bands) > 0 and int(i) not in bands:
                 continue
             stats = band.Stats()
             stat_arr = build_stat_array(req_stats, stats)
@@ -101,7 +101,7 @@ def stats_worker(args):
         else:
            msg = 'FID {}, date {}, prod {}: '.format(key[0], key[1], key[2])
            msg += e
-           print msg
+           VerboseOut(msg)
            raise e
 
 
@@ -140,7 +140,7 @@ class SpatialAggregator(object):
     
     @classmethod
     def get_attributes_list(cls, shp):
-    """Return a list of shapefile attributes"""
+        """Return a list of shapefile attributes"""
         try:
             gv = GeoVector(shp)
         except:
@@ -152,7 +152,7 @@ class SpatialAggregator(object):
 
     @classmethod
     def get_features_list(cls, shp, filt=None):
-    """Return a list of GeoFeatures in the shapefile."""
+        """Return a list of GeoFeatures in the shapefile."""
         try:
             gv = GeoVector(shp)
         except:
@@ -307,25 +307,25 @@ class SpatialAggregator(object):
 
     @classmethod
     def aggregate(cls, feature_worker=stats_worker, fworker_args=None, **kwargs):
-    """Aggregate several features and provide statistics.
+        """Aggregate several features and provide statistics.
 
-    Dictionary arguments:
-    rasters -- a list of raster files (required if shapefile is specified)
-    shapefile -- a shapefile used to create a ProjectDirectory (optional)
-    req_stats -- desired statistsics (default valid_stats)
-    filt -- filter features from ProjectDirectory conversion (optional)
-    percentiles -- list of desired percentiles (optional)
-    passthrough -- pass shapefile attributes through to output (optional)
-    bands -- list of desired bands (optional)
-    nodata -- replace default nodata value (optional)
-    rasterdates -- list of dates for raster files
-                   order must match rasters (optional)
-    num_procs -- number of processor cores to use (default 1)
-    products -- desired products (optional)
-    alltouch -- cut shapes using alltouch option (optional)
-    continue_on_error -- pass over operations that cause errors (optional)
-    projdir -- ProjectInventory directory (required unless shapefile present)
-    """
+        Dictionary arguments:
+        rasters -- a list of raster files (required if shapefile is specified)
+        shapefile -- a shapefile used to create a ProjectDirectory (optional)
+        req_stats -- desired statistsics (default valid_stats)
+        filt -- filter features from ProjectDirectory conversion (optional)
+        percentiles -- list of desired percentiles (optional)
+        passthrough -- pass shapefile attributes through to output (optional)
+        bands -- list of desired bands (optional)
+        nodata -- replace default nodata value (optional)
+        rasterdates -- list of dates for raster files
+                       order must match rasters (optional)
+        num_procs -- number of processor cores to use (default 1)
+        products -- desired products (optional)
+        alltouch -- cut shapes using alltouch option (optional)
+        continue_on_error -- pass over operations that cause errors (optional)
+        projdir -- ProjectInventory directory (required unless shapefile present)
+        """
         rasters = kwargs.get('rasterpaths', [])
         shapefile = kwargs.get('shapefile', None)
         req_stats = kwargs.get('stats', cls.valid_stats)
@@ -351,7 +351,8 @@ class SpatialAggregator(object):
                 "There must be one raster date for ever raster"
             )
 
-        features_list = cls.get_features_list(shapefile, filt)
+        if shapefile:
+            features_list = cls.get_features_list(shapefile, filt)
 
         if not rasters:
             features_list = [
@@ -359,8 +360,10 @@ class SpatialAggregator(object):
                     os.path.join(projdir, o)
                 )
             ]
-
-        attributes_list = cls.get_attributes_list(shapefile)
+       
+        attributes_list = []
+        if passthrough:
+            attributes_list = cls.get_attributes_list(shapefile)
 
         table = {}
         max_bands = 0
