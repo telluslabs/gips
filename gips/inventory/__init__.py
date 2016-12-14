@@ -266,7 +266,7 @@ class DataInventory(Inventory):
                 'driver': Repository.name.lower(),
                 'tile__in': spatial.tiles,
                 'date__in': dates,
-                'status'  : dbinv.models.Status.objects.get(status='complete')
+                'status'  : 'complete'
             }
             for p in dbinv.product_search(**search_criteria).order_by('date', 'tile'):
                 add_to_collection(p.date, p.tile, 'p', str(p.name))
