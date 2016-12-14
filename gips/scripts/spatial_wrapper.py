@@ -100,12 +100,19 @@ def main():
         help='Source of shapes',
         required=True
     )
+    parser.add_argument(
+        '-n',
+        '--num-procs',
+        help='Number of processors to use',
+        default=1
+    )
 
     init_args = parser.parse_args()
     projdir = init_args.projdir
     g_site = init_args.site
     g_id = init_args.identifier
     g_dv = get_product(init_args.product)
+    nprocs = init_args.num_procs
 
     source = init_args.source
     proj_name = os.path.basename(os.path.dirname(projdir))
@@ -114,8 +121,7 @@ def main():
         'bands': [g_dv.band_number],
         'products': [g_dv.product],
         'projdir': projdir,
-        #TODO: Make this configurable
-        'processes': 1,
+        'processes': nprocs,
 
     }
 
