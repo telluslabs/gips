@@ -17,13 +17,9 @@ def disable_db_blocker(django_db_blocker):
     with django_db_blocker.unblock():
         orm.setup()
         call_command('migrate', interactive=False)
-        """
-        for s in 'requested', 'in-progress', 'complete', 'failed':
-            dbinv.models.Status.objects.update_or_create(status=s)
-        """
         yield
 
-def t_submit_single(disable_db_blocker):
+def t_single_fetch(disable_db_blocker):
     """Simple test for torque.submit('fetch'...).  Warning:  Destructive."""
 
     # config
@@ -37,7 +33,7 @@ def t_submit_single(disable_db_blocker):
     fetch_args = tuple(key_kwargs[k] for k in ('driver', 'asset', 'tile', 'date'))
     api_kwargs = dict(sensor='dontcare', 
                       name  ='unspecified',
-                      status='requested',
+                      status='scheduled',
                       **key_kwargs)
     expected = os.path.join(
             util.DATA_REPO_ROOT,
@@ -57,18 +53,18 @@ def t_submit_single(disable_db_blocker):
     queried_asset = dbinv.models.Asset.objects.get(**key_kwargs)
     for i in range(1, 46):
         queried_asset.refresh_from_db()
-        if queried_asset.status.status in ('complete', 'failed'):
+        if queried_asset.status in ('complete', 'failed'):
             break
         time.sleep(1)
         if i % 5 == 0:
             print "Wait time: {}s".format(i)
 
     assert (True # TODO check outcome of job in torque via pbs_python call
-            and (expected, 'complete') == (queried_asset.name, queried_asset.status.status)
+            and (expected, 'complete') == (queried_asset.name, queried_asset.status)
             and os.path.isfile(expected))
 
 
-def t_submit_three(disable_db_blocker):
+def t_submit_three_fetch(disable_db_blocker):
     """Simple test for torque.submit('fetch'...).  Warning:  Destructive."""
 
     # config
@@ -92,12 +88,12 @@ def t_submit_three(disable_db_blocker):
         todays_key = dict(driver='modis', asset='MCD43A2', tile='h12v04', date=today)
         fetch_args.append(['modis', 'MCD43A2', 'h12v04', today])
         key_kwargs.append(todays_key)
-        api_kwargs.append(dict(sensor='dontcare', name='unspecified', status='requested',
+        api_kwargs.append(dict(sensor='dontcare', name='unspecified', status='scheduled',
                                **todays_key))
 
     # setup
     [os.remove(e) for e in expected if os.path.exists(e)]   # remove the asset if it's present
-    [dbinv.update_or_add_asset(**ak) for ak in api_kwargs]  # set the asset to 'requested' status
+    [dbinv.update_or_add_asset(**ak) for ak in api_kwargs]  # set the asset to 'scheduled' status
 
     # test
     outcomes = submit('fetch', fetch_args, 2) # should be two batches: [two fetches, one fetch]
@@ -107,7 +103,7 @@ def t_submit_three(disable_db_blocker):
     queried_assets = [dbinv.models.Asset.objects.get(**kk) for kk in key_kwargs]
     for i in range(1, 61):
         [qa.refresh_from_db() for qa in queried_assets]
-        if all([qa.status.status in ('complete', 'failed') for qa in queried_assets]):
+        if all([qa.status in ('complete', 'failed') for qa in queried_assets]):
             break # done waiting when all three are in a final state
         time.sleep(1)
         if i % 5 == 0:
@@ -118,7 +114,7 @@ def t_submit_three(disable_db_blocker):
         'filenames':    set(expected),
         'files_exist':  [True, True, True]
     } == {
-        'status':       [qa.status.status for qa in queried_assets],
+        'status':       [qa.status for qa in queried_assets],
         'filenames':    set(qa.name for qa in queried_assets),
         'files_exist':  [os.path.isfile(e) for e in expected],
     }
