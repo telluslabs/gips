@@ -709,7 +709,7 @@ class Data(object):
         self.sensors[product] = sensor
         if add_to_db and orm.use_orm(): # update inventory DB if such is requested
             dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
-                                        tile=self.id, date=self.date, name=filename, status='complete')
+                                        tile=self.id, date=self.date, name=filename, status=dbinv.api._status('complete'))
 
 
     def asset_filenames(self, product):
@@ -831,37 +831,49 @@ class Data(object):
         return set(assets)
 
     @classmethod
-    def query_service(cls, products, tiles, textent, force=False):
+    def query_service(cls, products, tiles, textent, update=False, force=False):
         """
-        query data service for tiles and add to archive.
+        query data service -- product-level interface
         """
         response  = []
         for p in products:
             assets = cls.products2assets([p])
             for t in tiles:
                 for a in assets:
-                    sensor = cls.Asset._sensor[a]
                     asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                     for d in asset_dates:
-                        # if we don't have it already, or if update (force) flag
+                        # if we don't have it already, or if 'update' flag
                         local_assets = cls.Asset.discover(t, d, a)
-                        if len(local_assets) == 0 or force:
+                        if force or len(local_assets) == 0 or update:
                             date_str = d.strftime("%F")
-                            msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
+                            msg_prefix = (
+                                'query_service for {}, {}, {}'
+                                .format(a, t, date_str)
+                            )
                             with utils.error_handler(msg_prefix, continuable=True):
                                 resp = cls.Asset.query_service(a, t, d)
-                                response.append(
-                                    {
-                                        'product': p, 'sensor': s, 'tile': t,
-                                        'asset': a, 'date': d, 'response': resp
-                                    }
-                                )
+                                assert len(resp) == 1, 'should only be one asset'
+                                aobj = cls.Asset(resp[0]['basename'])
+
+                                if (force or len(local_assets) == 0 or
+                                    (len(local_assets) == 1 and
+                                     local_assets[0].updated(aobj))
+                                ):
+                                    response.append(
+                                        {
+                                            'product': p,
+                                            'sensor': aobj.sensor,
+                                            'tile': t,
+                                            'asset': a,
+                                            'date': d
+                                        }
+                                    )
         return response
 
     @classmethod
     def fetch(cls, products, tiles, textent, update=False):
-        available_assets = query_service(
-            cls, products, tiles, textent, force=update
+        available_assets = cls.query_service(
+            products, tiles, textent, update
         )
         for asset_info in available_assets:
             asset = asset_info['asset']
