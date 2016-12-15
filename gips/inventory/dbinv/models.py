@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 def valid_status(val):
     if val not in ('remote',
                    'requested',
+                   'scheduled',
                    'in-progress',
                    'complete',
                    'failed'):
@@ -98,9 +99,6 @@ class AssetStatusChange(models.Model):
     status  = models.TextField(validators=[valid_status])
     time    = models.DateTimeField(auto_now_add=True)
 
-    class Meta:
-        unique_together = ('asset', 'status')
-
         
 class ProductStatusChange(models.Model):
     """Record of times product status updates"""
@@ -108,9 +106,6 @@ class ProductStatusChange(models.Model):
     product = models.ForeignKey(Product)
     status  = models.TextField(validators=[valid_status])
     time    = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('product', 'status')
 
         
 class Vector(models.Model):
