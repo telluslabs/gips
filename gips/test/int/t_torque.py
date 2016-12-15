@@ -12,16 +12,16 @@ from gips.inventory import dbinv, orm
 from gips.test.sys import util
 from gips.datahandler.torque import submit
 
-
 @pytest.fixture
 def disable_db_blocker(django_db_blocker):
     with django_db_blocker.unblock():
         orm.setup()
         call_command('migrate', interactive=False)
+        """
         for s in 'requested', 'in-progress', 'complete', 'failed':
             dbinv.models.Status.objects.update_or_create(status=s)
+        """
         yield
-
 
 def t_submit_single(disable_db_blocker):
     """Simple test for torque.submit('fetch'...).  Warning:  Destructive."""
