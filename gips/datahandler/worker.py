@@ -17,7 +17,7 @@ def fetch(driver, asset_type, tile, date):
         # TODO confirm transaction.atomic prevents DB writes while it's active
         asset = dbinv.models.Asset.objects.get(
                 driver=driver, asset=asset_type, tile=tile, date=date)
-        if asset.status.status in ('in-progress', 'complete'):
+        if asset.status != 'scheduled':
             # TODO log/msg about giving up here
             return asset
         # TODO: this status change needs to be made earlier or could be scheduled twice
@@ -33,7 +33,7 @@ def fetch(driver, asset_type, tile, date):
     # update DB now that the work is done; no need for an atomic transaction
     # because the only critical action is Model.save(), which is already atomic
     asset.refresh_from_db()
-    if asset.status.status != 'in-progress':
+    if asset.status != 'in-progress':
         # sanity check; have to keep going but do whine about it
         err_msg = "Expected Asset status to be 'in-progress' but got '{}'"
         utils.verbose_out(err_msg.format(asset.status.status), 1)
