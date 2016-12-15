@@ -48,11 +48,29 @@ def fetch(driver, asset_type, tile, date):
     return asset
 
 
-##### TODO unimplemented here down - needs doing for the demo #####
-
 def process(driver, product_type, tile, date):
     """Produce the specified product file."""
-    pass
+    # Notify everyone that this process is doing the fetch.
+    with transaction.atomic():
+        product = dbinv.models.Product.objects.get(
+                driver=driver, product=product_type, tile=tile, date=date)
+        if product.status != 'scheduled':
+            return product
+        product.status = 'in-progress'
+        product.save()
+
+    DataClass = utils.import_data_class(driver)
+    data = DataClass(tile, date) # should autopopulate with the right assets
+    data.process([product_type])
+
+    # sanity check
+    product.refresh_from_db()
+    if product.status != 'complete': # check process()'s work
+        # sanity check; have to keep going but do whine about it
+        err_msg = "Expected product status to be 'complete' but got '{}'"
+        utils.verbose_out(err_msg.format(product.status), 1)
+
+    return product
 
 
 def export(*args, **kwargs):

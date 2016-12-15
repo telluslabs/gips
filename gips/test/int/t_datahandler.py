@@ -61,7 +61,7 @@ def t_process():
     dependee_model = dbinv.models.Asset(driver='modis',     asset ='MCD43A2',
                                         tile  ='h12v04',    date  =datetime.date(2012, 12, 1),
                                         sensor='dontcare',  name  =dependee_fname,
-                                        status=dbinv.api._status('complete'))
+                                        status='complete')
     dependee_model.save()
 
     # config
@@ -83,7 +83,7 @@ def t_process():
 
     # setup
     orm.setup()
-    if os.path.exists(fname): # remove the prod if it's present
+    if os.path.lexists(fname): # remove the prod if it's present
         os.remove(fname)
     dbinv.update_or_add_product(**api_kwargs) # set the prod to 'scheduled' status
 
@@ -94,4 +94,4 @@ def t_process():
     expected = {'fname': fname,              'status': 'complete'}
     returned = {'fname': returned_prod.name, 'status': returned_prod.status}
     queried  = {'fname': queried_prod.name,  'status': queried_prod.status}
-    assert (expected == returned == queried) and os.path.isfile(fname)
+    assert (expected == returned == queried) and os.path.lexists(fname)
