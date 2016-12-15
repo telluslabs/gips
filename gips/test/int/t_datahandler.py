@@ -10,9 +10,11 @@ from gips.test.sys import util
 
 @pytest.fixture
 def status_table(db, request):
+    pass
+    """
     for s in 'requested', 'in-progress', 'complete', 'failed':
         dbinv.models.Status(status=s).save()
-
+    """
 
 @pytest.mark.django_db()
 def t_fetch(status_table):

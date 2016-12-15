@@ -20,7 +20,8 @@ def fetch(driver, asset_type, tile, date):
         if asset.status.status in ('in-progress', 'complete'):
             # TODO log/msg about giving up here
             return asset
-        asset.status = dbinv.models.Status.objects.get(status='in-progress')
+        # TODO: this status change needs to be made earlier or could be scheduled twice
+        asset.status = 'in-progress'
         asset.save()
 
     # locate the correct fetch function & execute it, then archive the file and update the DB
@@ -38,7 +39,7 @@ def fetch(driver, asset_type, tile, date):
         utils.verbose_out(err_msg.format(asset.status.status), 1)
     asset.sensor = a_obj.sensor
     asset.name   = a_obj.archived_filename
-    asset.status = dbinv.models.Status.objects.get(status='complete')
+    asset.status = 'complete'
     asset.save()
 
     if len(filenames) > 1:
