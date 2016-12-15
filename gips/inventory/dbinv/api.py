@@ -168,14 +168,14 @@ def rectify_products(data_class):
 
 def list_tiles(driver):
     """List tiles for which there are extant asset files for the given driver."""
-    from .models import Asset, Status
+    from .models import Asset
     return Asset.objects.filter(driver=driver, status='complete').values_list(
             'tile', flat=True).distinct().order_by('tile')
 
 
 def list_dates(driver, tile):
     """For the given driver & tile, list dates for which assets exist."""
-    from .models import Asset, Status
+    from .models import Asset
     return Asset.objects.filter(driver=driver, tile=tile, status='complete').values_list(
             'date', flat=True).distinct().order_by('date')
 
