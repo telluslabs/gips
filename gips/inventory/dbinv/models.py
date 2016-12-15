@@ -74,12 +74,12 @@ class Product(models.Model):
     def save(self, *args, **kwargs):
         if self.pk is not None:
             orig = Product.objects.get(pk=self.pk)
-            super(Asset, self).save(*args, **kwargs)
+            super(Product, self).save(*args, **kwargs)
             if orig.status != self.status:
                 change = ProductStatusChange(product=self, status=self.status)
                 change.save()
         else:
-            super(Asset, self).save(*args, **kwargs)
+            super(Product, self).save(*args, **kwargs)
             change = ProductStatusChange(product=self, status=self.status)
             change.save()
 
