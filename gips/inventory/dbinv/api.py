@@ -14,12 +14,6 @@ bootstrapping weirdness, some imports have to be done in each function's
 body.
 """
 
-def _status(status_string):
-    """Converts a string into the corresponding Status object."""
-    from gips.inventory.dbinv import models
-    return models.Status.objects.get(status=status_string)
-
-
 def _chunky_transaction(iterable, function, chunk_sz=1000, item_desc="items"):
     """Iterate over items in chunks; each chunk is 1 database transaction."""
     iter_cnt = 0
@@ -58,7 +52,7 @@ def rectify_assets(asset_class):
         a = asset_class(f_name)
         (asset, created) = mao.update_or_create(
                 asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-                name=f_name, driver=driver, status=_status('complete'))
+                name=f_name, driver=driver, status='complete')
         asset.save()
         touched_rows.add(asset.pk)
         if created:
@@ -146,7 +140,7 @@ def rectify_products(data_class):
 
         (product, created) = mpo.update_or_create(
                 product=product, sensor=sensor, tile=tile, date=date,
-                driver=driver, name=full_fn, status=_status('complete'))
+                driver=driver, name=full_fn, status='complete')
         product.save()
         # TODO can subtract this item from starting_keys each time and possibly save some memory and time
         touched_rows.add(product.pk)
@@ -175,16 +169,14 @@ def rectify_products(data_class):
 def list_tiles(driver):
     """List tiles for which there are extant asset files for the given driver."""
     from .models import Asset, Status
-    # TODO _status
-    return Asset.objects.filter(driver=driver, status=Status.objects.get(status='complete')).values_list(
+    return Asset.objects.filter(driver=driver, status='complete').values_list(
             'tile', flat=True).distinct().order_by('tile')
 
 
 def list_dates(driver, tile):
     """For the given driver & tile, list dates for which assets exist."""
     from .models import Asset, Status
-    # TODO _status
-    return Asset.objects.filter(driver=driver, tile=tile, status=Status.objects.get(status='complete')).values_list(
+    return Asset.objects.filter(driver=driver, tile=tile, status='complete').values_list(
             'date', flat=True).distinct().order_by('date')
 
 
@@ -225,11 +217,9 @@ def update_or_add_asset(driver, asset, tile, date, sensor, name, status='request
         'tile':   tile,
         'date':   date,
     }
-    # TODO _status
-    s = models.Status.objects.get(status=status)
     update_vals = {'sensor': sensor,
                    'name':   name,
-                   'status': s,
+                   'status': status,
                   }
     (asset, created) = models.Asset.objects.update_or_create(defaults=update_vals, **query_vals)
     return asset # in case the user needs it
@@ -247,8 +237,7 @@ def update_or_add_product(driver, product, tile, date, sensor, name, status):
         'product':  product,
         'tile':     tile,
         'date':     date,
-        # TODO _status
-        'status':   models.Status.objects.get(status=status),
+        'status':   status,
     }
     update_vals = {'sensor': sensor, 'name': name}
     (asset, created) = models.Product.objects.update_or_create(defaults=update_vals, **query_vals)
@@ -262,7 +251,7 @@ def product_search(status='complete', **criteria):
     see Django ORM docs for more details.
     """
     from gips.inventory.dbinv import models
-    return models.Product.objects.filter(status=_status(status), **criteria)
+    return models.Product.objects.filter(status=status, **criteria)
 
 
 def asset_search(status='complete', **criteria):
@@ -272,4 +261,4 @@ def asset_search(status='complete', **criteria):
     see Django ORM docs for more details.
     """
     from gips.inventory.dbinv import models
-    return models.Asset.objects.filter(status=_status(status), **criteria)
+    return models.Asset.objects.filter(status=status, **criteria)

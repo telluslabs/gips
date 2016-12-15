@@ -127,7 +127,7 @@ def query_service(driver_name, spatial, temporal, products,
     force = action.startswith('force')
 
     # set status 'requested' on items (products and/or assets)
-    req_status = dbinv.models.Status.objects.get(status='requested')
+    req_status = 'requested'
     for i in items:
         if request_asset:
             params = {
@@ -137,12 +137,13 @@ def query_service(driver_name, spatial, temporal, products,
             try:
                 with transaction.atomic():
                     asset = dbinv.models.Asset.objects.get(**params)
-                    if force or asset.status.status not in ('in-progress', 'complete'):
+                    if force or asset.status not in ('in-progress', 'complete'):
                         asset.status = req_status
                         asset.save()
             except ObjectDoesNotExist:
                 params['status'] = req_status
                 asset = dbinv.models.Asset(**params)
+                asset.save()
         if request_product:
             params.update({'product': i['product'], 'sensor': i['sensor']})
             params.pop('asset')
@@ -152,13 +153,13 @@ def query_service(driver_name, spatial, temporal, products,
             try:
                 with transaction.atomic():
                     product = dbinv.models.Product.objects.get(**params)
-                    if product.status.status not in ('in-progress', 'complete'):
+                    if product.status not in ('in-progress', 'complete'):
                         product.status = req_status
                         product.save()
             except ObjectDoesNotExist:
                 params['status'] = req_status
                 product = dbinv.models.Product(**params)
-
+                product.save()
     tstamps.append((time(), 'marked requested'))
     tprint(tstamps)
     return items
