@@ -58,7 +58,7 @@ def rectify_assets(asset_class):
         a = asset_class(f_name)
         (asset, created) = mao.update_or_create(
                 asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-                name=f_name, driver=driver)
+                name=f_name, driver=driver, status=_status('complete'))
         asset.save()
         touched_rows.add(asset.pk)
         if created:
@@ -146,7 +146,7 @@ def rectify_products(data_class):
 
         (product, created) = mpo.update_or_create(
                 product=product, sensor=sensor, tile=tile, date=date,
-                driver=driver, name=full_fn)
+                driver=driver, name=full_fn, status=_status('complete'))
         product.save()
         # TODO can subtract this item from starting_keys each time and possibly save some memory and time
         touched_rows.add(product.pk)
