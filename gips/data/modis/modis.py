@@ -228,7 +228,7 @@ class modisAsset(Asset):
                             fd.write(connection.read())
 
                     else: # http
-                        kw = {'timeout': 10}
+                        kw = {'timeout': 30}
                         if asset not in cls._skip_auth:
                             kw['auth'] = (username, password)
                         response = requests.get(url, **kw)
