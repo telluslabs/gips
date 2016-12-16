@@ -6,8 +6,9 @@ import pytest
 import envoy
 
 from gips.inventory import dbinv, orm
-from gips.test.sys import util
+from gips.test.sys import util, expected
 
+from gips.datahandler import worker
 
 @pytest.mark.django_db()
 def t_fetch():
@@ -100,8 +101,56 @@ def t_process():
 def t_aggregate_helper():
     pass
 
-def t_export_helper():
-    pass
+
+from django.core.management import call_command
+#from gips.test.int.t_torque import disable_db_blocker
+@pytest.fixture
+def disable_db_blocker(django_db_blocker):
+    with django_db_blocker.unblock():
+        orm.setup()
+        call_command('migrate', interactive=False)
+        yield
+
+def t_export_helper(disable_db_blocker):
+    """Test gips_project modis with warping."""
+    import gippy
+    gippy.Options.SetVerbose(4) # substantial verbosity for testing purposes
+
+    os.environ['GIPS_ORM'] = 'true'
+
+    kwargs = { # same arguments used by system test for gips config
+        'alltouch': False,
+        'batchout': None,
+        'chunksize': 128.0,
+        'command': 'modis',
+        'crop': False,
+        'dates': '2012-12-01,2012-12-03',
+        'days': None,
+        'fetch': False,
+        'format': 'GTiff',
+        'interpolation': 0,
+        'key': '',
+        'notld': True,
+        'numprocs': 2,
+        'outdir': util.OUTPUT_DIR,
+        'overwrite': False,
+        'pcov': 0,
+        'products': None,
+        'ptile': 0,
+        'res': [100.0, 100.0],
+        'sensors': None,
+        'site': util.NH_SHP_PATH,
+        'stop_on_error': False,
+        'suffix': '',
+        'tiles': None,
+        'tree': False,
+        'update': False,
+        'verbose': 4,
+        'where': ''
+    }
+
+    worker._export(**kwargs)
+
 
 def t_aggregate():
     pass

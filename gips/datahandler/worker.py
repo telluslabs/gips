@@ -3,11 +3,14 @@
 Called inside worker processes; first implementation is expected to be torque
 jobs.
 """
+import os
 
 from django.db import transaction, IntegrityError
 
 from gips import utils
-from gips.inventory import dbinv
+from gips.core import SpatialExtent, TemporalExtent
+from gips.inventory import DataInventory, ProjectInventory
+from gips.inventory import dbinv, orm
 
 
 def fetch(driver, asset_type, tile, date):
@@ -73,8 +76,55 @@ def process(driver, product_type, tile, date):
     return product
 
 
-def _export(*args, **kwargs):
+def _export(**kwargs):
     """Performs a 'gips_project' with the given paramenters."""
+
+    class Arguments(object):
+        pass
+
+    args = Arguments()
+    args.__dict__ = kwargs
+
+
+    DataClass = utils.import_data_class(kwargs['command'])
+
+    # TODO trash and recreate output dir
+
+    extents = SpatialExtent.factory(
+        DataClass, args.site, args.key, args.where, args.tiles, args.pcov,
+        args.ptile
+    )
+
+    # create tld: SITENAME--KEY_DATATYPE_SUFFIX
+    if args.notld:
+        tld = args.outdir
+    else:
+        key = '' if args.key == '' else '--' + args.key
+        suffix = '' if args.suffix == '' else '_' + args.suffix
+        res = '' if args.res is None else '_%sx%s' % (args.res[0], args.res[1])
+        bname = (
+            extents[0].site.LayerName() +
+            key + res + '_' + args.command + suffix
+        )
+        tld = os.path.join(args.outdir, bname)
+
+    for extent in extents:
+        t_extent = TemporalExtent(args.dates, args.days)
+        inv = DataInventory(DataClass, extent, t_extent, **vars(args))
+        datadir = os.path.join(tld, extent.site.Value())
+        if inv.numfiles > 0:
+            inv.mosaic(
+                datadir=datadir, tree=args.tree, overwrite=args.overwrite,
+                res=args.res, interpolation=args.interpolation,
+                crop=args.crop, alltouch=args.alltouch,
+            )
+        else:
+            utils.verbose_out(
+                'No data found for {} within temporal extent {}'
+                .format(str(t_extent), str(t_extent)),
+                2,
+            )
+    # TODO nothing meaningful to return?
 
 
 def _aggregate(*args, **kwargs):
@@ -84,5 +134,4 @@ def _aggregate(*args, **kwargs):
 def aggregate(driver, *args, **kwargs):
     """Entirely TBD but does the same things as gips_project + zonal summary."""
     # TODO export step
-
     # TODO spatial aggregator
