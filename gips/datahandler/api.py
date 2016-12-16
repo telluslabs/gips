@@ -105,8 +105,11 @@ def query_service(driver_name, spatial, temporal, products,
                              .format(query_type))
     # query data service
     items = datacls.query_service(
-        products, tiles, temporal_ext, update=update, force=force
+        products, tiles, temporal_ext,
+        update=update, force=force, grouped=True
     )
+
+    print items
 
     tstamps.append((time(), 'queried service'))
     tprint(tstamps)
@@ -129,37 +132,45 @@ def query_service(driver_name, spatial, temporal, products,
     # set status 'requested' on items (products and/or assets)
     req_status = 'requested'
     for i in items:
-        if request_asset:
+        print i
+        (p, t, d) = i
+        assets = []
+        for a in items[i]:
+            print a
+            if request_asset:
+                params = {
+                    'driver': driver_name, 'asset': a['asset'],
+                    'tile': a['tile'], 'date': a['date']
+                }
+                try:
+                    with transaction.atomic():
+                        asset = dbinv.models.Asset.objects.get(**params)
+                        if force or asset.status not in ('scheduled', 'in-progress', 'complete'):
+                            asset.status = req_status
+                            asset.save()
+                except ObjectDoesNotExist:
+                    params['status'] = req_status
+                    asset = dbinv.models.Asset(**params)
+                    asset.save()
+                assets.append(asset)
+        if request_product:
             params = {
-                'driver': driver_name, 'asset': i['asset'],
-                'tile': i['tile'], 'date': i['date']
+                'driver': driver_name, 'product': p,
+                'tile': t, 'date': d
             }
             try:
                 with transaction.atomic():
-                    asset = dbinv.models.Asset.objects.get(**params)
-                    if force or asset.status not in ('in-progress', 'complete'):
-                        asset.status = req_status
-                        asset.save()
-            except ObjectDoesNotExist:
-                params['status'] = req_status
-                asset = dbinv.models.Asset(**params)
-                asset.save()
-        if request_product:
-            params.update({'product': i['product'], 'sensor': i['sensor']})
-            params.pop('asset')
-
-            if 'status' in params:
-                params.pop('status')
-            try:
-                with transaction.atomic():
                     product = dbinv.models.Product.objects.get(**params)
-                    if product.status not in ('in-progress', 'complete'):
+                    if product.status not in ('scheduled', 'in-progress', 'complete'):
                         product.status = req_status
                         product.save()
             except ObjectDoesNotExist:
                 params['status'] = req_status
                 product = dbinv.models.Product(**params)
                 product.save()
+            for asset in assets:
+                dep = dbinv.models.AssetDependency(product=product, asset=asset)
+                dep.save()
     tstamps.append((time(), 'marked requested'))
     tprint(tstamps)
     return items
