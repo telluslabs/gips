@@ -73,11 +73,16 @@ def process(driver, product_type, tile, date):
     return product
 
 
-def export(*args, **kwargs):
-    """Entirely TBD but does the same things as gips_project."""
-    pass
+def _export(*args, **kwargs):
+    """Performs a 'gips_project' with the given paramenters."""
 
 
-def post_process(*args, **kwargs):
-    """Entirely TBD but will support what used to be called zonalsummary ."""
-    pass
+def _aggregate(*args, **kwargs):
+    raise NotImplemented('Dunno what to do here')
+
+
+def aggregate(driver, *args, **kwargs):
+    """Entirely TBD but does the same things as gips_project + zonal summary."""
+    # TODO export step
+
+    # TODO spatial aggregator

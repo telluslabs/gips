@@ -95,3 +95,13 @@ def t_process():
     returned = {'fname': returned_prod.name, 'status': returned_prod.status}
     queried  = {'fname': queried_prod.name,  'status': queried_prod.status}
     assert (expected == returned == queried) and os.path.lexists(fname)
+
+
+def t_aggregate_helper():
+    pass
+
+def t_export_helper():
+    pass
+
+def t_aggregate():
+    pass
