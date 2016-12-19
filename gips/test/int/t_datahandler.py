@@ -1,5 +1,5 @@
 
-import os
+import os, shutil
 import datetime
 
 import pytest
@@ -149,7 +149,72 @@ def t_export_helper(disable_db_blocker):
         'where': ''
     }
 
+    # setup - check for prereqs then clear test directory
+    prerequisites = [os.path.join(util.DATA_REPO_ROOT, f) for f in (
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_fsnow.tif',
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_indices.tif',
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_quality.tif',
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_snow.tif',
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MOD_clouds.tif',
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_obstime.tif',
+        'modis/tiles/h12v04/2012336/h12v04_2012336_MOD-MYD_temp.tif',
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_fsnow.tif',
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_indices.tif',
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_quality.tif',
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_snow.tif',
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_clouds.tif',
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD-MYD_obstime.tif',
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD-MYD_temp.tif',
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8td.tif',
+        'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8tn.tif',
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_fsnow.tif',
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_indices.tif',
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_quality.tif',
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MCD_snow.tif',
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MOD_clouds.tif',
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_obstime.tif',
+        'modis/tiles/h12v04/2012338/h12v04_2012338_MOD-MYD_temp.tif',
+    )]
+    for p in prerequisites:
+        try:
+            dbinv.models.Product.objects.get(name=p) # raises on failure, which is desired here
+            assert os.path.lexists(p)
+        except:
+            print ("Prerequisite not meant, try: "
+                   "`py.test --sys --clear-repo -k 'modis and process' -s --ll debug`")
+            raise
+    if os.path.exists(kwargs['outdir']): # remove the output dir if it's present
+        shutil.rmtree(kwargs['outdir'])
+
+    # run the test
     worker._export(**kwargs)
+    expected = set((
+        '2012336_MCD_fsnow.tif',
+        '2012336_MCD_indices.tif',
+        '2012336_MCD_quality.tif',
+        '2012336_MCD_snow.tif',
+        '2012336_MOD_clouds.tif',
+        '2012336_MOD-MYD_obstime.tif',
+        '2012336_MOD-MYD_temp.tif',
+        '2012337_MCD_fsnow.tif',
+        '2012337_MCD_indices.tif',
+        '2012337_MCD_quality.tif',
+        '2012337_MCD_snow.tif',
+        '2012337_MOD_clouds.tif',
+        '2012337_MOD-MYD_obstime.tif',
+        '2012337_MOD-MYD_temp.tif',
+        '2012337_MOD_temp8td.tif',
+        '2012337_MOD_temp8tn.tif',
+        '2012338_MCD_fsnow.tif',
+        '2012338_MCD_indices.tif',
+        '2012338_MCD_quality.tif',
+        '2012338_MCD_snow.tif',
+        '2012338_MOD_clouds.tif',
+        '2012338_MOD-MYD_obstime.tif',
+        '2012338_MOD-MYD_temp.tif',
+    ))
+    actual = set(os.listdir(os.path.join(util.OUTPUT_DIR, '0')))
+    assert expected == actual
 
 
 def t_aggregate():
