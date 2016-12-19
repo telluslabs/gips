@@ -15,16 +15,16 @@ def query (job):
     """Determine which assets to fetch and products to process"""
     with transaction.atomic():
         job = dbinv.models.Job.objects.get(pk=job)
-        if job.status != 'scheduled':
+        if job.status != 'initializing':
             # TODO log/msg about giving up here
             return job # not sure this is useful for anything
-        job.status = 'initializing' 
+        job.status = 'scheduled' 
         job.save()
 
     api.query_service(job.variable.driver, eval(job.spatial), eval(job.temporal), [job.variable.product])
 
     job.refresh_from_db()
-    if job.status != 'initializing':
+    if job.status != 'scheduled':
         # sanity check; have to keep going, but whine about it
         err_msg = "Expected Job status to be 'initializing, but got {}"
         utils.verbose_out(err_msg.format(job.status), 1)
