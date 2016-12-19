@@ -275,7 +275,7 @@ def get_data_variables():
                     'band': bandname,
                 }
 
-            data_variables.append(data_variable)
+                data_variables.append(data_variable)
     return data_variables
 
 
