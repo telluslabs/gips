@@ -28,8 +28,8 @@ def submit_job (site, variable, spatial, temporal):
     job = dbinv.models.Job.objects.create(
         site=site,
         variable=dbinv.models.DataVariable.objects.get(name=variable),
-        spatial=spatial,
-        temporal=temporal,
+        spatial=repr(spatial),
+        temporal=repr(temporal),
         status='requested',
     )
 

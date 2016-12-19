@@ -21,7 +21,7 @@ def query (job):
         job.status = 'initializing' 
         job.save()
 
-    api.query_service(job.variable.driver, job.spatial, job.temporal, [job.variable.product])
+    api.query_service(job.variable.driver, eval(job.spatial), eval(job.temporal), [job.variable.product])
 
     job.refresh_from_db()
     if job.status != 'initializing':

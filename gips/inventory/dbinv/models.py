@@ -161,8 +161,8 @@ class Job(models.Model):
 
     site     = models.CharField(max_length=255)
     variable = models.ForeignKey(DataVariable)
-    spatial  = HStoreField()
-    temporal = HStoreField()
+    spatial  = models.TextField()
+    temporal = models.TextField()
     # TODO: aggregation method?
     status   = models.TextField(validators=[valid_status])
     
