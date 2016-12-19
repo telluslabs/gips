@@ -2,6 +2,16 @@
 from osgeo import gdal, osr, ogr
 
 
+def create_datatype(np_dtype):
+    """ provide translation between data type codes """
+    gdal.GDT_UInt8 = gdal.GDT_Byte
+    np_dtype = str(np_dtype)
+    typestr = 'gdal.GDT_' + np_dtype.title().replace('Ui', 'UI')
+    g_dtype = eval(typestr)
+    return g_dtype
+
+
+
 def write_raster(fname, data, proj, geo, meta, bandnames=[], gcps=None, nodata=None):
     driver = gdal.GetDriverByName('GTiff')
     try:
@@ -32,14 +42,6 @@ def write_raster(fname, data, proj, geo, meta, bandnames=[], gcps=None, nodata=N
         band.WriteArray(data[i])
     tfh = None
 
-gdal.GDT_UInt8 = gdal.GDT_Byte
-
-def create_datatype(np_dtype):
-    """ provide translation between data type codes """
-    np_dtype = str(np_dtype)
-    typestr = 'gdal.GDT_' + np_dtype.title().replace('Ui', 'UI')
-    g_dtype = eval(typestr)
-    return g_dtype
 
 def create_meta(descr):
     """ generate metadata based on a simple template """

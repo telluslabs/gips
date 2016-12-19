@@ -24,26 +24,31 @@
 from __future__ import print_function
 
 import os
+import re
 import datetime
 import time
 
 import urllib, urllib2
+import requests
 
-import numpy
 import signal
+
+import numpy as np
+from netCDF4 import Dataset
+
+from osgeo import gdal
 
 import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, basename, open_vector
+from gips import utils
 
-# TODO: use gippy instead
-from gips.data.merra import raster
 
 # TODO: delete the line below
 from pdb import set_trace
 
 
-MISSING = 9.999999870e+14
+#MISSING = 9.999999870e+14
 
 class Timeout():
     """Timeout class using ALARM signal."""
@@ -63,6 +68,34 @@ class Timeout():
 
     def raise_timeout(self, *args):
         raise Timeout.Timeout()
+
+
+def write_raster(fname, data, proj, geo, meta, bandnames, nodata):
+    driver = gdal.GetDriverByName('GTiff')
+    try:
+        (nband, ny, nx) = data.shape
+    except:
+        # TODO error-handling-fix: leave as-is but report the error
+        nband = 1
+        (ny, nx) = data.shape
+        data = data.reshape(1, ny, nx)
+    # create data type
+    gdal.GDT_UInt8 = gdal.GDT_Byte
+    np_dtype = str(data.dtype)
+    typestr = 'gdal.GDT_' + np_dtype.title().replace('Ui', 'UI')
+    dtype = eval(typestr)
+    tfh = driver.Create(fname, nx, ny, nband, dtype, [])
+    tfh.SetGeoTransform(geo)
+    tfh.SetMetadata(meta)
+    tfh.SetProjection(proj)
+    assert len(bandnames) == nband
+    for i in range(nband):
+        band = tfh.GetRasterBand(i+1)
+        assert len(bandnames) == nband, "wrong number of band names"
+        band.SetDescription(bandnames[i])        
+        band.SetNoDataValue(nodata)
+        band.WriteArray(data[i])
+    tfh = None
 
 
 class merraRepository(Repository):
@@ -92,11 +125,10 @@ class merraAsset(Asset):
 
     _bandnames = ['%02d30GMT' % i for i in range(24)]
 
-    #_asset_pattern = "MERRA2_100.tavg1_2d_slv_Nx.19830601.nc4
-    _asset_pattern = "MERRA2_???.{name}.%04d%02d%02d.nc4"
-    
-    _assets = {
+    _asset_re_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d.nc4"
+    _asset_pattern = "MERRA2_???.{name}.????????.nc4"
 
+    _assets = {
         # MERRA2 SLV
         ## TS (Surface skin temperature)
         ## T2M (Temperature at 2 m above the displacement height)
@@ -106,94 +138,38 @@ class merraAsset(Asset):
         'SLV': {
             'shortname': 'M2T1NXSLV',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Single-Level Diagnostics V5.12.4',
+            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4',
             'pattern': _asset_pattern.format(name='tavg1_2d_slv_Nx'),
-            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4',
+            're_pattern': _asset_re_pattern.format(name='tavg1_2d_slv_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
-
-    }
-
-    """
-        None of the old SLV assets below will be needed once this works
-        'TS': {
-            'description': 'Surface skin temperature',
-            'pattern': 'MERRA_TS_*.tif',
-            #'url': 'http://goldsmr4.sci.gsfc.nasa.gov/opendap/MERRA2/M2T1NXSLV.5.12.4',
-            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4',
-            'source': 'MERRA2_%s.tavg1_2d_slv_Nx.%04d%02d%02d.nc4',
-            'startdate': datetime.date(1980, 1, 1),
-            'latency': 60,
-            'bandnames': _bandnames
-        },
-        'T2M': {
-            'description': 'Temperature at 2 m above the displacement height',
-            'pattern': 'MERRA_T2M_*.tif',
-            'url': 'http://goldsmr4.sci.gsfc.nasa.gov/opendap/MERRA2/M2T1NXSLV.5.12.4',
-            'source': 'MERRA2_%s.tavg1_2d_slv_Nx.%04d%02d%02d.nc4',
-            'startdate': datetime.date(1980, 1, 1),
-            'latency': 60,
-            'bandnames': _bandnames
-        },
-        'T10M': {
-            'description': 'Temperature at 10 m above the displacement height',
-            'pattern': 'MERRA_T10M_*.tif',
-            'url': 'http://goldsmr4.sci.gsfc.nasa.gov/opendap/MERRA2/M2T1NXSLV.5.12.4',
-            'source': 'MERRA2_%s.tavg1_2d_slv_Nx.%04d%02d%02d.nc4',
-            'startdate': datetime.date(1980, 1, 1),
-            'latency': 60,
-            'bandnames': _bandnames
-        },
-        'PS': {
-            'description': 'Time averaged surface pressure (Pa)',
-            'pattern': 'MERRA_PS_*.tif',
-            'url': 'http://goldsmr4.sci.gsfc.nasa.gov/opendap/MERRA2/M2T1NXSLV.5.12.4',
-            'source': 'MERRA2_%s.tavg1_2d_slv_Nx.%04d%02d%02d.nc4',
-            'startdate': datetime.date(1980, 1, 1),
-            'latency': 60,
-            'bandnames': _bandnames
-        },
-        'QV2M': {
-            'description': 'Specific humidity at 2 m above the displacement height (kg kg-1)',
-            'pattern': 'MERRA_QV2M_*.tif',
-            'url': 'http://goldsmr4.sci.gsfc.nasa.gov/opendap/MERRA2/M2T1NXSLV.5.12.4',
-            'source': 'MERRA2_%s.tavg1_2d_slv_Nx.%04d%02d%02d.nc4',
-            'startdate': datetime.date(1980, 1, 1),
-            'latency': 60,
-            'bandnames': _bandnames
-        },
-        #
         # MERRA2 FLX
-        # http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXFLX.5.12.4/
-        'PRECTOT': {
-            'description': 'Total Precipitation (kg m-2 s-1)',
-            'pattern': 'MERRA_PRECTOT_*.tif',
-            'url': 'http://goldsmr4.sci.gsfc.nasa.gov/opendap/MERRA2/M2T1NXFLX.5.12.4',
-            'source': 'MERRA2_%s.tavg1_2d_flx_Nx.%04d%02d%02d.nc4',
+        ## PRECTOT (Total Precipitation in kg m-2 s-1)'
+        ## SPEED (3-dimensional wind speed for surface fluxes in m s-1)'
+        'FLX': {
+            'shortname': 'M2T1NXFLX',
+            'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Surface Flux Diagnostics V5.12.4',
+            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXFLX.5.12.4',
+            'pattern': _asset_pattern.format(name='tavg1_2d_flx_Nx'),
+            're_pattern': _asset_re_pattern.format(name='tavg1_2d_flx_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
-            'bandnames': _bandnames
-        },
-        'SPEED': {
-            'description': '3-dimensional wind speed for surface fluxes (m s-1)',
-            'pattern': 'MERRA_SPEED_*.tif',
-            'url': 'http://goldsmr4.sci.gsfc.nasa.gov/opendap/MERRA2/M2T1NXFLX.5.12.4',
-            'source': 'MERRA2_%s.tavg1_2d_flx_Nx.%04d%02d%02d.nc4',
-            'startdate': datetime.date(1980, 1, 1),
-            'latency': 60,
-            'bandnames': _bandnames
         },
         # MERRA2 RAD
-        # http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXRAD.5.12.4/
-        'SWGDN': {
-            'description': 'Surface incident shortwave flux (W m-2)',
-            'pattern': 'MERRA_SWGDN_*.tif',
-            'url': 'http://goldsmr4.sci.gsfc.nasa.gov/opendap/MERRA2/M2T1NXRAD.5.12.4',
-            'source': 'MERRA2_%s.tavg1_2d_rad_Nx.%04d%02d%02d.nc4',
+        ## SWGDN: Surface incident shortwave flux (W m-2)
+        'RAD': {
+            'shortname': 'M2T1NXRAD',
+            'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Radiation Diagnostics V5.12.4',
+            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXRAD.5.12.4',
+            'pattern': _asset_pattern.format(name='tavg1_2d_rad_Nx'),
+            're_pattern': _asset_re_pattern.format(name='tavg1_2d_rad_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
-            'bandnames': _bandnames
-        },
+        }   
+    }
+
+
         # MERRA2 CONST
         # http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980/MERRA2_101.const_2d_asm_Nx.00000000.nc4
         #'FRLAND': {
@@ -223,12 +199,8 @@ class merraAsset(Asset):
         #     'latency': 60,
         #     'bandnames': ['0000GMT', '0600GMT', '1200GMT', '1800GMT']
         # },
-    """
 
-
-    _origin = (-180., -90.)
-    _defaultresolution = (0.625, 0.50)
-    
+        
     def __init__(self, filename):
         """ Inspect a single file and get some metadata """
         super(merraAsset, self).__init__(filename)
@@ -236,10 +208,10 @@ class merraAsset(Asset):
         self.tile = 'h01v01'
         parts = basename(filename).split('.')
 
-        print(filename)
-        print(parts)
-        print(parts[1].split('_'))
-        
+        #print(filename)
+        #print(parts)
+        #print(parts[1].split('_'))
+
         self.asset = parts[1].split('_')[2].upper()
         self.version = int(parts[0].split('_')[1])
         self.date = datetime.datetime.strptime(parts[2], '%Y%m%d').date()
@@ -254,36 +226,23 @@ class merraAsset(Asset):
 
         year, month, day = date.timetuple()[:3]
 
-        # TODO: figure out how to deal with products asset only on a particular day
-        #if asset == "MCD12Q1" and (month != 1 or day != 1):
-        #    print("Land cover data are only available for Jan. 1")
-        #    return
-
-        #username = cls.Repository.get_setting('username')
-        #password = cls.Repository.get_setting('password')
-
-        username = 'bobbyhbraswell'
-        password = 'Coffeedog_2'
-        
-        #mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
-        #pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
+        username = cls.Repository.get_setting('username')
+        password = cls.Repository.get_setting('password')
 
         mainurl = "%s/%04d/%02d/" % (cls._assets[asset]['url'], year, month)
-        pattern = cls._assets[asset]['pattern'] % (year, month, day)
+
+        pattern = cls._assets[asset]['re_pattern'] % (year, month, day)
         cpattern = re.compile(pattern)
         
         err_msg = "Error downloading"
-        #with utils.error_handler(err_msg):
-        #    listing = urllib.urlopen(mainurl).readlines()
-        listing = urllib.urlopen(mainurl).readlines()
-
-        set_trace()
+        with utils.error_handler(err_msg):
+            listing = urllib.urlopen(mainurl).readlines()
         
         success = False
         for item in listing:
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
-            # effectively random).
+            # effectively random)
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
@@ -294,8 +253,7 @@ class merraAsset(Asset):
                 with utils.error_handler("Asset fetch error", continuable=True):
 
                     kw = {'timeout': 20}
-                    if asset not in cls._skip_auth:
-                        kw['auth'] = (username, password)
+                    kw['auth'] = (username, password)
                     response = requests.get(url, **kw)
 
                     if response.status_code != requests.codes.ok:
@@ -312,6 +270,7 @@ class merraAsset(Asset):
 
         if not success:
             VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
+        print("success!")
 
     def updated(self, newasset):
         '''
@@ -322,57 +281,6 @@ class merraAsset(Asset):
                 self.tile == newasset.tile and
                 self.date == newasset.date and
                 self.version < newasset.version)
-            
-    
-    #@classmethod
-    #def lonlat2xy(cls, lon, lat):
-    #    """ Convert from lon-lat to x-y in array """
-    #    x = int(round((lon - cls._origin[0]) / cls._defaultresolution[0]))
-    #    y = int(round((lat - cls._origin[1]) / cls._defaultresolution[1]))
-    #    return (x, y)
-
-    #@classmethod
-    #def fetch(cls, asset, tile, date):
-    #    """ Get this asset for this tile and date (using OpenDap service) """
-    #    #super(MerraAsset, cls).fetch(asset, tile, date)
-    #    if cls._assets[asset]['latency'] is None:
-    #        assert date == datetime.datetime(1980, 1, 1)
-    #    if date > (datetime.datetime.now() - datetime.timedelta(cls._assets[asset]['latency'])):
-    #        print("These data are not available for specified dates.")
-    #        return None   
-    #    try:
-    #        dataset = cls.opendap_fetch(asset, date)
-    #    except Exception:
-    #        # TODO error-handling-fix:  permit this exception to bubble up; 
-    #        # use continuable handler in caller
-    #        print("Fetch: data not available", asset, tile, date)
-    #        return
-    #    # Find the bounds of the tile requested
-    #    bounds = cls.Repository.tile_bounds(tile)
-    #    # TODO - get origin from shapefile
-    #    ORIGIN = (-180., -90.)
-    #    dx = bounds[2] - bounds[0]
-    #    dy = bounds[3] - bounds[1]
-    #    xsize = int(round(dx / cls._defaultresolution[0]))
-    #    ysize = int(round(dy / cls._defaultresolution[1]))
-    #    ix0 = int(round((bounds[0] - ORIGIN[0]) / cls._defaultresolution[0]))
-    #    iy0 = int(round((bounds[1] - ORIGIN[1]) / cls._defaultresolution[1]))
-    #    ix1 = ix0 + xsize
-    #    iy1 = iy0 + ysize
-    #    VerboseOut('Retrieving data for bounds (%s, %s) - (%s, %s)' % (bounds[0], bounds[1], bounds[2], bounds[3]), 3)
-    #    set_trace()
-    #    data = dataset[asset][:, iy0:iy1, ix0:ix1].astype('float32')
-    #    data = data[:, ::-1, :]
-    #    # Save tile data
-    #    description = cls._assets[asset]['description']
-    #    meta = {'ASSET': asset, 'TILE': tile, 'DATE': str(date.date()), 'DESCRIPTION': description}
-    #    doy = date.strftime('%j')
-    #    fout = os.path.join(cls.Repository.path('stage'), "MERRA_%s_%s_%4d%s.tif" % (asset, tile, date.year, doy))
-    #    # TODO: use gippy instead
-    #    proj = raster.create_proj(4326)
-    #    geo = (bounds[0], cls._defaultresolution[0], 0.0, bounds[3], 0.0, -cls._defaultresolution[1])
-    #    print("writing", fout)
-    #    raster.write_raster(fout, data, proj, geo, meta, bandnames=cls._assets[asset]['bandnames'])
 
 
 class merraData(Data):
@@ -381,49 +289,52 @@ class merraData(Data):
     version = '1.0.0'
     Asset = merraAsset
 
+    _geotransform = (-180.3125, 0.625, 0.0, 90.25, 0.0, -0.5)
+    _projection = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.01745329251994328,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]'
+    
     _products = {
-        #'T2M': {
-        #    'description': 'Temperature at 2 m above the displacement height',
-        #    'assets': ['T2M']
-        #},
-        #'T10M': {
-        #    'description': 'Temperature at 10 m above the displacement height',
-        #    'assets': ['T10M']
-        #},
-        #'TS': {
-        #    'description': 'Surface temperature',
-        #    'assets': ['TS']
-        #},
-        #'PRECTOT': {
-        #    'description': 'Precipitation rate [kg m-2 s-1]',
-        #    'assets': ['PRECTOT']
-        #},
-        #'SPEED': {
-        #    'description': '3-dimensional wind speed for surface fluxes (m s-1)',
-        #    'assets': ['SPEED']
-        #},
+
         #'FRLAND': {
         #    'description': 'Land Fraction (static map)',
         #    'assets': ['FRLAND']
         #},
 
         'tave': {
-            'description': 'Ave daily air temperature data',
-            'assets': ['SLV']
+            'description': 'Ave daily air temperature data (K)',
+            'assets': ['SLV'],
+            'layers': ['T2M'],
+            'bands': ['tave']
         },
         'tmin': {
             'description': 'Min daily air temperature data',
-            'assets': ['SLV']
+            'assets': ['SLV'],
+            'layers': ['T2M'],
+            'bands': ['tmin']
         },
         'tmax': {
             'description': 'Max daily air temperature data',
-            'assets': ['SLV']
+            'assets': ['SLV'],
+            'layers': ['T2M'],
+            'bands': ['tmax']
         },
 
-        #'prcp': {
-        #    'description': 'Daily total precipitation (mm day-1)',
-        #    'assets': ['PRECTOT']
+        #'patm': {
+        #    'description': 'Surface atmospheric pressure (mb)',
+        #    'assets': ['PS']
         #},
+        #'rhum': {
+        #    'description': 'Relative humidity (%)',
+        #    'assets': ['QV2M', 'PS', 'T2M']
+        #},
+
+
+        'prcp': {
+            'description': 'Daily total precipitation (mm day-1)',
+            'assets': ['FLX'],
+            'layers': ['PRECTOT'],
+            'bands': ['prcp']
+        },
+
         #'wind': {
         #    'description': 'Daily mean wind speed (m s-1)',
         #    'assets': ['SPEED']
@@ -435,14 +346,6 @@ class merraData(Data):
         #'srad': {
         #    'description': 'Incident solar radiation (W m-2)',
         #    'assets': ['SWGDN']
-        #},
-        #'patm': {
-        #    'description': 'Surface atmospheric pressure (mb)',
-        #    'assets': ['PS']
-        #},
-        #'rhum': {
-        #    'description': 'Relative humidity (%)',
-        #    'assets': ['QV2M', 'PS', 'T2M']
         #},
 
         # BELOW NOT NEEDED?
@@ -484,6 +387,13 @@ class merraData(Data):
     #                 raise Exception('No daily LTA files exist!')
 
     # TODO: move this into Landsat or atmos module to support the wtemp pro
+    #@classmethod
+    #def lonlat2xy(cls, lon, lat):
+    #    """ Convert from lon-lat to x-y in array """
+    #    x = int(round((lon - cls._origin[0]) / cls._defaultresolution[0]))
+    #    y = int(round((lat - cls._origin[1]) / cls._defaultresolution[1]))
+    #    return (x, y)
+    #
     #@classmethod
     #def profile(cls, lon, lat, dtime):
     #    """ Retrieve atmospheric profile directly from merra data via OpenDap """
@@ -532,68 +442,61 @@ class merraData(Data):
         houroffset = lon * (12. / 180.)
         return houroffset
 
+    def write_reduced(self, prod, fun, fout, meta):
+        """ apply a function to reduce to a daily value """
+        assetname = self._products[prod]['assets'][0]
+        layername = self._products[prod]['layers'][0]
+        bandnames = self._products[prod]['bands']
+        assetfile = self.assets[assetname].filename     
+
+        ncroot = Dataset(assetfile)
+        var = ncroot.variables[layername]
+
+        missing = float(var.missing_value)
+        scale = var.scale_factor
+        assert scale == 1.0, "Handle non-unity scale functions"
+        
+        data = fun(var[:])
+        data = np.flipud(data)
+
+        geo = self._geotransform
+        proj = self._projection                
+        print('writing', fout)
+        write_raster(fout, data, proj, geo, meta, bandnames, missing)
+
+        
     def process(self, *args, **kwargs):
+        """ create products """
         products = super(merraData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
-
         bname = os.path.join(self.path, self.basename)
-        
+        sensor = "merra"
+
         for key, val in products.requested.items():
-            try:
-                assets = self.asset_filenames(val[0])
-            except:
-                # TODO error-handling-fix: leave as literal try-except but report on error
-                # Required assets unavailable, continue to next product
-                continue
-
-            fout = os.path.join(self.path, self.basename + "_merra_" + key)
-
-            if val[0] == "tave":
-
-                set_trace()
+            fout = "%s_%s_%s.tif" % (bname, sensor, key)
+            meta = {}
+            VERSION = "1.0"
+            meta['VERSION'] = VERSION
                 
+            if val[0] == "tave":
+                fun = lambda x: x.mean(axis=0) - 273.15
+                self.write_reduced(val[0], fun, fout, meta)
+
+            elif val[0] == "tmin":
+                fun = lambda x: x.min(axis=0) - 273.15
+                self.write_reduced(val[0], fun, fout, meta)
+
+            elif val[0] == "tmax":
+                fun = lambda x: x.max(axis=0) - 273.15
+                self.write_reduced(val[0], fun, fout, meta)
+
+            elif val[0] == "prcp":
+                fun = lambda x: x.mean(axis=0)*36.*24.*1000.
+                self.write_reduced(val[0], fun, fout, meta)
+
                 
             """
-            if val[0] == "tave":
-                img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
-                thourly = numpy.ma.MaskedArray(img.Read().squeeze())
-                thourly.mask = (thourly == MISSING)
-                temp = thourly.mean(axis=0)
-                temp = temp - 273.16
-                temp[temp.mask] = MISSING
-                imgout[0].Write(numpy.array(temp))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('C')
-                imgout.SetNoData(MISSING)
-
-            if val[0] == "tmax":
-                img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
-                thourly = numpy.ma.MaskedArray(img.Read().squeeze())
-                thourly.mask = (thourly == MISSING)
-                temp = thourly.max(axis=0)
-                temp = temp - 273.16
-                temp[temp.mask] = MISSING
-                imgout[0].Write(numpy.array(temp))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('C')
-                imgout.SetNoData(MISSING)
-
-            if val[0] == "tmin":
-                img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
-                thourly = numpy.ma.MaskedArray(img.Read().squeeze())
-                thourly.mask = (thourly == MISSING)
-                temp = thourly.min(axis=0)
-                temp = temp - 273.16
-                temp[temp.mask] = MISSING
-                imgout[0].Write(numpy.array(temp))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('C')
-                imgout.SetNoData(MISSING)
-
             if val[0] == "prcp":
                 img = gippy.GeoImage(assets[0])
                 imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
@@ -731,3 +634,8 @@ class merraData(Data):
             #    pass
 
             """
+
+            # add product to inventory
+            #self.AddFile(sensor, key, imgout.Filename())
+            self.AddFile(sensor, key, fout)
+
