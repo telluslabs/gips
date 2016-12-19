@@ -166,3 +166,5 @@ class Job(models.Model):
     # TODO: aggregation method?
     status   = models.TextField(validators=[valid_status])
     
+    class Meta:
+        unique_together = ('site', 'variable', 'spatial', 'temporal')
