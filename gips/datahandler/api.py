@@ -128,7 +128,6 @@ def query_service(driver_name, spatial, temporal, products,
         + 'get-info' - do nothing but return that which would have been requested.
     '''
     from time import time
-    print driver_name, spatial, temporal, products
     
     def tprint(tslist):
         last = tslist[0]
