@@ -71,7 +71,7 @@ def schedule_fetch ():
                 assets
             )
             assets.update(status='scheduled')
-            torque.submit('fetch', fetch_args, 2)
+            torque.submit('fetch', fetch_args) # for now, submit all to same job
 
 
 def schedule_process ():

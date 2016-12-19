@@ -51,7 +51,6 @@ def generate_script(operation, args_batch):
         #lines.append("worker.{}({}, {}, {}, {})".format(operation, *[repr(i) for i in args]))
         lines.append("worker.{}{}".format(operation, tuple(args)))
 
-    print lines
     return '\n'.join(lines) # stitch into single string & return
 
 
