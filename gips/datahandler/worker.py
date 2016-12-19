@@ -8,8 +8,32 @@ from django.db import transaction, IntegrityError
 
 from gips import utils
 from gips.inventory import dbinv
+from gips.datahandler import api
 
 
+def query (job):
+    """Determine which assets to fetch and products to process"""
+    with transaction.atomic():
+        job = dbinv.models.Job.objects.get(pk=job)
+        if job.status != 'scheduled':
+            # TODO log/msg about giving up here
+            return job # not sure this is useful for anything
+        job.status = 'initializing' 
+        job.save()
+
+    api.query_service(job.variable.driver, job.spatial, job.temporal, [job.variable.product])
+
+    job.refresh_from_db()
+    if job.status != 'initializing':
+        # sanity check; have to keep going, but whine about it
+        err_msg = "Expected Job status to be 'initializing, but got {}"
+        utils.verbose_out(err_msg.format(job.status), 1)
+    job.status = 'in-progress'
+    job.save()
+
+    return job
+    
+        
 def fetch(driver, asset_type, tile, date):
     """Fetch the asset file specified."""
     # Notify everyone that this process is doing the fetch.
@@ -36,7 +60,7 @@ def fetch(driver, asset_type, tile, date):
     if asset.status != 'in-progress':
         # sanity check; have to keep going but do whine about it
         err_msg = "Expected Asset status to be 'in-progress' but got '{}'"
-        utils.verbose_out(err_msg.format(asset.status.status), 1)
+        utils.verbose_out(err_msg.format(asset.status), 1)
     asset.sensor = a_obj.sensor
     asset.name   = a_obj.archived_filename
     asset.status = 'complete'
