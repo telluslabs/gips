@@ -15,26 +15,97 @@ from gips.datahandler import torque
 #from pdb import set_trace
 
 
-# entry point for Tom's bit for the demo; Tom doesn't go "further up" at the
-# moment.
-def schedule(assets=None, products=None, export_spec=None, aggregation=None, config=None):
+def submit_job (site, variable, spatial, temporal):
     """Pass a work spec in to the scheduler, and the work will be done.
 
-    Schedules the work by defining and starting a series of jobs managed by a
-    supporting task queueing or batching system.
-
-    assets:         list of the form (driver, asset_type, tile, date)
-    products:       list of the form (driver, product_type, tile, date)
-    export_spec:    TBD gips_project
-    aggregation:    TBD zonal summary
-    config:         TBD scheduling params such as how the work should be
-                    divided; leave as None for a sensible default, which is
-                    in turn TBD.
-
+    site:           geokit site id
+    variable:       DataVariable.name
+    spatial:        dictionary of parameters specifying a spatial extent
+                    (see gips.core.SpatialExtent.factory)
+    temporal:       dictionary of TemporalExtent parameters ('dates' and 'days')
     """
-    # TODO does this function set 'requested' on workers?
+    orm.setup()
+    job = dbinv.models.Job.objects.create(
+        site=site,
+        variable=dbinv.models.DataVariable.objects.get(name=variable),
+        spatial=repr(spatial),
+        temporal=repr(temporal),
+        status='requested',
+    )
+
+    return job.pk
+    
+
+def schedule_query ():
+    '''
+    Submit to torque (or other) query job for any new 'job'.
+    Runs query_service(...) to determine assets that need to be
+    fetched and products that need to be processed.
+
+    Will be called by a cron'd scheduler job.
+    '''
+    orm.setup()
+    with transaction.atomic():
+        jobs = dbinv.models.Job.objects.filter(status='requested')
+        if jobs.exists():
+            query_args = map(lambda j : [j.pk], jobs)
+            jobs.update(status='initializing')
+            torque.submit('query', query_args, 1)
+
+    
+def schedule_fetch ():
+    '''
+    Submit to torque (or other) fetch jobs for any assets that
+    are 'requested'. Mark scheduled assets as 'scheduled'.
+
+    Will be called by a cron'd scheduler job.
+    '''
+    
+    orm.setup()
+    # TODO: this needs to be throttleable 
+    with transaction.atomic():
+        assets = dbinv.models.Asset.objects.filter(status='requested')
+        if assets.exists():
+            fetch_args = map(
+                lambda a : [a.driver, a.asset, a.tile, a.date],
+                assets
+            )
+            assets.update(status='scheduled')
+            torque.submit('fetch', fetch_args) # for now, submit all to same job
 
 
+def schedule_process ():
+    '''
+    Submit to torque (or other?) jobs to process any products that are
+    ready to be processed - i.e. are 'requested' and all asset
+    dependencies are 'complete'. Mark scheduled products as 'scheduled'.
+
+    Will be called by a cron'd scheduler job
+    '''
+    
+    orm.setup()
+    from django.db.models import Q
+    with transaction.atomic():
+        products = dbinv.models.Product.objects.filter(
+            status='requested'
+        ).exclude(
+            ~Q(assetdependency__asset__status='complete')
+        )
+        if products.exists():
+            # TODO: process() fails if passed unicode strings. why?
+            def de_u(u):
+                return u.encode('ascii', 'ignore')
+            process_args = map(
+                lambda p : [de_u(p.driver), de_u(p.product), de_u(p.tile), p.date],
+                products
+            )
+            for p in process_args:
+                print p
+            products.update(status='scheduled')
+            torque.submit('process', process_args, 2)
+        
+                                                                                    
+    
 def query_service(driver_name, spatial, temporal, products,
                   query_type='missing', action='request-product'):
     '''
@@ -57,7 +128,7 @@ def query_service(driver_name, spatial, temporal, products,
         + 'get-info' - do nothing but return that which would have been requested.
     '''
     from time import time
-
+    
     def tprint(tslist):
         last = tslist[0]
         print('---')
@@ -105,7 +176,8 @@ def query_service(driver_name, spatial, temporal, products,
                              .format(query_type))
     # query data service
     items = datacls.query_service(
-        products, tiles, temporal_ext, update=update, force=force
+        products, tiles, temporal_ext,
+        update=update, force=force, grouped=True
     )
 
     tstamps.append((time(), 'queried service'))
@@ -129,37 +201,45 @@ def query_service(driver_name, spatial, temporal, products,
     # set status 'requested' on items (products and/or assets)
     req_status = 'requested'
     for i in items:
-        if request_asset:
+        print i
+        (p, t, d) = i
+        assets = []
+        for a in items[i]:
+            print a
+            if request_asset:
+                params = {
+                    'driver': driver_name, 'asset': a['asset'],
+                    'tile': a['tile'], 'date': a['date']
+                }
+                try:
+                    with transaction.atomic():
+                        asset = dbinv.models.Asset.objects.get(**params)
+                        if force or asset.status not in ('scheduled', 'in-progress', 'complete'):
+                            asset.status = req_status
+                            asset.save()
+                except ObjectDoesNotExist:
+                    params['status'] = req_status
+                    asset = dbinv.models.Asset(**params)
+                    asset.save()
+                assets.append(asset)
+        if request_product:
             params = {
-                'driver': driver_name, 'asset': i['asset'],
-                'tile': i['tile'], 'date': i['date']
+                'driver': driver_name, 'product': p,
+                'tile': t, 'date': d
             }
             try:
                 with transaction.atomic():
-                    asset = dbinv.models.Asset.objects.get(**params)
-                    if force or asset.status not in ('in-progress', 'complete'):
-                        asset.status = req_status
-                        asset.save()
-            except ObjectDoesNotExist:
-                params['status'] = req_status
-                asset = dbinv.models.Asset(**params)
-                asset.save()
-        if request_product:
-            params.update({'product': i['product'], 'sensor': i['sensor']})
-            params.pop('asset')
-
-            if 'status' in params:
-                params.pop('status')
-            try:
-                with transaction.atomic():
                     product = dbinv.models.Product.objects.get(**params)
-                    if product.status not in ('in-progress', 'complete'):
+                    if product.status not in ('scheduled', 'in-progress', 'complete'):
                         product.status = req_status
                         product.save()
             except ObjectDoesNotExist:
                 params['status'] = req_status
                 product = dbinv.models.Product(**params)
                 product.save()
+            for asset in assets:
+                dep = dbinv.models.AssetDependency(product=product, asset=asset)
+                dep.save()
     tstamps.append((time(), 'marked requested'))
     tprint(tstamps)
     return items

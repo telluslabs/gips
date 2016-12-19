@@ -831,11 +831,14 @@ class Data(object):
         return set(assets)
 
     @classmethod
-    def query_service(cls, products, tiles, textent, update=False, force=False):
+    def query_service(cls, products, tiles, textent, update=False, force=False, grouped=False):
         """
         query data service -- product-level interface
         """
-        response  = []
+        if grouped:
+            response = {}
+        else:
+            response  = []
         for p in products:
             assets = cls.products2assets([p])
             for t in tiles:
@@ -859,15 +862,22 @@ class Data(object):
                                     (len(local_assets) == 1 and
                                      local_assets[0].updated(aobj))
                                 ):
-                                    response.append(
-                                        {
-                                            'product': p,
-                                            'sensor': aobj.sensor,
-                                            'tile': t,
-                                            'asset': a,
-                                            'date': d
-                                        }
-                                    )
+                                    rec = {
+                                        'product': p,
+                                        'sensor': aobj.sensor,
+                                        'tile': t,
+                                        'asset': a,
+                                        'date': d
+                                    }
+                                    # useful to datahandler to have this grouped by (p,t,d)
+                                    # there is a fair bit of duplicated info this way, but oh well
+                                    if grouped:
+                                        if (p,t,d) in response:
+                                            response[(p,t,d)].append(rec)
+                                        else:
+                                            response[(p,t,d)] = [rec]
+                                    else:
+                                        response.append(rec)
         return response
 
     @classmethod

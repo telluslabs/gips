@@ -7,6 +7,7 @@ from django.core.exceptions import ValidationError
 def valid_status(val):
     if val not in ('remote',
                    'requested',
+                   'initializing' # this is only used at the job level
                    'scheduled',
                    'in-progress',
                    'complete',
@@ -153,3 +154,17 @@ class Result(models.Model):
 
     class Meta:
         unique_together = ('feature_set', 'date', 'product', 'site')
+
+
+class Job(models.Model):
+    """Description of gips job to be processed"""
+
+    site     = models.CharField(max_length=255)
+    variable = models.ForeignKey(DataVariable)
+    spatial  = models.TextField()
+    temporal = models.TextField()
+    # TODO: aggregation method?
+    status   = models.TextField(validators=[valid_status])
+    
+    class Meta:
+        unique_together = ('site', 'variable', 'spatial', 'temporal')
