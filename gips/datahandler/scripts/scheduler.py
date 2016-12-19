@@ -3,10 +3,10 @@
 from gips.datahandler import api
 
 def main ():
-    schedule_query()
-    schedule_fetch()
-    schedule_process()
-    #schedule_export_and_aggregate()
+    api.schedule_query()
+    api.schedule_fetch()
+    api.schedule_process()
+    #api.schedule_export_and_aggregate()
 
 if __name__ == '__main__':
     main()
