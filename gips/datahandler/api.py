@@ -180,8 +180,6 @@ def query_service(driver_name, spatial, temporal, products,
         update=update, force=force, grouped=True
     )
 
-    print items
-
     tstamps.append((time(), 'queried service'))
     tprint(tstamps)
 
