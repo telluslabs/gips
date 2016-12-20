@@ -237,9 +237,9 @@ def query_service(driver_name, spatial, temporal, products,
                 params['status'] = req_status
                 product = dbinv.models.Product(**params)
                 product.save()
-            for asset in assets:
-                dep = dbinv.models.AssetDependency(product=product, asset=asset)
-                dep.save()
+                for asset in assets:
+                    dep = dbinv.models.AssetDependency(product=product, asset=asset)
+                    dep.save()
     tstamps.append((time(), 'marked requested'))
     tprint(tstamps)
     return items
