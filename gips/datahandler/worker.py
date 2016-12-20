@@ -56,9 +56,7 @@ def fetch(driver, asset_type, tile, date):
     AssetClass = DataClass.Asset
     filenames  = AssetClass.fetch(asset_type, tile, date)
     if len(filenames) == 0:
-        asset = dbinv.models.Asset.objects.get(
-            driver=driver, asset=asset_type, tile=tile, date=date)
-        asset.status = dbinv.models.Status.objects.get(status='failed')
+        asset.status = 'failed'
         asset.save()
         return asset  # TODO: seems odd that this function returns
                       #       asset...discuss with tolson and fisk.
