@@ -3,7 +3,7 @@
 #    GIPS: Geospatial Image Processing System
 #
 #    AUTHOR: Matthew Hanson
-#    EMAIL:  matt.a.hanson@gmail.com 
+#    EMAIL:  matt.a.hanson@gmail.com
 #
 #    Copyright (C) 2014 Applied Geosolutions
 #
@@ -165,7 +165,7 @@ class modisAsset(Asset):
 
         bname = os.path.basename(filename)
         parts = bname.split('.')
-        
+
         self.asset = parts[0]
         self.tile = parts[2]
         self.sensor = parts[0][:3]
@@ -256,7 +256,7 @@ class modisAsset(Asset):
                     if response.status_code != requests.codes.ok:
                         print('Download of', basename, 'failed:', response.status_code, response.reason,
                               '\nFull URL:', url, file=sys.stderr)
-                        return # might as well stop b/c the rest will probably fail too
+                        return retrieved_filenames # might as well stop b/c the rest will probably fail too
 
                     with open(outpath, 'wb') as fd:
                         for chunk in response.iter_content():
@@ -277,7 +277,7 @@ class modisAsset(Asset):
                 self.tile == newasset.tile and
                 self.date == newasset.date and
                 self.version < newasset.version)
-            
+
 class modisData(Data):
     """ A tile of data (all assets and products) """
     name = 'Modis'
@@ -611,7 +611,7 @@ class modisData(Data):
 
                     nbad1 = len(wbad1[0])
                     nsurface1 = len(wsurface1[0])
-                    nvalid1 = len(wvalid1[0]) 
+                    nvalid1 = len(wvalid1[0])
                     assert nbad1 + nsurface1 + nvalid1 == frac.size, "frac contains invalid values"
 
                     # check out cover
@@ -669,7 +669,7 @@ class modisData(Data):
                 numvalidfrac = np.sum(fracout != 127)
                 numvalidcover = np.sum(coverout != 127)
 
-                # mask fractional product with binary 
+                # mask fractional product with binary
                 mask = np.where((coverout == 0) | (coverout == 50))
                 fracout[mask] = 0
 
@@ -824,7 +824,7 @@ class modisData(Data):
                 imgout[1].Write(fracout)
 
                 VerboseOut('Completed writing %s' % fname)
-                
+
             ###################################################################
             # TEMPERATURE PRODUCT (DAILY)
             if val[0] == "temp":
