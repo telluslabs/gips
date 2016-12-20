@@ -21,7 +21,7 @@ def query (job):
         if job.status != 'initializing':
             # TODO log/msg about giving up here
             return job # not sure this is useful for anything
-        job.status = 'scheduled' 
+        job.status = 'scheduled'
         job.save()
 
     api.query_service(job.variable.driver, eval(job.spatial), eval(job.temporal), [job.variable.product])
@@ -35,8 +35,8 @@ def query (job):
     job.save()
 
     return job
-    
-        
+
+
 def fetch(driver, asset_type, tile, date):
     """Fetch the asset file specified."""
     # Notify everyone that this process is doing the fetch.
@@ -55,6 +55,14 @@ def fetch(driver, asset_type, tile, date):
     DataClass  = utils.import_data_class(driver)
     AssetClass = DataClass.Asset
     filenames  = AssetClass.fetch(asset_type, tile, date)
+    if len(filenames) == 0:
+        asset = dbinv.models.Asset.objects.get(
+            driver=driver, asset=asset_type, tile=tile, date=date)
+        asset.status = dbinv.models.Status.objects.get(status='failed')
+        asset.save()
+        return asset  # TODO: seems odd that this function returns
+                      #       asset...discuss with tolson and fisk.
+
     a_obj = AssetClass._archivefile(filenames[0])[0] # for now neglect the 'update' case
 
     # update DB now that the work is done; no need for an atomic transaction
