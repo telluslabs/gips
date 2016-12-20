@@ -155,7 +155,8 @@ def _aggregate(*args, **kwargs):
     raise NotImplemented('Dunno what to do here')
 
 
-def aggregate(driver, *args, **kwargs):
+def export_and_aggregate(kwargs):
     """Entirely TBD but does the same things as gips_project + zonal summary."""
-    # TODO export step
-    # TODO spatial aggregator
+    _export(**kwargs)
+    agg_kwargs = {'outdir': kwargs['outdir']}
+    _aggregate(**kwargs)

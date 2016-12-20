@@ -34,12 +34,7 @@ orm.setup()
 """
 
 def generate_script(operation, args_batch):
-    if operation not in ('query', 'fetch', 'process'):
-        raise NotImplementedError('only fetch is supported')
-    if operation not in ('query', 'fetch', 'process', 'export', 'postprocess'):
-        err_msg = ("'{}' is an invalid operation (valid operations are "
-                   "'fetch', 'process', 'export', and 'postprocess')".format(operation))
-        raise ValueError(err_msg)
+    """Produce torque script from given worker function and arguments."""
     lines = []
     lines.append('#!' + utils.settings().REMOTE_PYTHON) # shebang
     lines += ['#PBS ' + d for d in pbs_directives]      # #PBS directives
@@ -48,7 +43,6 @@ def generate_script(operation, args_batch):
 
     # star of the show, the actual fetch
     for args in args_batch:
-        #lines.append("worker.{}({}, {}, {}, {})".format(operation, *[repr(i) for i in args]))
         lines.append("worker.{}{}".format(operation, tuple(args)))
 
     return '\n'.join(lines) # stitch into single string & return
@@ -65,9 +59,7 @@ def submit(operation, args_ioi, batch_size=None):
         batch_size function calls to perform in a loop.  Leave None for one job
         that works the whole batch.
     """
-    if operation not in ('query', 'fetch', 'process'):
-        raise NotImplementedError('only fetch is supported')
-    if operation not in ('query', 'fetch', 'process', 'export', 'postprocess'):
+    if operation not in ('query', 'fetch', 'process', 'export', 'export_and_aggregate'):
         err_msg = ("'{}' is an invalid operation (valid operations are "
                    "'fetch', 'process', 'export', and 'postprocess')".format(operation))
         raise ValueError(err_msg)
