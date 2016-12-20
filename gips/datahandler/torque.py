@@ -41,6 +41,9 @@ def generate_script(operation, args_batch):
     lines.append(import_block)  # python imports, std lib, 3rd party, and gips
     lines.append(setup_block)   # config & setup code
 
+    lines.append("print 'starting on `{}` job, sample arguments:'".format(operation))
+    lines.append("print '{}'".format(repr(args_batch[0])))
+
     # star of the show, the actual fetch
     for args in args_batch:
         lines.append("worker.{}{}".format(operation, tuple(args)))
