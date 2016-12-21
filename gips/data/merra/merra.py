@@ -317,36 +317,42 @@ class merraData(Data):
             'layers': ['T2M'],
             'bands': ['tmax']
         },
-
-        #'patm': {
-        #    'description': 'Surface atmospheric pressure (mb)',
-        #    'assets': ['PS']
-        #},
-        #'rhum': {
-        #    'description': 'Relative humidity (%)',
-        #    'assets': ['QV2M', 'PS', 'T2M']
-        #},
-
-
+        'patm': {
+            'description': 'Surface atmospheric pressure (mb)',
+            'assets': ['SLV'],
+            'layers': ['PS'],
+            'bands': ['patm']
+        },
+        'shum': {
+            'description': 'Relative humidity (kg kg-1)',
+            'assets': ['SLV'],
+            'layers': ['QV2M'],
+            'bands': ['shum']
+        },
+        'rhum': {
+            'description': 'Relative humidity (%)',
+            'assets': ['SLV'],
+            'layers': ['QV2M', 'PS', 'T2M'],
+            'bands': ['rhum']
+        },
         'prcp': {
             'description': 'Daily total precipitation (mm day-1)',
             'assets': ['FLX'],
             'layers': ['PRECTOT'],
             'bands': ['prcp']
         },
-
-        #'wind': {
-        #    'description': 'Daily mean wind speed (m s-1)',
-        #    'assets': ['SPEED']
-        #},
-        #'shum': {
-        #    'description': 'Relative humidity (kg kg-1)',
-        #    'assets': ['QV2M']
-        #},
-        #'srad': {
-        #    'description': 'Incident solar radiation (W m-2)',
-        #    'assets': ['SWGDN']
-        #},
+        'wind': {
+            'description': 'Daily mean wind speed (m s-1)',
+            'assets': ['FLX'],
+            'layers': ['SPEED'],
+            'bands': ['wind']
+        },
+        'srad': {
+            'description': 'Incident solar radiation (W m-2)',
+            'assets': ['RAD'],
+            'layers': ['SWGDN'],
+            'bands': ['srad']
+        },
 
         # BELOW NOT NEEDED?
         #'_temps': {
@@ -442,29 +448,39 @@ class merraData(Data):
         houroffset = lon * (12. / 180.)
         return houroffset
 
-    def write_reduced(self, prod, fun, fout, meta):
+    def write_reduced(self, prod, fun, fout, meta, units):
         """ apply a function to reduce to a daily value """
         assetname = self._products[prod]['assets'][0]
         layername = self._products[prod]['layers'][0]
         bandnames = self._products[prod]['bands']
-        assetfile = self.assets[assetname].filename     
-
+        assetfile = self.assets[assetname].filename
         ncroot = Dataset(assetfile)
         var = ncroot.variables[layername]
-
         missing = float(var.missing_value)
         scale = var.scale_factor
-        assert scale == 1.0, "Handle non-unity scale functions"
-        
-        data = fun(var[:])
-        data = np.flipud(data)
-
-        geo = self._geotransform
-        proj = self._projection                
+        assert scale == 1.0, "Handle non-unity scale functions"        
+        hourly = np.ma.MaskedArray(var[:])
+        hourly.mask = (hourly == missing)
+        nb, ny, nx = hourly.shape
+        # apply reduce rule
+        daily = fun(hourly)
+        daily[daily.mask] = missing
         print('writing', fout)
-        write_raster(fout, data, proj, geo, meta, bandnames, missing)
+        imgout = gippy.GeoImage(fout, nx, ny, 1, gdal.GDT_Float32)                
+        imgout[0].Write(np.flipud(np.array(daily)))
+        imgout.SetBandName(prod, 1)
+        imgout.SetUnits(units)
+        imgout.SetNoData(missing)
+        imgout.SetProjection(self._projection)
+        imgout.SetAffine(np.array(self._geotransform))
 
-        
+
+        #data = np.flipud(data)
+        #geo = self._geotransform
+        #proj = self._projection                
+        #write_raster(fout, data, proj, geo, meta, bandnames, missing)
+
+ 
     def process(self, *args, **kwargs):
         """ create products """
         products = super(merraData, self).process(*args, **kwargs)
@@ -472,7 +488,6 @@ class merraData(Data):
             return
         bname = os.path.join(self.path, self.basename)
         sensor = "merra"
-
         for key, val in products.requested.items():
             fout = "%s_%s_%s.tif" % (bname, sensor, key)
             meta = {}
@@ -481,121 +496,86 @@ class merraData(Data):
                 
             if val[0] == "tave":
                 fun = lambda x: x.mean(axis=0) - 273.15
-                self.write_reduced(val[0], fun, fout, meta)
+                units = "C"
+                self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "tmin":
                 fun = lambda x: x.min(axis=0) - 273.15
-                self.write_reduced(val[0], fun, fout, meta)
+                units = "C"
+                self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "tmax":
                 fun = lambda x: x.max(axis=0) - 273.15
-                self.write_reduced(val[0], fun, fout, meta)
+                units = "C"
+                self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "prcp":
                 fun = lambda x: x.mean(axis=0)*36.*24.*1000.
-                self.write_reduced(val[0], fun, fout, meta)
+                units = "mm d-1"
+                self.write_reduced(val[0], fun, fout, meta, units)
 
+            elif val[0] == "srad":
+                fun = lambda x: x.mean(axis=0)
+                units = "W m-2"
+                self.write_reduced(val[0], fun, fout, meta, units)
+
+            elif val[0] == "wind":
+                fun = lambda x: x.mean(axis=0)
+                units = "m s-1"
+                self.write_reduced(val[0], fun, fout, meta, units)
                 
-            """
-            if val[0] == "prcp":
-                img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
-                phourly = numpy.ma.MaskedArray(img.Read().squeeze())
-                phourly.mask = (phourly == MISSING)
-                prcp = phourly.mean(axis=0)
-                prcp = prcp * 36. * 24. * 1000
-                prcp[prcp.mask] = MISSING
-                imgout[0].Write(numpy.array(prcp))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('mm d-1')
-                imgout.SetNoData(MISSING)
+            elif val[0] == "shum":
+                fun = lambda x: x.mean(axis=0)
+                units = "kg kg-1"
+                self.write_reduced(val[0], fun, fout, meta, units)
 
-            if val[0] == "wind":
-                img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
-                hourly = numpy.ma.MaskedArray(img.Read().squeeze())
-                hourly.mask = (hourly == MISSING)
-                daily = hourly.mean(axis=0)
-                # daily = daily * 1.0
-                daily[daily.mask] = MISSING
-                imgout[0].Write(numpy.array(daily))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('m s-1')
-                imgout.SetNoData(MISSING)
+            elif val[0] == "patm":
+                fun = lambda x: x.mean(axis=0)/100.
+                units = "mb"
+                self.write_reduced(val[0], fun, fout, meta, units)
 
-            if val[0] == "srad":
-                img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
-                hourly = numpy.ma.MaskedArray(img.Read().squeeze())
-                hourly.mask = (hourly == MISSING)
-                daily = hourly.mean(axis=0)
-                # daily = daily * 1.0
-                daily[daily.mask] = MISSING
-                imgout[0].Write(numpy.array(daily))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('W m-2')
-                imgout.SetNoData(MISSING)
-
-            if val[0] == "shum":
-                img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
-                hourly = numpy.ma.MaskedArray(img.Read().squeeze())
-                hourly.mask = (hourly == MISSING)
-                daily = hourly.mean(axis=0)
-                # daily = daily * 1.0
-                daily[daily.mask] = MISSING
-                imgout[0].Write(numpy.array(daily))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('kg kg-1')
-                imgout.SetNoData(MISSING)
-
-            if val[0] == "patm":
-                img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
-                hourly = numpy.ma.MaskedArray(img.Read().squeeze())
-                hourly.mask = (hourly == MISSING)
-                daily = hourly.mean(axis=0)
-                daily = daily / 100.
-                daily[daily.mask] = MISSING
-                imgout[0].Write(numpy.array(daily))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('mb')
-                imgout.SetNoData(MISSING)
-
-            if val[0] == "rhum":
-                # based on 'QV2M', 'PS', 'T2M
-                # qair2rh <- function(qair, temp, press = 1013.25){
-                #     es <-  6.112 * exp((17.67 * temp)/(temp + 243.5))
-                #     e <- qair * press / (0.378 * qair + 0.622)
-                #     rh <- e / es
-                #     rh[rh > 1] <- 1
-                #     rh[rh < 0] <- 0
-                #     return(rh)
-                img = gippy.GeoImage(assets[0])
-                qv2m = numpy.ma.MaskedArray(img.Read().squeeze()) # kg kg-1
-                qv2m.mask = (qv2m == MISSING)
-                img = gippy.GeoImage(assets[1])
-                ps = numpy.ma.MaskedArray(img.Read().squeeze()) # Pa
-                ps.mask = (ps == MISSING)
-                img = gippy.GeoImage(assets[2])
-                t2m = numpy.ma.MaskedArray(img.Read().squeeze()) # K
-                t2m.mask = (t2m == MISSING)
+            elif val[0] == "rhum":
+                # uses layers QV2M PS T2M from asset SLV
+                prod = val[0]
+                bandnames = self._products[prod]['bands']
+                assetname = self._products[prod]['assets'][0]
+                assetfile = self.assets[assetname].filename
+                ncroot = Dataset(assetfile)
+                qv2m = ncroot.variables['QV2M']
+                ps = ncroot.variables['PS']
+                t2m = ncroot.variables['T2M']               
+                missing = float(qv2m.missing_value)
+                assert missing == float(ps.missing_value)
+                assert missing == float(t2m.missing_value)    
+                assert qv2m.scale_factor == 1.
+                assert ps.scale_factor == 1.
+                assert t2m.scale_factor == 1.
+                qv2m = np.ma.MaskedArray(qv2m[:])
+                ps = np.ma.MaskedArray(ps[:])
+                t2m = np.ma.MaskedArray(t2m[:])
+                nb, ny, nx = qv2m.shape
+                qv2m.mask = (qv2m == missing)
+                ps.mask = (ps == missing)
+                t2m.mask = (t2m == missing)
                 temp = t2m - 273.15
                 press = ps/100.
                 qair = qv2m
-                es = 6.112*numpy.exp((17.67*temp)/(temp + 243.5))
+                es = 6.112*np.exp((17.67*temp)/(temp + 243.5))
                 e = qair*press/(0.378*qair + 0.622)
                 rh = 100. * (e/es)
                 rh[rh > 100.] = 100.
                 rh[rh < 0.] = 0.
-                daily = rh.mean(axis=0)
-                daily[daily.mask] = MISSING
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 1)
-                imgout[0].Write(numpy.array(daily))
+                rhday = rh.mean(axis=0)
+                rhday[rhday.mask] = missing
+                imgout = gippy.GeoImage(fout, nx, ny, 1, gdal.GDT_Float32)                
+                imgout[0].Write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.SetBandName(val[0], 1)
                 imgout.SetUnits('%')
-                imgout.SetNoData(MISSING)
+                imgout.SetNoData(missing)
+                imgout.SetProjection(self._projection)
+                imgout.SetAffine(np.array(self._geotransform))
 
+            """
             if val[0] == "temp_modis":
                 img = gippy.GeoImage(assets[0])
                 imgout = gippy.GeoImage(fout, img, img.DataType(), 4)
@@ -630,12 +610,10 @@ class merraData(Data):
                     descr = " ".join([strtimes[itime], obsdate.isoformat()])
                     imgout.SetBandName(descr, itime + 1)
 
-            #elif val[0] == 'profile':
-            #    pass
-
+            elif val[0] == 'profile':
+                pass
             """
 
             # add product to inventory
-            #self.AddFile(sensor, key, imgout.Filename())
             self.AddFile(sensor, key, fout)
 
