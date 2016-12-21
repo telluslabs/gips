@@ -48,8 +48,6 @@ from gips import utils
 from pdb import set_trace
 
 
-#MISSING = 9.999999870e+14
-
 class Timeout():
     """Timeout class using ALARM signal."""
 
@@ -79,7 +77,6 @@ def write_raster(fname, data, proj, geo, meta, bandnames, nodata):
         nband = 1
         (ny, nx) = data.shape
         data = data.reshape(1, ny, nx)
-    # create data type
     gdal.GDT_UInt8 = gdal.GDT_Byte
     np_dtype = str(data.dtype)
     typestr = 'gdal.GDT_' + np_dtype.title().replace('Ui', 'UI')
@@ -124,7 +121,6 @@ class merraAsset(Asset):
     }
 
     _bandnames = ['%02d30GMT' % i for i in range(24)]
-
     _asset_re_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d.nc4"
     _asset_pattern = "MERRA2_???.{name}.????????.nc4"
 
@@ -207,15 +203,11 @@ class merraAsset(Asset):
         self.sensor = 'merra'
         self.tile = 'h01v01'
         parts = basename(filename).split('.')
-
-        #print(filename)
-        #print(parts)
-        #print(parts[1].split('_'))
-
         self.asset = parts[1].split('_')[2].upper()
         self.version = int(parts[0].split('_')[1])
         self.date = datetime.datetime.strptime(parts[2], '%Y%m%d').date()
 
+    # Example
     # url: http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4
     # pattern: "MERRA2_???.tavg1_2d_slv_Nx.%04d%02d%02d.nc4"
     # fully: http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4/1983/06/MERRA2_100.tavg1_2d_slv_Nx.19830601.nc4
@@ -225,12 +217,9 @@ class merraAsset(Asset):
     def fetch(cls, asset, tile, date):
 
         year, month, day = date.timetuple()[:3]
-
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
-
         mainurl = "%s/%04d/%02d/" % (cls._assets[asset]['url'], year, month)
-
         pattern = cls._assets[asset]['re_pattern'] % (year, month, day)
         cpattern = re.compile(pattern)
         
@@ -240,31 +229,24 @@ class merraAsset(Asset):
         
         success = False
         for item in listing:
-            # screen-scrape the content of the page and extract the full name of the needed file
-            # (this step is needed because part of the filename, the creation timestamp, is
-            # effectively random)
+            # inspect the content of the page and extract the full name of the needed file
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
                 name = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', name])
                 outpath = os.path.join(cls.Repository.path('stage'), name)
-
                 with utils.error_handler("Asset fetch error", continuable=True):
-
                     kw = {'timeout': 20}
                     kw['auth'] = (username, password)
                     response = requests.get(url, **kw)
-
                     if response.status_code != requests.codes.ok:
                         print('Download of', name, 'failed:', response.status_code, response.reason,
                               '\nFull URL:', url, file=sys.stderr)
-                        return # might as well stop b/c the rest will probably fail too
-
+                        return
                     with open(outpath, 'wb') as fd:
                         for chunk in response.iter_content():
                             fd.write(chunk)
-
                     utils.verbose_out('Retrieved %s' % name, 2)
                     success = True
 
@@ -474,19 +456,6 @@ class merraData(Data):
         imgout.SetNoData(missing)
         imgout.SetProjection(self._projection)
         imgout.SetAffine(np.array(self._geotransform))
-
-
-        #imgout[0].Write(np.flipud(np.array(daily)))
-        #imgout.SetBandName(prod, 1)
-        #imgout.SetUnits(units)
-        #imgout.SetNoData(missing)
-        #imgout.SetProjection(self._projection)
-        #imgout.SetAffine(np.array(self._geotransform))
-
-        #data = np.flipud(data)
-        #geo = self._geotransform
-        #proj = self._projection                
-        #write_raster(fout, data, proj, geo, meta, bandnames, missing)
 
         
     def process(self, *args, **kwargs):
