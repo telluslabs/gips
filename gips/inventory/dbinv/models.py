@@ -4,16 +4,19 @@ from django.contrib.gis.db import models
 from django.contrib.postgres.fields import HStoreField
 from django.core.exceptions import ValidationError
 
+status_strings = ('remote',
+                  'requested',
+                  'initializing',  # this is only used at the job level
+                  'scheduled',
+                  'in-progress',
+                  'complete',
+                  'failed')
+
+
 def valid_status(val):
-    if val not in ('remote',
-                   'requested',
-                   'initializing' # this is only used at the job level
-                   'scheduled',
-                   'in-progress',
-                   'complete',
-                   'failed'):
+    if val not in status_strings:
         raise ValidationError("invalid status: {}".format(val))
-        
+
 
 class Asset(models.Model):
     """Inventory for assets, which are downloaded files from data sources.
@@ -30,7 +33,7 @@ class Asset(models.Model):
     date   = models.DateField(db_index=True)   # of observation, not production
     name   = models.TextField()                # file name including full path
     status = models.TextField(validators=[valid_status])
-    
+
     class Meta:
         # These four columns uniquely identify an asset file
         unique_together = ('driver', 'asset', 'tile', 'date')
@@ -48,7 +51,7 @@ class Asset(models.Model):
             super(Asset, self).save(*args, **kwargs)
             change = AssetStatusChange(asset=self, status=self.status)
             change.save()
-                  
+
 
 class Product(models.Model):
     """Inventory for products, which GIPS generates from Assets.
@@ -65,7 +68,7 @@ class Product(models.Model):
     date    = models.DateField(db_index=True)   # of observation, not production
     name    = models.TextField()                # file name including full path
     status = models.TextField(validators=[valid_status])
-    
+
     class Meta:
         # These four columns uniquely identify an asset file
         unique_together = ('driver', 'product', 'tile', 'date')
@@ -88,11 +91,11 @@ class AssetDependency(models.Model):
     """Dependencies of products on specific assets"""
     product = models.ForeignKey(Product)
     asset   = models.ForeignKey(Asset)
-    
+
     class Meta:
         unique_together = ('product', 'asset')
 
-        
+
 class AssetStatusChange(models.Model):
     """Record of times product status updates"""
 
@@ -100,7 +103,7 @@ class AssetStatusChange(models.Model):
     status  = models.TextField(validators=[valid_status])
     time    = models.DateTimeField(auto_now_add=True)
 
-        
+
 class ProductStatusChange(models.Model):
     """Record of times product status updates"""
 
@@ -108,7 +111,7 @@ class ProductStatusChange(models.Model):
     status  = models.TextField(validators=[valid_status])
     time    = models.DateTimeField(auto_now_add=True)
 
-        
+
 class Vector(models.Model):
     geom       = models.GeometryField()
     name       = models.CharField(max_length=255)
@@ -165,6 +168,6 @@ class Job(models.Model):
     temporal = models.TextField()
     # TODO: aggregation method?
     status   = models.TextField(validators=[valid_status])
-    
+
     class Meta:
         unique_together = ('site', 'variable', 'spatial', 'temporal')
