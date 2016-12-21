@@ -50,7 +50,7 @@ def schedule_query ():
         if jobs.exists():
             query_args = map(lambda j : [j.pk], jobs)
             jobs.update(status='initializing')
-            torque.submit('query', query_args, 1)
+            return torque.submit('query', query_args, 1)
 
 
 def schedule_fetch ():
@@ -71,7 +71,7 @@ def schedule_fetch ():
                 assets
             )
             assets.update(status='scheduled')
-            torque.submit('fetch', fetch_args) # for now, submit all to same job
+            return torque.submit('fetch', fetch_args) # for now, submit all to same job
 
 
 def schedule_process ():
@@ -102,7 +102,7 @@ def schedule_process ():
             for p in process_args:
                 print p
             products.update(status='scheduled')
-            torque.submit('process', process_args, 2)
+            return torque.submit('process', process_args, 2)
 
 
 def processing_status(driver_name, spatial_spec, temporal_spec, products):
@@ -131,8 +131,6 @@ def processing_status(driver_name, spatial_spec, temporal_spec, products):
         for p in dbinv.product_search(**search_criteria):
             status[p.status] += 1
         return status
-
-
 
 
 def query_service(driver_name, spatial, temporal, products,

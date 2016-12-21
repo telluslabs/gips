@@ -41,6 +41,9 @@ def generate_script(operation, args_batch):
     lines.append(import_block)  # python imports, std lib, 3rd party, and gips
     lines.append(setup_block)   # config & setup code
 
+    lines.append("print 'starting on `{}` job, sample arguments:'".format(operation))
+    lines.append("print '{}'".format(repr(args_batch[0])))
+
     # star of the show, the actual fetch
     for args in args_batch:
         lines.append("worker.{}{}".format(operation, tuple(args)))
@@ -50,6 +53,9 @@ def generate_script(operation, args_batch):
 
 def submit(operation, args_ioi, batch_size=None):
     """Submit jobs to the configured Torque system.
+
+    Return value is a list of tuples, one for each batch:
+        (exit status of qsub, qsub's stdout, qsub's stderr)
 
     operation:  Defines which function will be performed, and must be one of
         'fetch', 'process', 'export', or 'postprocess'.
