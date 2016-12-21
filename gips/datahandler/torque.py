@@ -54,6 +54,9 @@ def generate_script(operation, args_batch):
 def submit(operation, args_ioi, batch_size=None):
     """Submit jobs to the configured Torque system.
 
+    Return value is a list of tuples, one for each batch:
+        (exit status of qsub, qsub's stdout, qsub's stderr)
+
     operation:  Defines which function will be performed, and must be one of
         'fetch', 'process', 'export', or 'postprocess'.
     args_ioi:  An iterable of iterables; each inner iterable gives the
