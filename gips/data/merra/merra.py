@@ -467,7 +467,8 @@ class merraData(Data):
         daily[daily.mask] = missing
         print('writing', fout)
         imgout = gippy.GeoImage(fout, nx, ny, 1, gdal.GDT_Float32)                
-        imgout[0].Write(np.flipud(np.array(daily)))
+
+        imgout[0].Write(np.array(np.flipud(daily)).astype('float32'))
         imgout.SetBandName(prod, 1)
         imgout.SetUnits(units)
         imgout.SetNoData(missing)
@@ -475,12 +476,19 @@ class merraData(Data):
         imgout.SetAffine(np.array(self._geotransform))
 
 
+        #imgout[0].Write(np.flipud(np.array(daily)))
+        #imgout.SetBandName(prod, 1)
+        #imgout.SetUnits(units)
+        #imgout.SetNoData(missing)
+        #imgout.SetProjection(self._projection)
+        #imgout.SetAffine(np.array(self._geotransform))
+
         #data = np.flipud(data)
         #geo = self._geotransform
         #proj = self._projection                
         #write_raster(fout, data, proj, geo, meta, bandnames, missing)
 
- 
+        
     def process(self, *args, **kwargs):
         """ create products """
         products = super(merraData, self).process(*args, **kwargs)
