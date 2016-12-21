@@ -34,7 +34,7 @@ def submit_job (site, variable, spatial, temporal):
     )
 
     return job.pk
-    
+
 
 def schedule_query ():
     '''
@@ -52,7 +52,7 @@ def schedule_query ():
             jobs.update(status='initializing')
             torque.submit('query', query_args, 1)
 
-    
+
 def schedule_fetch ():
     '''
     Submit to torque (or other) fetch jobs for any assets that
@@ -60,9 +60,9 @@ def schedule_fetch ():
 
     Will be called by a cron'd scheduler job.
     '''
-    
+
     orm.setup()
-    # TODO: this needs to be throttleable 
+    # TODO: this needs to be throttleable
     with transaction.atomic():
         assets = dbinv.models.Asset.objects.filter(status='requested')
         if assets.exists():
@@ -82,7 +82,7 @@ def schedule_process ():
 
     Will be called by a cron'd scheduler job
     '''
-    
+
     orm.setup()
     from django.db.models import Q
     with transaction.atomic():
@@ -103,9 +103,38 @@ def schedule_process ():
                 print p
             products.update(status='scheduled')
             torque.submit('process', process_args, 2)
-        
-                                                                                    
-    
+
+
+def processing_status(driver_name, spatial_spec, temporal_spec, products):
+        """ status of products matching this time-space-product query
+        :drivername: The name of the Data class to use (e.g., landsat, modis)
+        :spatial_spec: The dict of SpatialExtent.factory parameters
+        :temporal_spec: The TemporalExtent constructor parameters
+        :products: List of requested products of interest
+        """
+        orm.setup()
+        dataclass = utils.import_data_class(driver_name)
+        Repository = dataclass.Asset.Repository
+        spatial = SpatialExtent.factory(spatial_spec)
+        temporal = TemporalExtent(temporal_spec)
+        products = dataclass.RequestedProducts(products)
+
+        dates = temporal.prune_dates(spatial.available_dates)
+
+        status = {s: 0 for s in dbinv.models._status_strings}
+        search_criteria = {
+            'driver': driver_name,
+            'tile__in': spatial.tiles,
+            'date__in': dates,
+            'product__in': products,
+        }
+        for p in dbinv.product_search(**search_criteria):
+            status[p.status] += 1
+        return status
+
+
+
+
 def query_service(driver_name, spatial, temporal, products,
                   query_type='missing', action='request-product'):
     '''
@@ -128,7 +157,7 @@ def query_service(driver_name, spatial, temporal, products,
         + 'get-info' - do nothing but return that which would have been requested.
     '''
     from time import time
-    
+
     def tprint(tslist):
         last = tslist[0]
         print('---')
@@ -211,35 +240,35 @@ def query_service(driver_name, spatial, temporal, products,
                     'driver': driver_name, 'asset': a['asset'],
                     'tile': a['tile'], 'date': a['date']
                 }
-                try:
-                    with transaction.atomic():
+                with transaction.atomic():
+                    try:
                         asset = dbinv.models.Asset.objects.get(**params)
                         if force or asset.status not in ('scheduled', 'in-progress', 'complete'):
                             asset.status = req_status
                             asset.save()
-                except ObjectDoesNotExist:
-                    params['status'] = req_status
-                    asset = dbinv.models.Asset(**params)
-                    asset.save()
+                    except ObjectDoesNotExist:
+                        params['status'] = req_status
+                        asset = dbinv.models.Asset(**params)
+                        asset.save()
                 assets.append(asset)
         if request_product:
             params = {
                 'driver': driver_name, 'product': p,
                 'tile': t, 'date': d
             }
-            try:
-                with transaction.atomic():
+            with transaction.atomic():
+                try:
                     product = dbinv.models.Product.objects.get(**params)
                     if product.status not in ('scheduled', 'in-progress', 'complete'):
                         product.status = req_status
                         product.save()
-            except ObjectDoesNotExist:
-                params['status'] = req_status
-                product = dbinv.models.Product(**params)
-                product.save()
-                for asset in assets:
-                    dep = dbinv.models.AssetDependency(product=product, asset=asset)
-                    dep.save()
+                except ObjectDoesNotExist:
+                    params['status'] = req_status
+                    product = dbinv.models.Product(**params)
+                    product.save()
+                    for asset in assets:
+                        dep = dbinv.models.AssetDependency(product=product, asset=asset)
+                        dep.save()
     tstamps.append((time(), 'marked requested'))
     tprint(tstamps)
     return items
