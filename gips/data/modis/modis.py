@@ -421,13 +421,12 @@ class modisData(Data):
                     grnimg = refl[10].Read()
                     mirimg = refl[11].Read()
                     swrimg = refl[12].Read() # formerly swir2
-                elif versions[asset] == 5:
-                    redimg = refl[0].Read()
-                    nirimg = refl[1].Read()
-                    bluimg = refl[2].Read()
-                    grnimg = refl[3].Read()
-                    mirimg = refl[4].Read()
-                    swrimg = refl[5].Read() # formerly swir2
+                    redqcimg = refl[0].Read()
+                    nirqcimg = refl[1].Read()
+                    bluqcimg = refl[2].Read()
+                    grnqcimg = refl[3].Read()
+                    mirqcimg = refl[4].Read()
+                    swrqcimg = refl[5].Read()
                 else:
                     raise Exception('product version not supported')
 
@@ -475,6 +474,12 @@ class modisData(Data):
                 wg = np.where((bluimg != missing) & (redimg != missing) & (nirimg != missing) & (nirimg + 6.0*redimg - 7.5*bluimg + 1.0 != 0.0))
                 evi[wg] = (2.5*(nirimg[wg] - redimg[wg])) / (nirimg[wg] + 6.0*redimg[wg] - 7.5*bluimg[wg] + 1.0)
 
+                qc = missing + np.ones_like(redimg)
+                w0 = np.where((redqcimg == 0)&(nirqcimg == 0)&(bluqcimg == 0)&(grnqcimg == 0)&(mirqcimg == 0)&(swrqcimg == 0))
+                w255 = np.where((redqcimg == 255)|(nirqcimg == 255)|(bluqcimg == 255)|(grnqcimg == 255)|(mirqcimg == 255)|(swrqcimg == 255))
+                qc[w0] = 0
+                qc[w255] = 1
+                
                 # create output gippy image
                 print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 6)
@@ -482,12 +487,15 @@ class modisData(Data):
                 imgout.SetNoData(missing)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(0.0001)
-
+                imgout[6].SetGain(1.0)
+                
                 imgout[0].Write(ndvi)
                 imgout[1].Write(lswi)
                 imgout[2].Write(vari)
                 imgout[3].Write(brgt)
                 imgout[4].Write(satvi)
+                imgout[5].Write(evi)
+                imgout[6].Write(qc)
 
                 imgout.SetBandName('NDVI', 1)
                 imgout.SetBandName('LSWI', 2)
@@ -495,6 +503,7 @@ class modisData(Data):
                 imgout.SetBandName('BRGT', 4)
                 imgout.SetBandName('SATVI', 5)
                 imgout.SetBandName('EVI', 6)
+                imgout.SetBandName('QC', 7)
 
 
             # CLOUD MASK PRODUCT
