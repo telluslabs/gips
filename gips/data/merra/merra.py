@@ -214,8 +214,7 @@ class merraAsset(Asset):
     # basename: MERRA2_100.tavg1_2d_slv_Nx.19830601
 
     @classmethod
-    def fetch(cls, asset, tile, date):
-
+    def query_service(cls, asset, tile, date):
         year, month, day = date.timetuple()[:3]
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
@@ -224,35 +223,54 @@ class merraAsset(Asset):
         cpattern = re.compile(pattern)
         
         err_msg = "Error downloading"
+
         with utils.error_handler(err_msg):
             listing = urllib.urlopen(mainurl).readlines()
-        
-        success = False
+
+        available = []
         for item in listing:
-            # inspect the content of the page and extract the full name of the needed file
+            # inspect the page and extract the full name of the needed file
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
-                name = cpattern.findall(item)[0]
-                url = ''.join([mainurl, '/', name])
-                outpath = os.path.join(cls.Repository.path('stage'), name)
-                with utils.error_handler("Asset fetch error", continuable=True):
-                    kw = {'timeout': 20}
-                    kw['auth'] = (username, password)
-                    response = requests.get(url, **kw)
-                    if response.status_code != requests.codes.ok:
-                        print('Download of', name, 'failed:', response.status_code, response.reason,
-                              '\nFull URL:', url, file=sys.stderr)
-                        return
-                    with open(outpath, 'wb') as fd:
-                        for chunk in response.iter_content():
-                            fd.write(chunk)
-                    utils.verbose_out('Retrieved %s' % name, 2)
-                    success = True
+                basename = cpattern.findall(item)[0]
+                url = ''.join([mainurl, '/', basename])
+                available.append({'basename': basename, 'url': url})
 
-        if not success:
-            VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
-        print("success!")
+        if len(available) == 0:
+            msg = 'Unable to find a remote match for {} at {}'
+            VerboseOut(msg.format(pattern, mainurl), 4)
+        return available
+
+    @classmethod
+    def fetch(cls, asset, tile, date):
+        available_assets = cls.query_service(asset, tile, date)
+        retrieved_filenames = []
+
+        for asset_info in available_assets:
+            basename = asset_info['basename']
+            url = asset_info['url']
+            outpath = os.path.join(cls.Repository.path('stage'), basename)
+            
+            with utils.error_handler("Asset fetch error", continuable=True):
+                kw = {'timeout': 30}
+                username = cls.Repository.get_setting('username')
+                password = cls.Repository.get_setting('password')
+                kw['auth'] = (username, password)
+                response = requests.get(url, **kw)                
+                if response.status_code != requests.codes.ok:
+                    print('Download of', basename, 'failed:', response.status_code,
+                          response.reason, '\nFull URL:', url, file=sys.stderr)
+                    return
+
+                with open(outpath, 'wb') as fd:
+                    for chunk in response.iter_content():
+                        fd.write(chunk)
+            utils.verbose_out('Retrieved %s' % basename, 2)
+            retrieved_filenames.append(outpath)        
+
+        return retrieved_filenames
+
 
     def updated(self, newasset):
         '''
