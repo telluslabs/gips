@@ -41,7 +41,6 @@ from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, settings
 from gips import utils
 
-from pdb import set_trace
 
 def binmask(arr, bit):
     """ Return boolean array indicating which elements as binary have a 1 in
@@ -83,19 +82,19 @@ class modisAsset(Asset):
     _assets = {
         'MCD43A4': {
             'pattern': 'MCD43A4' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MCD43A2': {
             'pattern': 'MCD43A2' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MOD09Q1': {
             'pattern': 'MOD09Q1' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.005/',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.005/',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -7,
         },
@@ -113,25 +112,25 @@ class modisAsset(Asset):
         },
         'MOD11A1': {
             'pattern': 'MOD11A1' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.005',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -1
         },
         'MYD11A1': {
             'pattern': 'MYD11A1' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.005',
             'startdate': datetime.date(2002, 7, 8),
             'latency': -1
         },
         'MOD11A2': {
             'pattern': 'MOD11A2' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.005',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -7
         },
         'MYD11A2': {
             'pattern': 'MYD11A2' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.005',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -7
         },
@@ -149,7 +148,7 @@ class modisAsset(Asset):
         },
         'MCD12Q1': {
             'pattern': 'MCD12Q1' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
@@ -177,7 +176,6 @@ class modisAsset(Asset):
         collection = int(parts[3])
         file_version = int(parts[4])
         self.version = float('{}.{}'.format(collection, file_version))
-
         
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -197,7 +195,7 @@ class modisAsset(Asset):
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
         cpattern = re.compile(pattern)
-
+        
         if datetime.datetime.today().date().weekday() == 2:
             err_msg = "Error downloading on a Wednesday; possible planned MODIS provider downtime"
         else:
@@ -227,7 +225,7 @@ class modisAsset(Asset):
                         with open(outpath, 'wb') as fd:
                             fd.write(connection.read())
 
-                    else: # http
+                    else: # https :-/                        
                         kw = {'timeout': 30}
                         if asset not in cls._skip_auth:
                             kw['auth'] = (username, password)
@@ -406,6 +404,7 @@ class modisData(Data):
 
 
             # LAND VEGETATION INDICES PRODUCT
+            # now with QC layer!
             if val[0] == "indices":
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
@@ -420,7 +419,7 @@ class modisData(Data):
                     bluimg = refl[9].Read()
                     grnimg = refl[10].Read()
                     mirimg = refl[11].Read()
-                    swrimg = refl[12].Read() # formerly swir2
+                    swrimg = refl[12].Read() # swir1, formerly swir2
                     redqcimg = refl[0].Read()
                     nirqcimg = refl[1].Read()
                     bluqcimg = refl[2].Read()
@@ -474,15 +473,15 @@ class modisData(Data):
                 wg = np.where((bluimg != missing) & (redimg != missing) & (nirimg != missing) & (nirimg + 6.0*redimg - 7.5*bluimg + 1.0 != 0.0))
                 evi[wg] = (2.5*(nirimg[wg] - redimg[wg])) / (nirimg[wg] + 6.0*redimg[wg] - 7.5*bluimg[wg] + 1.0)
 
-                qc = missing + np.ones_like(redimg)
+                qc = np.ones_like(redimg) # mark as poor if all are not missing and not all are good
                 w0 = np.where((redqcimg == 0)&(nirqcimg == 0)&(bluqcimg == 0)&(grnqcimg == 0)&(mirqcimg == 0)&(swrqcimg == 0))
                 w255 = np.where((redqcimg == 255)|(nirqcimg == 255)|(bluqcimg == 255)|(grnqcimg == 255)|(mirqcimg == 255)|(swrqcimg == 255))
-                qc[w0] = 0
-                qc[w255] = 1
-                
+                qc[w0] = 0 # mark as good if they are all good
+                qc[w255] = missing # mark as missing if any are missing 
+
                 # create output gippy image
                 print("writing", fname)
-                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 6)
+                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 7)
 
                 imgout.SetNoData(missing)
                 imgout.SetOffset(0.0)
