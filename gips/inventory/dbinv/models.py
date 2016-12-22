@@ -142,21 +142,20 @@ class DataVariable(models.Model):
 class Result(models.Model):
     """Results from spatial aggregation operations."""
 
-    feature_set = models.CharField(max_length=255)
     count       = models.IntegerField(blank=True, null=True)
     date        = models.DateField()
+    job         = models.ForeignKey('Job')
     maximum     = models.FloatField(null=True, blank=True)
     mean        = models.FloatField(null=True, blank=True)
     skew        = models.FloatField(null=True, blank=True)
     minimum     = models.FloatField(null=True, blank=True)
-    product     = models.ForeignKey(DataVariable)
     sd          = models.FloatField(null=True, blank=True)
     fid         = models.IntegerField()
     site        = models.CharField(max_length=255)
     vector      = models.ForeignKey(Vector, null=True, blank=True)
 
     class Meta:
-        unique_together = ('feature_set', 'date', 'product', 'site')
+        unique_together = ('job', 'date', 'site')
 
 
 class Job(models.Model):

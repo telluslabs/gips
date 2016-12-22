@@ -2,17 +2,16 @@
 import argparse
 import sys
 import os
-import gips
 # Setup django
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "gips.inventory.orm.settings")
 import django
 django.setup()
 from gips.tools import SpatialAggregator
 from gips.utils import VerboseOut
-from gips.inventory.dbinv.models import Result, DataVariable, Vector
+from gips.inventory.dbinv.models import Result, DataVariable, Vector, Job
 from gips import settings
 
-def make_result(result, g_dv, g_site, g_id, source):
+def make_result(result, g_dv, g_id):
     key = result[0]
     bands = result[1]
 
@@ -29,39 +28,32 @@ def make_result(result, g_dv, g_site, g_id, source):
         skew = float(stats[4]) if stats[4] != 'nan' else None
         count = float(stats[5]) if stats[5] != 'nan' else None
 
-        try:
-            vector = Vector.objects.get(source=source, fid=fid)
-        except:
-            error = '''Could not find Vector with 
-                    src/fid {}/{}'''.format(source, fid)
-            VerboseOut(error, 2)
-            vector = None
-
         r = Result(
             date=date,
             fid=fid,
             minimum=minimum,
             maximum=maximum,
+            job=get_job(g_id),
             mean=mean,
             sd=sd,
             skew=skew,
             count=count,
-            product=g_dv,
-            site=g_site,
-            vector=vector,
-            feature_set=g_id,
         )
-        r.save()
+        try:
+            r.save()
+        except django.db.utils.IntegrityError:
+            # Result already exists, skip it
+            pass
 
 
-def get_product(prod):
+def get_job(job):
     try:
-        dv = DataVariable.objects.get(name=prod)
+        job = Job.objects.get(id=job)
     except django.core.exceptions.ObjectDoesNotExist:
-        VerboseOut('Product with name "{}" does not exist'.format(prod))
+        VerboseOut('Job with id {} does not exist'.format(job))
         exit(1)
-    
-    return dv
+
+    return job
 
 
 def main():
@@ -69,23 +61,6 @@ def main():
     desc = '''A wrapper for the Spatial Aggregator tool which creates Result
         objects from the output.'''
     parser = argparse.ArgumentParser(description=desc)
-    parser.add_argument(
-        '-s',
-        '--site',
-        required=True,
-        help='GeoKit site requesting data'
-    )
-    parser.add_argument(
-        '-i',
-        '--identifier',
-        required=True,
-        help='Request identifier',
-    )
-    parser.add_argument(
-        '-p',
-        '--product',
-        required=True,
-    )
     parser.add_argument(
         '-d',
         '--projdir',
@@ -95,9 +70,10 @@ def main():
 
     )
     parser.add_argument(
-        '-r',
-        '--source',
-        help='Source of shapes',
+        '-j',
+        '--job',
+        type=int,
+        help='Job ID',
         required=True
     )
     parser.add_argument(
@@ -109,12 +85,11 @@ def main():
 
     init_args = parser.parse_args()
     projdir = init_args.projdir
-    g_site = init_args.site
-    g_id = init_args.identifier
-    g_dv = get_product(init_args.product)
+    job = get_job(init_args.job)
+    g_id = job.pk
+    g_dv = job.variable
     nprocs = init_args.num_procs
 
-    source = init_args.source
     proj_name = os.path.basename(os.path.dirname(projdir))
 
     args = {
@@ -127,8 +102,7 @@ def main():
 
     results = SpatialAggregator.aggregate(**args)
     for r in results:
-        make_result(r, g_dv, g_site, g_id, source)
-        return
+        make_result(r, g_dv, g_id)
 
 if __name__ == "__main__":
     main()
