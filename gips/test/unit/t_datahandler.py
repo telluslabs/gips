@@ -12,8 +12,8 @@ def t_worker_export_and_aggregate(mocker):
     m_makedirs  = mocker.patch.object(worker.os, 'makedirs')
     m_rmtree    = mocker.patch.object(worker.shutil, 'rmtree')
 
-    prod_catalog_entry = models.DataVariable.create()
-    job = models.Job.create(variable=prod_catalog_entry.pk, status='in-progress')
+    catalog_entry = models.DataVariable.objects.create()
+    job = models.Job.objects.create(variable=catalog_entry, status='in-progress')
 
     # call
     worker.export_and_aggregate(job.pk, {})

@@ -157,7 +157,7 @@ def _export(**kwargs):
     # TODO nothing meaningful to return?
 
 
-def _aggregate(*args, **kwargs):
+def _aggregate(job_id, outdir):
     raise NotImplemented('Dunno what to do here')
 
 
@@ -175,7 +175,7 @@ def export_and_aggregate(job_id, export_kwargs):
     _aggregate(job_id, outdir)
 
     # bookkeeping & cleanup
-    job = dbinv.models.Job.get(job_id)
+    job = dbinv.models.Job.objects.get(pk=job_id)
     job.status = 'complete'
     job.save()
 
