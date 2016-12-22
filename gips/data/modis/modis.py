@@ -294,7 +294,7 @@ class modisData(Data):
         'indices': {
             'description': 'Land indices',
             'assets': ['MCD43A4'],
-            'bands': ['NDVI', 'LSWI', 'VARI', 'BRGT', 'SATVI', 'EVI'],
+            'bands': ['ndvi', 'lswi', 'vari', 'brgt', 'satvi', 'evi'],
         },
         'quality': {
             'description': 'MCD Product Quality',
@@ -310,39 +310,39 @@ class modisData(Data):
         'fsnow': {
             'description': 'Fractional snow cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
-            'bands': ['Fractional Snow Cover'],
+            'bands': ['fractional-snow-cover'],
         },
         'snow': {
             'description': 'Snow and ice cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
-            'bands': ['Snow Cover', 'Fractional Snow Cover'],
+            'bands': ['snow-cover', 'fractional-snow-cover'],
         },
         'temp': {
             'description': 'Surface temperature data',
             'assets': ['MOD11A1', 'MYD11A1'],
             'bands': [
-                'Temperature Daytime Terra',
-                'Temperature Nighttime Terra',
-                'Temperature Daytime Aqua',
-                'Temperature Nighttime Aqua',
-                'Temperature Best Quality',
+                'temperature-daytime-terra',
+                'temperature-nighttime-terra',
+                'temperature-daytime-aqua',
+                'temperature-nighttime-aqua',
+                'temperature-best-quality',
             ],
         },
         'obstime': {
             'description': 'MODIS Terra/Aqua overpass time',
             'assets': ['MOD11A1', 'MYD11A1'],
             'bands': [
-                'Observation Time Daytime Terra',
-                'Observation Time Nighttime Terra',
-                'Observation Time Daytime Aqua',
-                'Observation Time Nighttime Aqua'
+                'observation-time-daytime-terra',
+                'observation-time-nighttime-terra',
+                'observation-time-daytime-aqua',
+                'observation-time-nighttime-aqua'
             ],
         },
         # Misc
         'ndvi8': {
             'description': 'Normalized Difference Vegetation Index: 250m',
             'assets': ['MOD09Q1'],
-            'bands': ['RED', 'NIR'],
+            'bands': ['red', 'nir'],
         },
         'temp8td': {
             'description': 'Surface temperature: 1km',
@@ -357,7 +357,7 @@ class modisData(Data):
         'clouds': {
             'description': 'Cloud Mask',
             'assets': ['MOD10A1'],
-            'bands': ['Cloud Cover'],
+            'bands': ['cloud-cover'],
         }
     }
 
