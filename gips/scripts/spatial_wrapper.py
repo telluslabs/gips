@@ -56,6 +56,25 @@ def get_job(job):
     return job
 
 
+def aggregate(projdir, job_id, nprocs=1):
+    job = get_job(job_id)
+    dv = job.variable
+
+    proj_name = os.path.basename(os.path.dirname(projdir))
+
+    args = {
+        'bands': [dv.band_number],
+        'products': [dv.product],
+        'projdir': projdir,
+        'processes': nprocs,
+
+    }
+
+    results = SpatialAggregator.aggregate(**args)
+    for r in results:
+        make_result(r, dv, job_id)
+
+
 def main():
     path = os.path.dirname(os.path.abspath(__file__))
     desc = '''A wrapper for the Spatial Aggregator tool which creates Result
@@ -85,24 +104,11 @@ def main():
 
     init_args = parser.parse_args()
     projdir = init_args.projdir
-    job = get_job(init_args.job)
-    g_id = job.pk
-    g_dv = job.variable
+    job_id = init_args.job
     nprocs = init_args.num_procs
 
-    proj_name = os.path.basename(os.path.dirname(projdir))
+    aggregate(projdir, job_id, nprocs)
 
-    args = {
-        'bands': [g_dv.band_number],
-        'products': [g_dv.product],
-        'projdir': projdir,
-        'processes': nprocs,
-
-    }
-
-    results = SpatialAggregator.aggregate(**args)
-    for r in results:
-        make_result(r, g_dv, g_id)
 
 if __name__ == "__main__":
     main()
