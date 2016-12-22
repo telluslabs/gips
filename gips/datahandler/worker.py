@@ -3,7 +3,7 @@
 Called inside worker processes; first implementation is expected to be torque
 jobs.
 """
-import os
+import os, shutil
 
 from django.db import transaction, IntegrityError
 
@@ -157,12 +157,26 @@ def _export(**kwargs):
     # TODO nothing meaningful to return?
 
 
-def _aggregate(*args, **kwargs):
+def _aggregate(job_id, outdir):
     raise NotImplemented('Dunno what to do here')
 
 
-def export_and_aggregate(kwargs):
+def export_and_aggregate(job_id, export_kwargs):
     """Entirely TBD but does the same things as gips_project + zonal summary."""
-    _export(**kwargs)
-    agg_kwargs = {'outdir': kwargs['outdir']}
-    _aggregate(**kwargs)
+    # setup output dir
+    outdir = export_kwargs.setdefault('outdir',
+                                      os.path.join(utils.settings().EXPORT_DIR, str(job_id)))
+    # poor man's binary semaphore since mkdir is atomic;
+    # exception on a priori existence is what we want here
+    os.makedirs(outdir)
+
+    # run
+    _export(**export_kwargs)
+    _aggregate(job_id, outdir)
+
+    # bookkeeping & cleanup
+    job = dbinv.models.Job.objects.get(pk=job_id)
+    job.status = 'complete'
+    job.save()
+
+    shutil.rmtree(outdir)
