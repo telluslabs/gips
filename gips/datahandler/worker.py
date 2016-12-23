@@ -12,6 +12,7 @@ from gips.datahandler import api
 from gips.core import SpatialExtent, TemporalExtent
 from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import dbinv, orm
+from gips.scripts.spatial_wrapper import aggregate
 
 
 def query (job):
@@ -158,7 +159,7 @@ def _export(**kwargs):
 
 
 def _aggregate(job_id, outdir):
-    raise NotImplemented('Dunno what to do here')
+    aggregate(outdir, job_id)
 
 
 def export_and_aggregate(job_id, export_kwargs):
