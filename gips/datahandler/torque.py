@@ -42,7 +42,9 @@ def generate_script(operation, args_batch):
     lines.append(setup_block)   # config & setup code
 
     lines.append("print 'starting on `{}` job, sample arguments:'".format(operation))
-    lines.append("print '{}'".format(repr(args_batch[0])))
+    # TODO: this is risky. if args_batch has quotes in it, generates syntax error
+    #       i switched to double quotes because repr seems to generate singles in most cases
+    lines.append('print "{}"'.format(repr(args_batch[0])))
 
     # star of the show, the actual fetch
     for args in args_batch:
@@ -66,6 +68,7 @@ def submit(operation, args_ioi, batch_size=None):
         that works the whole batch.
     """
     if operation not in ('query', 'fetch', 'process', 'export', 'export_and_aggregate'):
+        # TODO: this error message does not match the 'operations'
         err_msg = ("'{}' is an invalid operation (valid operations are "
                    "'fetch', 'process', 'export', and 'postprocess')".format(operation))
         raise ValueError(err_msg)

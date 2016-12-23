@@ -9,6 +9,8 @@ status_strings = ('remote',
                   'initializing',  # this is only used at the job level
                   'scheduled',
                   'in-progress',
+                  'pp_scheduled', # name TBD. only used at job level
+                  'post-processing', # only used at job level
                   'complete',
                   'failed')
 
