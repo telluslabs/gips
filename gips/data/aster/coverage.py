@@ -22,30 +22,38 @@ from pdb import set_trace
 
 ROOTURL = "http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003"
 STARTDATE = datetime.date(2000, 3, 6)
-ENDDATE = datetime.date(2016, 6, 30)
+#ENDDATE = datetime.date(2016, 6, 30)
+ENDDATE = datetime.datetime.now().date()
 OUTDIR = "/data/aster/db"
 TIMEOUT = 60
 SLEEP = 0.1
-AUTH = ('bobbyhbraswell', 'Coffeedog_1')
+AUTH = ('bobbyhbraswell', 'Coffeedog_2')
 
 
 def main():
 
     ndays = (ENDDATE - STARTDATE).days + 1
+    
     for nday in range(ndays):
         date = STARTDATE + datetime.timedelta(nday)
         datestr = date.strftime('%Y.%m.%d')
         outpath = os.path.join(OUTDIR, datestr + ".csv")
         if os.path.exists(outpath):
             continue
+
+        print "trying", outpath
+        
         mainurl = ROOTURL + "/" + datestr
         pattern = '(AST_L1T_\d{17}_\d{14}_\d+.hdf)'
         cpattern = re.compile(pattern)
 
         listing = wget.get(mainurl, auth=AUTH).split('\n')
-        if listing == '':
+        
+        if listing == '':            
             continue
 
+        print "there is a listing"
+        
         opened = False
         for item in listing:            
             if cpattern.search(item):
