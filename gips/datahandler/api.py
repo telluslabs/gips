@@ -48,7 +48,7 @@ def schedule_query ():
     with transaction.atomic():
         jobs = dbinv.models.Job.objects.filter(status='requested')
         if jobs.exists():
-            query_args = map(lambda j : [j.pk], jobs)
+            query_args = [ [j.pk] for j in jobs ]
             jobs.update(status='initializing')
             return torque.submit('query', query_args, 1)
 
@@ -66,10 +66,8 @@ def schedule_fetch ():
     with transaction.atomic():
         assets = dbinv.models.Asset.objects.filter(status='requested')
         if assets.exists():
-            fetch_args = map(
-                lambda a : [a.driver, a.asset, a.tile, a.date],
-                assets
-            )
+            fetch_args = [ [a.driver, a.asset, a.tile, a.date]
+                           for a in assets ]
             assets.update(status='scheduled')
             return torque.submit('fetch', fetch_args) # for now, submit all to same job
 
@@ -95,14 +93,55 @@ def schedule_process ():
             # TODO: process() fails if passed unicode strings. why?
             def de_u(u):
                 return u.encode('ascii', 'ignore')
-            process_args = map(
-                lambda p : [de_u(p.driver), de_u(p.product), de_u(p.tile), p.date],
-                products
-            )
-            for p in process_args:
-                print p
+            process_args = [ [de_u(p.driver), de_u(p.product), de_u(p.tile), p.date]
+                             for p in products ]
             products.update(status='scheduled')
             return torque.submit('process', process_args, 2)
+
+
+def schedule_export_and_aggregate ():
+    '''
+    Check all Jobs to see if  ready for post-processing (all assets fetched and
+    all products processed). If so, submit export and aggregate jobs
+    to torque (or other?) 
+
+    Will be called by a cron'd scheduler job
+
+    '''
+    orm.setup()
+    with transaction.atomic():
+        jobs = dbinv.models.Job.objects.filter(status='in-progress')
+        if jobs.exists():
+            job_info = [
+                (
+                    j, 
+                    {
+                        'driver'   : j.variable.driver.encode('ascii', 'ignore'),
+                        'spatial'  : eval(j.spatial),
+                        'temporal' : eval(j.temporal),
+                        'products' : [j.variable.product.encode('ascii', 'ignore')],
+                    }
+                )
+                for j in jobs
+            ]
+            for job, args in job_info:
+                status = processing_status(
+                    args['driver'],
+                    args['spatial'],
+                    args['temporal'],
+                    args['products'],
+                )
+                if (
+                        status['requested'] == 0
+                        and status['scheduled'] == 0
+                        and status['in-progress'] == 0
+                ):
+                    # nothing being worked on. must be done pre-processing
+                    print "Submitting job", job.pk, "for export and aggregate"
+                    job.status = 'pp-scheduled'
+                    job.save()
+                    # TODO: need to figure out the right arguments
+                    #submit_job('export_and_aggregate', job.pk, args) # TODO: undoubtedly wrong args
 
 
 def processing_status(driver_name, spatial_spec, temporal_spec, products):
@@ -114,22 +153,30 @@ def processing_status(driver_name, spatial_spec, temporal_spec, products):
         """
         orm.setup()
         dataclass = utils.import_data_class(driver_name)
-        Repository = dataclass.Asset.Repository
-        spatial = SpatialExtent.factory(spatial_spec)
-        temporal = TemporalExtent(temporal_spec)
-        products = dataclass.RequestedProducts(products)
+        spatial = SpatialExtent.factory(dataclass, **spatial_spec)
+        temporal = TemporalExtent(**temporal_spec)
 
-        dates = temporal.prune_dates(spatial.available_dates)
+        # convert spatial_extents into just a stack of tiles
+        tiles = set()
+        for se in spatial:
+            tiles = tiles.union(se.tiles)
+            
 
-        status = {s: 0 for s in dbinv.models._status_strings}
-        search_criteria = {
+        status = {s: 0 for s in dbinv.models.status_strings}
+        criteria = {
             'driver': driver_name,
-            'tile__in': spatial.tiles,
-            'date__in': dates,
+            'tile__in': tiles,
+            'date__gte': temporal.datebounds[0],
+            'date__lte': temporal.datebounds[1],
             'product__in': products,
         }
-        for p in dbinv.product_search(**search_criteria):
-            status[p.status] += 1
+        for p in dbinv.models.Product.objects.filter(**criteria):
+            # TODO: check for daybounds should be built in to query!
+            if (
+                    p.date.timetuple().tm_yday >= temporal.daybounds[0]
+                    and p.date.timetuple().tm_yday <= temporal.daybounds[1]
+            ):
+                status[p.status] += 1
         return status
 
 

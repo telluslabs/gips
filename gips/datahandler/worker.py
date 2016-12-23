@@ -164,6 +164,14 @@ def _aggregate(job_id, outdir):
 
 def export_and_aggregate(job_id, export_kwargs):
     """Entirely TBD but does the same things as gips_project + zonal summary."""
+    with transaction.atomic():
+        job = dbinv.models.Job.objects.get(pk=job_id)
+        if job.status != 'pp-scheduled':
+            # TODO log/msg about giving up here
+            return job # not sure this is useful for anything
+        job.status = 'post-processing'
+        job.save()
+
     # setup output dir
     outdir = export_kwargs.setdefault('outdir',
                                       os.path.join(utils.settings().EXPORT_DIR, str(job_id)))
@@ -176,7 +184,11 @@ def export_and_aggregate(job_id, export_kwargs):
     _aggregate(job_id, outdir)
 
     # bookkeeping & cleanup
-    job = dbinv.models.Job.objects.get(pk=job_id)
+    job.refresh_from_db()
+    if job.status != 'post-processing':
+        # sanity check; have to keep going, but whine about it
+        err_msg = "Expected Job status to be 'post-processing', but got {}"
+        utils.verbose_out(err_msg.format(job.status), 1)
     job.status = 'complete'
     job.save()
 
