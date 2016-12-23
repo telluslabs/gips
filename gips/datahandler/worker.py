@@ -166,7 +166,7 @@ def export_and_aggregate(job_id, export_kwargs):
     """Entirely TBD but does the same things as gips_project + zonal summary."""
     with transaction.atomic():
         job = dbinv.models.Job.objects.get(pk=job_id)
-        if job.status != 'pp_scheduled':
+        if job.status != 'pp-scheduled':
             # TODO log/msg about giving up here
             return job # not sure this is useful for anything
         job.status = 'post-processing'
