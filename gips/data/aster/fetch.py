@@ -1,33 +1,41 @@
 #!/usr/bin/env python
 
-""" Download ASTER data matching a prescribed polygon """
+""" Download ASTER data matching a prescribed polygon using the db """
 
 import os
-import re
+import csv
 import datetime
-import urllib, urllib2
-import xml.etree.ElementTree as ET
+#import urllib, urllib2
+import requests
+from functools import partial
 
 import fiona
 from shapely.geometry import Polygon
-
-from functools import partial
-import pyproj
+from shapely.wkt import loads
 from shapely.ops import transform
+import pyproj
+
 
 
 from pdb import set_trace
 
 
-ROOTURL = "http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003"
-# http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003/2013.10.03/AST_L1T_00310032013031653_20150618010058_108124.hdf
-# http://e4ftl01.cr.usgs.gov/ASTT/AST_L1T.003/2013.10.03/AST_L1T_00310032013031653_20150618010058_108124.hdf.xml
+DBDIR = "/data/aster/db"
+OUTDIR = "/data/aster/test"
 
+USERNAME = "bobbyhbraswell"
+PASSWORD = "Coffeedog_2"
+
+
+# Test times
 STARTDATE = datetime.date(2003, 1, 1)
-ENDDATE = datetime.date(2015, 12, 31)
+ENDDATE = datetime.date(2016, 12, 31)
+#STARTDATE = datetime.date(2010, 6, 1)
+#ENDDATE = datetime.date(2010, 6, 30)
 
-MODISTILES = "/home/braswell/gips/gips/data/modis/tiles.shp"
-TILEID = "h12v03"
+# Test locations
+SHPFILE = "/home/braswell/gips/gips/data/modis/tiles.shp"
+FEATURE = ('cat', 517)
 PROJ = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +no_defs"
 
 
@@ -37,13 +45,13 @@ def getgeom_by_attr(filename, attrname, attrval):
     for feature in collection:
         if feature['properties'][attrname] == attrval:
             return Polygon(feature['geometry']['coordinates'][0])
-        
+
         
 def main():
 
-    tilepoly = getgeom_by_attr(MODISTILES, 'tileid', TILEID)
+    targetpoly = getgeom_by_attr(SHPFILE, FEATURE[0], FEATURE[1])
 
-    project = partial(
+    reproject = partial(
         pyproj.transform,
         pyproj.Proj(init='epsg:4326'),
         pyproj.Proj(PROJ))
@@ -52,38 +60,40 @@ def main():
 
     for nday in range(ndays):
         date = STARTDATE + datetime.timedelta(nday)
-        datestr = date.strftime('%Y.%m.%d')        
-        mainurl = ROOTURL + "/" + datestr
-        pattern = '(AST_L1T_\d{17}_\d{14}_\d{6}.hdf)'
-        cpattern = re.compile(pattern)                                
-        listing = urllib.urlopen(mainurl).readlines()
+        datestr = date.strftime('%Y.%m.%d')
         
-        for item in listing:
-            if cpattern.search(item):
-                if 'xml' not in item:
-                    name = cpattern.findall(item)[0]
-                    outpath = os.path.join('/data/aster', name)
-                    if os.path.exists(outpath):
-                        print "skipping"
-                        continue
-                    xmlname = name + ".xml"
-                    xmlurl = mainurl + "/" + xmlname
-                    connection = urllib2.urlopen(xmlurl) 
-                    data = connection.read()
-                    root = ET.fromstring(data)                    
-                    boundary = root.findall('./GranuleURMetaData/SpatialDomainContainer/HorizontalSpatialDomainContainer/GPolygon/Boundary')
-                    coords = []
-                    for point in boundary[0].findall('Point'):                        
-                        coords.append((float(point.find('PointLongitude').text), float(point.find('PointLatitude').text)))
-                    poly = Polygon(coords)
-                    polysin = transform(project, poly)                    
-                    if polysin.intersects(tilepoly):
-                        print xmlname                    
-                        url = mainurl + "/" + name
-                        connection = urllib2.urlopen(url)
-                        output = open(outpath, 'wb')
-                        output.write(connection.read())
-                        output.close()
+        dbfile = os.path.join(DBDIR, datestr + ".csv")
+
+        try:
+            reader = csv.reader(open(dbfile, 'r'), delimiter=",", quotechar="'")
+        except IOError:
+            print "NO DB FILE", dbfile
+            continue
+        
+        for row in reader:    
+            url, polystr, daynight, utmzone = row
+            if daynight != 'Day':
+                continue
+            astpoly_orig = loads(polystr)
+            astpoly = transform(reproject, astpoly_orig)
+            if astpoly.intersects(targetpoly):
+                filename = url.split('/')[-1]
+                outpath = os.path.join(OUTDIR, filename)
+                if os.path.exists(outpath):
+                    print "file already exists"
+                    continue
+                print "{} -> {}".format(url, outpath)
+                kw = {'timeout': 20, 'auth': (USERNAME, PASSWORD)}
+                response = requests.get(url, **kw)
+                with open(outpath, 'wb') as fd:
+                    for chunk in response.iter_content():
+                        fd.write(chunk)
+                
+                #connection = urllib2.urlopen(url)
+                #output = open(outpath, 'wb')
+                #output.write(connection.read())
+                #output.close()
+                break
 
 if __name__ == "__main__":
     main()
