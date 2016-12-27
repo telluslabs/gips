@@ -96,6 +96,7 @@ class merraAsset(Asset):
     _bandnames = ['%02d30GMT' % i for i in range(24)]
     _asset_re_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d.nc4"
     _asset_pattern = "MERRA2_???.{name}.????????.nc4"
+
     _assets = {
         # MERRA2 SLV
         ## TS: Surface skin temperature (K)
@@ -146,7 +147,6 @@ class merraAsset(Asset):
             'startdate': datetime.date(1980, 1, 1),
             'latency': None,
         }
-    }
 
         #'PROFILE': {
         #     'description': 'Atmospheric Profile',
@@ -166,8 +166,8 @@ class merraAsset(Asset):
         #     'latency': 60,
         #     'bandnames': ['0000GMT', '0600GMT', '1200GMT', '1800GMT']
         # },
+    }
 
-        
     def __init__(self, filename):
         """ Inspect a single file and get some metadata """
         super(merraAsset, self).__init__(filename)
@@ -192,9 +192,6 @@ class merraAsset(Asset):
             pattern = cls._assets[asset]['re_pattern'] % (year, month, day)
         else:
             # asset ASM is for constants which all go into 1980-01-01
-            if date.date() != cls._assets[asset]['startdate']:
-                #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
-                VerboseOut('constants are available for %s only' % cls._assets[asset]['startdate'])
             mainurl = cls._assets[asset]['url']
             pattern = cls._assets[asset]['re_pattern'] % (0, 0, 0)
         cpattern = re.compile(pattern)
@@ -217,6 +214,11 @@ class merraAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
+        if date.date() != cls._assets[asset]['startdate']:
+            #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
+            VerboseOut('constants are available for %s only' % cls._assets[asset]['startdate'])
+            return
+
         available_assets = cls.query_service(asset, tile, date)
         retrieved_filenames = []
 
@@ -243,7 +245,6 @@ class merraAsset(Asset):
             retrieved_filenames.append(outpath)        
 
         return retrieved_filenames
-
 
     def updated(self, newasset):
         '''
@@ -327,8 +328,13 @@ class merraData(Data):
             'layers': ['FRLAND'],
             'bands': ['frland']
         }
-
-        # BELOW NOT NEEDED?
+        # TODO:
+        # 'temp_modis': {
+        #    'description': 'Fraction of land (fraction)',
+        #    'assets': ['SLV'],
+        #    'layers': ['T2M'],
+        #    'bands': ['temp_modis']
+        #},
         #'_temps': {
         #    'description': 'Air temperature data',
         #    'assets': ['TS', 'T2M', 'T10M']
@@ -341,10 +347,9 @@ class merraData(Data):
         #    'description': 'Atmospheric Profile',
         #    'assets': ['PROFILE'],
         #}
-
     }
 
-
+    
     # @classmethod
     # def process_composites(cls, inventory, products, **kwargs):
     #     for product in products:
