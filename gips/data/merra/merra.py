@@ -217,7 +217,7 @@ class merraAsset(Asset):
         
         if asset == "ASM" and date.date() != cls._assets[asset]['startdate']:
             #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
-            VerboseOut('bullshit constants are available for %s only' % cls._assets[asset]['startdate'])
+            VerboseOut('constants are available for %s only' % cls._assets[asset]['startdate'])
             return
 
         available_assets = cls.query_service(asset, tile, date)
@@ -554,7 +554,6 @@ class merraData(Data):
                 startdate = merraAsset._assets[self._products[val[0]]['assets'][0]]['startdate']
                 if self.date != startdate:
                     VerboseOut('constants are available for %s only' % startdate)
-                    print("what th FUCK")
                     continue
 
                 prod = val[0]
