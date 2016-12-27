@@ -427,7 +427,7 @@ def gips_exit():
     if len(_accumulated_errors) == 0:
         sys.exit(0)
     verbose_out("Fatal: {} error(s) occurred:".format(len(_accumulated_errors)), 1, sys.stderr)
-    [report_error(error, error.msg_prefix, show_tb=False) for error in _accumulated_errors]
+    [report_error(error, error.msg_prefix) for error in _accumulated_errors]
     sys.exit(1)
 
 
