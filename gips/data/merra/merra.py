@@ -214,9 +214,10 @@ class merraAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        if date.date() != cls._assets[asset]['startdate']:
+        
+        if asset == "ASM" and date.date() != cls._assets[asset]['startdate']:
             #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
-            VerboseOut('constants are available for %s only' % cls._assets[asset]['startdate'])
+            VerboseOut('bullshit constants are available for %s only' % cls._assets[asset]['startdate'])
             return
 
         available_assets = cls.query_service(asset, tile, date)
@@ -461,7 +462,7 @@ class merraData(Data):
             return
         bname = os.path.join(self.path, self.basename)
         sensor = "merra"
-        for key, val in products.requested.items():
+        for key, val in products.requested.items():           
             fout = "%s_%s_%s.tif" % (bname, sensor, key)
             meta = {}
             VERSION = "1.0"
@@ -549,6 +550,13 @@ class merraData(Data):
                 imgout.SetAffine(np.array(self._geotransform))
 
             elif val[0] == "frland":
+
+                startdate = merraAsset._assets[self._products[val[0]]['assets'][0]]['startdate']
+                if self.date != startdate:
+                    VerboseOut('constants are available for %s only' % startdate)
+                    print("what th FUCK")
+                    continue
+
                 prod = val[0]
                 bandnames = self._products[prod]['bands']
                 assetname = self._products[prod]['assets'][0]
