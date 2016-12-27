@@ -68,7 +68,6 @@ class Timeout():
         raise Timeout.Timeout()
 
 
-
 class merraRepository(Repository):
     name = 'merra'
     description = 'Modern Era Retrospective-Analysis for Research and Applications (weather and climate)'
@@ -97,14 +96,13 @@ class merraAsset(Asset):
     _bandnames = ['%02d30GMT' % i for i in range(24)]
     _asset_re_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d.nc4"
     _asset_pattern = "MERRA2_???.{name}.????????.nc4"
-
     _assets = {
         # MERRA2 SLV
-        ## TS (Surface skin temperature)
-        ## T2M (Temperature at 2 m above the displacement height)
-        ## T10M (Temperature at 10 m above the displacement height)
-        ## PS (Time averaged surface pressure in Pa)
-        ## QV2M (Specific humidity at 2 m above the displacement height in kg kg-1)
+        ## TS: Surface skin temperature (K)
+        ## T2M: Temperature at 2 m above the displacement height (K)
+        ## T10M: Temperature at 10 m above the displacement height (K)
+        ## PS: Time averaged surface pressure (Pa)
+        ## QV2M: Specific humidity at 2 m above the displacement height (kg kg-1)
         'SLV': {
             'shortname': 'M2T1NXSLV',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Single-Level Diagnostics V5.12.4',
@@ -115,8 +113,8 @@ class merraAsset(Asset):
             'latency': 60,
         },
         # MERRA2 FLX
-        ## PRECTOT (Total Precipitation in kg m-2 s-1)'
-        ## SPEED (3-dimensional wind speed for surface fluxes in m s-1)'
+        ## PRECTOT: Total Precipitation (kg m-2 s-1)'
+        ## SPEED: 3-dimensional wind speed for surface fluxes (m s-1)'
         'FLX': {
             'shortname': 'M2T1NXFLX',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Surface Flux Diagnostics V5.12.4',
@@ -136,21 +134,20 @@ class merraAsset(Asset):
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_rad_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
-        }   
+        },
+        # MERRA2 ASM
+        ## FRLAND: Fraction of land (fraction)
+        'ASM': {
+            'shortname': 'M2C0NXASM',
+            'description': '2d, constants V5.12.4',
+            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980',
+            'pattern': _asset_pattern.format(name='const_2d_asm_Nx'),
+            're_pattern': _asset_re_pattern.format(name='const_2d_asm_Nx'),
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': None,
+        }
     }
 
-
-        # MERRA2 CONST
-        # http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980/MERRA2_101.const_2d_asm_Nx.00000000.nc4
-        #'FRLAND': {
-        #    'description': 'Land Fraction',
-        #    'pattern': 'MERRA_FRLAND_*.tif',
-        #    'url': 'http://goldsmr4.sci.gsfc.nasa.gov:80/opendap/MERRA2_MONTHLY/M2C0NXASM.5.12.4',
-        #    'source': 'MERRA2_%s.const_2d_asm_Nx.%04d%02d%02d.nc4',
-        #    'startdate': datetime.date(1980, 1, 1),
-        #    'latency': 0,
-        #    'bandnames': ['FRLAND']
-        #}
         #'PROFILE': {
         #     'description': 'Atmospheric Profile',
         #     'pattern': 'MAI6NVANA_PROFILE_*.tif',
@@ -179,28 +176,31 @@ class merraAsset(Asset):
         parts = basename(filename).split('.')
         self.asset = parts[1].split('_')[2].upper()
         self.version = int(parts[0].split('_')[1])
-        self.date = datetime.datetime.strptime(parts[2], '%Y%m%d').date()
-
-    # Example
-    # url: http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4
-    # pattern: "MERRA2_???.tavg1_2d_slv_Nx.%04d%02d%02d.nc4"
-    # fully: http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4/1983/06/MERRA2_100.tavg1_2d_slv_Nx.19830601.nc4
-    # basename: MERRA2_100.tavg1_2d_slv_Nx.19830601
+        if self.asset == "ASM":
+            # assign date of static data sets
+            self.date = self._assets[self.asset]['startdate']
+        else:
+            self.date = datetime.datetime.strptime(parts[2], '%Y%m%d').date()
 
     @classmethod
     def query_service(cls, asset, tile, date):
         year, month, day = date.timetuple()[:3]
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
-        mainurl = "%s/%04d/%02d/" % (cls._assets[asset]['url'], year, month)
-        pattern = cls._assets[asset]['re_pattern'] % (year, month, day)
+        if asset != "ASM":
+            mainurl = "%s/%04d/%02d/" % (cls._assets[asset]['url'], year, month)
+            pattern = cls._assets[asset]['re_pattern'] % (year, month, day)
+        else:
+            # asset ASM is for constants which all go into 1980-01-01
+            if date.date() != cls._assets[asset]['startdate']:
+                #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
+                VerboseOut('constants are available for %s only' % cls._assets[asset]['startdate'])
+            mainurl = cls._assets[asset]['url']
+            pattern = cls._assets[asset]['re_pattern'] % (0, 0, 0)
         cpattern = re.compile(pattern)
-        
         err_msg = "Error downloading"
-
         with utils.error_handler(err_msg):
             listing = urllib.urlopen(mainurl).readlines()
-
         available = []
         for item in listing:
             # inspect the page and extract the full name of the needed file
@@ -210,7 +210,6 @@ class merraAsset(Asset):
                 basename = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', basename])
                 available.append({'basename': basename, 'url': url})
-
         if len(available) == 0:
             msg = 'Unable to find a remote match for {} at {}'
             VerboseOut(msg.format(pattern, mainurl), 4)
@@ -268,11 +267,6 @@ class merraData(Data):
     
     _products = {
 
-        #'FRLAND': {
-        #    'description': 'Land Fraction (static map)',
-        #    'assets': ['FRLAND']
-        #},
-
         'tave': {
             'description': 'Ave daily air temperature data (K)',
             'assets': ['SLV'],
@@ -327,6 +321,12 @@ class merraData(Data):
             'layers': ['SWGDN'],
             'bands': ['srad']
         },
+        'frland': {
+            'description': 'Fraction of land (fraction)',
+            'assets': ['ASM'],
+            'layers': ['FRLAND'],
+            'bands': ['frland']
+        }
 
         # BELOW NOT NEEDED?
         #'_temps': {
@@ -440,8 +440,7 @@ class merraData(Data):
         daily = fun(hourly)
         daily[daily.mask] = missing
         print('writing', fout)
-        imgout = gippy.GeoImage(fout, nx, ny, 1, gdal.GDT_Float32)                
-
+        imgout = gippy.GeoImage(fout, nx, ny, 1, gdal.GDT_Float32)
         imgout[0].Write(np.array(np.flipud(daily)).astype('float32'))
         imgout.SetBandName(prod, 1)
         imgout.SetUnits(units)
@@ -449,7 +448,7 @@ class merraData(Data):
         imgout.SetProjection(self._projection)
         imgout.SetAffine(np.array(self._geotransform))
 
-        
+
     def process(self, *args, **kwargs):
         """ create products """
         products = super(merraData, self).process(*args, **kwargs)
@@ -540,6 +539,29 @@ class merraData(Data):
                 imgout[0].Write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.SetBandName(val[0], 1)
                 imgout.SetUnits('%')
+                imgout.SetNoData(missing)
+                imgout.SetProjection(self._projection)
+                imgout.SetAffine(np.array(self._geotransform))
+
+            elif val[0] == "frland":
+                prod = val[0]
+                bandnames = self._products[prod]['bands']
+                assetname = self._products[prod]['assets'][0]
+                assetfile = self.assets[assetname].filename
+                ncroot = Dataset(assetfile)
+                var = ncroot.variables['FRLAND']
+                missing = float(var.missing_value)
+                scale = var.scale_factor
+                assert scale == 1.0, "Handle non-unity scale functions"
+                frland = np.ma.MaskedArray(var[:])
+                frland.mask = (frland == missing)
+                nb, ny, nx = frland.shape
+                frland = frland.squeeze()
+                frland[frland.mask] = missing
+                imgout = gippy.GeoImage(fout, nx, ny, 1, gdal.GDT_Float32)
+                imgout[0].Write(np.array(np.flipud(frland)).astype('float32'))
+                imgout.SetBandName(prod, 1)
+                imgout.SetUnits('fraction')
                 imgout.SetNoData(missing)
                 imgout.SetProjection(self._projection)
                 imgout.SetAffine(np.array(self._geotransform))
