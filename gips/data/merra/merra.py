@@ -68,32 +68,6 @@ class Timeout():
         raise Timeout.Timeout()
 
 
-def write_raster(fname, data, proj, geo, meta, bandnames, nodata):
-    driver = gdal.GetDriverByName('GTiff')
-    try:
-        (nband, ny, nx) = data.shape
-    except:
-        # TODO error-handling-fix: leave as-is but report the error
-        nband = 1
-        (ny, nx) = data.shape
-        data = data.reshape(1, ny, nx)
-    gdal.GDT_UInt8 = gdal.GDT_Byte
-    np_dtype = str(data.dtype)
-    typestr = 'gdal.GDT_' + np_dtype.title().replace('Ui', 'UI')
-    dtype = eval(typestr)
-    tfh = driver.Create(fname, nx, ny, nband, dtype, [])
-    tfh.SetGeoTransform(geo)
-    tfh.SetMetadata(meta)
-    tfh.SetProjection(proj)
-    assert len(bandnames) == nband
-    for i in range(nband):
-        band = tfh.GetRasterBand(i+1)
-        assert len(bandnames) == nband, "wrong number of band names"
-        band.SetDescription(bandnames[i])        
-        band.SetNoDataValue(nodata)
-        band.WriteArray(data[i])
-    tfh = None
-
 
 class merraRepository(Repository):
     name = 'merra'
