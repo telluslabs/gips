@@ -122,7 +122,7 @@ def t_export_helper(disable_db_blocker):
         'alltouch': False,
         'batchout': None,
         'chunksize': 128.0,
-        'command': 'modis',
+        'driver': 'modis',
         'crop': False,
         'dates': '2012-12-01,2012-12-03',
         'days': None,

@@ -14,7 +14,6 @@ status_strings = ('remote',
                   'complete',
                   'failed')
 
-
 def valid_status(val):
     if val not in status_strings:
         raise ValidationError("invalid status: {}".format(val))
@@ -172,3 +171,4 @@ class Job(models.Model):
 
     class Meta:
         unique_together = ('site', 'variable', 'spatial', 'temporal')
+    
