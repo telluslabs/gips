@@ -53,7 +53,7 @@ def generate_script(operation, args_batch):
     return '\n'.join(lines) # stitch into single string & return
 
 
-def submit(operation, args_ioi, batch_size=None):
+def submit(operation, args_ioi, batch_size=None, nproc=1):
     """Submit jobs to the configured Torque system.
 
     Return value is a list of tuples, one for each batch:
@@ -66,6 +66,7 @@ def submit(operation, args_ioi, batch_size=None):
     batch_size:  The work is divided among torque jobs; each job receives
         batch_size function calls to perform in a loop.  Leave None for one job
         that works the whole batch.
+    nproc: number of processors to request
     """
     if operation not in ('query', 'fetch', 'process', 'export', 'export_and_aggregate'):
         # TODO: this error message does not match the 'operations'
@@ -83,17 +84,22 @@ def submit(operation, args_ioi, batch_size=None):
 
     outcomes = []
 
+    qsub_cmd = ['qsub']
+    if utils.settings().TORQUE_QUEUE:
+        qsub_cmd.append('-q' + utils.settings().TORQUE_QUEUE)
+    qsub_cmd.append('-lnodes=1:ppn={}'.format(nproc))
+    
     for chunk in chunks:
         job_script = generate_script(operation, chunk)
 
         # open a pipe to the qsub command, then end job_string to it
-        proc = Popen('qsub', shell=True, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+        proc = Popen(qsub_cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
         proc.stdin.write(job_script)
         out, err = proc.communicate()
         outcomes.append((proc.returncode, out, err))
 
     # TODO confirm qsub exited 0 (raise otherwise)
     # TODO return best thing for checking on status
-    # TODO log err someplace
+    # TODO log err someplaceb
 
     return outcomes

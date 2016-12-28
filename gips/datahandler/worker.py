@@ -25,7 +25,11 @@ def query (job):
         job.status = 'scheduled'
         job.save()
 
-    api.query_service(job.variable.driver, eval(job.spatial), eval(job.temporal), [job.variable.product])
+    api.query_service(
+        job.variable.driver,
+        eval(job.spatial),
+        eval(job.temporal),
+        [job.variable.product])
 
     job.refresh_from_db()
     if job.status != 'scheduled':
@@ -107,48 +111,40 @@ def process(driver, product_type, tile, date):
     return product
 
 
-def _export(**kwargs):
+def _export(driver, spatial_spec, temporal_spec, products, outdir,
+            notld=True, suffix='', **kwargs):
     """Performs a 'gips_project' with the given paramenters."""
 
-    class Arguments(object):
-        pass
-
-    args = Arguments()
-    args.__dict__ = kwargs
-
-
-    DataClass = utils.import_data_class(kwargs['command'])
+    DataClass = utils.import_data_class(driver)
 
     # TODO trash and recreate output dir
 
-    extents = SpatialExtent.factory(
-        DataClass, args.site, args.key, args.where, args.tiles, args.pcov,
-        args.ptile
-    )
+    extents = SpatialExtent.factory(DataClass, **spatial_spec)
 
     # create tld: SITENAME--KEY_DATATYPE_SUFFIX
-    if args.notld:
-        tld = args.outdir
+    if notld:
+        tld = outdir
     else:
-        key = '' if args.key == '' else '--' + args.key
-        suffix = '' if args.suffix == '' else '_' + args.suffix
-        res = '' if args.res is None else '_%sx%s' % (args.res[0], args.res[1])
+        key = spatial_spec.get('key', '')
+        if key:
+            key = '--' + key
+        suffix = '_' + suffix if suffix else ''
+        res = kwargs.get('res', '')
+        if res:
+            res = '_{}x{}'.format(res[0], res[1])
         bname = (
             extents[0].site.LayerName() +
-            key + res + '_' + args.command + suffix
+            key + res + '_' + driver + suffix
         )
-        tld = os.path.join(args.outdir, bname)
+        tld = os.path.join(outdir, bname)
+
+    t_extent = TemporalExtent(**temporal_spec)
 
     for extent in extents:
-        t_extent = TemporalExtent(args.dates, args.days)
-        inv = DataInventory(DataClass, extent, t_extent, **vars(args))
+        inv = DataInventory(DataClass, extent, t_extent, products, **kwargs)
         datadir = os.path.join(tld, extent.site.Value())
         if inv.numfiles > 0:
-            inv.mosaic(
-                datadir=datadir, tree=args.tree, overwrite=args.overwrite,
-                res=args.res, interpolation=args.interpolation,
-                crop=args.crop, alltouch=args.alltouch,
-            )
+            inv.mosaic(datadir=datadir, **kwargs)
         else:
             utils.verbose_out(
                 'No data found for {} within temporal extent {}'
@@ -158,11 +154,11 @@ def _export(**kwargs):
     # TODO nothing meaningful to return?
 
 
-def _aggregate(job_id, outdir):
-    aggregate(outdir, job_id)
+def _aggregate(job, outdir, nproc=1):
+    aggregate(job, outdir,  nproc)
 
 
-def export_and_aggregate(job_id, export_kwargs):
+def export_and_aggregate(job_id, nprocs=1, outdir=None, **mosaic_kwargs):
     """Entirely TBD but does the same things as gips_project + zonal summary."""
     with transaction.atomic():
         job = dbinv.models.Job.objects.get(pk=job_id)
@@ -171,17 +167,24 @@ def export_and_aggregate(job_id, export_kwargs):
             return job # not sure this is useful for anything
         job.status = 'post-processing'
         job.save()
-
+    
     # setup output dir
-    outdir = export_kwargs.setdefault('outdir',
-                                      os.path.join(utils.settings().EXPORT_DIR, str(job_id)))
+    if outdir is None:
+        outdir = os.path.join(utils.settings().EXPORT_DIR, str(job_id))
     # poor man's binary semaphore since mkdir is atomic;
     # exception on a priori existence is what we want here
     os.makedirs(outdir)
 
     # run
-    _export(**export_kwargs)
-    _aggregate(job_id, outdir)
+    _export(
+        job.variable.driver,
+        eval(job.spatial),
+        eval(job.temporal),
+        [job.variable.product],
+        outdir,
+        **mosaic_kwargs
+    )
+    _aggregate(job, outdir, nprocs)
 
     # bookkeeping & cleanup
     job.refresh_from_db()

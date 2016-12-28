@@ -14,7 +14,7 @@ from gips.datahandler import torque
 
 #from pdb import set_trace
 
-
+    
 def submit_job (site, variable, spatial, temporal):
     """Pass a work spec in to the scheduler, and the work will be done.
 
@@ -111,37 +111,25 @@ def schedule_export_and_aggregate ():
     orm.setup()
     with transaction.atomic():
         jobs = dbinv.models.Job.objects.filter(status='in-progress')
-        if jobs.exists():
-            job_info = [
-                (
-                    j, 
-                    {
-                        'driver'   : j.variable.driver.encode('ascii', 'ignore'),
-                        'spatial'  : eval(j.spatial),
-                        'temporal' : eval(j.temporal),
-                        'products' : [j.variable.product.encode('ascii', 'ignore')],
-                    }
-                )
-                for j in jobs
-            ]
-            for job, args in job_info:
-                status = processing_status(
-                    args['driver'],
-                    args['spatial'],
-                    args['temporal'],
-                    args['products'],
-                )
-                if (
-                        status['requested'] == 0
-                        and status['scheduled'] == 0
-                        and status['in-progress'] == 0
-                ):
-                    # nothing being worked on. must be done pre-processing
-                    print "Submitting job", job.pk, "for export and aggregate"
-                    job.status = 'pp-scheduled'
-                    job.save()
-                    # TODO: need to figure out the right arguments
-                    #submit_job('export_and_aggregate', job.pk, args) # TODO: undoubtedly wrong args
+        for job in jobs:
+            status = processing_status(
+                job.variable.driver.encode('ascii', 'ignore'),
+                eval(job.spatial),
+                eval(job.temporal),
+                [job.variable.product.encode('ascii', 'ignore')]
+            )
+            if (
+                    status['requested'] == 0
+                    and status['scheduled'] == 0
+                    and status['in-progress'] == 0
+            ):
+                # nothing being worked on. must be done pre-processing
+                print "Submitting job", job.pk, "for export and aggregate"
+                job.status = 'pp-scheduled'
+                job.save()
+                # TODO: need a better way to configure / determine nproc
+                nproc = 4
+                torque.submit('export_and_aggregate', [[job.pk, nproc]], nproc=nproc)
 
 
 def processing_status(driver_name, spatial_spec, temporal_spec, products):

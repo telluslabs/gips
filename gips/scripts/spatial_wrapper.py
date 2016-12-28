@@ -11,7 +11,7 @@ from gips.utils import VerboseOut
 from gips.inventory.dbinv.models import Result, DataVariable, Vector, Job
 from gips import settings
 
-def make_result(result, g_dv, g_id):
+def make_result(result, job):
     key = result[0]
     bands = result[1]
 
@@ -33,7 +33,7 @@ def make_result(result, g_dv, g_id):
             fid=fid,
             minimum=minimum,
             maximum=maximum,
-            job=get_job(g_id),
+            job=job,
             mean=mean,
             sd=sd,
             skew=skew,
@@ -56,15 +56,11 @@ def get_job(job):
     return job
 
 
-def aggregate(projdir, job_id, nprocs=1):
-    job = get_job(job_id)
-    dv = job.variable
-
-    proj_name = os.path.basename(os.path.dirname(projdir))
+def aggregate(job, projdir, nprocs=1):
 
     args = {
-        'bands': [dv.band_number],
-        'products': [dv.product],
+        'bands': [job.variable.band_number],
+        'products': [job.variable.product],
         'projdir': projdir,
         'processes': nprocs,
 
@@ -72,7 +68,7 @@ def aggregate(projdir, job_id, nprocs=1):
 
     results = SpatialAggregator.aggregate(**args)
     for r in results:
-        make_result(r, dv, job_id)
+        make_result(r, job)
 
 
 def main():

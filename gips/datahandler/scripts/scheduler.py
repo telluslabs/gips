@@ -20,8 +20,8 @@ def main ():
     outcomes = api.schedule_process()
     print_outcomes('Process', outcomes)
 
-    #outcomes = api.schedule_export_and_aggregate()
-    #print_outcomes('Export & Aggregate', outcomes)
+    outcomes = api.schedule_export_and_aggregate()
+    print_outcomes('Export & Aggregate', outcomes)
 
 if __name__ == '__main__':
     main()
