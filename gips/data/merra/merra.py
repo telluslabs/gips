@@ -438,7 +438,7 @@ class merraData(Data):
         # apply reduce rule
         daily = fun(hourly)
         daily[daily.mask] = missing
-        print('writing', fout)
+        VerboseOut('writing %s' % fout, 4)
         imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
         imgout[0].Write(np.array(np.flipud(daily)).astype('float32'))
         imgout.SetBandName(prod, 1)
@@ -535,6 +535,7 @@ class merraData(Data):
                 rh[rh < 0.] = 0.
                 rhday = rh.mean(axis=0)
                 rhday[rhday.mask] = missing
+                VerboseOut('writing %s' % fout, 4)
                 imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)                
                 imgout[0].Write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.SetBandName(val[0], 1)
@@ -544,12 +545,10 @@ class merraData(Data):
                 imgout.SetAffine(np.array(self._geotransform))
 
             elif val[0] == "frland":
-
                 startdate = merraAsset._assets[self._products[val[0]]['assets'][0]]['startdate']
                 if self.date != startdate:
                     VerboseOut('constants are available for %s only' % startdate)
                     continue
-
                 prod = val[0]
                 bandnames = self._products[prod]['bands']
                 assetname = self._products[prod]['assets'][0]
@@ -564,6 +563,7 @@ class merraData(Data):
                 nb, ny, nx = frland.shape
                 frland = frland.squeeze()
                 frland[frland.mask] = missing
+                VerboseOut('writing %s' % fout, 4)
                 imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
                 imgout[0].Write(np.array(np.flipud(frland)).astype('float32'))
                 imgout.SetBandName(prod, 1)
