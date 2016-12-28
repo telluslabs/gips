@@ -14,7 +14,7 @@ from gips.datahandler import torque
 
 #from pdb import set_trace
 
-    
+
 def submit_job (site, variable, spatial, temporal):
     """Pass a work spec in to the scheduler, and the work will be done.
 

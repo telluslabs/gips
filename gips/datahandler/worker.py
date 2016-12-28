@@ -167,7 +167,7 @@ def export_and_aggregate(job_id, nprocs=1, outdir=None, **mosaic_kwargs):
             return job # not sure this is useful for anything
         job.status = 'post-processing'
         job.save()
-    
+
     # setup output dir
     if outdir is None:
         outdir = os.path.join(utils.settings().EXPORT_DIR, str(job_id))

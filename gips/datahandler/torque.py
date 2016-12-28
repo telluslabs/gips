@@ -100,6 +100,6 @@ def submit(operation, args_ioi, batch_size=None, nproc=1):
 
     # TODO confirm qsub exited 0 (raise otherwise)
     # TODO return best thing for checking on status
-    # TODO log err someplaceb
+    # TODO log err someplace
 
     return outcomes
