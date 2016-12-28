@@ -477,6 +477,7 @@ class merraData(Data):
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "prcp":
+                # TODO: check this units conversion from (kg m-2 s-1) to (mm d-1)
                 fun = lambda x: x.mean(axis=0)*36.*24.*1000.
                 units = "mm d-1"
                 self.write_reduced(val[0], fun, fout, meta, units)
