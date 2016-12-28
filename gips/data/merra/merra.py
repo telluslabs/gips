@@ -28,24 +28,17 @@ import re
 import datetime
 import time
 
-import urllib, urllib2
+import urllib
 import requests
-
 import signal
 
 import numpy as np
 from netCDF4 import Dataset
 
-from osgeo import gdal
-
 import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, basename, open_vector
 from gips import utils
-
-
-# TODO: delete the line below
-from pdb import set_trace
 
 
 class Timeout():
@@ -446,7 +439,7 @@ class merraData(Data):
         daily = fun(hourly)
         daily[daily.mask] = missing
         print('writing', fout)
-        imgout = gippy.GeoImage(fout, nx, ny, 1, gdal.GDT_Float32)
+        imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
         imgout[0].Write(np.array(np.flipud(daily)).astype('float32'))
         imgout.SetBandName(prod, 1)
         imgout.SetUnits(units)
@@ -541,7 +534,7 @@ class merraData(Data):
                 rh[rh < 0.] = 0.
                 rhday = rh.mean(axis=0)
                 rhday[rhday.mask] = missing
-                imgout = gippy.GeoImage(fout, nx, ny, 1, gdal.GDT_Float32)                
+                imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)                
                 imgout[0].Write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.SetBandName(val[0], 1)
                 imgout.SetUnits('%')
@@ -570,7 +563,7 @@ class merraData(Data):
                 nb, ny, nx = frland.shape
                 frland = frland.squeeze()
                 frland[frland.mask] = missing
-                imgout = gippy.GeoImage(fout, nx, ny, 1, gdal.GDT_Float32)
+                imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
                 imgout[0].Write(np.array(np.flipud(frland)).astype('float32'))
                 imgout.SetBandName(prod, 1)
                 imgout.SetUnits('fraction')
