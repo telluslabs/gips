@@ -12,9 +12,9 @@ def t_worker_export_and_aggregate(mocker):
     m_makedirs  = mocker.patch.object(worker.os, 'makedirs')
     m_rmtree    = mocker.patch.object(worker.shutil, 'rmtree')
 
-    catalog_entry = models.DataVariable.objects.create()
-    job = models.Job.objects.create(variable=catalog_entry, status='in-progress')
-
+    catalog_entry = models.DataVariable.objects.create(product='whatever')
+    job = models.Job.objects.create(variable=catalog_entry, status='pp-scheduled',
+                                    spatial='0', temporal='0')
     # call
     worker.export_and_aggregate(job.pk, {})
 
