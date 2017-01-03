@@ -140,18 +140,21 @@ def _export(driver, spatial_spec, temporal_spec, products, outdir,
 
     t_extent = TemporalExtent(**temporal_spec)
 
+    errors = []
     for extent in extents:
         inv = DataInventory(DataClass, extent, t_extent, products, **kwargs)
         datadir = os.path.join(tld, extent.site.Value())
         if inv.numfiles > 0:
             inv.mosaic(datadir=datadir, **kwargs)
         else:
+            errors.append((str(extent), str(t_extent)))
             utils.verbose_out(
                 'No data found for {} within temporal extent {}'
-                .format(str(t_extent), str(t_extent)),
-                2,
+                .format(str(extent), str(t_extent)),
+                1,
             )
-    # TODO nothing meaningful to return?
+    if len(errors) > 0:
+        raise ValueError("Data not found for some extents: {}".format(errors), errors)
 
 
 def _aggregate(job, outdir, nproc=1):
