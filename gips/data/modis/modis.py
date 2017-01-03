@@ -41,6 +41,7 @@ from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, settings
 from gips import utils
 
+from pdb import set_trace
 
 def binmask(arr, bit):
     """ Return boolean array indicating which elements as binary have a 1 in
@@ -92,12 +93,12 @@ class modisAsset(Asset):
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
-        'MOD09Q1': {
-            'pattern': 'MOD09Q1' + _asset_glob_tail,
-            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.005/',
-            'startdate': datetime.date(2000, 2, 18),
-            'latency': -7,
-        },
+        #'MOD09Q1': {
+        #    'pattern': 'MOD09Q1' + _asset_glob_tail,
+        #    'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006/',
+        #    'startdate': datetime.date(2000, 2, 18),
+        #    'latency': -7,
+        #},
         'MOD10A1': {
             'pattern': 'MOD10A1' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A1.005',
@@ -112,37 +113,37 @@ class modisAsset(Asset):
         },
         'MOD11A1': {
             'pattern': 'MOD11A1' + _asset_glob_tail,
-            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.006',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -1
         },
         'MYD11A1': {
             'pattern': 'MYD11A1' + _asset_glob_tail,
-            'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.006',
             'startdate': datetime.date(2002, 7, 8),
             'latency': -1
         },
         'MOD11A2': {
             'pattern': 'MOD11A2' + _asset_glob_tail,
-            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.006',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -7
         },
         'MYD11A2': {
             'pattern': 'MYD11A2' + _asset_glob_tail,
-            'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.006',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -7
         },
         'MOD10A2': {
             'pattern': 'MOD10A2' + _asset_glob_tail,
-            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A2.005',
+            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A2.006',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A2': {
             'pattern': 'MYD10A2' + _asset_glob_tail,
-            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A2.005',
+            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A2.006',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
@@ -263,7 +264,7 @@ class modisData(Data):
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
-        # "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
+        #"Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
         "Terra 8-day": ['temp8tn', 'temp8td'],
     }
     _products = {
@@ -298,10 +299,10 @@ class modisData(Data):
             'assets': ['MOD11A1', 'MYD11A1'],
         },
         # Misc
-        'ndvi8': {
-            'description': 'Normalized Difference Vegetation Index: 250m',
-            'assets': ['MOD09Q1'],
-        },
+        #'ndvi8': {
+        #    'description': 'Normalized Difference Vegetation Index: 250m',
+        #    'assets': ['MOD09Q1'],
+        #},
         'temp8td': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
@@ -352,7 +353,7 @@ class modisData(Data):
                 else:
                     availassets.append(asset)
                     allsds.extend(sds)
-                    versions[asset] = int(re.findall('M.*\.00(\d)\.\d{13}\.hdf', sds[0])[0])
+                    versions[asset] = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
 
             if not availassets:
                 # some products aren't available for every day but this is trying every day
@@ -948,20 +949,17 @@ class modisData(Data):
 
             ###################################################################
             # NDVI (8-day) - Terra only
-            if val[0] == "ndvi8":
-                # NOTE this code is unreachable currently; see _products above.
-                VERSION = "1.0"
-                meta['VERSION'] = VERSION
-                sensor = 'MOD'
-                fname = '%s_%s_%s' % (bname, sensor, key)
-
-                refl = gippy.GeoImage(allsds)
-                refl.SetBandName("RED", 1)
-                refl.SetBandName("NIR", 2)
-                refl.SetNoData(-28762)
-
-                fouts = dict(Indices(refl, {'ndvi': fname}, meta))
-                imgout = gippy.GeoImage(fouts['ndvi'])
+            #if val[0] == "ndvi8":
+            #    VERSION = "1.0"
+            #    meta['VERSION'] = VERSION
+            #    sensor = 'MOD'
+            #    fname = '%s_%s_%s.tif' % (bname, sensor, key)
+            #    refl = gippy.GeoImage(allsds)
+            #    refl.SetBandName("RED", 1)
+            #    refl.SetBandName("NIR", 2)
+            #    refl.SetNoData(-28762)
+            #    fouts = dict(Indices(refl, {'ndvi': fname}, meta))
+            #    imgout = gippy.GeoImage(fouts['ndvi'])
 
             # TEMPERATURE PRODUCT (8-day) - Terra only
 
