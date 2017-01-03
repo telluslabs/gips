@@ -149,7 +149,7 @@ def t_export_helper(disable_db_blocker):
             dbinv.models.Product.objects.get(name=p) # raises on failure, which is desired here
             assert os.path.lexists(p)
         except:
-            print ("Prerequisite not meant, try: "
+            print ("Prerequisite not met, try: "
                    "`py.test --sys --clear-repo -k 'modis and process' -s --ll debug`")
             raise
     if os.path.exists(util.OUTPUT_DIR): # remove the output dir if it's present
