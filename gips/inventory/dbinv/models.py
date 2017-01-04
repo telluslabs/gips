@@ -135,6 +135,7 @@ class DataVariable(models.Model):
     name        = models.CharField(max_length=255, unique=True)
     asset_link  = models.TextField(null=True, blank=True)
     asset       = models.CharField(max_length=255, null=True, blank=True)
+    category    = models.CharField(max_length=255, null=True, blank=True)
     description = models.CharField(max_length=255)
     driver      = models.CharField(max_length=255)
     product     = models.CharField(max_length=255)
