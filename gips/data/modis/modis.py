@@ -93,12 +93,12 @@ class modisAsset(Asset):
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
-        #'MOD09Q1': {
-        #    'pattern': 'MOD09Q1' + _asset_glob_tail,
-        #    'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006/',
-        #    'startdate': datetime.date(2000, 2, 18),
-        #    'latency': -7,
-        #},
+        'MOD09Q1': {
+            'pattern': 'MOD09Q1' + _asset_glob_tail,
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006/',
+            'startdate': datetime.date(2000, 2, 18),
+            'latency': -7,
+        },
         'MOD10A1': {
             'pattern': 'MOD10A1' + _asset_glob_tail,
             'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A1.005',
@@ -264,7 +264,7 @@ class modisData(Data):
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
-        #"Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
+        "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
         "Terra 8-day": ['temp8tn', 'temp8td'],
     }
     _products = {
@@ -299,10 +299,10 @@ class modisData(Data):
             'assets': ['MOD11A1', 'MYD11A1'],
         },
         # Misc
-        #'ndvi8': {
-        #    'description': 'Normalized Difference Vegetation Index: 250m',
-        #    'assets': ['MOD09Q1'],
-        #},
+        'ndvi8': {
+            'description': 'Normalized Difference Vegetation Index: 250m',
+            'assets': ['MOD09Q1'],
+        },
         'temp8td': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
