@@ -17,16 +17,16 @@ dt = datetime.datetime
 # everything for NH's tile for Dec 1 2012 that fails:
 http_404_params = (
     (('MOD11A2', 'h12v04', dt(2012, 12, 1, 0, 0)),                  # call
-        'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.005/2012.12.01'),  # passed to urlopen
+        'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.006/2012.12.01'), # passed to urlopen
 
     (('MCD43A2', 'h12v04', dt(2012, 12, 1, 0, 0)),
-        'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006/2012.12.01'),
+        'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006/2012.12.01'),
 
     (('MOD09Q1', 'h12v04', dt(2012, 12, 1, 0, 0)),
-        'http://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.005//2012.12.01'),
+        'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006//2012.12.01'),
 
     (('MCD43A4', 'h12v04', dt(2012, 12, 1, 0, 0)),
-        'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006/2012.12.01'),
+        'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006/2012.12.01'),
 )
 
 
@@ -137,12 +137,12 @@ MOD11A1_listing = [
 # everything for NH's tile for Dec 1 2012 that succeeds, including both inputs and outputs
 http_200_params = (
     (('MYD11A1', 'h12v04', dt(2012, 12, 1, 0, 0)),
-        'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.005/2012.12.01',
+        'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.006/2012.12.01',
         MYD11A1_listing, # HTML index page
         'MYD11A1.A2012336.h12v04.005.2012341040543.hdf'),
 
     (('MOD11A1', 'h12v04', dt(2012, 12, 1, 0, 0)),
-        'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.005/2012.12.01',
+        'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.006/2012.12.01',
         MOD11A1_listing, # HTML index page
         'MOD11A1.A2012336.h12v04.005.2012339180517.hdf'),
 )
@@ -173,7 +173,7 @@ def t_http_matching_listings(mocker, fetch_mocks, call, listing_url, listing, as
     urlopen.assert_called_once_with(listing_url)
     urlopen.return_value.readlines.assert_called_once_with()
     # request assertions:  response = request.get(...) && response.iter_content()
-    get.assert_called_once_with(listing_url + '/' + asset_fn, auth=(user, passwd), timeout=10)
+    get.assert_called_once_with(listing_url + '/' + asset_fn, auth=(user, passwd), timeout=30)
     response.iter_content.assert_called_once_with()
     # file write assertions:  open(...) as fd && fd.write(...)
     assert open.call_args[0][0].endswith(asset_fn) # did we open the right filename?
