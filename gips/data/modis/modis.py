@@ -391,6 +391,7 @@ class modisData(Data):
                 for i in range(6):
                     data = img[i].Read()
                     imgout[i].Write(data)
+                del img
 
 
             if val[0] == "quality":
@@ -483,6 +484,7 @@ class modisData(Data):
                 # create output gippy image
                 print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 7)
+                del refl
 
                 imgout.SetNoData(missing)
                 imgout.SetOffset(0.0)
@@ -533,6 +535,7 @@ class modisData(Data):
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
@@ -656,6 +659,7 @@ class modisData(Data):
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
@@ -780,6 +784,7 @@ class modisData(Data):
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 2)
+                del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
@@ -892,6 +897,9 @@ class modisData(Data):
 
                     tempbands[iband].Process(imgout[band])
 
+                del tempbands
+                del qcbands
+
                 imgout[4].SetGain(1.0)
                 imgout[4].Write(bestmask)
                 imgout.SetBandName('Temperature Daytime Terra', 1)
@@ -941,6 +949,7 @@ class modisData(Data):
 
                     hourbands[iband].Process(imgout[band])
 
+                del hourbands
                 imgout.SetBandName('Observation Time Daytime Terra', 1)
                 imgout.SetBandName('Observation Time Nighttime Terra', 2)
                 imgout.SetBandName('Observation Time Daytime Aqua', 3)
@@ -949,17 +958,21 @@ class modisData(Data):
 
             ###################################################################
             # NDVI (8-day) - Terra only
-            #if val[0] == "ndvi8":
-            #    VERSION = "1.0"
-            #    meta['VERSION'] = VERSION
-            #    sensor = 'MOD'
-            #    fname = '%s_%s_%s.tif' % (bname, sensor, key)
-            #    refl = gippy.GeoImage(allsds)
-            #    refl.SetBandName("RED", 1)
-            #    refl.SetBandName("NIR", 2)
-            #    refl.SetNoData(-28762)
-            #    fouts = dict(Indices(refl, {'ndvi': fname}, meta))
-            #    imgout = gippy.GeoImage(fouts['ndvi'])
+            if val[0] == "ndvi8":
+                # NOTE this code is unreachable currently; see _products above.
+                VERSION = "1.0"
+                meta['VERSION'] = VERSION
+                sensor = 'MOD'
+                fname = '%s_%s_%s' % (bname, sensor, key)
+
+                refl = gippy.GeoImage(allsds)
+                refl.SetBandName("RED", 1)
+                refl.SetBandName("NIR", 2)
+                refl.SetNoData(-28762)
+
+                fouts = dict(Indices(refl, {'ndvi': fname}, meta))
+                del refl
+                imgout = gippy.GeoImage(fouts['ndvi'])
 
             # TEMPERATURE PRODUCT (8-day) - Terra only
 
@@ -985,4 +998,5 @@ class modisData(Data):
 
             # add product to inventory
             self.AddFile(sensor, key, imgout.Filename())
+            del imgout # to cover for GDAL's internal problems
             VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.datetime.now() - start), 1)

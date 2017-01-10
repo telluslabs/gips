@@ -105,6 +105,7 @@ Terra/Aqua Daily Products
 Standard Products
 \x1b[0m   clouds      Cloud Mask                              
    landcover   MCD Annual Land Cover                   
+   ndvi8       Normalized Difference Vegetation Index: 250m
 """}
 
 t_project = { 'created': {

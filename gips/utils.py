@@ -22,6 +22,7 @@
 ################################################################################
 from __future__ import print_function
 
+import imp
 import sys
 import os
 import errno
@@ -78,7 +79,7 @@ def verbose_out(obj, level=1, stream=sys.stdout):
         for o in obj:
             print(o, file=stream)
 
-VerboseOut = verbose_out # TODO deprecate then remove
+VerboseOut = verbose_out # VerboseOut name is deprecated
 
 ##############################################################################
 # Filesystem functions
@@ -99,25 +100,18 @@ def List2File(lst, filename):
     f.close()
 
 
-def RemoveFiles(filenames, extensions=['']):
-    """Remove the given filenames with os.remove.
+def remove_files(filenames, extensions=()):
+    """Remove the given files and all permutations with the given extensions.
 
-    Pass in a list of extensions to treat each filename as a prefix and
-    extensions as suffixes, and remove all possible combinations.
+    So RemoveFiles(['a.hdf', 'b.hdf'], ['.index', '.aux.xml']) attempts to
+    these files:  a.hdf, b.hdf, a.hdf.index, a.hdf.aux.xml, b.hdf,
+    b.hdf.index, and b.hdf.aux.xml.
     """
-    # TODO error-handling-fix: this whole function looks strange:
-    #   when extensions is [''], same filename is tried twice
-    #   don't use a mutable type as a default argument
-    #   why give up on all files once one extension fails?
-    for f in filenames:
-        for ext in ([''] + extensions):
-            try:
-                os.remove(f + ext)
-            except OSError as e:
-                if e.errno != errno.ENOENT:
-                    raise
-                continue
+    for f in (list(filenames) + [f + e for f in filenames for e in extensions]):
+        with error_handler(continuable=True, msg_prefix="Error removing '{}'".format(f)):
+            os.remove(f)
 
+RemoveFiles = remove_files # RemoveFiles name is deprecated
 
 def basename(str):
     """Return the input string, stripped of directories and extensions.
@@ -153,27 +147,18 @@ def link(src, dst, hard=False):
 
 def settings():
     """ Retrieve GIPS settings - first from user, then from system """
-    # TODO error-handling-fix: reconsider this whole function
-    import imp
-    try:
+    settings_path = os.path.expanduser('~/.gips/settings.py')
+    with error_handler("Error loading '{}'".format(settings_path), continuable=True):
         # import user settings first
-        src = imp.load_source(
-            'settings',
-            os.path.expanduser('~/.gips/settings.py')
-        )
+        src = imp.load_source('settings', settings_path)
         return src
-    except (ImportError, IOError) as e:
-        try:
-            import gips.settings
-            return gips.settings
-        except ImportError:
-            raise ImportError('No settings found...did you run gips_config?')
+    with error_handler("gips.settings not found; consider running gips_config"):
+        import gips.settings
+        return gips.settings
 
 
 def create_environment_settings(repos_path, email=''):
     """ Create settings file and data directory """
-    # TODO error-handling-fix: this is called only once, in gips/scripts/config.py
-    # TODO error-handling-fix: consider refactoring it away
     from gips.settings_template import __file__ as src
     cfgpath = os.path.dirname(__file__)
     cfgfile = os.path.join(cfgpath, 'settings.py')
@@ -189,7 +174,7 @@ def create_environment_settings(repos_path, email=''):
     except OSError:
         # no permissions, so no environment level config installed
         #print traceback.format_exck()
-        # TODO error-handling-fix: continuable handler
+        # TODO error-handling-fix: report on specifics of error then continue; no error handler here
         return None
 
 
@@ -213,12 +198,7 @@ def create_user_settings(email=''):
 
 def create_repos():
     """ Create any necessary repository directories """
-    try:
-        repos = settings().REPOS
-    except:
-        # TODO error-handling-fix: with handler
-        print(traceback.format_exc())
-        raise Exception('Problem reading repository...check settings files')
+    repos = settings().REPOS
     for key in repos.keys():
         repo = import_repository_class(key)
         for d in repo._subdirs:
@@ -283,16 +263,11 @@ def open_vector(fname, key="", where=''):
         # or it is a database
         if parts[0] not in settings().DATABASES.keys():
             raise Exception("%s is not a valid database" % parts[0])
-        try:
-            db = settings().DATABASES[parts[0]]
-            filename = ("PG:dbname=%s host=%s port=%s user=%s password=%s" %
-                        (db['NAME'], db['HOST'], db['PORT'], db['USER'], db['PASSWORD']))
-            vector = GeoVector(filename, parts[1])
-            vector.SetPrimaryKey(key)
-
-        except Exception as e:
-            # TODO error-handling-fix: can't open a vector = done working, so let it raise
-            VerboseOut(traceback.format_exc(), 4)
+        db = settings().DATABASES[parts[0]]
+        filename = ("PG:dbname=%s host=%s port=%s user=%s password=%s" %
+                    (db['NAME'], db['HOST'], db['PORT'], db['USER'], db['PASSWORD']))
+        vector = GeoVector(filename, parts[1])
+        vector.SetPrimaryKey(key)
     if where != '':
         # return array of features
 
@@ -427,7 +402,7 @@ def gips_exit():
     if len(_accumulated_errors) == 0:
         sys.exit(0)
     verbose_out("Fatal: {} error(s) occurred:".format(len(_accumulated_errors)), 1, sys.stderr)
-    [report_error(error, error.msg_prefix, show_tb=False) for error in _accumulated_errors]
+    [report_error(error, error.msg_prefix) for error in _accumulated_errors]
     sys.exit(1)
 
 
