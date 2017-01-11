@@ -267,8 +267,7 @@ class modisData(Data):
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
-        "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
-        "Terra 8-day": ['temp8tn', 'temp8td'],
+        "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
     }
     _products = {
         # MCD Products
