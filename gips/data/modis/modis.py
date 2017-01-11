@@ -101,13 +101,13 @@ class modisAsset(Asset):
         },
         'MOD10A1': {
             'pattern': 'MOD10A1' + _asset_glob_tail,
-            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A1.006/',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A1.005/',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A1': {
             'pattern': 'MYD10A1' + _asset_glob_tail,
-            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A1.006/',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A1.005/',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
