@@ -403,7 +403,7 @@ def mosaic(images, outfile, vector):
     cmd = 'gdal_merge.py -o %s -ul_lr %s %s %s' % (outfile, ullr, nodatastr, " ".join(filenames))
     result = commands.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
-    imgout = gippy.GeoImage(outfile, True)
+    imgout = gippy.GeoImage(str(outfile), True)
     for b in range(0, images[0].NumBands()):
         imgout[b].CopyMeta(images[0][b])
     imgout.CopyColorTable(images[0])

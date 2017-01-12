@@ -5,13 +5,17 @@ import datetime
 from django.forms.models import model_to_dict
 from gips.inventory import orm
 orm.setup()
-from gips.inventory.dbinv.models import Result
+from gips.inventory.dbinv.models import DataVariable, Result
 from gips.datahandler import api
 
 
 def get_datacatalog ():
-    # TODO: return list of dicts
-    pass
+    """Return list of installed DataVariables as dicts"""
+    dv_list = []
+    dvs = DataVariable.objects.all()
+    for dv in dvs:
+        dv_list.append(model_to_dict(dv))
+    return dv_list
 
 
 def submit_job(site, variable, spatial_spec, temporal_spec):
@@ -26,7 +30,7 @@ def submit_job(site, variable, spatial_spec, temporal_spec):
 def job_status(job_id):
     pass
 
-    
+
 def stats_request_results(request_id):
     """Get all the results in the specified result set.
 

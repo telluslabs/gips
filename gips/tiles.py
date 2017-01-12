@@ -95,7 +95,7 @@ class Tiles(object):
                     images = gippy.GeoImages(filenames)
                     if self.spatial.site is not None and res is not None:
                         CookieCutter(
-                            images, self.spatial.site, fout, res[0], res[1],
+                            images, self.spatial.site, str(fout), res[0], res[1],
                             crop, interpolation, {}, alltouch,
                         )
                     else:
