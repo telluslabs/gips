@@ -149,10 +149,11 @@ def link(src, dst, hard=False):
 def settings():
     """ Retrieve GIPS settings - first from user, then from system """
     settings_path = os.path.expanduser('~/.gips/settings.py')
-    with error_handler("Error loading '{}'".format(settings_path), continuable=True):
-        # import user settings first
-        src = imp.load_source('settings', settings_path)
-        return src
+    if os.path.isfile(settings_path):
+        with error_handler("Error loading '{}'".format(settings_path)):
+            # import user settings first
+            src = imp.load_source('settings', settings_path)
+            return src
     with error_handler("gips.settings not found; consider running gips_config"):
         import gips.settings
         return gips.settings
