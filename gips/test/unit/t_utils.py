@@ -31,6 +31,7 @@ def t_remove_files_no_ext(mocker):
 
 def t_settings_user(mocker):
     """gips.settings should load user settings first."""
+    mocker.patch.object(utils.os.path, 'isfile').return_value = True
     mocker.patch.object(utils.os.path, 'expanduser').return_value = 'whatever'
     m_load_source = mocker.patch.object(utils.imp, 'load_source')
     fake_settings = m_load_source.return_value # a MagicMock
@@ -40,7 +41,7 @@ def t_settings_user(mocker):
 def t_settings_global(mocker):
     """gips.settings should fall back on gips.settings when user settings fail."""
     # force into the second clause
-    mocker.patch.object(utils.imp, 'load_source').side_effect = IOError('aaah!')
+    mocker.patch.object(utils.os.path, 'isfile').return_value = False
     # fake out `import gips.settings` with mocks and trickery:
     fake_gips = mocker.Mock()
     fake_settings = fake_gips.settings
