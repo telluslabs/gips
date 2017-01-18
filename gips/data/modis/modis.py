@@ -273,8 +273,7 @@ class modisData(Data):
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
-        # "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
-        "Terra 8-day": ['temp8tn', 'temp8td'],
+        "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
     }
     _products = {
         # MCD Products
@@ -395,6 +394,7 @@ class modisData(Data):
                 for i in range(6):
                     data = img[i].Read()
                     imgout[i].Write(data)
+                del img
 
 
             if val[0] == "quality":
@@ -481,6 +481,7 @@ class modisData(Data):
                 # create output gippy image
                 print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 6)
+                del refl
 
                 imgout.SetNoData(missing)
                 imgout.SetOffset(0.0)
@@ -527,6 +528,7 @@ class modisData(Data):
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
@@ -650,6 +652,7 @@ class modisData(Data):
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
@@ -774,6 +777,7 @@ class modisData(Data):
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 2)
+                del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
@@ -784,7 +788,7 @@ class modisData(Data):
                 imgout[1].Write(fracout)
 
                 VerboseOut('Completed writing %s' % fname)
-                
+
             ###################################################################
             # TEMPERATURE PRODUCT (DAILY)
             if val[0] == "temp":
@@ -896,6 +900,9 @@ class modisData(Data):
                 imgout.SetBandName('Temperature Daytime Aqua', 3)
                 imgout.SetBandName('Temperature Nighttime Aqua', 4)
                 imgout.SetBandName('Temperature Best Quality', 5)
+                del tempbands
+                del qcbands
+                del hourbands
 
             ###################################################################
             # OBSERVATION TIME PRODUCT (DAILY)
@@ -942,6 +949,7 @@ class modisData(Data):
                 imgout.SetBandName('Observation Time Nighttime Terra', 2)
                 imgout.SetBandName('Observation Time Daytime Aqua', 3)
                 imgout.SetBandName('Observation Time Nighttime Aqua', 4)
+                del hourbands
 
 
             ###################################################################
@@ -960,6 +968,7 @@ class modisData(Data):
 
                 fouts = dict(Indices(refl, {'ndvi': fname}, meta))
                 imgout = gippy.GeoImage(fouts['ndvi'])
+                del refl
 
             # TEMPERATURE PRODUCT (8-day) - Terra only
 
@@ -985,4 +994,5 @@ class modisData(Data):
 
             # add product to inventory
             self.AddFile(sensor, key, imgout.Filename())
+            del imgout # to cover for GDAL's internal problems
             VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.datetime.now() - start), 1)
