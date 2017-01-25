@@ -64,7 +64,7 @@ setup(
         'landsat-util==0.8.0ircwaves0',
     ],
     dependency_links=[
-        'http://github.com/ircwaves/landsat-util/tarball/develop#egg=landsat-util-0.8.0ircwaves0'
+        'http://github.com/ircwaves/landsat-util/tarball/landsat_util#egg=landsat-util-0.8.0ircwaves0'
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
