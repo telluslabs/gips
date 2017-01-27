@@ -214,7 +214,7 @@ class landsatAsset(Asset):
 
         s = search.Search()
         response = s.search(paths_rows=paths_rows, start_date=fdate, end_date=fdate, cloud_max=90)
-        if response['status'] == 'SUCCESS':
+        if response['status'] == 'SUCCESS' and response['total'] > 0:
             VerboseOut('Fetching %s %s %s' % (asset, tile, fdate), 1)
             if response['total_returned'] != 1:
                 raise Exception('Single date, single location, returned more than one result')
