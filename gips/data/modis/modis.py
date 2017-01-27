@@ -204,7 +204,7 @@ class modisAsset(Asset):
             listing = urllib.urlopen(mainurl).readlines()
 
         available = []
-        for item in listing.iter_lines():
+        for item in listing:
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
             # effectively random).
