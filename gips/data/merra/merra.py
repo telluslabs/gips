@@ -25,6 +25,7 @@ from __future__ import print_function
 
 import os
 import re
+import sys
 import datetime
 import time
 
@@ -39,6 +40,8 @@ import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, basename, open_vector
 from gips import utils
+
+from pdb import set_trace
 
 
 class Timeout():
@@ -100,7 +103,7 @@ class merraAsset(Asset):
         'SLV': {
             'shortname': 'M2T1NXSLV',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Single-Level Diagnostics V5.12.4',
-            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4',
+            'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4',
             'pattern': _asset_pattern.format(name='tavg1_2d_slv_Nx'),
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_slv_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -112,7 +115,7 @@ class merraAsset(Asset):
         'FLX': {
             'shortname': 'M2T1NXFLX',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Surface Flux Diagnostics V5.12.4',
-            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXFLX.5.12.4',
+            'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXFLX.5.12.4',
             'pattern': _asset_pattern.format(name='tavg1_2d_flx_Nx'),
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_flx_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -123,7 +126,7 @@ class merraAsset(Asset):
         'RAD': {
             'shortname': 'M2T1NXRAD',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Radiation Diagnostics V5.12.4',
-            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXRAD.5.12.4',
+            'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXRAD.5.12.4',
             'pattern': _asset_pattern.format(name='tavg1_2d_rad_Nx'),
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_rad_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -134,7 +137,7 @@ class merraAsset(Asset):
         'ASM': {
             'shortname': 'M2C0NXASM',
             'description': '2d, constants V5.12.4',
-            'url': 'http://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980',
+            'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980',
             'pattern': _asset_pattern.format(name='const_2d_asm_Nx'),
             're_pattern': _asset_re_pattern.format(name='const_2d_asm_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -198,7 +201,7 @@ class merraAsset(Asset):
                 if 'xml' in item:
                     continue
                 basename = cpattern.findall(item)[0]
-                url = ''.join([mainurl, '/', basename])
+                url = ''.join([mainurl, basename])
                 available.append({'basename': basename, 'url': url})
         if len(available) == 0:
             msg = 'Unable to find a remote match for {} at {}'
@@ -231,10 +234,10 @@ class merraAsset(Asset):
                     print('Download of', basename, 'failed:', response.status_code,
                           response.reason, '\nFull URL:', url, file=sys.stderr)
                     return
-
                 with open(outpath, 'wb') as fd:
                     for chunk in response.iter_content():
                         fd.write(chunk)
+
             utils.verbose_out('Retrieved %s' % basename, 2)
             retrieved_filenames.append(outpath)        
 
