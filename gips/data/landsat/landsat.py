@@ -214,7 +214,7 @@ class landsatAsset(Asset):
 
         s = search.Search()
         response = s.search(paths_rows=paths_rows, start_date=fdate, end_date=fdate, cloud_max=90)
-        if response['status'] == 'SUCCESS':
+        if response['status'] == 'SUCCESS' and response['total'] > 0:
             VerboseOut('Fetching %s %s %s' % (asset, tile, fdate), 1)
             if response['total_returned'] != 1:
                 raise Exception('Single date, single location, returned more than one result')
@@ -565,15 +565,9 @@ class landsatData(Data):
                     if val[0] == 'acca':
                         s_azim = self.metadata['geometry']['solarazimuth']
                         s_elev = 90 - self.metadata['geometry']['solarzenith']
-                        try:
-                            erosion = int(val[1]) if len(val) > 1 else 5
-                            dilation = int(val[2]) if len(val) > 2 else 10
-                            cloudheight = int(val[3]) if len(val) > 3 else 4000
-                        except:
-                            # TODO error-handling-fix: refactor; no try-except needed
-                            erosion = 5
-                            dilation = 10
-                            cloudheight = 4000
+                        erosion, dilation, cloudheight = 5, 10, 4000
+                        if len(val) >= 4:
+                            erosion, dilation, cloudheight = [int(v) for v in val[1:4]]
                         resset = set(
                             [(reflimg[band].Resolution().x(),
                               reflimg[band].Resolution().y())
@@ -587,13 +581,9 @@ class landsatData(Data):
                             )
                         imgout = ACCA(reflimg, fname, s_elev, s_azim, erosion, dilation, cloudheight)
                     elif val[0] == 'fmask':
-                        try:
-                            tolerance = int(val[1]) if len(val) > 1 else 3
-                            dilation = int(val[2]) if len(val) > 2 else 5
-                        except:
-                            # TODO error-handling-fix: refactor; no try-except needed
-                            tolerance = 3
-                            dilation = 5
+                        tolerance, dilation = 3, 5
+                        if len(val) >= 3:
+                            tolerance, dilation = [int(v) for v in val[1:3]]
                         imgout = Fmask(reflimg, fname, tolerance, dilation)
                     elif val[0] == 'rad':
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
@@ -727,15 +717,9 @@ class landsatData(Data):
 
                         s_azim = self.metadata['geometry']['solarazimuth']
                         s_elev = 90 - self.metadata['geometry']['solarzenith']
-                        try:
-                            erosion = int(val[1]) if len(val) > 1 else 5
-                            dilation = int(val[2]) if len(val) > 2 else 10
-                            cloudheight = int(val[3]) if len(val) > 3 else 4000
-                        except:
-                            # TODO error-handling-fix: refactor; no try-except needed
-                            erosion = 5
-                            dilation = 10
-                            cloudheight = 4000
+                        erosion, dilation, cloudheight = 5, 10, 4000
+                        if len(val) >= 4:
+                            erosion, dilation, cloudheight = [int(v) for v in val[1:4]]
                         imgout = AddShadowMask(
                             abimg, imgout, 0, s_elev, s_azim, erosion,
                             dilation, cloudheight, {'notes': 'dev-version'}

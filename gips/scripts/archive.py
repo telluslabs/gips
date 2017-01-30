@@ -31,8 +31,7 @@ def main():
     title = Colors.BOLD + 'GIPS Data Archive Utility (v%s)' % gipsversion + Colors.OFF
 
     # argument parsing
-    parser0 = GIPSParser(description=title)
-    parser = parser0.add_default_parser()
+    parser = GIPSParser(description=title)
     group = parser.add_argument_group('archive options')
     group.add_argument('--keep', help='Keep files after adding to archive', default=False, action='store_true')
     group.add_argument('--recursive', help='Iterate through subdirectories', default=False, action='store_true')
@@ -42,7 +41,7 @@ def main():
         default=False,
         action='store_true'
     )
-    args = parser0.parse_args()
+    args = parser.parse_args()
 
     try:
         print title
