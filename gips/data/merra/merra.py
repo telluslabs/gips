@@ -184,7 +184,7 @@ class merraAsset(Asset):
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
         if asset != "ASM":
-            mainurl = "%s/%04d/%02d/" % (cls._assets[asset]['url'], year, month)
+            mainurl = "%s/%04d/%02d" % (cls._assets[asset]['url'], year, month)
             pattern = cls._assets[asset]['re_pattern'] % (year, month, day)
         else:
             # asset ASM is for constants which all go into 1980-01-01
@@ -201,7 +201,7 @@ class merraAsset(Asset):
                 if 'xml' in item:
                     continue
                 basename = cpattern.findall(item)[0]
-                url = ''.join([mainurl, basename])
+                url = '/'.join([mainurl, basename])
                 available.append({'basename': basename, 'url': url})
         if len(available) == 0:
             msg = 'Unable to find a remote match for {} at {}'
@@ -458,7 +458,7 @@ class merraData(Data):
             return
         bname = os.path.join(self.path, self.basename)
         sensor = "merra"
-        for key, val in products.requested.items():           
+        for key, val in products.requested.items():
             fout = "%s_%s_%s.tif" % (bname, sensor, key)
             meta = {}
             VERSION = "1.0"
@@ -565,7 +565,8 @@ class merraData(Data):
                 frland.mask = (frland == missing)
                 nb, ny, nx = frland.shape
                 frland = frland.squeeze()
-                frland[frland.mask] = missing
+                if frland.mask.sum() > 0:
+                    frland[frland.mask] = missing
                 VerboseOut('writing %s' % fout, 4)
                 imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
                 imgout[0].Write(np.array(np.flipud(frland)).astype('float32'))
