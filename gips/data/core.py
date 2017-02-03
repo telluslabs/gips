@@ -318,6 +318,7 @@ class Asset(object):
 
     @classmethod
     def end_date(cls, asset):
+        # TODO this method never seems to be called?
         """ Get ending date for this asset """
         edate = cls._assets[asset].get('enddate', None)
         if edate is None:
@@ -327,6 +328,7 @@ class Asset(object):
 
     @classmethod
     def available(cls, asset, date):
+        # TODO this method never seems to be called?
         """ Check availability of an asset for given date """
         date1 = cls._assets[asset].get(['startdate'], None)
         date2 = cls._assets[asset].get(['enddate'], None)
