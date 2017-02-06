@@ -113,19 +113,6 @@ class ProductStatusChange(models.Model):
     time    = models.DateTimeField(auto_now_add=True)
 
 
-class Vector(models.Model):
-    geom       = models.GeometryField()
-    name       = models.CharField(max_length=255)
-    attributes = HStoreField()
-    site       = models.CharField(max_length=255, null=True, blank=True)
-    source     = models.CharField(max_length=255)
-    type       = models.CharField(max_length=255)
-    fid        = models.IntegerField()
-
-    class Meta:
-        unique_together = ('fid', 'source')
-
-
 class DataVariable(models.Model):
     """Inventory of Data Variables.
 
@@ -157,7 +144,6 @@ class Result(models.Model):
     sd          = models.FloatField(null=True, blank=True)
     fid         = models.IntegerField()
     site        = models.CharField(max_length=255)
-    vector      = models.ForeignKey(Vector, null=True, blank=True)
 
     class Meta:
         unique_together = ('job', 'date', 'site')
