@@ -1,7 +1,7 @@
 # GIPS
 
 See http://gipit.github.io/gips/ for documentation, but know it is not
-necessarily current. 
+necessarily current.
 
 ## Installation
 
