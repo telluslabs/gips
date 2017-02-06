@@ -216,10 +216,11 @@ class modisAsset(Asset):
                 available.append({'basename': basename, 'url': url})
 
         if len(available) == 0:
-            VerboseOut(
+            utils.verbose_out(
                 'Unable to find remote match for {} at {}'
                 .format(pattern, mainurl),
-                4
+                4,
+                sys.stderr
             )
         return available
 
@@ -227,14 +228,16 @@ class modisAsset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         available_assets = cls.query_service(asset, tile, date)
-        success = False
         retrieved_filenames = []
         for asset_info in available_assets:
             basename = asset_info['basename']
             url = asset_info['url']
             outpath = os.path.join(cls.Repository.path('stage'), basename)
 
-            with utils.error_handler("Asset fetch error", continuable=True):
+            with utils.error_handler(
+                    "Asset fetch error ({})".format(asset_info),
+                    continuable=True
+            ):
                 # tinkering:
                 # chunk size & stream=True in req
                 # cookies / cache auth
@@ -245,7 +248,7 @@ class modisAsset(Asset):
                     with open(outpath, 'wb') as fd:
                         fd.write(connection.read())
 
-                else: # http
+                else:  # http
                     kw = {'timeout': 10}
                     if asset not in cls._skip_auth:
                         username = cls.Repository.get_setting('username')
@@ -254,16 +257,20 @@ class modisAsset(Asset):
                     response = requests.get(url, **kw)
 
                     if response.status_code != requests.codes.ok:
-                        print('Download of', basename, 'failed:', response.status_code, response.reason,
-                              '\nFull URL:', url, file=sys.stderr)
-                        return retrieved_filenames # might as well stop b/c the rest will probably fail too
+                        utils.verbose_out(
+                            'Download failed({}): code={} reason="{}" url="{}"'
+                            .format(basename, response.status_code,
+                                    response.reason, url),
+                            2,
+                            sys.stderr
+                        )
+                        return retrieved_filenames  # might as well stop b/c the rest will probably fail too
 
                     with open(outpath, 'wb') as fd:
                         for chunk in response.iter_content():
                             fd.write(chunk)
                 utils.verbose_out('Retrieved %s' % basename, 2)
                 retrieved_filenames.append(outpath)
-                success = True
 
         return retrieved_filenames
 
