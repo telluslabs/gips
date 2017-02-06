@@ -3,7 +3,7 @@
 #    GIPS: Geospatial Image Processing System
 #
 #    AUTHOR: Matthew Hanson
-#    EMAIL:  matt.a.hanson@gmail.com
+#    EMAIL:  matt.a.hanson@gmail.com 
 #
 #    Copyright (C) 2014 Applied Geosolutions
 #
@@ -75,81 +75,81 @@ class modisAsset(Asset):
     }
 
 
-    # some modis data sources require authorization for access; these do not.
-    _skip_auth = ['MOD10A2', 'MOD10A1', 'MYD10A1', 'MYD10A2']
+    # modis data used to be free for all, now you have to log in, hence no assets skip auth.
+    _skip_auth = []
 
     _asset_glob_tail = '.A???????.h??v??.???.?????????????.hdf'
 
     _assets = {
         'MCD43A4': {
             'pattern': 'MCD43A4' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MCD43A2': {
             'pattern': 'MCD43A2' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MOD09Q1': {
             'pattern': 'MOD09Q1' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.005/',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006/',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -7,
         },
         'MOD10A1': {
             'pattern': 'MOD10A1' + _asset_glob_tail,
-            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A1.005',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A1.005/',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A1': {
             'pattern': 'MYD10A1' + _asset_glob_tail,
-            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A1.005',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A1.005/',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
         'MOD11A1': {
             'pattern': 'MOD11A1' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.006',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -1
         },
         'MYD11A1': {
             'pattern': 'MYD11A1' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.006',
             'startdate': datetime.date(2002, 7, 8),
             'latency': -1
         },
         'MOD11A2': {
             'pattern': 'MOD11A2' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.006',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -7
         },
         'MYD11A2': {
             'pattern': 'MYD11A2' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.005',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.006',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -7
         },
         'MOD10A2': {
             'pattern': 'MOD10A2' + _asset_glob_tail,
-            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOST/MOD10A2.005',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A2.006/',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A2': {
             'pattern': 'MYD10A2' + _asset_glob_tail,
-            'url': 'ftp://n5eil01u.ecs.nsidc.org/SAN/MOSA/MYD10A2.005',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A2.006/',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
         'MCD12Q1': {
             'pattern': 'MCD12Q1' + _asset_glob_tail,
-            'url': 'http://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
@@ -197,9 +197,9 @@ class modisAsset(Asset):
         cpattern = re.compile(pattern)
 
         if datetime.datetime.today().date().weekday() == 2:
-            err_msg = "Error downloading on a Wednesday; possible planned MODIS provider downtime"
+            err_msg = "Error downloading on a Wednesday; possible planned MODIS provider downtime: " + mainurl
         else:
-            err_msg = "Error downloading"
+            err_msg = "Error downloading: " + mainurl
         with utils.error_handler(err_msg):
             listing = urllib.urlopen(mainurl).readlines()
 
@@ -293,8 +293,7 @@ class modisData(Data):
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
-        # "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'], # ndvi8 is deactivated for now
-        "Terra 8-day": ['temp8tn', 'temp8td'],
+        "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
     }
     _products = {
         # MCD Products
@@ -404,7 +403,7 @@ class modisData(Data):
                 else:
                     availassets.append(asset)
                     allsds.extend(sds)
-                    versions[asset] = int(re.findall('M.*\.00(\d)\.\d{13}\.hdf', sds[0])[0])
+                    versions[asset] = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
 
             if not availassets:
                 # some products aren't available for every day but this is trying every day
@@ -442,6 +441,7 @@ class modisData(Data):
                 for i in range(6):
                     data = img[i].Read()
                     imgout[i].Write(data)
+                del img
 
 
             if val[0] == "quality":
@@ -456,6 +456,7 @@ class modisData(Data):
 
 
             # LAND VEGETATION INDICES PRODUCT
+            # now with QC layer!
             if val[0] == "indices":
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
@@ -470,14 +471,13 @@ class modisData(Data):
                     bluimg = refl[9].Read()
                     grnimg = refl[10].Read()
                     mirimg = refl[11].Read()
-                    swrimg = refl[12].Read() # formerly swir2
-                elif versions[asset] == 5:
-                    redimg = refl[0].Read()
-                    nirimg = refl[1].Read()
-                    bluimg = refl[2].Read()
-                    grnimg = refl[3].Read()
-                    mirimg = refl[4].Read()
-                    swrimg = refl[5].Read() # formerly swir2
+                    swrimg = refl[12].Read() # swir1, formerly swir2
+                    redqcimg = refl[0].Read()
+                    nirqcimg = refl[1].Read()
+                    bluqcimg = refl[2].Read()
+                    grnqcimg = refl[3].Read()
+                    mirqcimg = refl[4].Read()
+                    swrqcimg = refl[5].Read()
                 else:
                     raise Exception('product version not supported')
 
@@ -525,19 +525,29 @@ class modisData(Data):
                 wg = np.where((bluimg != missing) & (redimg != missing) & (nirimg != missing) & (nirimg + 6.0*redimg - 7.5*bluimg + 1.0 != 0.0))
                 evi[wg] = (2.5*(nirimg[wg] - redimg[wg])) / (nirimg[wg] + 6.0*redimg[wg] - 7.5*bluimg[wg] + 1.0)
 
+                qc = np.ones_like(redimg) # mark as poor if all are not missing and not all are good
+                w0 = np.where((redqcimg == 0)&(nirqcimg == 0)&(bluqcimg == 0)&(grnqcimg == 0)&(mirqcimg == 0)&(swrqcimg == 0))
+                w255 = np.where((redqcimg == 255)|(nirqcimg == 255)|(bluqcimg == 255)|(grnqcimg == 255)|(mirqcimg == 255)|(swrqcimg == 255))
+                qc[w0] = 0 # mark as good if they are all good
+                qc[w255] = missing # mark as missing if any are missing 
+
                 # create output gippy image
                 print("writing", fname)
-                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 6)
+                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 7)
+                del refl
 
                 imgout.SetNoData(missing)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(0.0001)
-
+                imgout[6].SetGain(1.0)
+                
                 imgout[0].Write(ndvi)
                 imgout[1].Write(lswi)
                 imgout[2].Write(vari)
                 imgout[3].Write(brgt)
                 imgout[4].Write(satvi)
+                imgout[5].Write(evi)
+                imgout[6].Write(qc)
 
                 imgout.SetBandName('NDVI', 1)
                 imgout.SetBandName('LSWI', 2)
@@ -545,6 +555,7 @@ class modisData(Data):
                 imgout.SetBandName('BRGT', 4)
                 imgout.SetBandName('SATVI', 5)
                 imgout.SetBandName('EVI', 6)
+                imgout.SetBandName('QC', 7)
 
 
             # CLOUD MASK PRODUCT
@@ -574,6 +585,7 @@ class modisData(Data):
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
@@ -697,6 +709,7 @@ class modisData(Data):
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
@@ -821,6 +834,7 @@ class modisData(Data):
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 2)
+                del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
@@ -940,6 +954,9 @@ class modisData(Data):
                 imgout.SetBandName('Temperature Daytime Aqua', 3)
                 imgout.SetBandName('Temperature Nighttime Aqua', 4)
                 imgout.SetBandName('Temperature Best Quality', 5)
+                del tempbands
+                del qcbands
+                del hourbands
 
             ###################################################################
             # OBSERVATION TIME PRODUCT (DAILY)
@@ -986,6 +1003,7 @@ class modisData(Data):
                 imgout.SetBandName('Observation Time Nighttime Terra', 2)
                 imgout.SetBandName('Observation Time Daytime Aqua', 3)
                 imgout.SetBandName('Observation Time Nighttime Aqua', 4)
+                del hourbands
 
 
             ###################################################################
@@ -1004,6 +1022,7 @@ class modisData(Data):
 
                 fouts = dict(Indices(refl, {'ndvi': fname}, meta))
                 imgout = gippy.GeoImage(fouts['ndvi'])
+                del refl
 
             # TEMPERATURE PRODUCT (8-day) - Terra only
 
@@ -1029,4 +1048,5 @@ class modisData(Data):
 
             # add product to inventory
             self.AddFile(sensor, key, imgout.Filename())
+            del imgout # to cover for GDAL's internal problems
             VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.datetime.now() - start), 1)
