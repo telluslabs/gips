@@ -43,6 +43,7 @@ from gips import utils
 
 from pdb import set_trace
 
+
 def binmask(arr, bit):
     """ Return boolean array indicating which elements as binary have a 1 in
         a specified bit position. Input is Numpy array.
@@ -73,7 +74,6 @@ class modisAsset(Asset):
         'MCD': {'description': 'Aqua/Terra Combined'},
         'MOD-MYD': {'description': 'Aqua/Terra together'}
     }
-
 
     # modis data used to be free for all, now you have to log in, hence no assets skip auth.
     _skip_auth = []
@@ -285,6 +285,7 @@ class modisAsset(Asset):
                 self.date == newasset.date and
                 self.version < newasset.version)
 
+
 class modisData(Data):
     """ A tile of data (all assets and products) """
     name = 'Modis'
@@ -423,7 +424,6 @@ class modisData(Data):
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
-
             if val[0] == "refl":
                 # NOTE this code is unreachable (no refl entry in _products)
                 if versions[asset] != 6:
@@ -443,7 +443,6 @@ class modisData(Data):
                     imgout[i].Write(data)
                 del img
 
-
             if val[0] == "quality":
                 if versions[asset] != 6:
                     raise Exception('product version not supported')
@@ -453,7 +452,6 @@ class modisData(Data):
                     os.remove(fname)
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
-
 
             # LAND VEGETATION INDICES PRODUCT
             # now with QC layer!
@@ -471,7 +469,7 @@ class modisData(Data):
                     bluimg = refl[9].Read()
                     grnimg = refl[10].Read()
                     mirimg = refl[11].Read()
-                    swrimg = refl[12].Read() # swir1, formerly swir2
+                    swrimg = refl[12].Read()  # swir1, formerly swir2
                     redqcimg = refl[0].Read()
                     nirqcimg = refl[1].Read()
                     bluqcimg = refl[2].Read()
@@ -488,12 +486,12 @@ class modisData(Data):
                 mirimg[mirimg < 0.0] = 0.0
                 swrimg[swrimg < 0.0] = 0.0
 
-                redimg[(redimg != missing)&(redimg > 1.0)] = 1.0
-                nirimg[(nirimg != missing)&(nirimg > 1.0)] = 1.0
-                bluimg[(bluimg != missing)&(bluimg > 1.0)] = 1.0
-                grnimg[(grnimg != missing)&(grnimg > 1.0)] = 1.0
-                mirimg[(mirimg != missing)&(mirimg > 1.0)] = 1.0
-                swrimg[(swrimg != missing)&(swrimg > 1.0)] = 1.0
+                redimg[(redimg != missing) & (redimg > 1.0)] = 1.0
+                nirimg[(nirimg != missing) & (nirimg > 1.0)] = 1.0
+                bluimg[(bluimg != missing) & (bluimg > 1.0)] = 1.0
+                grnimg[(grnimg != missing) & (grnimg > 1.0)] = 1.0
+                mirimg[(mirimg != missing) & (mirimg > 1.0)] = 1.0
+                swrimg[(swrimg != missing) & (swrimg > 1.0)] = 1.0
 
                 # red, nir
                 ndvi = missing + np.zeros_like(redimg)
@@ -512,24 +510,49 @@ class modisData(Data):
 
                 # blu, grn, red, nir
                 brgt = missing + np.zeros_like(redimg)
-                wg = np.where((nirimg != missing)&(redimg != missing)&(bluimg != missing)&(grnimg != missing))
-                brgt[wg] = 0.3*bluimg[wg] + 0.3*redimg[wg] + 0.1*nirimg[wg] + 0.3*grnimg[wg]
+                wg = np.where(
+                    (nirimg != missing) & (redimg != missing) &
+                    (bluimg != missing) & (grnimg != missing)
+                )
+                brgt[wg] = (
+                    0.3 * bluimg[wg] + 0.3 * redimg[wg] + 0.1 * nirimg[wg] +
+                    0.3 * grnimg[wg]
+                )
 
                 # red, mir, swr
                 satvi = missing + np.zeros_like(redimg)
-                wg = np.where((redimg != missing)&(mirimg != missing)&(swrimg != missing)&((mirimg + redimg + 0.5) != 0.0))
-                satvi[wg] = (((mirimg[wg] - redimg[wg])/(mirimg[wg] + redimg[wg] + 0.5))*1.5) - (swrimg[wg] / 2.0)
+                wg = np.where(
+                    (redimg != missing) & (mirimg != missing) &
+                    (swrimg != missing) & ((mirimg + redimg + 0.5) != 0.0)
+                )
+                satvi[wg] = (
+                    ((mirimg[wg] - redimg[wg]) /
+                     (mirimg[wg] + redimg[wg] + 0.5)) * 1.5
+                ) - (swrimg[wg] / 2.0)
 
                 # blu, red, nir
                 evi = missing + np.zeros_like(redimg)
-                wg = np.where((bluimg != missing) & (redimg != missing) & (nirimg != missing) & (nirimg + 6.0*redimg - 7.5*bluimg + 1.0 != 0.0))
-                evi[wg] = (2.5*(nirimg[wg] - redimg[wg])) / (nirimg[wg] + 6.0*redimg[wg] - 7.5*bluimg[wg] + 1.0)
+                wg = np.where(
+                    (bluimg != missing) & (redimg != missing) &
+                    (nirimg != missing) &
+                    (nirimg + 6.0 * redimg - 7.5 * bluimg + 1.0 != 0.0)
+                )
+                evi[wg] = (
+                    (2.5 * (nirimg[wg] - redimg[wg])) /
+                    (nirimg[wg] + 6.0 * redimg[wg] - 7.5 * bluimg[wg] + 1.0)
+                )
 
-                qc = np.ones_like(redimg) # mark as poor if all are not missing and not all are good
-                w0 = np.where((redqcimg == 0)&(nirqcimg == 0)&(bluqcimg == 0)&(grnqcimg == 0)&(mirqcimg == 0)&(swrqcimg == 0))
-                w255 = np.where((redqcimg == 255)|(nirqcimg == 255)|(bluqcimg == 255)|(grnqcimg == 255)|(mirqcimg == 255)|(swrqcimg == 255))
-                qc[w0] = 0 # mark as good if they are all good
-                qc[w255] = missing # mark as missing if any are missing 
+                qc = np.ones_like(redimg)  # mark as poor if all are not missing and not all are good
+                w0 = np.where(
+                    (redqcimg == 0) & (nirqcimg == 0) & (bluqcimg == 0) &
+                    (grnqcimg == 0) & (mirqcimg == 0) & (swrqcimg == 0)
+                )
+                w255 = np.where(
+                    (redqcimg == 255) | (nirqcimg == 255) | (bluqcimg == 255) |
+                    (grnqcimg == 255) | (mirqcimg == 255) | (swrqcimg == 255)
+                )
+                qc[w0] = 0  # mark as good if they are all good
+                qc[w255] = missing  # mark as missing if any are missing 
 
                 # create output gippy image
                 print("writing", fname)
@@ -557,14 +580,12 @@ class modisData(Data):
                 imgout.SetBandName('EVI', 6)
                 imgout.SetBandName('QC', 7)
 
-
             # CLOUD MASK PRODUCT
             if val[0] == "clouds":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
                 sensor = 'MOD'
                 fname = '%s_%s_%s' % (bname, sensor, key)
-
 
                 img = gippy.GeoImage(allsds)
 
@@ -592,7 +613,6 @@ class modisData(Data):
                 imgout.SetBandName('Cloud Cover', 1)
                 imgout[0].Write(clouds)
                 VerboseOut('Completed writing %s' % fname)
-
 
             # SNOW/ICE COVER PRODUCT - FRACTIONAL masked with binary
             if val[0] == "fsnow":
@@ -682,7 +702,7 @@ class modisData(Data):
                 fracclearcoversnow = np.sum((fracout == 0) & (coverout == 100))
                 fracsnowcovermissing = np.sum((fracout > 0) & (fracout <= 100) & (coverout == 127))
                 fracsnowcoverclear = np.sum((fracout > 0) & (fracout <= 100) & (coverout == 0))
-                #fracmostlycoverclear = np.sum((fracout > 50) & (fracout <= 100) & (coverout == 0))
+                # fracmostlycoverclear = np.sum((fracout > 50) & (fracout <= 100) & (coverout == 0))
                 totsnowfrac = int(0.01 * np.sum(fracout[fracout <= 100]))
                 totsnowcover = int(0.01 * np.sum(coverout[coverout <= 100]))
                 numvalidfrac = np.sum(fracout != 127)
@@ -713,14 +733,13 @@ class modisData(Data):
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
-                #imgout.SetBandName('Snow Cover', 1)
+                # imgout.SetBandName('Snow Cover', 1)
                 imgout.SetBandName('Fractional Snow Cover', 1)
 
-                #imgout[0].Write(coverout)
+                # imgout[0].Write(coverout)
                 imgout[0].Write(fracout)
 
                 VerboseOut('Completed writing %s' % fname)
-
 
             ###################################################################
             # SNOW/ICE COVER PRODUCT
@@ -811,7 +830,7 @@ class modisData(Data):
                 fracclearcoversnow = np.sum((fracout == 0) & (coverout == 100))
                 fracsnowcovermissing = np.sum((fracout > 0) & (fracout <= 100) & (coverout == 127))
                 fracsnowcoverclear = np.sum((fracout > 0) & (fracout <= 100) & (coverout == 0))
-                #fracmostlycoverclear = np.sum((fracout > 50) & (fracout <= 100) & (coverout == 0))
+                # fracmostlycoverclear = np.sum((fracout > 50) & (fracout <= 100) & (coverout == 0))
                 totsnowfrac = int(0.01 * np.sum(fracout[fracout <= 100]))
                 totsnowcover = int(0.01 * np.sum(coverout[coverout <= 100]))
                 numvalidfrac = np.sum(fracout != 127)
@@ -908,14 +927,14 @@ class modisData(Data):
                     bestmask += (math.pow(2, band) * newmaskbest).astype('uint16')
 
                     numbad = np.sum(newmaskbad)
-                    #fracbad = np.sum(newmaskbad) / float(newmaskbad.size)
+                    # fracbad = np.sum(newmaskbad) / float(newmaskbad.size)
 
                     numgood = np.sum(newmaskgood)
-                    #fracgood = np.sum(newmaskgood) / float(newmaskgood.size)
+                    # fracgood = np.sum(newmaskgood) / float(newmaskgood.size)
                     assert numgood == qc.size - numbad
 
                     numbest = np.sum(newmaskbest)
-                    #fracbest = np.sum(newmaskbest) / float(newmaskbest.size)
+                    # fracbest = np.sum(newmaskbest) / float(newmaskbest.size)
 
                     metaname = "NUMBAD_%s_%s" % (dayornight, platform)
                     metaname = metaname.upper()
@@ -1005,7 +1024,6 @@ class modisData(Data):
                 imgout.SetBandName('Observation Time Nighttime Aqua', 4)
                 del hourbands
 
-
             ###################################################################
             # NDVI (8-day) - Terra only
             if val[0] == "ndvi8":
@@ -1048,5 +1066,5 @@ class modisData(Data):
 
             # add product to inventory
             self.AddFile(sensor, key, imgout.Filename())
-            del imgout # to cover for GDAL's internal problems
+            del imgout  # to cover for GDAL's internal problems
             VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.datetime.now() - start), 1)
