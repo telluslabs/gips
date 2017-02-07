@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import datetime
+
 from django.forms.models import model_to_dict
 from gips.inventory import orm
 orm.setup()
@@ -40,7 +42,10 @@ def stats_request_results(request_id):
     qs = Result.objects.filter(job=request_id['job'])
     result_list = []
     for result in qs:
-        result_list.append(model_to_dict(result))
+        r = model_to_dict(result)
+        # xmlrpclib doesn't like datetime.date, convert to datetime.datetime
+        r['date'] = datetime.datetime.fromordinal(r['date'].toordinal())
+        result_list.append(r)
 
     return result_list
 
@@ -60,7 +65,10 @@ def stats_request_results_filter(request_id, filters):
     qs.filter(**filters)
     result_list = []
     for result in qs:
-        result_list.append(model_to_dict(result))
+        r = model_to_dict(result)
+        # xmlrpclib doesn't like datetime.date, convert to datetime.datetime
+        r['date'] = datetime.datetime.fromordinal(r['date'].toordinal())
+        result_list.append(r)
 
     return result_list
     #return Result.objects.filter(feature_set).filter(filters)
