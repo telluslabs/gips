@@ -39,25 +39,17 @@ from __future__ import print_function
 #from gips import utils
 
 class sentinel2Repository(Repository):
-    name = 'Sentinel 2' # TODO is a space allowed here?  magic driver determination?
+    name = 'Sentinel-2'
     description = 'Data from the Sentinel 2 satellite(s) from the ESA'
-
-    @classmethod
-    def feature2tile(cls, feature):
-        """ convert tile field attributes to tile identifier """
-        raise NotImplemented('unwritten method') # TODO, here down is modis version
-        fldindex_h = feature.GetFieldIndex("h")
-        fldindex_v = feature.GetFieldIndex("v")
-        h = str(int(feature.GetField(fldindex_h))).zfill(2)
-        v = str(int(feature.GetField(fldindex_v))).zfill(2)
-        return "h%sv%s" % (h, v)
+    # when looking at the tiles shapefile, what's the key to fetch a feature's tile ID?
+    _tile_attribute = 'Name'
 
 
 class sentinel2Asset(Asset):
     Repository = sentinel2Repository
 
     _sensors = {
-        'MSI': {'description': 'Multipectral Instrument'},
+        'MSI': {'description': 'Multispectral Instrument'},
     }
 
     # example url:
