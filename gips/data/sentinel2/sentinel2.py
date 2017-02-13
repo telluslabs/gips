@@ -23,7 +23,7 @@ from __future__ import print_function
 #import os
 #import sys
 #import re
-#import datetime
+import datetime
 
 #import urllib
 #import urllib2
@@ -34,7 +34,7 @@ from __future__ import print_function
 
 #import gippy
 #from gippy.algorithms import Indices
-#from gips.data.core import Repository, Asset, Data
+from gips.data.core import Repository, Asset, Data
 #from gips.utils import VerboseOut, settings
 #from gips import utils
 
@@ -89,3 +89,9 @@ class sentinel2Asset(Asset):
                 self.tile == newasset.tile and
                 self.date == newasset.date and
                 self.version < newasset.version)
+
+
+class sentinel2Data(Data):
+    name = 'Sentinel-2'
+    version = '0.1.0'
+    Asset = sentinel2Asset
