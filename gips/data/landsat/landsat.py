@@ -31,6 +31,8 @@ from fnmatch import fnmatchcase
 import traceback
 from copy import deepcopy
 import commands
+import tempfile
+import tarfile
 
 import numpy
 
@@ -405,8 +407,64 @@ class landsatData(Data):
             'assets': ['SR'],
             'description': 'Land mask from LC8SR',
         },
-
+        # ACOLITE products
+        'rhow': {
+            'assets': ['DN'],
+            'description': 'ACOLITE Water-leaving radiance-reflectance',
+        },
     }
+
+    def _process_acolite(self, product='rhow'):
+        ACOLITEPATHS = {
+            'ACO_DIR': '/projects/cyanomap/acolite/icooke/acolite_linux/',
+            'IDLPATH': './idl84/bin/idl',  # only seems to work when run from the ACO_DIR
+            'ACOLITE_BINARY': 'acolite.sav',
+            'RHOW_SETTINGS': '/scratch/icooke/acolite/simple_config.sav.cfg',
+        }
+        _ACOLITE_NDV = 1.875 * 2 ** 122
+
+        # TEMPDIR FOR PROCESSING
+        aco_proc_dir = tempfile.mkdtemp(
+            prefix='aco_proc_',
+            dir=os.path.join(self.Repository.path(), 'stage')
+        )
+
+        # EXTRACT ASSET
+        tar = tarfile.open(filename)
+        tar.extractall(aco_proc_dir)
+
+        # PROCESS VIA ACOLITE IDL CALL
+        cmd = (
+            ('cd {ACO_DIR} ; '
+             '{IDLPATH} -rt={ACOLITE_BINARY} -args settings={RHOW_SETTINGS} '
+             'output={OUTPUT} image={IMAGES}')
+            .format(
+                OUTPUT=out_dir,
+                IMAGES=ls_dir,
+                **ACOLITEPATHS
+            )
+        )
+
+        # CHECK EXIT STATUS
+        print('Running: {}'.format(cmd))
+        status, output = getstatusoutput(cmd)
+        if status != 0:
+            print('Encountered errors with:')
+        else:
+            print('Ran command: ')
+        print('    ' + cmd)
+        print(output)
+        print('--- end of output ---')
+
+        # COMBINE ALL RHOW IMAGES INTO A MULTI-BAND TIF AND ADD METADATA
+        file_by_wavelength = map(
+            lambda x: x[1],
+            sorted(
+                [(int(re.sub(r'.*RHOW_(\d+).tif', '\g<1>', fn)), fn)
+                 for fn in glob.glob(aco_proc_dir, '*RHOW*.tif')]
+            )
+        )
+
 
     def process(self, products=None, overwrite=False, **kwargs):
         """ Make sure all products have been processed """
