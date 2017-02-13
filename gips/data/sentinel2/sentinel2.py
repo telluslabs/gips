@@ -95,3 +95,18 @@ class sentinel2Data(Data):
     name = 'Sentinel-2'
     version = '0.1.0'
     Asset = sentinel2Asset
+
+    _productgroups = {
+        "Placeholder Products": ['placeholder'],
+    }
+    _products = {
+        # placeholder product standing in for the real thing so fetch can work
+        'placeholder': {
+            'description': 'Placeholder Product',
+            'assets': ['L1C'],
+        },
+    }
+
+
+    def process(self, *args, **kwargs):
+        raise NotImplemented()
