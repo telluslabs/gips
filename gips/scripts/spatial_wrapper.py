@@ -2,16 +2,20 @@
 import argparse
 import sys
 import os
-# Setup django
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "gips.inventory.orm.settings")
-import django
-django.setup()
+
 from gips.tools import SpatialAggregator
 from gips.utils import VerboseOut
-from gips.inventory.dbinv.models import Result, DataVariable, Vector, Job
+from gips.inventory import orm
 from gips import settings
+from gips import utils
+
+with utils.cli_error_handler('The ORM-based inventory is required, and there was an error loading it'):
+    orm.setup()
+
 
 def make_result(result, job):
+    from gips.inventory.dbinv.models import Result
+
     key = result[0]
     bands = result[1]
 
@@ -47,6 +51,7 @@ def make_result(result, job):
 
 
 def get_job(job):
+    from gips.inventory.dbinv.models import Job
     try:
         job = Job.objects.get(id=job)
     except django.core.exceptions.ObjectDoesNotExist:
