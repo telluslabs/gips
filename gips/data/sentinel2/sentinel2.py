@@ -21,9 +21,11 @@
 from __future__ import print_function
 
 #import os
-#import sys
+import sys
 #import re
 import datetime
+import shlex
+import subprocess
 
 #import urllib
 #import urllib2
@@ -35,8 +37,7 @@ import datetime
 #import gippy
 #from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
-#from gips.utils import VerboseOut, settings
-#from gips import utils
+from gips import utils
 
 class sentinel2Repository(Repository):
     name = 'Sentinel-2'
@@ -74,11 +75,37 @@ class sentinel2Asset(Asset):
     def __init__(self, filename):
         """ Inspect a single file and get some metadata """
         super(sentinel2Asset, self).__init__(filename)
-        raise NotImplemented()
+        raise NotImplementedError()
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        raise NotImplemented()
+        """Fetch the asset corresponding to the given asset type, tile, and date."""
+        # set up fetch params
+        year, month, day = date.timetuple()[:3]
+        username = cls.Repository.get_setting('username')
+        password = cls.Repository.get_setting('password')
+
+        # search for the asset's URL with wget call (using a suprocess call to wget instead of a
+        # more conventional call to a lib because available libs are perceived to be inferior).
+        search_url = cls._assets[asset]['url'] + (
+                #          year mon day                    tile
+                'S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'.format(year, month, day, tile))
+        search_cmd = (
+                'wget --no-verbose --no-check-certificate --user="{}" --password="{}" --timeout 30'
+                ' --output-document=/dev/stdout "{}"').format(username, password, search_url)
+        with utils.error_handler("Error retrieving '{}'".format(search_url)):
+            args = shlex.split(search_cmd)
+            p = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            (stdout_data, stderr_data) = p.communicate()
+            if p.returncode != 0:
+                verbose_out(stderr_data, stream=sys.stderr)
+                raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
+
+        print("=== GOT OUTPUT ===")
+        print(stdout_data)
+        print("==================")
+
+        raise NotImplementedError('fetch is in-progress')
 
     def updated(self, newasset):
         '''
@@ -109,4 +136,4 @@ class sentinel2Data(Data):
 
 
     def process(self, *args, **kwargs):
-        raise NotImplemented()
+        raise NotImplementedError()
