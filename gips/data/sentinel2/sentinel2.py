@@ -26,9 +26,7 @@ import sys
 import datetime
 import shlex
 import subprocess
-
-#import urllib
-#import urllib2
+import json
 
 #import math
 #import numpy as np
@@ -87,23 +85,28 @@ class sentinel2Asset(Asset):
 
         # search for the asset's URL with wget call (using a suprocess call to wget instead of a
         # more conventional call to a lib because available libs are perceived to be inferior).
-        search_url = cls._assets[asset]['url'] + (
-                #          year mon day                    tile
-                'S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'.format(year, month, day, tile))
+        #                              year mon day                    tile
+        url_search_string = 'S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE&format=json'
+        search_url = cls._assets[asset]['url'] + url_search_string.format(year, month, day, tile)
         search_cmd = (
                 'wget --no-verbose --no-check-certificate --user="{}" --password="{}" --timeout 30'
                 ' --output-document=/dev/stdout "{}"').format(username, password, search_url)
-        with utils.error_handler("Error retrieving '{}'".format(search_url)):
+        with utils.error_handler("Error performing asset search '({})'".format(search_url)):
             args = shlex.split(search_cmd)
             p = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             (stdout_data, stderr_data) = p.communicate()
             if p.returncode != 0:
                 verbose_out(stderr_data, stream=sys.stderr)
                 raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
+            link = json.loads(stdout_data)['feed']['entry']['link'][0]
+            if 'rel' in link: # sanity check - the right one doesn't have a 'rel' attrib
+                raise IOError("Unexpected 'rel' attribute in search result", link)
+            asset_url = link['href']
 
-        print("=== GOT OUTPUT ===")
-        print(stdout_data)
-        print("==================")
+        print("=== GOT URL ===")
+        print(asset_url)
+        print("===============")
+
 
         raise NotImplementedError('fetch is in-progress')
 
