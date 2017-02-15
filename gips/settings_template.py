@@ -53,11 +53,12 @@ REPOS = {
         '6S': False,            # atm correction for VIS/NIR/SWIR bands
         'MODTRAN': False,       # atm correction for LWIR
         'extract': False,       # extract files from tar.gz before processing instead of direct access
+        # 'ACOLITE_DIR':  '',   # ACOLITE installation for atm correction over water
     },
     'modis': {
         'repository': '$TLD/modis',
         # For NASA EarthData Authentication
-        #'username': '' 
+        #'username': ''
         #'password': ''
     },
     # these drivers tend to more specialized and experimental so turned off by default
