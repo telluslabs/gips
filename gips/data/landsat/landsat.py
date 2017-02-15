@@ -715,9 +715,10 @@ class landsatData(Data):
                 # TODO - update if no atmos desired for others
                 toa = self._products[val[0]].get('toa', False) or 'toa' in val
                 # Create product
-                with utils.error_handler('Error creating product {} for {}'.format(
-                        key, basename(self.assets['DN'].filename),
-                        continuable=True)):
+                with utils.error_handler(
+                        'Error creating product {} for {}'
+                        .format(key, basename(self.assets['DN'].filename)),
+                        continuable=True):
                     fname = os.path.join(self.path, self.basename + '_' + key)
                     if val[0] == 'acca':
                         s_azim = self.metadata['geometry']['solarazimuth']
