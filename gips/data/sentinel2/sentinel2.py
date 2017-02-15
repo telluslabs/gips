@@ -20,20 +20,13 @@
 
 from __future__ import print_function
 
-#import os
+import os
 import sys
-#import re
 import datetime
 import shlex
 import subprocess
 import json
 
-#import math
-#import numpy as np
-#import requests
-
-#import gippy
-#from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
 from gips import utils
 
@@ -98,15 +91,32 @@ class sentinel2Asset(Asset):
             if p.returncode != 0:
                 verbose_out(stderr_data, stream=sys.stderr)
                 raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-            link = json.loads(stdout_data)['feed']['entry']['link'][0]
+            entry = json.loads(stdout_data)['feed']['entry']
+            # TODO entry['summary'] is good for printing out for user consumption
+            # TODO sanity check that ['feed']["opensearch:totalResults"] == "1"
+            link = entry['link'][0]
             if 'rel' in link: # sanity check - the right one doesn't have a 'rel' attrib
-                raise IOError("Unexpected 'rel' attribute in search result", link)
+                raise IOError("Unexpected 'rel' attribute in search link", link)
             asset_url = link['href']
+            output_full_path = os.path.join(cls.Repository.path('stage'), entry['title'] + '.zip')
 
-        print("=== GOT URL ===")
-        print(asset_url)
-        print("===============")
-
+        # download the asset via the asset URL, putting it in the stage
+        # TODO put it in a temp folder and move it to the stage if the file download is successful
+        # TODO need ATOMIC file move from temp folder to stage
+        # TODO periodically notify the user how the download is going (let wget's natural output do
+        # it hopefully)
+        fetch_cmd = (
+                'wget --no-check-certificate --user="{}" --password="{}" --timeout 30'
+                ' --output-document="{}" "{}"').format(username, password, output_full_path, asset_url)
+        print('FETCHING WITH:', fetch_cmd)
+        with utils.error_handler("Error performing asset download '({})'".format(asset_url)):
+            args = shlex.split(fetch_cmd)
+            # TODO can't let stdout go to console if gips is in 'library mode'
+            p = subprocess.Popen(args, stderr=subprocess.PIPE)
+            (_, stderr_data) = p.communicate()
+            if p.returncode != 0:
+                verbose_out(stderr_data, stream=sys.stderr)
+                raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
 
         raise NotImplementedError('fetch is in-progress')
 
