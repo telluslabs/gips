@@ -558,6 +558,7 @@ class landsatData(Data):
                     print('Processing {} to band {}'
                           .format(img.Filename(), i + 1))
             else:
+                # TODO: handle other 1-band products
                 pass
             prodout[key] = imgout.Filename()
 
