@@ -21,11 +21,14 @@
 from __future__ import print_function
 
 import os
+import shutil
 import sys
 import datetime
 import shlex
 import subprocess
 import json
+import tempfile
+import zipfile
 
 from gips.data.core import Repository, Asset, Data
 from gips import utils
@@ -66,6 +69,24 @@ class sentinel2Asset(Asset):
     def __init__(self, filename):
         """ Inspect a single file and get some metadata """
         super(sentinel2Asset, self).__init__(filename)
+        # TODO perform integrity check on file, raising exception on error:
+        '''
+        # check for file integrity before moving
+        try:
+            possibly_bad_file = zipfile.ZipFile(output_full_path).testzip()
+        except:
+            # TODO quarantine file here
+        if possibly_bad_file is not None:
+            # quarantine file here too:
+            quarantine_full_path = os.path.join(
+                    cls.Repository.path('quarantine'), output_file_name)
+            verbose_out("Asset failed zipfile integrity check.  Moving file to quarantine.",
+                    stream=sys.stderr)
+            os.rename(output_full_path, quarantine_full_path)
+            verbose_out("File moved to {}.".format(quarantine_full_path), stream=sys.stderr)
+            raise IOError("Bad file in downloaded asset zipfile: '{}'".format(
+                    possibly_bad_file))
+        '''
         raise NotImplementedError()
 
     @classmethod
@@ -98,25 +119,28 @@ class sentinel2Asset(Asset):
             if 'rel' in link: # sanity check - the right one doesn't have a 'rel' attrib
                 raise IOError("Unexpected 'rel' attribute in search link", link)
             asset_url = link['href']
-            output_full_path = os.path.join(cls.Repository.path('stage'), entry['title'] + '.zip')
+            output_file_name = entry['title'] + '.zip'
 
-        # download the asset via the asset URL, putting it in the stage
-        # TODO put it in a temp folder and move it to the stage if the file download is successful
-        # TODO need ATOMIC file move from temp folder to stage
-        # TODO periodically notify the user how the download is going (let wget's natural output do
-        # it hopefully)
-        fetch_cmd = (
-                'wget --no-check-certificate --user="{}" --password="{}" --timeout 30'
-                ' --output-document="{}" "{}"').format(username, password, output_full_path, asset_url)
-        print('FETCHING WITH:', fetch_cmd)
+        # download the asset via the asset URL, putting it in a temp folder, then move to the stage
+        # if the download is successful (this is necessary to avoid a race condition between
+        # archive actions and fetch actions by concurrent processes)
+        fetch_cmd_template = ('wget --no-check-certificate --user="{}" --password="{}" --timeout=30'
+                ' --no-verbose --show-progress --output-document="{}" "{}"')
         with utils.error_handler("Error performing asset download '({})'".format(asset_url)):
-            args = shlex.split(fetch_cmd)
-            # TODO can't let stdout go to console if gips is in 'library mode'
-            p = subprocess.Popen(args, stderr=subprocess.PIPE)
-            (_, stderr_data) = p.communicate()
-            if p.returncode != 0:
-                verbose_out(stderr_data, stream=sys.stderr)
-                raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
+            tmp_dir_full_path = tempfile.mkdtemp(dir=cls.Repository.path('stage'))
+            try:
+                output_full_path = os.path.join(tmp_dir_full_path, output_file_name)
+                fetch_cmd = fetch_cmd_template.format(
+                        username, password, output_full_path, asset_url)
+                args = shlex.split(fetch_cmd)
+                p = subprocess.Popen(args)
+                p.communicate()
+                if p.returncode != 0:
+                    raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
+                stage_full_path = os.path.join(cls.Repository.path('stage'), output_file_name)
+                os.rename(output_full_path, stage_full_path) # on POSIX, if it works, it's atomic
+            finally:
+                shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
 
         raise NotImplementedError('fetch is in-progress')
 
