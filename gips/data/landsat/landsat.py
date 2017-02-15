@@ -413,44 +413,44 @@ class landsatData(Data):
         # ACOLITE products
         'rhow': {
             'assets': ['DN'],
-            'description': 'ACOLITE Water-leaving radiance-reflectance',
+            'description': 'Water-Leaving Radiance-Reflectance',
             'acolite-product': 'rhow_vnir',
             'acolite-pattern': '.*{scene_id}_RHOW_[0-9]+.tif',
             'toa': True,
         },
         'rhoam': {
             'assets': ['DN'],
-            'description': 'ACOLITE Multi-scattering aerosol reflectance',
+            'description': 'Multi-Scattering Aerosol Reflectance',
             'acolite-product': 'rhoam_vnir',
             'acolite-pattern': '.*{scene_id}__RHOAM_VNIR.tif',
         },
         'oc2chl': {
             'assets': ['DN'],
-            'description': 'ACOLITE blue-green ratio chlorophyll algorithm using bands 483 & 561',
+            'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 483 & 561',
             'acolite-product': 'CHL_OC2',
             'acolite-pattern': '.*{scene_id}_CHL_OC2.tif',
         },
         'oc3chl': {
             'assets': ['DN'],
-            'description': 'ACOLITE blue-green ratio chlorophyll algorithm using bands 443, 483, & 561',
+            'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561',
             'acolite-product': 'CHL_OC3',
             'acolite-pattern': '.*{scene_id}_CHL_OC3.tif',
         },
         'fai': {
             'assets': ['DN'],
-            'description': 'ACOLITE Floating algae index',
+            'description': 'Floating Algae Index',
             'acolite-product': 'FAI',
             'acolite-pattern': '.*{scene_id}_FAI.tif',
         },
         'spm665': {
             'assets': ['DN'],
-            'description': 'ACOLITE suspended sediment concentration 665nm',
+            'description': 'Suspended Sediment Concentration 665nm',
             'acolite-product': 'SPM_NECHAD_655',
             'acolite-pattern': '.*{scene_id}_SPM_NECHAD_[0-9]+.tif',
         },
         'turbidity': {
             'assets': ['DN'],
-            'description': 'ACOLITE blended turbidity',
+            'description': 'Blended Turbidity',
             'acolite-product': 'T_DOGLIOTTI',
             'acolite-pattern': '.*{scene_id}_T_DOGLIOTTI.tif',
         },
@@ -462,7 +462,7 @@ class landsatData(Data):
         TODO: Ensure this is genericized to work for S2 or Landsat.
         '''
         ACOLITEPATHS = {
-            'ACO_DIR': '/projects/cyanomap/acolite/icooke/acolite_linux/',
+            'ACO_DIR': settings().REPOS['landsat']['ACOLITE_DIR'],
             # N.B.: only seems to work when run from the ACO_DIR
             'IDLPATH': './idl84/bin/idl',
             'ACOLITE_BINARY': 'acolite.sav',
@@ -525,7 +525,6 @@ class landsatData(Data):
                 self._products[key]['acolite-pattern']
                 .format(scene_id=sceneid),
             )
-            set_trace()
             files = filter(pat.match, allfiles)
             ofname = os.path.join(
                 self.path, self.basename + '_' + '-'.join(products[key])
