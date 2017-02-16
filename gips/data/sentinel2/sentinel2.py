@@ -34,6 +34,8 @@ import zipfile
 from gips.data.core import Repository, Asset, Data
 from gips import utils
 
+from gips.atmosphere import SIXS, MODTRAN
+
 class sentinel2Repository(Repository):
     name = 'Sentinel-2'
     description = 'Data from the Sentinel 2 satellite(s) from the ESA'
@@ -45,7 +47,19 @@ class sentinel2Asset(Asset):
     Repository = sentinel2Repository
 
     _sensors = {
-        'MSI': {'description': 'Multispectral Instrument'},
+        'MSI': {
+            'description': 'Multispectral Instrument'
+            'bands': ['1', '2', '3', '4', '5', '6', '7', '8', '8a', '9', '10',
+                      '10', '11', '12']
+            'colors': ["COASTAL", "BLUE", "GREEN", "RED", "REDEDGE1", "REDEDGE2", "REDEDGE3", "REDEDGE4", "NIR", "WV", "CIRRUS", "SWIR1", "SWIR2"],
+            'bandlocs': [0.443, 0.490, 0.560, 0.665, 0.705, 0.740, 0.783, 0.842, 0.865, 0.945, 1.375, 1.610, 2.190]
+            'bandwidths': [0.020,  0.065,  0.035,  0.030,  0.015,  0.015,  0.020, 0.115,  0.020,  0.020,   0.030,   0.090,  0.180],
+            # 'E': None  # S.B. Pulled from asset metadata file
+            # 'K1': [0, 0, 0, 0, 0, 607.76, 0],  For conversion of LW bands to Kelvin
+            # 'K2': [0, 0, 0, 0, 0, 1260.56, 0], For conversion of LW bands to Kelvin
+            # 'tcap': _tcapcoef,
+
+        },
     }
 
     # example url:
@@ -114,9 +128,12 @@ class sentinel2Asset(Asset):
             if p.returncode != 0:
                 verbose_out(stderr_data, stream=sys.stderr)
                 raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-            entry = json.loads(stdout_data)['feed']['entry']
+            response =  json.loads(stdout_data)
+            if response['feed']['opensearch:totalResults'] == '0':
+                return
+            entry = response['feed']['entry']
             # TODO entry['summary'] is good for printing out for user consumption
-            # TODO sanity check that ['feed']["opensearch:totalResults"] == "1"
+
             link = entry['link'][0]
             if 'rel' in link: # sanity check - the right one doesn't have a 'rel' attrib
                 raise IOError("Unexpected 'rel' attribute in search link", link)
@@ -173,4 +190,3 @@ class sentinel2Data(Data):
 
 
     def process(self, *args, **kwargs):
-        raise NotImplementedError()
