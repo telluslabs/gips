@@ -25,6 +25,7 @@ import shutil
 import sys
 import datetime
 import shlex
+import re
 import subprocess
 import json
 import tempfile
@@ -54,7 +55,7 @@ class sentinel2Asset(Asset):
         'L1C': {
             #                      sense datetime              tile
             #                     (YYYYMMDDTHHMMSS)            (MGRS)
-            'pattern': 'S2?_MSIL1C_????????T??????_N????_R???_T?????_*.SAFE',
+            'pattern': 'S2?_MSIL1C_????????T??????_N????_R???_T?????_*.zip',
             'url': 'https://scihub.copernicus.eu/dhus/search?q=filename:',
             'startdate': datetime.date(2016, 12, 06),
             'latency': 3 # TODO actually seems to be 3,7,3,7..., but this value seems to be unused?
@@ -65,29 +66,30 @@ class sentinel2Asset(Asset):
 
     _defaultresolution = None # [number, number] TODO get this value from science nerds, needed for core.py calls
 
-    # TODO here down
     def __init__(self, filename):
-        """ Inspect a single file and get some metadata """
+        """Inspect a single file and set some metadata.
+
+        Note that for now, only the shortened name format in use after Dec 6 2016 is supported:
+        https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
+        """
         super(sentinel2Asset, self).__init__(filename)
-        # TODO perform integrity check on file, raising exception on error:
-        '''
-        # check for file integrity before moving
-        try:
-            possibly_bad_file = zipfile.ZipFile(output_full_path).testzip()
-        except:
-            # TODO quarantine file here
-        if possibly_bad_file is not None:
-            # quarantine file here too:
-            quarantine_full_path = os.path.join(
-                    cls.Repository.path('quarantine'), output_file_name)
-            verbose_out("Asset failed zipfile integrity check.  Moving file to quarantine.",
-                    stream=sys.stderr)
-            os.rename(output_full_path, quarantine_full_path)
-            verbose_out("File moved to {}.".format(quarantine_full_path), stream=sys.stderr)
-            raise IOError("Bad file in downloaded asset zipfile: '{}'".format(
-                    possibly_bad_file))
-        '''
-        raise NotImplementedError()
+        # TODO later do ZipFile().testzip() somewhere else & move this check there
+        zipfile.ZipFile(filename) # sanity check; exception if file isn't a valid zip
+        base_filename = os.path.basename(filename)
+        # regex for verifying filename correctness & extracting metadata; note that for now, only
+        # the shortened name format in use after Dec 6 2016 is supported:
+        # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
+        #                                         year           mon          day
+        asset_name_pattern = ('^S2[AB]_MSIL1C_(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)T\d{6}'
+                              #                     tile
+                              '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$')
+        match = re.match(asset_name_pattern, base_filename)
+        if match is None:
+            raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(base_filename))
+        self.asset = 'L1C'
+        self.sensor = 'MSI'
+        self.tile = match.group('tile')
+        self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -141,8 +143,6 @@ class sentinel2Asset(Asset):
                 os.rename(output_full_path, stage_full_path) # on POSIX, if it works, it's atomic
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
-
-        raise NotImplementedError('fetch is in-progress')
 
     def updated(self, newasset):
         '''
