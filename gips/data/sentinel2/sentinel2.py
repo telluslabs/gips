@@ -31,6 +31,8 @@ import json
 import tempfile
 import zipfile
 
+import gippy
+
 from gips.data.core import Repository, Asset, Data
 from gips import utils
 
@@ -128,12 +130,17 @@ class sentinel2Asset(Asset):
             if p.returncode != 0:
                 verbose_out(stderr_data, stream=sys.stderr)
                 raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-            response =  json.loads(stdout_data)
-            if response['feed']['opensearch:totalResults'] == '0':
-                return
-            entry = response['feed']['entry']
-            # TODO entry['summary'] is good for printing out for user consumption
+            results = json.loads(stdout_data)['feed'] # always top-level key
 
+            result_count = int(results['opensearch:totalResults'])
+            if result_count == 0:
+                return # nothing found, a normal occurence for eg date range queries
+            if result_count > 1:
+                raise IOError(
+                        "Expected single result, but query returned {}.".format(result_count))
+
+            entry = results['entry']
+            # TODO entry['summary'] is good for printing out for user consumption
             link = entry['link'][0]
             if 'rel' in link: # sanity check - the right one doesn't have a 'rel' attrib
                 raise IOError("Unexpected 'rel' attribute in search link", link)
@@ -144,7 +151,10 @@ class sentinel2Asset(Asset):
         # if the download is successful (this is necessary to avoid a race condition between
         # archive actions and fetch actions by concurrent processes)
         fetch_cmd_template = ('wget --no-check-certificate --user="{}" --password="{}" --timeout=30'
-                ' --no-verbose --show-progress --output-document="{}" "{}"')
+                              ' --no-verbose --output-document="{}" "{}"')
+        if gippy.Options.Verbose() != 0:
+            fetch_cmd_template += ' --show-progress --progress=dot:giga'
+        utils.verbose_out("Fetching " + output_file_name)
         with utils.error_handler("Error performing asset download '({})'".format(asset_url)):
             tmp_dir_full_path = tempfile.mkdtemp(dir=cls.Repository.path('stage'))
             try:
