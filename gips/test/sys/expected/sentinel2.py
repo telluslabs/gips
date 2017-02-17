@@ -18,6 +18,7 @@ Tile Coverage
 2 files on 2 dates
 \x1b[1m
 SENSORS\x1b[0m
-\x1b[35mMSI: Multispectral Instrument\x1b[0m
+\x1b[35mS2A: Sentinel-2, Satellite A\x1b[0m
+\x1b[31mS2B: Sentinel-2, Satellite B\x1b[0m
 """
 }

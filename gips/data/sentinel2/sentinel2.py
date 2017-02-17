@@ -47,7 +47,8 @@ class sentinel2Asset(Asset):
     Repository = sentinel2Repository
 
     _sensors = {
-        'MSI': {'description': 'Multispectral Instrument'},
+        'S2A': {'description': 'Sentinel-2, Satellite A'},
+        'S2B': {'description': 'Sentinel-2, Satellite B'},
     }
 
     # example url:
@@ -81,15 +82,14 @@ class sentinel2Asset(Asset):
         # regex for verifying filename correctness & extracting metadata; note that for now, only
         # the shortened name format in use after Dec 6 2016 is supported:
         # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
-        #                                         year           mon          day
-        asset_name_pattern = ('^S2[AB]_MSIL1C_(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)T\d{6}'
-                              #                     tile
-                              '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$')
+        asset_name_pattern = ('^(?P<sensor>S2[AB])_MSIL1C_' # sensor
+                              '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)T\d{6}' # year, month, day
+                              '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$') # tile
         match = re.match(asset_name_pattern, base_filename)
         if match is None:
             raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(base_filename))
         self.asset = 'L1C'
-        self.sensor = 'MSI'
+        self.sensor = match.group('sensor')
         self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
 
