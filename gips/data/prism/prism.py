@@ -251,7 +251,10 @@ class prismData(Data):
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)
-                    vsinames[asset] = bil
+                     vsinames[asset] = os.path.join(
+                         '/vsizip/' + self.assets[asset].filename,
+                         bil
+                     )
 
             if not availassets:
                 VerboseOut(
