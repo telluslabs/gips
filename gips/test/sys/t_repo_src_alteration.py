@@ -13,7 +13,7 @@ pytestmark = pytest.mark.skipif(not pytest.config.getoption("src_altering"),
                                 reason="--src-altering is required for this test")
 
 # only one day for most of these tests (to save time), and note --fetch:
-STD_ARGS = ('modis', '-s', NH_SHP_PATH, '-d', '2012-12-01,2012-12-01', '-v', '4', '--fetch')
+STD_MODIS_ARGS = ('modis', '-s', NH_SHP_PATH, '-d', '2012-12-01,2012-12-01', '-v', '4', '--fetch')
 
 # will need to support changing the driver on a per-test basis; one idea is to have the test set
 # the driver on the fixture, then have the fixture inspect it when needed
@@ -26,11 +26,13 @@ def careful_repo_env(request, expected):
 
     It won't let the test run if existing files in the repo would be
     overwritten by files created during the test."""
+    logger.debug("starting careful_repo_env setup")
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     intersection = set(gtfe._find_files().keys()) & set(expected.created.keys())
     if intersection:
         msg = '{} output files found before test; test cannot proceed'
         raise RuntimeError(msg.format(len(intersection)), list(intersection))
+    logger.debug("careful_repo_env yielding to test")
     yield gtfe
     gtfe.remove_created()
     driver = request.function.func_name.split('_')[1]
@@ -42,7 +44,7 @@ is_wednesday = datetime.today().date().weekday() == 2
 @pytest.mark.skipif(is_wednesday, reason="Data isn't available on Wednesdays")
 def t_modis_inv_fetch(careful_repo_env, expected):
     """Test gips_inventory --fetch; actually contacts data provider."""
-    actual = careful_repo_env.run('gips_inventory', *STD_ARGS)
+    actual = careful_repo_env.run('gips_inventory', *STD_MODIS_ARGS)
     assert expected.created == actual.created
 
 
@@ -56,7 +58,7 @@ def t_modis_inv_fetch_on_wednesday(repo_env):
     Actually contacts data provider, but only on Wednesdays."""
     # TODO some files may be generated; put those in expected/ when they've been identified
     expected = GipsProcResult()
-    actual = repo_env.run('gips_inventory', *STD_ARGS)
+    actual = repo_env.run('gips_inventory', *STD_MODIS_ARGS)
     assert expected.created == actual.created
 
 
@@ -102,3 +104,10 @@ def t_modis_archive(careful_repo_env, repo_env, expected):
     assert (expected._post_archive_inv_stdout == inv_actual.stdout and
             expected.created == actual.created and
             expected.deleted == actual.deleted)
+
+
+def t_sentinel2_inv_fetch(careful_repo_env, expected):
+    """Test gips_inventory sentinel2 --fetch; actually contacts data provider."""
+    args = ('sentinel2', '-s', DURHAM_SHP_PATH, '-d', '2017-003', '-v', '4', '--fetch')
+    actual = careful_repo_env.run('gips_inventory', *args)
+    assert expected.created == actual.created

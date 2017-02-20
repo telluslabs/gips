@@ -11,11 +11,12 @@ _log = logging.getLogger(__name__)
 
 def set_constants(config):
     """Use pytest config API to set globals pointing at needed file paths."""
-    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH
+    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH, DURHAM_SHP_PATH
     TEST_DATA_DIR  = str(config.rootdir.join('gips/test'))
     DATA_REPO_ROOT = config.getini('data-repo')
     OUTPUT_DIR     = config.getini('output-dir')
     NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
+    DURHAM_SHP_PATH = os.path.join(TEST_DATA_DIR, 'durham.shp')
 
 slow = pytest.mark.skipif('not config.getoption("slow")',
                           reason="--slow is required for this test")
@@ -78,6 +79,15 @@ class GipsTestFileEnv(TestFileEnvironment):
             full_n = os.path.join(DATA_REPO_ROOT, n)
             if os.path.lexists(full_n):
                 shutil.rmtree(full_n)
+
+    def _find_files(self, *args, **kwargs):
+        """As super, but log that the checksums are being computed.
+
+        Logs are needed because the process takes time for large assets."""
+        _log.debug("Starting file detection & checksumming")
+        rv = super(GipsTestFileEnv, self)._find_files(*args, **kwargs)
+        _log.debug("Completed file detection & checksumming")
+        return rv
 
 
 class GipsProcResult(object):

@@ -49,8 +49,8 @@ class sentinel2Asset(Asset):
     Repository = sentinel2Repository
 
     _sensors = {
-        'MSI': {
-            'description': 'Multispectral Instrument'
+        'S2A': {
+            'description': 'Sentinel-2, Satellite A'
             'bands': ['1', '2', '3', '4', '5', '6', '7', '8', '8a', '9', '10',
                       '10', '11', '12']
             'colors': ["COASTAL", "BLUE", "GREEN", "RED", "REDEDGE1", "REDEDGE2", "REDEDGE3", "REDEDGE4", "NIR", "WV", "CIRRUS", "SWIR1", "SWIR2"],
@@ -63,6 +63,7 @@ class sentinel2Asset(Asset):
 
         },
     }
+    _sensors['S2B'] = {'description': 'Sentinel-2, Satellite B'}
 
     # example url:
     # https://scihub.copernicus.eu/dhus/search?q=filename:S2?_MSIL1C_20170202T??????_N????_R???_T19TCH_*.SAFE
@@ -95,15 +96,14 @@ class sentinel2Asset(Asset):
         # regex for verifying filename correctness & extracting metadata; note that for now, only
         # the shortened name format in use after Dec 6 2016 is supported:
         # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
-        #                                         year           mon          day
-        asset_name_pattern = ('^S2[AB]_MSIL1C_(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)T\d{6}'
-                              #                     tile
-                              '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$')
+        asset_name_pattern = ('^(?P<sensor>S2[AB])_MSIL1C_' # sensor
+                              '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)T\d{6}' # year, month, day
+                              '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$') # tile
         match = re.match(asset_name_pattern, base_filename)
         if match is None:
             raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(base_filename))
         self.asset = 'L1C'
-        self.sensor = 'MSI'
+        self.sensor = match.group('sensor')
         self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
 
@@ -200,3 +200,4 @@ class sentinel2Data(Data):
 
 
     def process(self, *args, **kwargs):
+        raise NotImplementedError()
