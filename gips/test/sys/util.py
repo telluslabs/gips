@@ -20,6 +20,8 @@ def set_constants(config):
 
 slow = pytest.mark.skipif('not config.getoption("slow")',
                           reason="--slow is required for this test")
+acolite = pytest.mark.skipif('not config.getoption("acolite")',
+                          reason="--acolite is required for this test")
 sys = pytest.mark.skipif('not config.getoption("sys")', reason="--sys is required for this test")
 
 

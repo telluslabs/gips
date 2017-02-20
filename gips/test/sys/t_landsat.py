@@ -16,6 +16,8 @@ product_args = tuple('-p acca bqashadow ref-toa ndvi-toa rad-toa'.split())
 
 STD_PROD_ARGS = STD_ARGS + product_args
 
+ACOLITE_PROD_ARGS = STD_ARGS + ('-p', 'rhow')
+
 driver = 'landsat'
 
 @pytest.fixture
@@ -49,6 +51,14 @@ def t_inventory(setup_landsat_data, repo_env, expected):
 def t_process(setup_landsat_data, repo_env, expected):
     """Test gips_process on landsat data."""
     actual = repo_env.run('gips_process', *STD_PROD_ARGS)
+    assert expected == actual
+
+
+@slow
+@acolite
+def t_process_acolite(setup_landsat_data, repo_env, expected):
+    """Test gips_process on landsat data."""
+    actual = repo_env.run('gips_process', *ACOLITE_PROD_ARGS)
     assert expected == actual
 
 
