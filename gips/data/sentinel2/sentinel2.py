@@ -38,6 +38,7 @@ from gips import utils
 
 from gips.atmosphere import SIXS, MODTRAN
 
+
 class sentinel2Repository(Repository):
     name = 'Sentinel-2'
     description = 'Data from the Sentinel 2 satellite(s) from the ESA'
@@ -50,12 +51,19 @@ class sentinel2Asset(Asset):
 
     _sensors = {
         'S2A': {
-            'description': 'Sentinel-2, Satellite A'
-            'bands': ['1', '2', '3', '4', '5', '6', '7', '8', '8a', '9', '10',
-                      '10', '11', '12']
-            'colors': ["COASTAL", "BLUE", "GREEN", "RED", "REDEDGE1", "REDEDGE2", "REDEDGE3", "REDEDGE4", "NIR", "WV", "CIRRUS", "SWIR1", "SWIR2"],
-            'bandlocs': [0.443, 0.490, 0.560, 0.665, 0.705, 0.740, 0.783, 0.842, 0.865, 0.945, 1.375, 1.610, 2.190]
-            'bandwidths': [0.020,  0.065,  0.035,  0.030,  0.015,  0.015,  0.020, 0.115,  0.020,  0.020,   0.030,   0.090,  0.180],
+            'description': 'Sentinel-2, Satellite A',
+            'bands': ['1', '2', '3', '4', '5',
+                      '6', '7', '8', '8a', '9', '10',
+                      '10', '11', '12'],
+            'colors': ["COASTAL", "BLUE", "GREEN", "RED", "REDEDGE1",
+                       "REDEDGE2", "REDEDGE3", "NIR", "REDEDGE4", "WV",
+                       "CIRRUS", "SWIR1", "SWIR2"],
+            'bandlocs': [0.443, 0.490, 0.560, 0.665, 0.705,
+                         0.740, 0.783, 0.842, 0.865, 0.945,
+                         1.375, 1.610, 2.190],
+            'bandwidths': [0.020, 0.065, 0.035, 0.030, 0.015,
+                           0.015, 0.020, 0.115, 0.020, 0.020,
+                           0.030, 0.090, 0.180],
             # 'E': None  # S.B. Pulled from asset metadata file
             # 'K1': [0, 0, 0, 0, 0, 607.76, 0],  For conversion of LW bands to Kelvin
             # 'K2': [0, 0, 0, 0, 0, 1260.56, 0], For conversion of LW bands to Kelvin
@@ -75,13 +83,15 @@ class sentinel2Asset(Asset):
             'pattern': 'S2?_MSIL1C_????????T??????_N????_R???_T?????_*.zip',
             'url': 'https://scihub.copernicus.eu/dhus/search?q=filename:',
             'startdate': datetime.date(2016, 12, 06),
-            'latency': 3 # TODO actually seems to be 3,7,3,7..., but this value seems to be unused?
-                         # only needed by Asset.end_date and Asset.available, but those are never called?
+            'latency': 3  # TODO actually seems to be 3,7,3,7..., but this value seems to be unused?
+                          # only needed by Asset.end_date and Asset.available, but those are never called?
         },
 
     }
 
-    _defaultresolution = None # [number, number] TODO get this value from science nerds, needed for core.py calls
+    _defaultresolution = (10, 10)  # 10m for optical
+                                   # 20m for REDEDGE and SWIR bands
+                                   # 60m for ATMOSPHERIC
 
     def __init__(self, filename):
         """Inspect a single file and set some metadata.
