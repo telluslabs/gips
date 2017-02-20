@@ -234,8 +234,7 @@ class Asset(object):
                 datafiles = tfile.getnames()
             elif zipfile.is_zipfile(self.filename):
                 zfile = zipfile.ZipFile(self.filename)
-                datafiles = ['/vsizip/' + os.path.join(self.filename, f)
-                             for f in zfile.namelist()]
+                datafiles = zfile.namelist()
             else:
                 # Try subdatasets
                 fh = gdal.Open(self.filename)
