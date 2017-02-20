@@ -91,7 +91,8 @@ t_info = { 'stdout':  u"""\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
 Modis Products v1.0.0\x1b[0m
 \x1b[1m
 Terra 8-day Products
-\x1b[0m   temp8td     Surface temperature: 1km                
+\x1b[0m   ndvi8       Normalized Difference Vegetation Index: 250m
+   temp8td     Surface temperature: 1km                
    temp8tn     Surface temperature: 1km                
 \x1b[1m
 Nadir BRDF-Adjusted 16-day Products
@@ -107,7 +108,6 @@ Terra/Aqua Daily Products
 Standard Products
 \x1b[0m   clouds      Cloud Mask                              
    landcover   MCD Annual Land Cover                   
-   ndvi8       Normalized Difference Vegetation Index: 250m
 """}
 
 t_project = { 'created': {
