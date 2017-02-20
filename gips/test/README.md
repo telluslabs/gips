@@ -232,8 +232,9 @@ which is convenient for making assertions in these system tests.
 
 The known-good values stored in `expected/` are usually captured from initial
 test runs.  For convenience, newly developed tests may be run with
-`py.test -s --log-level debug`; parts of the output can be cutpasted into an
-`expected/` file to establish these needed known-good values.
+`py.test -s --log-level debug --expectation-format`; parts of the output can
+be cutpasted into an `expected/` file to establish these needed known-good
+values.
 
 Caveats & Tips
 ==============

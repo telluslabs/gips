@@ -40,13 +40,17 @@ def pytest_addoption(parser):
 
     parser.addoption("--slow", action="store_true", help="Do not skip @slow tests.")
 
-    help_str = ("Do not skip @src_altering tests, which are tests that may "
+    help_str = ("Do not skip @src_altering system tests, which are tests that may "
                 "alter or remove source data in the repo.")
     parser.addoption("--src-altering", action="store_true", help=help_str)
 
     help_str = ("Do not skip @system tests, which are tests that may "
                 "change elements of the environment as they work.")
     parser.addoption("--sys", action="store_true", help=help_str)
+
+    help_str = ("Whenever a subprocess' output streams are captured via GipsTestFileEnv,"
+                " print them out in a format suitable for cutpasting into an expectations file.")
+    parser.addoption("--expectation-format", action="store_true", help=help_str)
 
 
 def pytest_configure(config):
