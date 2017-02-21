@@ -1,5 +1,20 @@
 """Known-good outcomes for tests, mostly stdout and created files."""
 
+t_info = { 'stdout':  u"""\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
+\x1b[1m
+PRISM Products v0.0.1\x1b[0m
+  Optional qualifiers listed below each product.
+  Specify by appending '-option' to product (e.g., ref-toa)
+\x1b[1m
+Standard Products
+\x1b[0m   ppt         Precipitate                             
+   pptsum      Cumulative Precipitate                  
+                 days: temporal window width (default: 3 days) .
+   tmax        Daily Maximum Temperature               
+   tmin        Daily Minimum Temperature               
+""" }
+
+
 t_inventory = {
     'stdout': u"""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
 Retrieving inventory for site NHseacoast-0
