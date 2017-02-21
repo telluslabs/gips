@@ -7,12 +7,14 @@ from .util import *
 
 logger = logging.getLogger(__name__)
 
-pytestmark = sys # skip everything unless --sys
+pytestmark = sys  # skip everything unless --sys
 
 # changing this will require changes in expected/
-STD_ARGS = ('prism', '-s', NH_SHP_PATH, '-d', '1982-12-01,1982-12-03', '-v', '4')
-
 driver = 'prism'
+STD_TILE = 'CONUS'
+STD_DATES = '1982-12-01,1982-12-03'
+STD_ARGS = (driver, '-s', NH_SHP_PATH, '-d', STD_DATES, '-v', '4')
+
 
 @pytest.fixture
 def setup_prism_data(pytestconfig):
@@ -28,68 +30,68 @@ def setup_prism_data(pytestconfig):
         raise RuntimeError("PRISM data setup via `gips_inventory` failed",
                            outcome.std_out, outcome.std_err, outcome)
 
+setup_fixture = setup_prism_data
 
-def t_inventory(setup_prism_data, repo_env, expected):
-    """Test `gips_inventory prism` and confirm recorded output is given.
+####   SHOULD BE STANDARD BELOW HERE #####
 
-    This is currently the fastest test so if you want to run this file to
-    confirm its sanity without running a bunch of slow tests, do this:
-        $ py.test gips/test/test_e2e_prism.py::test_inventory
+def t_inventory(setup_fixture, repo_env, expected):
     """
+    Test `gips_inventory` for {} and confirm recorded output is given.
+    """.format(driver)
     actual = repo_env.run('gips_inventory', *STD_ARGS)
     assert expected == actual
 
 
-def t_process(setup_prism_data, repo_env, expected):
-    """Test gips_process on prism data."""
+def t_process(setup_fixture, repo_env, expected):
+    """Test gips_process on {} data.""".format(driver)
     process_actual = repo_env.run('gips_process', *STD_ARGS)
     inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
     assert expected == process_actual and inventory_actual.std_out == expected._inv_stdout
 
 
 def t_info(repo_env, expected):
-    """Test `gips_info prism` and confirm recorded output is given."""
-    actual = repo_env.run('gips_info', 'prism')
+    """Test `gips_info {driver}` and confirm recorded output is given."""
+    actual = repo_env.run('gips_info', driver)
     assert expected == actual
 
 
-def t_project(setup_prism_data, clean_repo_env, output_tfe, expected):
-    """Test gips_project prism with warping."""
+def t_project(setup_fixture, clean_repo_env, output_tfe, expected):
+    """Test gips_project {} with warping.""".format(driver)
     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
     actual = output_tfe.run('gips_project', *args)
     assert expected == actual
 
 
-def t_project_no_warp(setup_prism_data, clean_repo_env, output_tfe, expected):
-    """Test gips_project prism without warping."""
+def t_project_no_warp(setup_fixture, clean_repo_env, output_tfe, expected):
+    """Test gips_project {} without warping.""".format(driver)
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     actual = output_tfe.run('gips_project', *args)
     assert expected == actual
 
 
 # # Haven't used gips_tiles ever
-# def t_tiles(setup_prism_data, clean_repo_env, output_tfe, expected):
-#     """Test gips_tiles prism with warping."""
+# def t_tiles(setup_fixture, clean_repo_env, output_tfe, expected):
+#     """Test gips_tiles {} with warping.""".format(driver)
 #     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
 #     actual = output_tfe.run('gips_tiles', *args)
 #     assert expected == actual
 
 
-def t_tiles_copy(setup_prism_data, clean_repo_env, output_tfe, expected):
-    """Test gips_tiles prism with copying."""
+def t_tiles_copy(setup_fixture, clean_repo_env, output_tfe, expected):
+    """Test gips_tiles {} with copying.""".format(driver)
     # doesn't quite use STD_ARGS
-    args = ('prism', '-t', 'CONUS', '-d', '2012-12-01,2012-12-03', '-v', '4',
+    args = (driver, '-t', STD_TILE, '-d', STD_DATES, '-v', '4',
             '--outdir', OUTPUT_DIR, '--notld')
     actual = output_tfe.run('gips_tiles', *args)
     assert expected == actual
 
 
-def t_stats(setup_prism_data, clean_repo_env, output_tfe, expected):
+def t_stats(setup_fixture, clean_repo_env, output_tfe, expected):
     """Test gips_stats on projected files."""
     # generate data needed for stats computation
     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
     prep_run = output_tfe.run('gips_project', *args)
-    assert prep_run.exit_status == 0 # confirm it worked; not really in the test
+    assert prep_run.exit_status == 0  # confirm it worked; not really in the test
 
     # compute stats
     gtfe = GipsTestFileEnv(OUTPUT_DIR, start_clear=False)
