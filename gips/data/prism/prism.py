@@ -233,26 +233,30 @@ class prismData(Data):
             missingassets = []
             availassets = []
 
+
             vsinames = {}
 
-            def get_bil_file(d, a):
-                return filter(
-                    lambda f: f.endswith('.bil'),
-                    d.assets[a].datafiles(),
-                )[0]
+            def get_bil_vsifile(d, a):
+                b = None
+                with utils.error_handler(
+                        'Error accessing asset {}'
+                        .format(d),
+                        continuable=True
+                ):
+                    b = os.path.join(
+                        '/vsizip/' + d.assets[a].filename,
+                        d.assets[a].datafiles()[0]
+                    )
+                return b
 
             for asset in requiredassets:
-                try:
-                    bil = get_bil_file(self, asset)
-                except KeyError:
-                    # TODO error-handling-fix: this doesn't have to be a try/except; use a conditional
+                bil = get_bil_vsifile(self, asset)
+                if bil is None:
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)
-                     vsinames[asset] = os.path.join(
-                         '/vsizip/' + self.assets[asset].filename,
-                         bil
-                     )
+                    vsinames[asset] = bil
+
 
             if not availassets:
                 utils.verbose_out(
@@ -313,7 +317,7 @@ class prismData(Data):
                 imgs = []
                 for tileobj in inv.data.values():
                     datobj = tileobj.tiles.values()[0]
-                    imgs.append(datobj.open_assets('ppt'))
+                    imgs.append(GeoImage(get_bil_vsifile(datobj, '_ppt')))
                 oimg = GeoImage(fname, imgs[0])
                 for chunk in oimg.Chunks():
                     oarr = oimg[0].Read(chunk) * 0.0
