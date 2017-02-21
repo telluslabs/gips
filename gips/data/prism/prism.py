@@ -220,34 +220,26 @@ class prismData(Data):
         products = super(prismData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
+        overwrite = kwargs.get('overwrite', False)
         bname = os.path.join(self.path, self.basename)
         assert len(prismAsset._sensors) == 1  # sanity check to force this code to stay current
         sensor = prismAsset._sensors.keys()[0]
 
+        def get_bil_vsifile(d, a):
+            with utils.error_handler('Error accessing asset {}'
+                                     .format(d), continuable=True):
+                return os.path.join(
+                    '/vsizip/' + d.assets[a].filename,
+                    d.assets[a].datafiles()[0])
+
         for key, val in products.requested.items():
             start = datetime.now()
-
             # check that we have required assets
             requiredassets = self.products2assets([val[0]])
             # val[0] s.b. key w/o product args
             missingassets = []
             availassets = []
-
-
             vsinames = {}
-
-            def get_bil_vsifile(d, a):
-                b = None
-                with utils.error_handler(
-                        'Error accessing asset {}'
-                        .format(d),
-                        continuable=True
-                ):
-                    b = os.path.join(
-                        '/vsizip/' + d.assets[a].filename,
-                        d.assets[a].datafiles()[0]
-                    )
-                return b
 
             for asset in requiredassets:
                 bil = get_bil_vsifile(self, asset)
@@ -257,19 +249,18 @@ class prismData(Data):
                     availassets.append(asset)
                     vsinames[asset] = bil
 
-
             if not availassets:
                 utils.verbose_out(
                     'There are no available assets ({}) on {} for tile {}'
-                    .format(
-                        str(missingassets), str(self.date), str(self.id),
-                    ),
+                    .format(str(missingassets), str(self.date), str(self.id)),
                     5,
                 )
                 continue
             fname = '{}_{}_{}.tif'.format(bname, 'prism', key)
             if val[0] in ['ppt', 'tmin', 'tmax']:
                 if os.path.lexists(fname):
+                    if overwrite:
+                        continue  # next product, not overwriting
                     os.remove(fname)
                 os.symlink(vsinames[self._products[key]['assets'][0]], fname)
             elif val[0] == 'pptsum':
@@ -287,10 +278,13 @@ class prismData(Data):
                     # default lag of 3 days SB configurable.
                     lag = 3
                     fname = re.sub(r'\.tif$', '-{}.tif'.format(lag), fname)
-                    utils.verbose_out('Using default lag of {} days.'.format(lag), 2)
+                    utils.verbose_out('Using default lag of {} days.'
+                                      .format(lag), 2)
 
-                if os.path.exists(fname):
-                    os.remove(fname)
+                if os.path.exists(fname) and not overwrite:
+                    utils.verbose_out('{} exists, not overwriting.'
+                                      .format(fname), 2)
+                    continue  # next product
 
                 date_spec = '{},{}'.format(
                     datetime.strftime(
@@ -298,39 +292,34 @@ class prismData(Data):
                     ),
                     datetime.strftime(self.date, '%Y-%m-%d'),
                 )
-                inv = self.inventory(
-                    dates=date_spec,
-                    products=['ppt'],
-                )
+                inv = self.inventory(dates=date_spec, products=['ppt'],)
                 inv.process()
-                inv = self.inventory(  # because DataInventory object doesn't update
-                    dates=date_spec,
-                    products=['ppt'],
-                )
+                # because DataInventory object doesn't update
+                inv = self.inventory(dates=date_spec, products=['ppt'],)
                 if len(inv.data) < lag:
                     utils.verbose_out(
                         '{}: requires {} preceding days ppt ({} found).'
                         .format(key, lag, len(inv.data)),
                         3,
                     )
-                    continue
+                    continue  # go to next product to process
                 imgs = []
                 for tileobj in inv.data.values():
                     datobj = tileobj.tiles.values()[0]
                     imgs.append(GeoImage(get_bil_vsifile(datobj, '_ppt')))
+
+                if os.path.exists(fname):
+                    # non-overwrite condition handled above
+                    os.remove(fname)
+
                 oimg = GeoImage(fname, imgs[0])
                 for chunk in oimg.Chunks():
                     oarr = oimg[0].Read(chunk) * 0.0
                     for img in imgs:
-                        utils.verbose_out(
-                            'mean value of image: {}'
-                            .format(mean(img[0].Read())),
-                            3,
-                        )
                         oarr += img[0].Read(chunk)
                     oimg[0].Write(oarr, chunk)
                 oimg.Process()
-                oimg = None
+                oimg = None  # help swig+gdal with GC
                 products.requested.pop(key)
             self.AddFile(sensor, key, fname)  # add product to inventory
         return products
