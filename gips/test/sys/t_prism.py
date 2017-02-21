@@ -47,43 +47,27 @@ def t_process(setup_prism_data, repo_env, expected):
     assert expected == process_actual and inventory_actual.std_out == expected._inv_stdout
 
 
-# def t_info(repo_env, expected):
-#     """Test `gips_info prism` and confirm recorded output is given."""
-#     actual = repo_env.run('gips_info', 'prism')
-#     assert expected == actual
+def t_info(repo_env, expected):
+    """Test `gips_info prism` and confirm recorded output is given."""
+    actual = repo_env.run('gips_info', 'prism')
+    assert expected == actual
 
 
-# def t_project(setup_prism_data, clean_repo_env, output_tfe, expected):
-#     """Test gips_project prism with warping."""
-#     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
-#     actual = output_tfe.run('gips_project', *args)
-#     assert expected == actual
+def t_project(setup_prism_data, clean_repo_env, output_tfe, expected):
+    """Test gips_project prism with warping."""
+    args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
+    actual = output_tfe.run('gips_project', *args)
+    assert expected == actual
 
 
-# def t_project_two_runs(setup_prism_data, clean_repo_env, output_tfe, expected):
-#     """As test_project, but run twice to confirm idempotence of gips_project.
-
-#     The data repo is only cleaned up after both runs are complete; this is
-#     intentional as changes in the data repo may influence gips_project.
-#     """
-#     args = STD_ARGS + ('--res', '100', '100',
-#                        '--outdir', OUTPUT_DIR, '--notld')
-
-#     actual = output_tfe.run('gips_project', *args)
-#     assert 'initial test_project run' and expected == actual
-
-#     actual = output_tfe.run('gips_project', *args)
-#     expected.created = {} # no created files on second run
-#     assert 'final test_project run' and expected == actual
+def t_project_no_warp(setup_prism_data, clean_repo_env, output_tfe, expected):
+    """Test gips_project prism without warping."""
+    args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
+    actual = output_tfe.run('gips_project', *args)
+    assert expected == actual
 
 
-# def t_project_no_warp(setup_prism_data, clean_repo_env, output_tfe, expected):
-#     """Test gips_project prism without warping."""
-#     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
-#     actual = output_tfe.run('gips_project', *args)
-#     assert expected == actual
-
-
+# # Haven't used gips_tiles ever
 # def t_tiles(setup_prism_data, clean_repo_env, output_tfe, expected):
 #     """Test gips_tiles prism with warping."""
 #     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
@@ -91,25 +75,25 @@ def t_process(setup_prism_data, repo_env, expected):
 #     assert expected == actual
 
 
-# def t_tiles_copy(setup_prism_data, clean_repo_env, output_tfe, expected):
-#     """Test gips_tiles prism with copying."""
-#     # doesn't quite use STD_ARGS
-#     args = ('prism', '-t', 'h12v04', '-d', '2012-12-01,2012-12-03', '-v', '4',
-#             '--outdir', OUTPUT_DIR, '--notld')
-#     actual = output_tfe.run('gips_tiles', *args)
-#     assert expected == actual
+def t_tiles_copy(setup_prism_data, clean_repo_env, output_tfe, expected):
+    """Test gips_tiles prism with copying."""
+    # doesn't quite use STD_ARGS
+    args = ('prism', '-t', 'CONUS', '-d', '2012-12-01,2012-12-03', '-v', '4',
+            '--outdir', OUTPUT_DIR, '--notld')
+    actual = output_tfe.run('gips_tiles', *args)
+    assert expected == actual
 
 
-# def t_stats(setup_prism_data, clean_repo_env, output_tfe, expected):
-#     """Test gips_stats on projected files."""
-#     # generate data needed for stats computation
-#     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
-#     prep_run = output_tfe.run('gips_project', *args)
-#     assert prep_run.exit_status == 0 # confirm it worked; not really in the test
+def t_stats(setup_prism_data, clean_repo_env, output_tfe, expected):
+    """Test gips_stats on projected files."""
+    # generate data needed for stats computation
+    args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
+    prep_run = output_tfe.run('gips_project', *args)
+    assert prep_run.exit_status == 0 # confirm it worked; not really in the test
 
-#     # compute stats
-#     gtfe = GipsTestFileEnv(OUTPUT_DIR, start_clear=False)
-#     actual = gtfe.run('gips_stats', OUTPUT_DIR)
+    # compute stats
+    gtfe = GipsTestFileEnv(OUTPUT_DIR, start_clear=False)
+    actual = gtfe.run('gips_stats', OUTPUT_DIR)
 
-#     # check for correct stats content
-#     assert expected == actual
+    # check for correct stats content
+    assert expected == actual

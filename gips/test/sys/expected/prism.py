@@ -92,3 +92,51 @@ SENSORS\x1b[0m
 \x1b[35mprism: Daily Gridded Climate Data\x1b[0m
 """,
 }
+
+t_project = {
+    'created': {
+        '0': None,
+        '0/1982335_prism_ppt.tif': -1525304978,
+        '0/1982335_prism_tmax.tif': 1259010415,
+        '0/1982335_prism_tmin.tif': -106507302,
+        '0/1982336_prism_ppt.tif': -92502584,
+        '0/1982336_prism_tmax.tif': 381286493,
+        '0/1982336_prism_tmin.tif': -801866142,
+        '0/1982337_prism_ppt.tif': 670927499,
+        '0/1982337_prism_pptsum.tif': 1195812568,
+        '0/1982337_prism_tmax.tif': 1464461372,
+        '0/1982337_prism_tmin.tif': -2082314142,
+    }
+}
+
+t_project_no_warp = {
+    'created': {'0': None,
+        '0/1982335_prism_ppt.tif': -427336450,
+        '0/1982335_prism_tmax.tif': 571279318,
+        '0/1982335_prism_tmin.tif': 1498899978,
+        '0/1982336_prism_ppt.tif': -427336450,
+        '0/1982336_prism_tmax.tif': -1198323967,
+        '0/1982336_prism_tmin.tif': 88143743,
+        '0/1982337_prism_ppt.tif': -1329047557,
+        '0/1982337_prism_pptsum.tif': -1792182993,
+        '0/1982337_prism_tmax.tif': -622113590,
+        '0/1982337_prism_tmin.tif': -1048138502,
+    }
+}
+
+# haven't ever used tiles
+# t_tiles = {
+#     'created': {},
+# }
+
+t_tiles_copy = { 'created': {}}
+
+t_stats = { 
+    'created': {
+        'ppt_stats.txt': -2108420090,
+        'pptsum_stats.txt': -1221703895,
+        'tmax_stats.txt': -628985934,
+        'tmin_stats.txt': 691861124
+    }
+}
+
