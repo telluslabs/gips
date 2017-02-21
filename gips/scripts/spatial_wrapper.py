@@ -8,7 +8,7 @@ import django
 django.setup()
 from gips.tools import SpatialAggregator
 from gips.utils import VerboseOut
-from gips.inventory.dbinv.models import Result, DataVariable, Vector, Job
+from gips.inventory.dbinv.models import Result, DataVariable, Job
 from gips import settings
 
 def make_result(result, job):
