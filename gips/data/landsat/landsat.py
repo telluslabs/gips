@@ -539,15 +539,18 @@ class landsatData(Data):
 
             # Break down by group
             groups = products.groups()
+            # ^--- has the info about what products the user requested
 
             # create non-atmospherically corrected apparent reflectance and temperature image
             reflimg = gippy.GeoImage(img)
             theta = numpy.pi * self.metadata['geometry']['solarzenith'] / 180.0
             sundist = (1.0 - 0.016728 * numpy.cos(numpy.pi * 0.9856 * (float(self.day) - 4.0) / 180.0))
             for col in self.assets['DN'].visbands:
-                reflimg[col] = img[col] * (1.0 / ((meta[col]['E'] * numpy.cos(theta)) / (numpy.pi * sundist * sundist)))
+                reflimg[col] = img[col] * (1.0 /
+                        ((meta[col]['E'] * numpy.cos(theta)) / (numpy.pi * sundist * sundist)))
             for col in self.assets['DN'].lwbands:
-                reflimg[col] = (((img[col].pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)) * meta[col]['K2'] - 273.15
+                reflimg[col] = (((img[col].pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
+                        ) * meta[col]['K2'] - 273.15
 
             # This is landsat, so always just one sensor for a given date
             sensor = self.sensors['DN']
@@ -754,11 +757,13 @@ class landsatData(Data):
                 if len(indices) > 0:
                     fnames = [os.path.join(self.path, self.basename + '_' + key) for key in indices]
                     for col in visbands:
-                        img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]) * (1.0 / atm6s.results[col][2])
+                        img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
+                                ) * (1.0 / atm6s.results[col][2])
                     prodout = Indices(img, dict(zip([p[0] for p in indices.values()], fnames)), md)
                     prodout = dict(zip(indices.keys(), prodout.values()))
                     [self.AddFile(sensor, key, fname) for key, fname in prodout.items()]
-                VerboseOut(' -> %s: processed %s in %s' % (self.basename, indices0.keys(), datetime.now() - start), 1)
+                VerboseOut(' -> %s: processed %s in %s' % (
+                        self.basename, indices0.keys(), datetime.now() - start), 1)
             img = None
             # cleanup directory
             try:
@@ -927,7 +932,8 @@ class landsatData(Data):
             datafiles = self.assets['DN'].extract(self.metadata['filenames'])
         else:
             # Use tar.gz directly using GDAL's virtual filesystem
-            datafiles = [os.path.join('/vsitar/' + self.assets['DN'].filename, f) for f in self.metadata['filenames']]
+            datafiles = [os.path.join('/vsitar/' + self.assets['DN'].filename, f)
+                    for f in self.metadata['filenames']]
 
         image = gippy.GeoImage(datafiles)
         image.SetNoData(0)

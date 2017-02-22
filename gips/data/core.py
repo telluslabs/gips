@@ -220,7 +220,10 @@ class Asset(object):
     # Child classes should not generally have to override anything below here
     ##########################################################################
     def datafiles(self):
-        """ Get list of readable datafiles from asset (multiple filenames if tar or hdf file) """
+        """Get list of readable datafiles from asset.
+
+        A 'datafile' in this context is a file contained within the
+        asset file, such as for tar, zip, and hdf files."""
         path = os.path.dirname(self.filename)
         indexfile = os.path.join(path, self.filename + '.index')
         if os.path.exists(indexfile):
@@ -247,8 +250,12 @@ class Asset(object):
                 return [self.filename]
 
 
+    # TODO mutable defaults are a bad idea in python
     def extract(self, filenames=[]):
-        """ Extract filenames from asset (if archive file) """
+        """Extract given files from asset (if it's a tar).
+
+        Extracted files are placed in the same dir as the asset file.
+        """
         if tarfile.is_tarfile(self.filename):
             tfile = tarfile.open(self.filename)
         else:
@@ -487,7 +494,11 @@ class Asset(object):
 
 
 class Data(object):
-    """ Collection of assets/products for single date and spatial region """
+    """Collection of assets/products for single date and tile.
+
+    If the data isn't given in tiles, then another discrete spatial
+    region may be used instead.
+    """
     name = 'Data'
     version = '0.0.0'
     Asset = Asset
@@ -500,13 +511,18 @@ class Data(object):
         """ Retrieve metadata for this tile """
         return {}
 
-    def process(self, products, overwrite=False, **kwargs):
+    def needed_products(self, products, overwrite):
         """ Make sure all products exist and return those that need processing """
-        # TODO - clean up this messy thing
+        # TODO calling RequestedProducts twice is strange; rework into something clean
         products = self.RequestedProducts(products)
         products = self.RequestedProducts([p for p in products.products if p not in self.products or overwrite])
         # TODO - this doesnt know that some products aren't available for all dates
         return products
+
+    def process(self, products, overwrite=False, **kwargs):
+        """ Make sure all products exist and return those that need processing """
+        # TODO replace all calls to this method by subclasses with needed_products, then delete.
+        return self.needed_products(products, overwrite)
 
     @classmethod
     def process_composites(cls, inventory, products, **kwargs):
@@ -593,8 +609,8 @@ class Data(object):
         self.id = tile
         self.date = date
         self.path = path
-        self.basename = ''              # this is used by child classes
-        self.assets = {}                # dict of asset name: Asset instance
+        self.basename = ''              # product file name prefix, form is <tile>_<date>
+        self.assets = {}                # dict of <asset type string>: <Asset instance>
         self.filenames = {}             # dict of (sensor, product): product filename
         self.sensors = {}               # dict of asset/product: sensor
         if tile is not None and date is not None:

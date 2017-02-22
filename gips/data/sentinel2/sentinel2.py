@@ -191,6 +191,27 @@ class sentinel2Asset(Asset):
                 self.date == newasset.date and
                 self.version < newasset.version)
 
+    def extract(self, filenames):
+        """Extract given files from asset.
+
+        Extracted files are placed in the same dir as the asset file.
+        """
+        dirname = os.path.dirname(self.filename) # should be an absolute path
+        zf = zipfile.ZipFile(self.filename)
+        for fn in filenames:
+            # TODO can this work with nested directories, or with a file that's in a nested directory?
+            tgt_full_path = os.path.join(dirname, fn)
+            if not os.path.exists(tgt_full_path):
+                verbose_out('Extracting {} to {}'.format(fn, tgt_full_path), 3)
+                zf.extract(fn, dirname)
+            with utils.error_handler('Error processing ' + fname, continuable=True):
+                # this ensures we have permissions on extracted files
+                if not os.path.isdir(tgt_full_path):
+                    os.chmod(fname, 0664)
+            extracted_files.append(fname) # not sure extracted_files should contain files that
+                                          # broke, but this was the pattern in data.core.Asset
+        return extracted_files
+
 
 class sentinel2Data(Data):
     name = 'Sentinel-2'
@@ -198,16 +219,52 @@ class sentinel2Data(Data):
     Asset = sentinel2Asset
 
     _productgroups = {
-        "Placeholder Products": ['placeholder'],
+        'Index': ['ndvi'],
     }
     _products = {
         # placeholder product standing in for the real thing so fetch can work
-        'placeholder': {
-            'description': 'Placeholder Product',
+        'ndvi': {
+            'description': 'Normalized Difference Vegetation Index',
             'assets': ['L1C'],
         },
     }
 
+    def load_metadata(self):
+        """Ingest metadata XML in Sentinel-2 SAFE asset files."""
+        if hasattr(self, 'metadata'):
+            return
 
-    def process(self, *args, **kwargs):
-        raise NotImplementedError()
+
+    def read_raw(self):
+        """Read in bands using original SAFE asset file (a .zip)."""
+        start = datetime.datetime.now()
+        self.load_metadata()
+
+
+    def process(self, products=None, overwrite=False, **kwargs):
+        """Produce data products and save them to files.
+
+        If `products` is None, it processes all products.  If
+        `overwrite` is True, it will overwrite existing products if they
+        are found.  Products are saved to a well-known or else specified
+        directory.
+        """
+        products = self.needed_products(products, overwrite)
+        for val in products.requested.values():
+            toa = (self._products[val[0]].get('toa', False) or 'toa' in val)
+            if not toa:
+		raise NotImplementedError('only toa products are supported for now')
+
+        start = datetime.datetime.now()
+
+        asset_type = 'L1C' # only one in the driver for now, conveniently
+
+        # construct as much of the product filename as we can right now
+        filename_prefix = self.basename + '_' + self.sensors[asset_type]
+
+        # Read the assets
+        with utils.error_handler('Error reading '
+                                 + utils.basename(self.assets[asset_type].filename)):
+            img = self.read_raw()
+
+	raise NotImplementedError()
