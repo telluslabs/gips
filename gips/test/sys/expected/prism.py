@@ -2,7 +2,7 @@
 
 t_info = { 'stdout':  u"""\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
 \x1b[1m
-PRISM Products v0.0.1\x1b[0m
+PRISM Products v0.1.1\x1b[0m
   Optional qualifiers listed below each product.
   Specify by appending '-option' to product (e.g., ref-toa)
 \x1b[1m
@@ -96,31 +96,51 @@ SENSORS\x1b[0m
 t_project = {
     'created': {
         '0': None,
-        '0/1982335_prism_ppt.tif': -1525304978,
-        '0/1982335_prism_tmax.tif': 1259010415,
-        '0/1982335_prism_tmin.tif': -106507302,
-        '0/1982336_prism_ppt.tif': -92502584,
-        '0/1982336_prism_tmax.tif': 381286493,
-        '0/1982336_prism_tmin.tif': -801866142,
-        '0/1982337_prism_ppt.tif': 670927499,
-        '0/1982337_prism_pptsum.tif': 1195812568,
-        '0/1982337_prism_tmax.tif': 1464461372,
-        '0/1982337_prism_tmin.tif': -2082314142,
+        '0/1982335_prism_ppt.tif': -393322682,
+        '0/1982335_prism_tmax.tif': 455141340,
+        '0/1982335_prism_tmin.tif': 847249412,
+        '0/1982336_prism_ppt.tif': 233388192,
+        '0/1982336_prism_tmax.tif': 858443300,
+        '0/1982336_prism_tmin.tif': -1078834087,
+        '0/1982337_prism_ppt.tif': 983840913,
+        '0/1982337_prism_pptsum.tif': 1470079626,
+        '0/1982337_prism_tmax.tif': 1878755022,
+        '0/1982337_prism_tmin.tif': -100140734,
+#        '0/1982335_prism_ppt.tif': -1525304978,
+#        '0/1982335_prism_tmax.tif': 1259010415,
+#        '0/1982335_prism_tmin.tif': -106507302,
+#        '0/1982336_prism_ppt.tif': -92502584,
+#        '0/1982336_prism_tmax.tif': 381286493,
+#        '0/1982336_prism_tmin.tif': -801866142,
+#        '0/1982337_prism_ppt.tif': 670927499,
+#        '0/1982337_prism_pptsum.tif': 1195812568,
+#        '0/1982337_prism_tmax.tif': 1464461372,
+#        '0/1982337_prism_tmin.tif': -2082314142,
     }
 }
 
 t_project_no_warp = {
     'created': {'0': None,
-        '0/1982335_prism_ppt.tif': -427336450,
-        '0/1982335_prism_tmax.tif': 571279318,
-        '0/1982335_prism_tmin.tif': 1498899978,
-        '0/1982336_prism_ppt.tif': -427336450,
-        '0/1982336_prism_tmax.tif': -1198323967,
-        '0/1982336_prism_tmin.tif': 88143743,
-        '0/1982337_prism_ppt.tif': -1329047557,
-        '0/1982337_prism_pptsum.tif': -1792182993,
-        '0/1982337_prism_tmax.tif': -622113590,
-        '0/1982337_prism_tmin.tif': -1048138502,
+        '0/1982335_prism_ppt.tif': -1700182526,
+        '0/1982337_prism_tmin.tif': 2101752746,
+        '0/1982336_prism_ppt.tif': -1700182526,
+        '0/1982337_prism_ppt.tif': -1352376509,
+        '0/1982335_prism_tmax.tif': 1306198481,
+        '0/1982336_prism_tmax.tif': 1773055017,
+        '0/1982337_prism_tmax.tif': -1029779846,
+        '0/1982335_prism_tmin.tif': 976342700,
+        '0/1982336_prism_tmin.tif': -165045365,
+        '0/1982337_prism_pptsum.tif': 868986376,
+#        '0/1982335_prism_ppt.tif': -427336450,
+#        '0/1982335_prism_tmax.tif': 571279318,
+#        '0/1982335_prism_tmin.tif': 1498899978,
+#        '0/1982336_prism_ppt.tif': -427336450,
+#        '0/1982336_prism_tmax.tif': -1198323967,
+#        '0/1982336_prism_tmin.tif': 88143743,
+#        '0/1982337_prism_ppt.tif': -1329047557,
+#        '0/1982337_prism_pptsum.tif': -1792182993,
+#        '0/1982337_prism_tmax.tif': -622113590,
+#        '0/1982337_prism_tmin.tif': -1048138502,
     }
 }
 
@@ -129,7 +149,21 @@ t_project_no_warp = {
 #     'created': {},
 # }
 
-t_tiles_copy = { 'created': {}}
+t_tiles_copy = {
+    'created': {
+        'CONUS': None,
+        'CONUS/CONUS_1982335_prism_ppt.tif': -55072421,
+        'CONUS/CONUS_1982335_prism_tmax.tif': -234123443,
+        'CONUS/CONUS_1982335_prism_tmin.tif': -1003055785,
+        'CONUS/CONUS_1982336_prism_ppt.tif': -1365707606,
+        'CONUS/CONUS_1982336_prism_tmax.tif': 2008098128,
+        'CONUS/CONUS_1982336_prism_tmin.tif': -1569456782,
+        'CONUS/CONUS_1982337_prism_ppt.tif': 570845567,
+        'CONUS/CONUS_1982337_prism_tmax.tif': 1289336243,
+        'CONUS/CONUS_1982337_prism_tmin.tif': -818489243,
+        'CONUS/CONUS_1982337_prism_pptsum.tif': -928448216,
+    }
+}
 
 t_stats = { 
     'created': {
