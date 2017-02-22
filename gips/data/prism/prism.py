@@ -43,7 +43,7 @@ from gippy import GeoImage
 from numpy import mean
 
 __author__ = "Ian Cooke <icooke@ags.io>"
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 
 class prismRepository(Repository):
@@ -188,7 +188,7 @@ class prismAsset(Asset):
 class prismData(Data):
     """ A tile (CONUS State) of PRISM """
     name = 'PRISM'
-    version = '0.0.1'
+    version = __version__
     Asset = prismAsset
     _products = {
         'ppt': {
@@ -220,7 +220,10 @@ class prismData(Data):
         products = super(prismData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
-        overwrite = kwargs.get('overwrite', False)
+        # overwrite = kwargs.get('overwrite', False)
+        # utils.verbose_out('\n\noverwrite = {}\n'.format(overwrite), 2)
+        # TODO: overwrite doesn't play well with pptsum -- wonder if it would
+        #       if it was made into a composite product (which it is)
         bname = os.path.join(self.path, self.basename)
         assert len(prismAsset._sensors) == 1  # sanity check to force this code to stay current
         sensor = prismAsset._sensors.keys()[0]
@@ -259,8 +262,6 @@ class prismData(Data):
             fname = '{}_{}_{}.tif'.format(bname, 'prism', key)
             if val[0] in ['ppt', 'tmin', 'tmax']:
                 if os.path.lexists(fname):
-                    if overwrite:
-                        continue  # next product, not overwriting
                     os.remove(fname)
                 os.symlink(vsinames[self._products[key]['assets'][0]], fname)
             elif val[0] == 'pptsum':
@@ -281,14 +282,9 @@ class prismData(Data):
                     utils.verbose_out('Using default lag of {} days.'
                                       .format(lag), 2)
 
-                if os.path.exists(fname) and not overwrite:
-                    utils.verbose_out('{} exists, not overwriting.'
-                                      .format(fname), 2)
-                    continue  # next product
-
                 date_spec = '{},{}'.format(
                     datetime.strftime(
-                        self.date - timedelta(days=lag - 1), '%Y-%m-%d',
+                        self.date - timedelta(days=lag), '%Y-%m-%d',
                     ),
                     datetime.strftime(self.date, '%Y-%m-%d'),
                 )
@@ -309,7 +305,6 @@ class prismData(Data):
                     imgs.append(GeoImage(get_bil_vsifile(datobj, '_ppt')))
 
                 if os.path.exists(fname):
-                    # non-overwrite condition handled above
                     os.remove(fname)
 
                 oimg = GeoImage(fname, imgs[0])

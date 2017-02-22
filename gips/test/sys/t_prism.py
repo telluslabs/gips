@@ -30,9 +30,11 @@ def setup_prism_data(pytestconfig):
         raise RuntimeError("PRISM data setup via `gips_inventory` failed",
                            outcome.std_out, outcome.std_err, outcome)
 
+
 setup_fixture = setup_prism_data
 
-####   SHOULD BE STANDARD BELOW HERE #####
+# ###   SHOULD BE STANDARD BELOW HERE #####
+
 
 def t_inventory(setup_fixture, repo_env, expected):
     """
@@ -47,6 +49,17 @@ def t_process(setup_fixture, repo_env, expected):
     process_actual = repo_env.run('gips_process', *STD_ARGS)
     inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
     assert expected == process_actual and inventory_actual.std_out == expected._inv_stdout
+
+
+# # TODO: determine why overwrite fails  (see comment in prism driver)
+# #       and then uncomment this test.
+# def t_process_overwrite(setup_fixture, repo_env, expected):
+#     """Test gips_process on {} data.""".format(driver)
+#     args = STD_ARGS + ('--overwrite',)
+#     process_run1 = repo_env.run('gips_process', *STD_ARGS)
+#     process_run2 = repo_env.run('gips_process', *args)
+#     assert expected == process_run2
+#     assert process_run1.timestamps != process_run2.timestamps
 
 
 def t_info(repo_env, expected):
