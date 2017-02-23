@@ -52,17 +52,18 @@ class sentinel2Asset(Asset):
     _sensors = {
         'S2A': {
             'description': 'Sentinel-2, Satellite A',
-            'bands': ['1', '2', '3', '4', '5',
+            'bands': ['1', '2', '3', '4', '5', # specified by the driver
                       '6', '7', '8', '8a', '9', '10',
                       '10', '11', '12'],
+            # for GIPS' & gippy's use, not inherent to driver
             'colors': ["COASTAL", "BLUE", "GREEN", "RED", "REDEDGE1",
                        "REDEDGE2", "REDEDGE3", "NIR", "REDEDGE4", "WV",
                        "CIRRUS", "SWIR1", "SWIR2"],
-            'bandlocs': [0.443, 0.490, 0.560, 0.665, 0.705,
-                         0.740, 0.783, 0.842, 0.865, 0.945,
+            'bandlocs': [0.443, 0.490, 0.560, 0.665, 0.705, # 'probably' center wavelength of band
+                         0.740, 0.783, 0.842, 0.865, 0.945, # in micrometers
                          1.375, 1.610, 2.190],
-            'bandwidths': [0.020, 0.065, 0.035, 0.030, 0.015,
-                           0.015, 0.020, 0.115, 0.020, 0.020,
+            'bandwidths': [0.020, 0.065, 0.035, 0.030, 0.015, # 'probably' width of band, evenly
+                           0.015, 0.020, 0.115, 0.020, 0.020, # split in the center by bandloc
                            0.030, 0.090, 0.180],
             # 'E': None  # S.B. Pulled from asset metadata file
             # 'K1': [0, 0, 0, 0, 0, 607.76, 0],  For conversion of LW bands to Kelvin
@@ -191,27 +192,6 @@ class sentinel2Asset(Asset):
                 self.date == newasset.date and
                 self.version < newasset.version)
 
-    def extract(self, filenames):
-        """Extract given files from asset.
-
-        Extracted files are placed in the same dir as the asset file.
-        """
-        dirname = os.path.dirname(self.filename) # should be an absolute path
-        zf = zipfile.ZipFile(self.filename)
-        for fn in filenames:
-            # TODO can this work with nested directories, or with a file that's in a nested directory?
-            tgt_full_path = os.path.join(dirname, fn)
-            if not os.path.exists(tgt_full_path):
-                verbose_out('Extracting {} to {}'.format(fn, tgt_full_path), 3)
-                zf.extract(fn, dirname)
-            with utils.error_handler('Error processing ' + fname, continuable=True):
-                # this ensures we have permissions on extracted files
-                if not os.path.isdir(tgt_full_path):
-                    os.chmod(fname, 0664)
-            extracted_files.append(fname) # not sure extracted_files should contain files that
-                                          # broke, but this was the pattern in data.core.Asset
-        return extracted_files
-
 
 class sentinel2Data(Data):
     name = 'Sentinel-2'
@@ -229,16 +209,44 @@ class sentinel2Data(Data):
         },
     }
 
+    @classmethod
+    def meta_dict(cls):
+        meta = super(sentinel2Data, cls).meta_dict()
+        meta['GIPS-sentinel2 Version'] = cls.version
+        return meta
+
+
     def load_metadata(self):
         """Ingest metadata XML in Sentinel-2 SAFE asset files."""
         if hasattr(self, 'metadata'):
-            return
+            return # nothing to do if metadata is already loaded
 
+        # only one asset type supported for this driver so for now hardcoding is ok
+        datafiles = self.assets['L1C'].datafiles()
+
+        self.metadata = {
+            'filenames': [df for df in datafiles if df.endswith('.jp2')],
+        }
 
     def read_raw(self):
         """Read in bands using original SAFE asset file (a .zip)."""
         start = datetime.datetime.now()
         self.load_metadata()
+
+        # TODO support GDAL virtual filesystem later, and support a subset via metadata somehow?
+        datafiles = self.assets['L1C'].extract(self.metadata['filenames'])
+        #if settings().REPOS[self.Repository.name.lower()]['extract']:
+        #    # Extract files to disk
+        #    datafiles = self.assets['L1C'].extract(self.metadata['filenames'])
+        #else:
+        #    # Use zipfile directly using GDAL's virtual filesystem
+        #    datafiles = [os.path.join('/vsizip/' + self.assets['L1C'].filename, f)
+        #            for f in self.metadata['filenames']]
+
+        image = gippy.GeoImage(datafiles)
+        image.SetNoData(0) # TODO correct?
+
+        raise NotImplementedError()
 
 
     def process(self, products=None, overwrite=False, **kwargs):

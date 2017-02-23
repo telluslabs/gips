@@ -421,7 +421,8 @@ class landsatData(Data):
             assets.update(self._products[val[0]]['assets'])
 
         if len(assets) != 1:
-            raise Exception('This driver does not support creation of products from different Assets at the same time')
+            raise Exception('This driver does not support creation of products'
+                            ' from different Assets at the same time')
 
         asset = list(assets)[0]
 
@@ -804,7 +805,7 @@ class landsatData(Data):
 
         datafiles = self.assets['DN'].datafiles()
 
-
+        # locate MTL file and save it to disk if it isn't saved already
         mtlfilename = [f for f in datafiles if 'MTL.txt' in f][0]
         if os.path.exists(mtlfilename) and os.stat(mtlfilename).st_size == 0:
             os.remove(mtlfilename)

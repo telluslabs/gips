@@ -250,16 +250,17 @@ class Asset(object):
                 return [self.filename]
 
 
-    # TODO mutable defaults are a bad idea in python
-    def extract(self, filenames=[]):
-        """Extract given files from asset (if it's a tar).
+    def extract(self, filenames=tuple()):
+        """Extract given files from asset (if it's a tar or zip).
 
         Extracted files are placed in the same dir as the asset file.
         """
         if tarfile.is_tarfile(self.filename):
-            tfile = tarfile.open(self.filename)
+            open_file = tarfile.open(self.filename)
+        elif zipfile.is_zipfile(self.filename):
+            open_file = zipfile.ZipFile(self.filename)
         else:
-            raise Exception('%s is not a valid tar file' % self.filename)
+            raise Exception('%s is not a valid tar or zip file' % self.filename)
         path = os.path.dirname(self.filename)
         if len(filenames) == 0:
             filenames = self.datafiles()
@@ -268,7 +269,7 @@ class Asset(object):
             fname = os.path.join(path, f)
             if not os.path.exists(fname):
                 VerboseOut("Extracting %s" % f, 3)
-                tfile.extract(f, path)
+                open_file.extract(f, path)
             with utils.error_handler('Error processing ' + fname, continuable=True):
                 # this ensures we have permissions on extracted files
                 if not os.path.isdir(fname):
@@ -497,7 +498,9 @@ class Data(object):
     """Collection of assets/products for single date and tile.
 
     If the data isn't given in tiles, then another discrete spatial
-    region may be used instead.
+    region may be used instead.  In general, only one asset of each
+    asset type is permitted (self.assets is a dict keyed by asset type,
+    whose values are Asset objects).
     """
     name = 'Data'
     version = '0.0.0'
