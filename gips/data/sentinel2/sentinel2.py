@@ -53,7 +53,7 @@ class sentinel2Asset(Asset):
         'S2A': {
             'description': 'Sentinel-2, Satellite A',
             'bands': ['1', '2', '3', '4', '5', # specified by the driver
-                      '6', '7', '8', '8a', '9', '10',
+                      '6', '7', '8', '8a', '9',
                       '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
             'colors': ["COASTAL", "BLUE", "GREEN", "RED", "REDEDGE1",
@@ -224,8 +224,10 @@ class sentinel2Data(Data):
         # only one asset type supported for this driver so for now hardcoding is ok
         datafiles = self.assets['L1C'].datafiles()
 
+        # restrict filenames known to just the raster layers
+        raster_fn_pat = '^.*/GRANULE/.*/IMG_DATA/.*_B\d[\dA].jp2$'
         self.metadata = {
-            'filenames': [df for df in datafiles if df.endswith('.jp2')],
+            'filenames': [df for df in datafiles if re.match(raster_fn_pat, df)]
         }
 
     def read_raw(self):
@@ -233,7 +235,7 @@ class sentinel2Data(Data):
         start = datetime.datetime.now()
         self.load_metadata()
 
-        # TODO support GDAL virtual filesystem later, and support a subset via metadata somehow?
+        # TODO support GDAL virtual filesystem later
         datafiles = self.assets['L1C'].extract(self.metadata['filenames'])
         #if settings().REPOS[self.Repository.name.lower()]['extract']:
         #    # Extract files to disk
@@ -244,9 +246,23 @@ class sentinel2Data(Data):
         #            for f in self.metadata['filenames']]
 
         image = gippy.GeoImage(datafiles)
-        image.SetNoData(0) # TODO correct?
+        image.SetNoData(0) # inferred rather than taken from spec
 
-        raise NotImplementedError()
+        sensor = self.assets['L1C'].sensor
+        # dict describing specification for all the bands in the asset
+        data_spec = self.assets['L1C']._sensors[sensor]
+
+        colors = self.assets['L1C']._sensors[sensor]['colors']
+        filenames = self.metadata['filenames']
+
+        assert len(filenames) == len(colors) # sanity check
+
+        # go through all the files/bands in the image object and set values for each one
+        for i, color in zip(range(1, len(colors) + 1), colors):
+            image.SetBandName(color, i)
+
+        verbose_out('%s: read in %s' % (image.Basename(), datetime.datetime.now() - start), 2)
+        return image
 
 
     def process(self, products=None, overwrite=False, **kwargs):
