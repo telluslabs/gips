@@ -32,6 +32,7 @@ import tempfile
 import zipfile
 
 import gippy
+import gippy.algorithms
 
 from gips.data.core import Repository, Asset, Data
 from gips import utils
@@ -55,6 +56,9 @@ class sentinel2Asset(Asset):
             'bands': ['1', '2', '3', '4', '5', # specified by the driver
                       '6', '7', '8', '8a', '9',
                       '10', '11', '12'],
+            'band_strings': ['01', '02', '03', '04', '05', # found in the granule filenames
+                             '06', '07', '08', '8A', '09',
+                             '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
             'colors': ["COASTAL", "BLUE", "GREEN", "RED", "REDEDGE1",
                        "REDEDGE2", "REDEDGE3", "NIR", "REDEDGE4", "WV",
@@ -222,13 +226,16 @@ class sentinel2Data(Data):
             return # nothing to do if metadata is already loaded
 
         # only one asset type supported for this driver so for now hardcoding is ok
-        datafiles = self.assets['L1C'].datafiles()
+        asset_type = 'L1C'
+        datafiles = self.assets[asset_type].datafiles()
 
         # restrict filenames known to just the raster layers
         raster_fn_pat = '^.*/GRANULE/.*/IMG_DATA/.*_B\d[\dA].jp2$'
-        self.metadata = {
-            'filenames': [df for df in datafiles if re.match(raster_fn_pat, df)]
-        }
+        fnl = [df for df in datafiles if re.match(raster_fn_pat, df)]
+        # have to sort the list or else gippy will get confused about which band is which
+        band_strings = sentinel2Asset._sensors[self.sensors[asset_type]]['band_strings']
+        fnl.sort(key=lambda f: band_strings.index(f[-6:-4]))
+        self.metadata = {'filenames': fnl}
 
     def read_raw(self):
         """Read in bands using original SAFE asset file (a .zip)."""
@@ -261,7 +268,7 @@ class sentinel2Data(Data):
         for i, color in zip(range(1, len(colors) + 1), colors):
             image.SetBandName(color, i)
 
-        verbose_out('%s: read in %s' % (image.Basename(), datetime.datetime.now() - start), 2)
+        utils.verbose_out('%s: read in %s' % (image.Basename(), datetime.datetime.now() - start), 2)
         return image
 
 
@@ -291,4 +298,24 @@ class sentinel2Data(Data):
                                  + utils.basename(self.assets[asset_type].filename)):
             img = self.read_raw()
 
-	raise NotImplementedError()
+        for i, b in enumerate(img):
+            print('band{bn} shape is {x}x{y}'.format(bn=i+1, x=b.XSize(), y=b.YSize()))
+
+        md = self.meta_dict()
+
+        sensor = self.sensors[asset_type]
+
+        # Process Indices - right now just NDVI, so some of the loop/conditional structure is
+        # technically not needed
+        indices = products.groups()['Index']
+        if len(indices) > 0:
+            start = datetime.datetime.now()
+            # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
+            fnames = {key: os.path.join(self.path, self.basename + '_' + key) for key in indices}
+            prodout = gippy.algorithms.Indices(img, fnames, md)
+            [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
+            verbose_out(' -> %s: processed %s in %s' % (
+                    self.basename, indices.keys(), datetime.datetime.now() - start), 1)
+        img = None # clue for the gc to reap img; probably needed due to C++/swig weirdness
+        prodout = None # more gc hinting; may not be as necessary as img
+        # cleanup directory here if necessary
