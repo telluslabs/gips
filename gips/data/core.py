@@ -841,7 +841,7 @@ class Data(object):
 
         Additionally, the return value is either grouped into a dict mapping
         (prod, tile, date) --> url
-        or simply a list of urls based on the 'grouped' parameter.
+        or simply a list of URLs, based on the 'grouped' parameter.
         """
         if grouped:
             response = {}
