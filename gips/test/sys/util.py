@@ -31,6 +31,14 @@ def extract_hashes(files):
     return {k: getattr(v, 'hash', None) for k, v in files.items()}
 
 
+def extract_timestamps(files):
+    """Return a dict of file names and unique hashes of their content.
+
+    `files` should be a dict in a result object from TestFileEnvironment.run().
+    Directories' don't have hashes so use None instead."""
+    return {k: getattr(v, 'hash', None) for k, v in files.items()}
+
+
 class GipsTestFileEnv(TestFileEnvironment):
     """As superclass but customized for GIPS use case.
 
@@ -49,17 +57,17 @@ class GipsTestFileEnv(TestFileEnvironment):
         """As super().run but store result & prevent premature exits."""
         logging.debug("command line: `{}`".format(' '.join(args)))
         self.proc_result = super(GipsTestFileEnv, self).run(
-                *args, expect_error=True, expect_stderr=True, **kwargs)
+            *args, expect_error=True, expect_stderr=True, **kwargs)
         self.gips_proc_result = gpr = GipsProcResult(self.proc_result)
         logging.debug("standard output: {}".format(
             gpr.stdout if gpr.stdout != '' else '(None)'))
         logging.debug("standard error: {}".format(
             gpr.stderr if gpr.stderr != '' else '(None)'))
         if pytest.config.getoption("--expectation-format"):
-            print ('standard output (expectation format): """'
-                    + re.sub('\\\\n', '\n', repr(gpr.stdout))[2:-1] + '"""')
-            print ('standard error (expectation format):  """'
-                    + re.sub('\\\\n', '\n', repr(gpr.stderr))[2:-1] + '"""')
+            print ('standard output (expectation format): """' +
+                   re.sub('\\\\n', '\n', repr(gpr.stdout))[2:-1] + '"""')
+            print ('standard error (expectation format):  """' +
+                   re.sub('\\\\n', '\n', repr(gpr.stderr))[2:-1] + '"""')
         self.log_findings("Created files", gpr.created)
         self.log_findings("Updated files", gpr.updated)
         self.log_findings("Deleted files", gpr.deleted)
@@ -94,7 +102,9 @@ class GipsProcResult(object):
     Standard output is handled specially for equality comparison; see __eq__.
     Can accept scripttest.ProcResult objects at initialization; see __init__.
     """
-    attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted', 'created', 'ignored')
+    attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted',
+               'created', 'ignored',)  # 'timestamps')
+
     def __init__(self, proc_result=None, compare_stdout=None, compare_stderr=True, **kwargs):
         """Initialize the object using a ProcResult, explicit kwargs, or both.
 
@@ -112,6 +122,7 @@ class GipsProcResult(object):
             self.updated = {}
             self.deleted = {}
             self.created = {}
+            # self.timestamps = {}
         else:
             # self.proc_result = proc_result # not sure if this is needed
             self.exit_status = proc_result.returncode
@@ -120,8 +131,11 @@ class GipsProcResult(object):
             self.updated = extract_hashes(proc_result.files_updated)
             self.deleted = extract_hashes(proc_result.files_deleted)
             self.created = extract_hashes(proc_result.files_created)
+            # self.timestamps = dict()
+            # for files in [proc_result.files_updated, proc_result.files_created]:
+            #     self.timestamps.update(extract_timestamps(files))
 
-        self.ignored = [] # list of filenames to ignore for comparison purposes
+        self.ignored = []  # list of filenames to ignore for comparison purposes
 
         # special keys are permitted if they begin with an underscore
         input_fields = set(k for k in kwargs.keys() if k[0] != '_')
@@ -129,7 +143,7 @@ class GipsProcResult(object):
             raise ValueError('Unknown attributes for GipsProcResult',
                              list(input_fields - set(self.attribs)))
 
-        self.__dict__.update(kwargs) # set user's desired values
+        self.__dict__.update(kwargs)  # set user's desired values
 
         # guess the user's wishes regarding stdout comparison;
         # explicit request should override guesswork
@@ -138,7 +152,7 @@ class GipsProcResult(object):
         else:
             self.compare_stdout = self.stdout is not None
         # need a valid value to compare against either way
-        #self.stdout = self.stdout or u''
+        # self.stdout = self.stdout or u''
         self.compare_stderr = compare_stderr
 
     def strip_ignored(self, d):
