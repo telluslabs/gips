@@ -291,7 +291,7 @@ class sentinel2Data(Data):
         asset_type = 'L1C' # only one in the driver for now, conveniently
 
         # construct as much of the product filename as we can right now
-        filename_prefix = self.basename + '_' + self.sensors[asset_type]
+        filename_prefix = self.basename + '_' + self.sensors[asset_type] + '_'
 
         # Read the assets
         with utils.error_handler('Error reading '
@@ -312,7 +312,7 @@ class sentinel2Data(Data):
             start = datetime.datetime.now()
             # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
             # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
-            fnames = {indices[key][0]: os.path.join(self.path, self.basename + '_' + key) for key in indices}
+            fnames = {indices[key][0]: os.path.join(self.path, filename_prefix + key) for key in indices}
             prodout = gippy.algorithms.Indices(img, fnames, md)
             [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
             utils.verbose_out(' -> %s: processed %s in %s' % (
