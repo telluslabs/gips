@@ -311,10 +311,11 @@ class sentinel2Data(Data):
         if len(indices) > 0:
             start = datetime.datetime.now()
             # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
-            fnames = {key: os.path.join(self.path, self.basename + '_' + key) for key in indices}
+            # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
+            fnames = {indices[key][0]: os.path.join(self.path, self.basename + '_' + key) for key in indices}
             prodout = gippy.algorithms.Indices(img, fnames, md)
             [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
-            verbose_out(' -> %s: processed %s in %s' % (
+            utils.verbose_out(' -> %s: processed %s in %s' % (
                     self.basename, indices.keys(), datetime.datetime.now() - start), 1)
         img = None # clue for the gc to reap img; probably needed due to C++/swig weirdness
         prodout = None # more gc hinting; may not be as necessary as img
