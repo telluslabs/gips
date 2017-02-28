@@ -106,6 +106,19 @@ t_process = {
     ]
 }
 
+t_process_acolite = {
+    'created': {
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_rhow.tif': -1466953795,
+    },
+    'updated': {
+        'landsat/stage': None,
+        'landsat/tiles/012030/2015352': None
+    },
+    'ignored': [
+        'gips-inv-db.sqlite3',
+    ],
+}
+
 t_project = {
     'compare_stderr': False,
     'created': {
