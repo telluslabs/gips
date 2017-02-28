@@ -40,6 +40,10 @@ def pytest_addoption(parser):
 
     parser.addoption("--slow", action="store_true", help="Do not skip @slow tests.")
 
+    parser.addoption(
+        "--acolite", action="store_true", help="Don't skip ACOLITE tests."
+    )
+
     help_str = ("Do not skip @src_altering system tests, which are tests that may "
                 "alter or remove source data in the repo.")
     parser.addoption("--src-altering", action="store_true", help=help_str)
