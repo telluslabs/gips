@@ -456,7 +456,7 @@ class landsatData(Data):
         },
     }
 
-    def _process_acolite(self, aco_proc_dir, products=['rhow_vnir']):
+    def _process_acolite(self, aco_proc_dir, products):
         '''
         TODO: Move this to `gips.atmosphere`.
         TODO: Ensure this is genericized to work for S2 or Landsat.
