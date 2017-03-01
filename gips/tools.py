@@ -16,7 +16,7 @@ def cookie_cutter_worker(args):
 
         gv = GeoVector(args['shp'])
         feat = gv[args['index']]
-        
+
         at = False
         if args['alltouch']:
             at = True
@@ -82,7 +82,7 @@ def stats_worker(args):
                 ############################################################
                 # DO NOT REMOVE THIS LINE OF CODE OR THE WORLD WILL END!!!!!
                 print band.Histogram(100, True) * 100
-                # 
+                #
                 ############################################################
                 for percen in percentiles:
                     percen_arr.append(band.Percentile(percen))
@@ -137,7 +137,7 @@ class SpatialAggregator(object):
         'count'
     ]
 
-    
+
     @classmethod
     def get_attributes_list(cls, shp):
         """Return a list of shapefile attributes"""
@@ -146,7 +146,7 @@ class SpatialAggregator(object):
         except:
             raise Exception("Invalid shapefile \"{}\"".format(shp))
 
-        attribute_list = gv.Attributes()    
+        attribute_list = gv.Attributes()
         return attribute_list
 
 
@@ -161,7 +161,7 @@ class SpatialAggregator(object):
         num_features = int(gv.NumFeatures())
 
         # Set attributes list for possible passthrough
-        attribute_list = gv.Attributes()    
+        attribute_list = gv.Attributes()
         if filt:
             if filt[0] not in attribute_list:
                 raise Exception(
@@ -234,7 +234,7 @@ class SpatialAggregator(object):
             if not coe:
                 exit(1)
 
-    
+
     @classmethod
     def write_file(
         cls, outfile, results, passthrough, req_stats, percentiles, shp
@@ -251,8 +251,8 @@ class SpatialAggregator(object):
         out_file = open(outfile, 'w')
         header = "date,product,fid"
 
-        attribute_list = get_attribute_list(shp)
         if passthrough:
+            attribute_list = cls.get_attribute_list(shp)
             for att in attribute_list:
                 header += ",{}".format(att)
 
@@ -276,7 +276,7 @@ class SpatialAggregator(object):
 
         out_file.write(header + "\n")
 
-        
+
         # Second loop: write stats
         for result in results:
             key = result[0]
@@ -298,7 +298,6 @@ class SpatialAggregator(object):
                     for stat in b_stats:
                         band_str += "," + stat
                 else:
-                    band_str
                     band_str += "".join([',' for i in req_stats])
                     band_str +="".join([',' for i in percentiles])
             out_file.write(key_str + band_str + "\n")
@@ -312,7 +311,7 @@ class SpatialAggregator(object):
         Dictionary arguments:
         rasters -- a list of raster files (required if shapefile is specified)
         shapefile -- a shapefile used to create a ProjectDirectory (optional)
-        req_stats -- desired statistsics (default valid_stats)
+        stats -- desired statistsics (default valid_stats)
         filt -- filter features from ProjectDirectory conversion (optional)
         percentiles -- list of desired percentiles (optional)
         passthrough -- pass shapefile attributes through to output (optional)
@@ -326,7 +325,7 @@ class SpatialAggregator(object):
         continue_on_error -- pass over operations that cause errors (optional)
         projdir -- ProjectInventory directory (required unless shapefile present)
         """
-        rasters = kwargs.get('rasterpaths', [])
+        rasters = kwargs.get('rasters', [])
         shapefile = kwargs.get('shapefile', None)
         req_stats = kwargs.get('stats', cls.valid_stats)
         filt = kwargs.get('filter', None)
@@ -344,7 +343,7 @@ class SpatialAggregator(object):
         if passthrough and not shapefile:
             raise Exception("passthrough requires a shapefile")
         elif rasters and not shapefile:
-            raise Exception("rasterpaths requires shapefile")
+            raise Exception("rasters requires shapefile")
 
         if rasterdates and (len(rasterdates) != len(rasters)):
             raise argparse.ArgumentTypeError(
@@ -360,7 +359,7 @@ class SpatialAggregator(object):
                     os.path.join(projdir, o)
                 )
             ]
-       
+
         attributes_list = []
         if passthrough:
             attributes_list = cls.get_attributes_list(shapefile)
@@ -415,7 +414,7 @@ class SpatialAggregator(object):
                     args['percentiles'] = percentiles
                     args['date'] = date
                     args['product'] = product
-                    args['key'] = (date, product,fid)
+                    args['key'] = (date, product, fid)
                     args['req_stats'] = req_stats
                     args['coe'] = continue_on_error
 
