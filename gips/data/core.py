@@ -350,8 +350,8 @@ class Asset(object):
 
     @classmethod
     def query_service(cls, asset, tile, date):
-        """ Fetch stub """
-        raise NotImplementedError("Fetch not supported for this data source")
+        """ Query service stub """
+        raise NotImplementedError("Query service not supported for this data source")
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -833,7 +833,15 @@ class Data(object):
     @classmethod
     def query_service(cls, products, tiles, textent, update=False, force=False, grouped=False):
         """
-        query data service -- product-level interface
+        Returns a list (or dict) of asset files that are available for
+        download, given the arguments provided.
+
+        These constraints include specific products, tiles, and temporal
+        extent.
+
+        Additionally, the return value is either grouped into a dict mapping
+        (prod, tile, date) --> url
+        or simply a list of urls based on the 'grouped' parameter.
         """
         if grouped:
             response = {}
@@ -869,8 +877,9 @@ class Data(object):
                                         'asset': a,
                                         'date': d
                                     }
-                                    # useful to datahandler to have this grouped by (p,t,d)
-                                    # there is a fair bit of duplicated info this way, but oh well
+                                    # useful to datahandler to have this
+                                    # grouped by (p,t,d) there is a fair bit of
+                                    # duplicated info this way, but oh well 
                                     if grouped:
                                         if (p,t,d) in response:
                                             response[(p,t,d)].append(rec)
@@ -899,25 +908,6 @@ class Data(object):
                 if len(filenames) == 1:
                     fetched.append((asset, tile, date))
 
-        return fetched
-
-    @classmethod
-    def old_fetch(cls, products, tiles, textent, update=False):
-        """ Download data for tiles and add to archive. update forces fetch """
-        assets = cls.products2assets(products)
-        fetched = []
-        for a in assets:
-            for t in tiles:
-                asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                for d in asset_dates:
-                    # if we don't have it already, or if update (force) flag
-                    if not cls.Asset.discover(t, d, a) or update == True:
-                        date_str = d.strftime("%y-%m-%d")
-                        msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
-                        with utils.error_handler(msg_prefix, continuable=True):
-                            cls.Asset.fetch(a, t, d)
-                            # fetched may contain both fetched things and unfetchable things
-                            fetched.append((a, t, d))
         return fetched
 
     @classmethod

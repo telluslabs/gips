@@ -1,9 +1,69 @@
 """Unit tests for code found in gips.utils."""
 
+import sys
+
 import pytest
 
 from gips import utils
 from gips import inventory
+
+
+def t_remove_files(mocker):
+    """remove_files should remove the permutations of its arguments."""
+    filenames = ['a.hdf', 'b.hdf']
+    extensions = ['.index', '.aux.xml']
+    removals = ('a.hdf', 'a.hdf.index', 'a.hdf.aux.xml', 'b.hdf', 'b.hdf.index', 'b.hdf.aux.xml')
+    m_os_remove = mocker.patch.object(utils.os, 'remove')
+    utils.remove_files(filenames, extensions)
+    [m_os_remove.assert_any_call(r) for r in removals]
+    assert m_os_remove.call_count == 6
+
+
+def t_remove_files_no_ext(mocker):
+    """remove_files should work correctly when `extensions` is defaulted."""
+    filenames = ['a.hdf', 'b.hdf']
+    removals = ('a.hdf', 'b.hdf')
+    m_os_remove = mocker.patch.object(utils.os, 'remove')
+    utils.remove_files(filenames)
+    [m_os_remove.assert_any_call(r) for r in removals]
+    assert m_os_remove.call_count == 2
+
+
+def t_settings_user(mocker):
+    """gips.settings should load user settings first."""
+    mocker.patch.object(utils.os.path, 'isfile').return_value = True
+    mocker.patch.object(utils.os.path, 'expanduser').return_value = 'whatever'
+    m_load_source = mocker.patch.object(utils.imp, 'load_source')
+    fake_settings = m_load_source.return_value # a MagicMock
+    assert utils.settings() == fake_settings
+
+
+def t_settings_global(mocker):
+    """gips.settings should fall back on gips.settings when user settings fail."""
+    # force into the second clause
+    mocker.patch.object(utils.os.path, 'isfile').return_value = False
+    # fake out `import gips.settings` with mocks and trickery:
+    fake_gips = mocker.Mock()
+    fake_settings = fake_gips.settings
+    sys.modules['gips'] = fake_gips
+    sys.modules['gips.settings'] = fake_settings
+    assert utils.settings() == fake_settings
+
+
+def t_open_vector_error_handling(mocker):
+    m_settings = mocker.patch.object(utils, 'settings')
+    m_settings.return_value.DATABASES = {'fakedbsetting': {
+        'NAME': 'fake-db',
+        'USER': 'fake-user',
+        'PASSWORD': 'fake-password',
+        'HOST': 'fake-oka',
+        'PORT': '5432',
+    }}
+    m_GeoVector = mocker.patch.object(utils, 'GeoVector')
+    fname = 'fakedbsetting:bar'
+    utils.open_vector(fname)
+    m_GeoVector.return_value.SetPrimaryKey.assert_called_once_with("")
+
 
 @pytest.yield_fixture
 def restore_error_handler():

@@ -23,6 +23,11 @@ vNEXT
 - Optional database inventory using the Django ORM, currently used for
   managing metadata for products and assets.
 
+v0.8.4
+- ndvi8 re-enabled
+- cleaned up all gippy HDF subdataset(sds) images (appear to be a limited number of
+  SDS handles in gdal1.x).
+
 v0.8.2
 - landsat assets now tagged as 'DN' and 'SR' for USGS downloaded surface
   reflectance.
