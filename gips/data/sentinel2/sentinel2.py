@@ -215,12 +215,28 @@ class sentinel2Data(Data):
     Asset = sentinel2Asset
 
     _productgroups = {
-        'Index': ['ndvi'],
+        'Index': ['ndvi', 'evi', 'lswi', 'ndsi', 'bi'],
     }
     _products = {
         # placeholder product standing in for the real thing so fetch can work
         'ndvi': {
             'description': 'Normalized Difference Vegetation Index',
+            'assets': ['L1C'],
+        },
+        'evi': {
+            'description': 'Enhanced Vegetation Index',
+            'assets': ['L1C'],
+        },
+        'lswi': {
+            'description': 'Land Surface Water Index',
+            'assets': ['L1C'],
+        },
+        'ndsi': {
+            'description': 'Normalized Difference Snow Index',
+            'assets': ['L1C'],
+        },
+        'bi': {
+            'description': 'Brightness Index',
             'assets': ['L1C'],
         },
         'ref': {
@@ -314,16 +330,40 @@ class sentinel2Data(Data):
         # Read the assets
         with utils.error_handler('Error reading '
                                  + utils.basename(self.assets[asset_type].filename)):
-            img = self.read_raw()
-
-        for i, b in enumerate(img):
-            print('band{bn} shape is {x}x{y}'.format(bn=i+1, x=b.XSize(), y=b.YSize()))
+            self.read_raw() # returns a GeoImage, presently unused
 
         md = self.meta_dict()
 
         sensor = self.sensors[asset_type]
         # dict describing specification for all the bands in the asset
         data_spec = self.assets[asset_type]._sensors[sensor]
+
+        # Make a proto-product which acts as a basis for several products, and is equivalent to
+        # ref-toa; it's needed because the asset's spatial resolution must be resampled to be equal
+        # for all bands of interest.
+        # compile a list of the files needed for the proto-product
+        src_filenames = [f for f in self.metadata['abs-filenames']
+                if f[-6:-4] in data_spec['indices-bands']]
+        # upsample each one in turn (some don't need it but do them all for simplicity)
+        with utils.make_temp_dir() as tmpdir:
+            upsampled_filenames = [os.path.join(tmpdir, os.path.basename(f) + '.tif')
+                    for f in src_filenames]
+            for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
+                cmd_str = 'gdalwarp -tr 10 10 {} {}'.format(in_fn, out_fn)
+                cmd_args = shlex.split(cmd_str)
+                p = subprocess.Popen(cmd_args)
+                utils.verbose_out('Upscaling command: ' + cmd_str, 3)
+                p.communicate()
+                if p.returncode != 0:
+                    raise IOError("Expected gdalwarp exit status 0, got {}".format(
+                            p.returncode))
+            upsampled_img = gippy.GeoImage(upsampled_filenames)
+            upsampled_img.SetMeta(md)
+            for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
+                band_index = data_spec['band-strings'].index(band_string) # starts at 0
+                color_name = data_spec['colors'][band_index]
+                upsampled_img.SetBandName(color_name, band_num)
+
 
         # Process standard products
         for key, val in products.groups()['Standard'].items():
@@ -333,41 +373,19 @@ class sentinel2Data(Data):
                                      continuable=True)):
                 # putting the conditional in now so more products can be added later
                 if val[0] == 'ref':
-                    # compile a list of the files needed for this product
-                    src_filenames = [f for f in self.metadata['abs-filenames']
-                            if f[-6:-4] in data_spec['indices-bands']]
-                    # upsample each one in turn (some don't need it but do them all for simplicity)
-                    with utils.make_temp_dir() as tmpdir:
-                        upsampled_filenames = [os.path.join(tmpdir, os.path.basename(f) + '.tif')
-                                for f in src_filenames]
-                        for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
-                            cmd_str = 'gdalwarp -tr 10 10 {} {}'.format(in_fn, out_fn)
-                            cmd_args = shlex.split(cmd_str)
-                            p = subprocess.Popen(cmd_args)
-                            utils.verbose_out('about to upscale: ' + cmd_str, 3)
-                            p.communicate()
-                            if p.returncode != 0:
-                                raise IOError("Expected gdalwarp exit status 0, got {}".format(
-                                        p.returncode))
-                        upsampled_img = gippy.GeoImage(upsampled_filenames)
-                        upsampled_img.SetMeta(md)
-                        for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
-                            band_index = data_spec['band-strings'].index(band_string) # starts at 0
-                            color_name = data_spec['colors'][band_index]
-                            upsampled_img.SetBandName(color_name, band_num)
-                        upsampled_img.Process(filename_prefix + key)
+                    # TODO note that this will need editing when atmo correction is implemented
+                    # upsampled_img is identical to the ref product, just annoint it as such
+                    upsampled_img.Process(filename_prefix + key)
                     self.AddFile(sensor, key, filename_prefix + key)
 
-
-        # Process Indices - right now just NDVI, so some of the loop/conditional structure is
-        # technically not needed
+        # Process Indices
         indices = products.groups()['Index']
         if len(indices) > 0:
             start = datetime.datetime.now()
             # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
             # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
             fnames = {indices[key][0]: filename_prefix + key for key in indices}
-            prodout = gippy.algorithms.Indices(img, fnames, md)
+            prodout = gippy.algorithms.Indices(upsampled_img, fnames, md)
             [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
             utils.verbose_out(' -> %s: processed %s in %s' % (
                     self.basename, indices.keys(), datetime.datetime.now() - start), 1)
