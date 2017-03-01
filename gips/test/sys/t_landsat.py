@@ -16,7 +16,9 @@ product_args = tuple('-p acca bqashadow ref-toa ndvi-toa rad-toa'.split())
 
 STD_PROD_ARGS = STD_ARGS + product_args
 
-ACOLITE_PROD_ARGS = STD_ARGS + ('-p', 'rhow')
+ACOLITE_PROD_ARGS = STD_ARGS + (
+    '-p', 'rhow fai oc2chl oc3chl rhoam spm665 turbidity'
+)
 
 driver = 'landsat'
 
