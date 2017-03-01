@@ -341,20 +341,21 @@ class sentinel2Data(Data):
                         upsampled_filenames = [os.path.join(tmpdir, os.path.basename(f) + '.tif')
                                 for f in src_filenames]
                         for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
-                            cmd_args = shlex.split('gdalwarp -tr 10 10 {} {}'.format(in_fn, out_fn))
+                            cmd_str = 'gdalwarp -tr 10 10 {} {}'.format(in_fn, out_fn)
+                            cmd_args = shlex.split(cmd_str)
                             p = subprocess.Popen(cmd_args)
+                            utils.verbose_out('about to upscale: ' + cmd_str, 3)
                             p.communicate()
                             if p.returncode != 0:
                                 raise IOError("Expected gdalwarp exit status 0, got {}".format(
                                         p.returncode))
                         upsampled_img = gippy.GeoImage(upsampled_filenames)
+                        upsampled_img.SetMeta(md)
                         for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
                             band_index = data_spec['band-strings'].index(band_string) # starts at 0
                             color_name = data_spec['colors'][band_index]
                             upsampled_img.SetBandName(color_name, band_num)
-                        #upsampled_img.save(filename_prefix + key)
-                        img_out = gippy.GeoImage(filename_prefix + key, upsampled_img)
-                        img_out.SetMeta(md)
+                        upsampled_img.Process(filename_prefix + key)
                     self.AddFile(sensor, key, filename_prefix + key)
 
 
