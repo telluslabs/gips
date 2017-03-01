@@ -42,6 +42,9 @@ DATABASES = {
     },
 }
 
+# For NASA EarthData Authentication
+EARTHDATA_USER = ""
+EARTHDATA_PASS = ""
 
 REPOS = {
     'aod': {
@@ -56,9 +59,8 @@ REPOS = {
     },
     'modis': {
         'repository': '$TLD/modis',
-        # For NASA EarthData Authentication
-        #'username': '' 
-        #'password': ''
+        'username': EARTHDATA_USER,
+        'password': EARTHDATA_PASS
     },
     # these drivers tend to more specialized and experimental so turned off by default
     #'cdl': {
@@ -70,9 +72,11 @@ REPOS = {
     #'sarannual': {
     #    'repository': '$TLD/sarannual',
     #},
-    #'merra': {
-    #    'repository': '$TLD/Merra',
-    #},
+    'merra': {
+        'repository': '$TLD/merra',
+        'username': EARTHDATA_USER,
+        'password': EARTHDATA_PASS
+    },
     #'daymet': {
     #    'repository': '$TLD/daymet',
     #},
