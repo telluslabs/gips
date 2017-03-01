@@ -53,27 +53,39 @@ class sentinel2Asset(Asset):
     _sensors = {
         'S2A': {
             'description': 'Sentinel-2, Satellite A',
-            'bands': ['1', '2', '3', '4', '5', # specified by the driver
-                      '6', '7', '8', '8a', '9',
-                      '10', '11', '12'],
-            'band_strings': ['01', '02', '03', '04', '05', # found in the granule filenames
-                             '06', '07', '08', '8A', '09',
-                             '10', '11', '12'],
+            # Note all these lists are aligned with eachother, so that GREEN is band 3, and has
+            # bandwidth 0.035.
+            'bands':
+                ['1',  '2',  '3',  '4',  '5',  '6',
+                 '7',  '8', '8a',  '9', '10', '11', '12'],
+            # found in the granule filenames
+            'band-strings':
+                ['01', '02', '03', '04', '05', '06',
+                 '07', '08', '8A', '09', '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
-            'colors': ["COASTAL", "BLUE", "GREEN", "RED", "REDEDGE1",
-                       "REDEDGE2", "REDEDGE3", "NIR", "REDEDGE4", "WV",
-                       "CIRRUS", "SWIR1", "SWIR2"],
-            'bandlocs': [0.443, 0.490, 0.560, 0.665, 0.705, # 'probably' center wavelength of band
-                         0.740, 0.783, 0.842, 0.865, 0.945, # in micrometers
-                         1.375, 1.610, 2.190],
-            'bandwidths': [0.020, 0.065, 0.035, 0.030, 0.015, # 'probably' width of band, evenly
-                           0.015, 0.020, 0.115, 0.020, 0.020, # split in the center by bandloc
-                           0.030, 0.090, 0.180],
+            'colors':
+                ["COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
+                 "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"],
+            # 'probably' center wavelength of band in micrometers
+            'bandlocs':
+                [0.443, 0.490, 0.560, 0.665, 0.705, 0.740,
+                 0.783, 0.842, 0.865, 0.945, 1.375, 1.610, 2.190],
+            # 'probably' width of band, evenly split in the center by bandloc
+            'bandwidths':
+                [0.020, 0.065, 0.035, 0.030, 0.015, 0.015,
+                 0.020, 0.115, 0.020, 0.020, 0.030, 0.090, 0.180],
+            # in meters per https://sentinel.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/spatial
+            'spatial-resolutions':
+                [60, 10, 10, 10, 20, 20,
+                 20, 10, 20, 60, 60, 20, 20],
             # 'E': None  # S.B. Pulled from asset metadata file
             # 'K1': [0, 0, 0, 0, 0, 607.76, 0],  For conversion of LW bands to Kelvin
             # 'K2': [0, 0, 0, 0, 0, 1260.56, 0], For conversion of LW bands to Kelvin
             # 'tcap': _tcapcoef,
 
+            # colors needed for computing indices products such as NDVI
+            # color names are ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2']
+	    'indices-bands': ['02', '03', '04', '08', '11', '12'],
         },
     }
     _sensors['S2B'] = {'description': 'Sentinel-2, Satellite B'}
@@ -211,6 +223,10 @@ class sentinel2Data(Data):
             'description': 'Normalized Difference Vegetation Index',
             'assets': ['L1C'],
         },
+        'ref': {
+            'description': 'Surface reflectance',
+            'assets': ['L1C'],
+        },
     }
 
     @classmethod
@@ -233,7 +249,7 @@ class sentinel2Data(Data):
         raster_fn_pat = '^.*/GRANULE/.*/IMG_DATA/.*_B\d[\dA].jp2$'
         fnl = [df for df in datafiles if re.match(raster_fn_pat, df)]
         # have to sort the list or else gippy will get confused about which band is which
-        band_strings = sentinel2Asset._sensors[self.sensors[asset_type]]['band_strings']
+        band_strings = sentinel2Asset._sensors[self.sensors[asset_type]]['band-strings']
         fnl.sort(key=lambda f: band_strings.index(f[-6:-4]))
         self.metadata = {'filenames': fnl}
 
@@ -244,6 +260,7 @@ class sentinel2Data(Data):
 
         # TODO support GDAL virtual filesystem later
         datafiles = self.assets['L1C'].extract(self.metadata['filenames'])
+        self.metadata['abs-filenames'] = datafiles
         #if settings().REPOS[self.Repository.name.lower()]['extract']:
         #    # Extract files to disk
         #    datafiles = self.assets['L1C'].extract(self.metadata['filenames'])
@@ -291,7 +308,8 @@ class sentinel2Data(Data):
         asset_type = 'L1C' # only one in the driver for now, conveniently
 
         # construct as much of the product filename as we can right now
-        filename_prefix = self.basename + '_' + self.sensors[asset_type] + '_'
+        filename_prefix = os.path.join(
+                self.path, self.basename + '_' + self.sensors[asset_type] + '_')
 
         # Read the assets
         with utils.error_handler('Error reading '
@@ -304,6 +322,41 @@ class sentinel2Data(Data):
         md = self.meta_dict()
 
         sensor = self.sensors[asset_type]
+        # dict describing specification for all the bands in the asset
+        data_spec = self.assets[asset_type]._sensors[sensor]
+
+        # Process standard products
+        for key, val in products.groups()['Standard'].items():
+            start = datetime.datetime.now()
+            with utils.error_handler('Error creating product {} for {}'.format(
+                                            key, os.path.basename(self.assets[asset_type].filename),
+                                     continuable=True)):
+                # putting the conditional in now so more products can be added later
+                if val[0] == 'ref':
+                    # compile a list of the files needed for this product
+                    src_filenames = [f for f in self.metadata['abs-filenames']
+                            if f[-6:-4] in data_spec['indices-bands']]
+                    # upsample each one in turn (some don't need it but do them all for simplicity)
+                    with utils.make_temp_dir() as tmpdir:
+                        upsampled_filenames = [os.path.join(tmpdir, os.path.basename(f) + '.tif')
+                                for f in src_filenames]
+                        for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
+                            cmd_args = shlex.split('gdalwarp -tr 10 10 {} {}'.format(in_fn, out_fn))
+                            p = subprocess.Popen(cmd_args)
+                            p.communicate()
+                            if p.returncode != 0:
+                                raise IOError("Expected gdalwarp exit status 0, got {}".format(
+                                        p.returncode))
+                        upsampled_img = gippy.GeoImage(upsampled_filenames)
+                        for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
+                            band_index = data_spec['band-strings'].index(band_string) # starts at 0
+                            color_name = data_spec['colors'][band_index]
+                            upsampled_img.SetBandName(color_name, band_num)
+                        #upsampled_img.save(filename_prefix + key)
+                        img_out = gippy.GeoImage(filename_prefix + key, upsampled_img)
+                        img_out.SetMeta(md)
+                    self.AddFile(sensor, key, filename_prefix + key)
+
 
         # Process Indices - right now just NDVI, so some of the loop/conditional structure is
         # technically not needed
@@ -312,7 +365,7 @@ class sentinel2Data(Data):
             start = datetime.datetime.now()
             # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
             # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
-            fnames = {indices[key][0]: os.path.join(self.path, filename_prefix + key) for key in indices}
+            fnames = {indices[key][0]: filename_prefix + key for key in indices}
             prodout = gippy.algorithms.Indices(img, fnames, md)
             [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
             utils.verbose_out(' -> %s: processed %s in %s' % (

@@ -141,6 +141,22 @@ def link(src, dst, hard=False):
         os.symlink(os.path.relpath(src, os.path.dirname(dst)), os.path.abspath(dst))
     return dst
 
+@contextmanager
+def make_temp_dir(suffix='', prefix='tmp', dir=None):
+    """Context manager to create then delete a temporary directory.
+
+    Arguments are the same as tempfile.mkdtemp, which it calls.  Yields
+    the absolute pathname to the new directory.  Deletes the directory
+    at the exit of the context, regardless of exceptions raised in the
+    context.
+    """
+    absolute_pathname = tempfile.mkdtemp(suffix, prefix, dir)
+    try:
+        yield absolute_pathname
+    finally:
+        shutil.rmtree(absolute_pathname)
+
+
 ##############################################################################
 # Settings functions
 ##############################################################################
