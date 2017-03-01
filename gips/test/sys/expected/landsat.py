@@ -108,7 +108,13 @@ t_process = {
 
 t_process_acolite = {
     'created': {
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_rhow.tif': -1466953795,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_fai.tif': 452685609,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_oc2chl.tif': -1873264626,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_oc3chl.tif': 717003616,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_rhoam.tif': -59301968,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_rhow.tif': -537427642,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_spm665.tif': 583714444,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_turbidity.tif': -959671700
     },
     'updated': {
         'landsat/stage': None,
