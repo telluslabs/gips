@@ -940,7 +940,7 @@ class landsatData(Data):
                 # VerboseOut(traceback.format_exc(), 4)
                 pass
 
-            if 'ACOLITE' in groups:
+            if groups['ACOLITE']:
                 start = datetime.now()
                 # TEMPDIR FOR PROCESSING
                 aco_proc_dir = tempfile.mkdtemp(
