@@ -7,10 +7,12 @@ from .util import *
 
 logger = logging.getLogger(__name__)
 
-pytestmark = sys # skip everything unless --sys
+pytestmark = sys  # skip everything unless --sys
 
-# changing this will require changes in expected/
-STD_ARGS = ('landsat', '-s', NH_SHP_PATH, '-d', '2015-352', '-v', '4')
+# Changing test parameterization will require changes in expected/
+# TODO: per issue #218, the IMAGE_DATE should be changed to 2017-005
+IMAGE_DATE = '2015-352'
+STD_ARGS = ('landsat', '-s', NH_SHP_PATH, '-d', IMAGE_DATE, '-v', '4')
 
 product_args = tuple('-p acca bqashadow ref-toa ndvi-toa rad-toa'.split())
 
@@ -59,7 +61,7 @@ def t_process(setup_landsat_data, repo_env, expected):
 @slow
 @acolite
 def t_process_acolite(setup_landsat_data, repo_env, expected):
-    """Test gips_process on landsat data."""
+    """ Test processing landsat data with ACOLITE. """
     actual = repo_env.run('gips_process', *ACOLITE_PROD_ARGS)
     assert expected == actual
 
