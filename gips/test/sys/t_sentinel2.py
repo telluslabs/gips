@@ -13,8 +13,8 @@ pytestmark = sys # skip everything unless --sys
 driver = 'sentinel2'
 
 # changing this will require changes in expected/
-# should be two assets, one for jan 3, one for jan 10 ------vvv------vvv also both are tile 19TCH
-STD_ARGS = ('sentinel2', '-s', DURHAM_SHP_PATH, '-d', '2017-003,2017-010', '-v', '4')
+# dates chosen for relative lack of cloud cover ------------vvv------vvv
+STD_ARGS = ('sentinel2', '-s', DURHAM_SHP_PATH, '-d', '2017-010,2017-030', '-v', '4')
 
 @pytest.fixture
 def setup_data(pytestconfig):

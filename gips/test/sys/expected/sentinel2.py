@@ -11,8 +11,8 @@ Tile Coverage
 
 \x1b[1m\x1b[4m    DATE       L1C     Product  \x1b[0m
 \x1b[1m2017        
-\x1b[0m    003       100.0%   
-    010       100.0%   
+\x1b[0m    010       100.0%   
+    030       100.0%   
 
 
 2 files on 2 dates
