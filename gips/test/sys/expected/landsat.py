@@ -107,7 +107,7 @@ t_process = {
 }
 
 # hashes correspond to all-cloud (hence masked) imagery
-# to be updated with gh-issue#218
+# to be updated with gh-issue #218
 t_process_acolite = {
     'created': {
         'landsat/tiles/012030/2015352/012030_2015352_LC8_fai.tif': 452685609,
