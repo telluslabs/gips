@@ -41,7 +41,7 @@ from gips.atmosphere import SIXS, MODTRAN
 
 
 class sentinel2Repository(Repository):
-    name = 'Sentinel-2'
+    name = 'Sentinel2'
     description = 'Data from the Sentinel 2 satellite(s) from the ESA'
     # when looking at the tiles shapefile, what's the key to fetch a feature's tile ID?
     _tile_attribute = 'Name'
@@ -210,7 +210,7 @@ class sentinel2Asset(Asset):
 
 
 class sentinel2Data(Data):
-    name = 'Sentinel-2'
+    name = 'Sentinel2'
     version = '0.1.0'
     Asset = sentinel2Asset
 
@@ -274,16 +274,14 @@ class sentinel2Data(Data):
         start = datetime.datetime.now()
         self.load_metadata()
 
-        # TODO support GDAL virtual filesystem later
-        datafiles = self.assets['L1C'].extract(self.metadata['filenames'])
+        if utils.settings().REPOS[self.Repository.name.lower()].get('extract', False):
+            # Extract files to disk
+            datafiles = self.assets['L1C'].extract(self.metadata['filenames'])
+        else:
+            # Use zipfile directly using GDAL's virtual filesystem
+            datafiles = [os.path.join('/vsizip/' + self.assets['L1C'].filename, f)
+                    for f in self.metadata['filenames']]
         self.metadata['abs-filenames'] = datafiles
-        #if settings().REPOS[self.Repository.name.lower()]['extract']:
-        #    # Extract files to disk
-        #    datafiles = self.assets['L1C'].extract(self.metadata['filenames'])
-        #else:
-        #    # Use zipfile directly using GDAL's virtual filesystem
-        #    datafiles = [os.path.join('/vsizip/' + self.assets['L1C'].filename, f)
-        #            for f in self.metadata['filenames']]
 
         image = gippy.GeoImage(datafiles)
         image.SetNoData(0) # inferred rather than taken from spec
@@ -314,6 +312,9 @@ class sentinel2Data(Data):
         directory.
         """
         products = self.needed_products(products, overwrite)
+        if len(products) == 0:
+            utils.verbose_out('No new processing required.')
+            return
         for val in products.requested.values():
             toa = (self._products[val[0]].get('toa', False) or 'toa' in val)
             if not toa:
@@ -341,6 +342,7 @@ class sentinel2Data(Data):
         # Make a proto-product which acts as a basis for several products, and is equivalent to
         # ref-toa; it's needed because the asset's spatial resolution must be resampled to be equal
         # for all bands of interest.
+        # TODO if the current date's ref-toa is already produced, open that instead, for performance
         # compile a list of the files needed for the proto-product
         src_filenames = [f for f in self.metadata['abs-filenames']
                 if f[-6:-4] in data_spec['indices-bands']]
