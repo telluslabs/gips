@@ -17,6 +17,7 @@ def make_result(result, job):
 
     date = key[0]
     fid = int(key[2])
+    shaid = bands.pop('passthrough')['shaid']
 
     for band in bands.keys():
         stats = bands[band]
@@ -30,7 +31,7 @@ def make_result(result, job):
 
         r = Result(
             date=date,
-            fid=fid,
+            shaid=shaid,
             minimum=minimum,
             maximum=maximum,
             job=job,
@@ -63,6 +64,7 @@ def aggregate(job, projdir, nprocs=1):
         'products': [job.variable.product],
         'projdir': projdir,
         'processes': nprocs,
+        'passthrough': true.
 
     }
 
