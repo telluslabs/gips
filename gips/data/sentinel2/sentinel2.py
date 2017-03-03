@@ -215,10 +215,16 @@ class sentinel2Data(Data):
     Asset = sentinel2Asset
 
     _productgroups = {
-        'Index': ['ndvi', 'evi', 'lswi', 'ndsi', 'bi'],
+        'Index': ['ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari', 'brgt',
+                  'ndti', 'crc', 'crcm', 'isti', 'sti'] # <-- tillage indices
     }
     _products = {
-        # placeholder product standing in for the real thing so fetch can work
+        # standard products
+        'ref': {
+            'description': 'Surface reflectance',
+            'assets': ['L1C'],
+        },
+        # index products
         'ndvi': {
             'description': 'Normalized Difference Vegetation Index',
             'assets': ['L1C'],
@@ -239,8 +245,43 @@ class sentinel2Data(Data):
             'description': 'Brightness Index',
             'assets': ['L1C'],
         },
-        'ref': {
-            'description': 'Surface reflectance',
+        'satvi': {
+            'description': 'Soil-Adjusted Total Vegetation Index',
+            'assets': ['L1C'],
+        },
+        'msavi2': {
+            'description': 'Modified Soil-adjusted Vegetation Index',
+            'assets': ['L1C'],
+        },
+        'vari': {
+            'description': 'Visible Atmospherically Resistant Index',
+            'assets': ['L1C'],
+        },
+        # index products related to tillage
+        'brgt': {
+            'description': ('Brightness index:  Visible to near infrared reflectance weighted by'
+                            ' approximate energy distribution of the solar spectrum. A proxy for'
+                            ' broadband albedo.')
+            'assets': ['L1C'],
+        },
+        'ndti': {
+            'description': 'Normalized Difference Tillage Index',
+            'assets': ['L1C'],
+        },
+        'crc': {
+            'description': 'Crop Residue Cover (uses BLUE)',
+            'assets': ['L1C'],
+        },
+        'crcm': {
+            'description': 'Crop Residue Cover, Modified (uses GREEN)',
+            'assets': ['L1C'],
+        },
+        'isti': {
+            'description': 'Inverse Standard Tillage Index',
+            'assets': ['L1C'],
+        },
+        'sti': {
+            'description': 'Standard Tillage Index',
             'assets': ['L1C'],
         },
     }
