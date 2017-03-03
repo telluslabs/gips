@@ -13,10 +13,17 @@ pytestmark = sys # skip everything unless --sys
 driver = 'sentinel2'
 
 # changing this will require changes in expected/
-# dates chosen for relative lack of cloud cover ------------vvv------vvv
-STD_ARGS = ('sentinel2', '-s', DURHAM_SHP_PATH, '-d', '2017-010,2017-030', '-v', '4')
+# date chosen for relative lack of cloud cover -------------vvv
+STD_ARGS = ('sentinel2', '-s', DURHAM_SHP_PATH, '-d', '2017-010', '-v', '4')
+# note that two dates doubles runtime and gips_process is approx 5 min / day runtime
+#STD_ARGS = ('sentinel2', '-s', DURHAM_SHP_PATH, '-d', '2017-010,2017-030', '-v', '4')
 # for now sentinel2 only supports top-of-atmo products
-PROD_ARGS = list(STD_ARGS) + ['-p', 'ref-toa', 'ndvi-toa', 'evi-toa', 'lswi-toa', 'ndsi-toa', 'bi-toa']
+PROD_ARGS = list(STD_ARGS) + ['-p',
+    'ref-toa', # standard
+    'ndvi-toa', 'evi-toa', 'lswi-toa', 'ndsi-toa', 'satvi-toa', 'msavi2-toa', 'vari-toa', # indices
+    'ndti-toa', 'crc-toa', 'crcm-toa', 'isti-toa', # tillage indices
+    'bi-toa', 'sti-toa', 'brgt-toa', # these are broken atm but still undergo testing
+]
 
 @pytest.fixture
 def setup_fixture(pytestconfig):
@@ -39,11 +46,15 @@ def t_inventory(setup_fixture, repo_env, expected):
     assert expected == actual
 
 
+@slow
 def t_process(setup_fixture, repo_env, expected):
     """Test `gips_process`, confirming products are created."""
     process_actual = repo_env.run('gips_process', *PROD_ARGS)
-    # TODO envoy doesn't respect --expectation-format the way repo_env does
     inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
+    # just to make updating the tests less painful
+    if pytest.config.getoption("--expectation-format"):
+        print ('standard output (expectation format, post-processing gips_inventory): """' +
+               re.sub('\\\\n', '\n', repr(inventory_actual.std_out))[2:-1] + '"""')
     assert (expected == process_actual
             and expected._inv_stdout == inventory_actual.std_out)
 

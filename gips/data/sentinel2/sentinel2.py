@@ -261,7 +261,7 @@ class sentinel2Data(Data):
         'brgt': {
             'description': ('Brightness index:  Visible to near infrared reflectance weighted by'
                             ' approximate energy distribution of the solar spectrum. A proxy for'
-                            ' broadband albedo.')
+                            ' broadband albedo.'),
             'assets': ['L1C'],
         },
         'ndti': {
@@ -312,7 +312,6 @@ class sentinel2Data(Data):
 
     def read_raw(self):
         """Read in bands using original SAFE asset file (a .zip)."""
-        start = datetime.datetime.now()
         self.load_metadata()
 
         if utils.settings().REPOS[self.Repository.name.lower()].get('extract', False):
@@ -340,8 +339,14 @@ class sentinel2Data(Data):
         for i, color in zip(range(1, len(colors) + 1), colors):
             image.SetBandName(color, i)
 
-        utils.verbose_out('%s: read in %s' % (image.Basename(), datetime.datetime.now() - start), 2)
         return image
+
+
+    def _time_report(self, msg, reset_clock=False):
+        start = getattr(self, '_time_report_start', None)
+        if reset_clock or start is None:
+            start = self._time_report_start = datetime.datetime.now()
+        utils.verbose_out('{}; time elapsed: {}'.format(msg, datetime.datetime.now() - start), 3)
 
 
     def process(self, products=None, overwrite=False, **kwargs):
@@ -352,6 +357,7 @@ class sentinel2Data(Data):
         are found.  Products are saved to a well-known or else specified
         directory.
         """
+        self._time_report('Starting processing for this temporal-spatial unit')
         products = self.needed_products(products, overwrite)
         if len(products) == 0:
             utils.verbose_out('No new processing required.')
@@ -360,8 +366,6 @@ class sentinel2Data(Data):
             toa = (self._products[val[0]].get('toa', False) or 'toa' in val)
             if not toa:
 		raise NotImplementedError('only toa products are supported for now')
-
-        start = datetime.datetime.now()
 
         asset_type = 'L1C' # only one in the driver for now, conveniently
 
@@ -375,6 +379,8 @@ class sentinel2Data(Data):
             self.read_raw() # returns a GeoImage, presently unused
 
         md = self.meta_dict()
+
+        self._time_report('Starting upsample of Sentinel-2 asset bands')
 
         sensor = self.sensors[asset_type]
         # dict describing specification for all the bands in the asset
@@ -407,6 +413,8 @@ class sentinel2Data(Data):
                 color_name = data_spec['colors'][band_index]
                 upsampled_img.SetBandName(color_name, band_num)
 
+        self._time_report('Completed upsampling of Sentinel-2 asset bands')
+        self._time_report('Starting on standard product processing')
 
         # Process standard products
         for key, val in products.groups()['Standard'].items():
@@ -421,10 +429,12 @@ class sentinel2Data(Data):
                     upsampled_img.Process(filename_prefix + key)
                     self.AddFile(sensor, key, filename_prefix + key)
 
+        self._time_report('Completed standard product processing')
+
         # Process Indices
         indices = products.groups()['Index']
         if len(indices) > 0:
-            start = datetime.datetime.now()
+            self._time_report('Starting indices processing')
             # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
             # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
             fnames = {indices[key][0]: filename_prefix + key for key in indices}
@@ -432,6 +442,8 @@ class sentinel2Data(Data):
             [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
             utils.verbose_out(' -> %s: processed %s in %s' % (
                     self.basename, indices.keys(), datetime.datetime.now() - start), 1)
+            self._time_report('Indices complete')
         img = None # clue for the gc to reap img; probably needed due to C++/swig weirdness
         prodout = None # more gc hinting; may not be as necessary as img
         # cleanup directory here if necessary
+        self._time_report('Processing complete for this spatial-temporal unit')
