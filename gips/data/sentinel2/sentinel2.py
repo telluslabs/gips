@@ -355,7 +355,7 @@ class sentinel2Data(Data):
         If `products` is None, it processes all products.  If
         `overwrite` is True, it will overwrite existing products if they
         are found.  Products are saved to a well-known or else specified
-        directory.
+        directory.  kwargs is unused, and is present for compatibility.
         """
         self._time_report('Starting processing for this temporal-spatial unit')
         products = self.needed_products(products, overwrite)
