@@ -114,3 +114,44 @@ Standard Products
 \x1b[0m   ref         Surface reflectance                     
 """
 }
+
+
+t_project = {
+    'created': {
+        '0': None,
+        '0/2017010_S2A_ref-toa.tif': 56081467,
+        '0/2017010_S2A_bi-toa.tif': -531404086,
+        '0/2017010_S2A_brgt-toa.tif': 1949224049,
+        '0/2017010_S2A_crc-toa.tif': -1921980023,
+        '0/2017010_S2A_crcm-toa.tif': -620088516,
+        '0/2017010_S2A_evi-toa.tif': 1327644820,
+        '0/2017010_S2A_isti-toa.tif': -621591635,
+        '0/2017010_S2A_lswi-toa.tif': 1687749861,
+        '0/2017010_S2A_msavi2-toa.tif': -1672549497,
+        '0/2017010_S2A_ndsi-toa.tif': 1678838722,
+        '0/2017010_S2A_ndti-toa.tif': -1245896923,
+        '0/2017010_S2A_ndvi-toa.tif': 754895178,
+        '0/2017010_S2A_satvi-toa.tif': -339325105,
+        '0/2017010_S2A_sti-toa.tif': 528679666,
+        '0/2017010_S2A_vari-toa.tif': -915656392,
+    },
+}
+
+
+t_stats = { 'created': {
+    'bi-toa_stats.txt': 1420978991,
+    'brgt-toa_stats.txt': 1420978991,
+    'crc-toa_stats.txt': 1420978991,
+    'crcm-toa_stats.txt': 1420978991,
+    'evi-toa_stats.txt': 1420978991,
+    'isti-toa_stats.txt': 1420978991,
+    'lswi-toa_stats.txt': 1420978991,
+    'msavi2-toa_stats.txt': 1420978991,
+    'ndsi-toa_stats.txt': 1420978991,
+    'ndti-toa_stats.txt': 1420978991,
+    'ndvi-toa_stats.txt': 1420978991,
+    'ref-toa_stats.txt': 698328601,
+    'satvi-toa_stats.txt': 1420978991,
+    'sti-toa_stats.txt': 1420978991,
+    'vari-toa_stats.txt': 1420978991,
+}}
