@@ -141,11 +141,11 @@ class Result(models.Model):
     skew        = models.FloatField(null=True, blank=True)
     minimum     = models.FloatField(null=True, blank=True)
     sd          = models.FloatField(null=True, blank=True)
-    fid         = models.IntegerField()
+    shaid       = models.CharField(max_length=255)
     site        = models.CharField(max_length=255)
 
     class Meta:
-        unique_together = ('job', 'date', 'site')
+        unique_together = ('job', 'date', 'shaid')
 
 
 class Job(models.Model):
