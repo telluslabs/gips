@@ -392,8 +392,8 @@ class sentinel2Data(Data):
         # for all bands of interest.
         # TODO if the current date's ref-toa is already produced, open that instead, for performance
         # compile a list of the files needed for the proto-product
-        # TODO don't do this for the bands that are already at the right resolution, just use the
-        # already-opened geoimage raster bands from self.read_raw()
+        # TODO this upsamples everything, when only two bands need it.  The first attempt to remedy
+        # this was actually slower, however; see branch 200-optimize-upsampling, commit 2e97ba0.
         src_filenames = [f for f in self.metadata['abs-filenames']
                 if f[-6:-4] in data_spec['indices-bands']]
         # upsample each one in turn (some don't need it but do them all for simplicity)
