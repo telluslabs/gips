@@ -37,8 +37,6 @@ import gippy.algorithms
 from gips.data.core import Repository, Asset, Data
 from gips import utils
 
-from gips.atmosphere import SIXS, MODTRAN
-
 
 class sentinel2Repository(Repository):
     name = 'Sentinel2'
@@ -55,9 +53,6 @@ class sentinel2Asset(Asset):
             'description': 'Sentinel-2, Satellite A',
             # Note all these lists are aligned with eachother, so that GREEN is band 3, and has
             # bandwidth 0.035.
-            'bands':
-                ['1',  '2',  '3',  '4',  '5',  '6',
-                 '7',  '8', '8a',  '9', '10', '11', '12'],
             # found in the granule filenames
             'band-strings':
                 ['01', '02', '03', '04', '05', '06',
@@ -90,25 +85,28 @@ class sentinel2Asset(Asset):
     }
     _sensors['S2B'] = {'description': 'Sentinel-2, Satellite B'}
 
+    # TODO move this someplace useful
     # example url:
     # https://scihub.copernicus.eu/dhus/search?q=filename:S2?_MSIL1C_20170202T??????_N????_R???_T19TCH_*.SAFE
 
     _assets = {
         'L1C': {
+            # 'pattern' is used for searching the repository of locally-managed assets
             #                      sense datetime              tile
             #                     (YYYYMMDDTHHMMSS)            (MGRS)
             'pattern': 'S2?_MSIL1C_????????T??????_N????_R???_T?????_*.zip',
+            # used by fetch() to search for assets
+            # TODO add filename pattern to end of this string?
             'url': 'https://scihub.copernicus.eu/dhus/search?q=filename:',
-            'startdate': datetime.date(2016, 12, 06),
+            'startdate': datetime.date(2016, 12, 06), # used to prevent impossible searches
             'latency': 3  # TODO actually seems to be 3,7,3,7..., but this value seems to be unused?
                           # only needed by Asset.end_date and Asset.available, but those are never called?
         },
 
     }
 
-    _defaultresolution = (10, 10)  # 10m for optical
-                                   # 20m for REDEDGE and SWIR bands
-                                   # 60m for ATMOSPHERIC
+    # default resultant resolution for resampling during to Data().copy()
+    _defaultresolution = (10, 10)
 
     def __init__(self, filename):
         """Inspect a single file and set some metadata.
@@ -117,7 +115,6 @@ class sentinel2Asset(Asset):
         https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
         """
         super(sentinel2Asset, self).__init__(filename)
-        # TODO later do ZipFile().testzip() somewhere else & move this check there
         zipfile.ZipFile(filename) # sanity check; exception if file isn't a valid zip
         base_filename = os.path.basename(filename)
         # regex for verifying filename correctness & extracting metadata; note that for now, only
@@ -129,10 +126,11 @@ class sentinel2Asset(Asset):
         match = re.match(asset_name_pattern, base_filename)
         if match is None:
             raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(base_filename))
-        self.asset = 'L1C'
+        self.asset = 'L1C' # only supported asset type
         self.sensor = match.group('sensor')
         self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
+
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -167,7 +165,6 @@ class sentinel2Asset(Asset):
                         "Expected single result, but query returned {}.".format(result_count))
 
             entry = results['entry']
-            # TODO entry['summary'] is good for printing out for user consumption
             link = entry['link'][0]
             if 'rel' in link: # sanity check - the right one doesn't have a 'rel' attrib
                 raise IOError("Unexpected 'rel' attribute in search link", link)
@@ -259,9 +256,11 @@ class sentinel2Data(Data):
         },
         # index products related to tillage
         'brgt': {
-            'description': ('Brightness index:  Visible to near infrared reflectance weighted by'
-                            ' approximate energy distribution of the solar spectrum. A proxy for'
-                            ' broadband albedo.'),
+            'description': ('VIS and NIR reflectance, weighted by solar energy distribution.'),
+            # rbraswell's original description:
+            #'description': ('Brightness index:  Visible to near infrared reflectance weighted by'
+            #                ' approximate energy distribution of the solar spectrum. A proxy for'
+            #                ' broadband albedo.'),
             'assets': ['L1C'],
         },
         'ndti': {
@@ -288,13 +287,13 @@ class sentinel2Data(Data):
 
     @classmethod
     def meta_dict(cls):
+        """Assemble GIPS & driver version for embedding in output files."""
         meta = super(sentinel2Data, cls).meta_dict()
         meta['GIPS-sentinel2 Version'] = cls.version
         return meta
 
-
     def load_metadata(self):
-        """Ingest metadata XML in Sentinel-2 SAFE asset files."""
+        """Ingest metadata from asset files; just raster filenames presently."""
         if hasattr(self, 'metadata'):
             return # nothing to do if metadata is already loaded
 
@@ -307,6 +306,7 @@ class sentinel2Data(Data):
         fnl = [df for df in datafiles if re.match(raster_fn_pat, df)]
         # have to sort the list or else gippy will get confused about which band is which
         band_strings = sentinel2Asset._sensors[self.sensors[asset_type]]['band-strings']
+        # sorting is weird because the bands aren't named consistently
         fnl.sort(key=lambda f: band_strings.index(f[-6:-4]))
         self.metadata = {'filenames': fnl}
 
@@ -325,15 +325,8 @@ class sentinel2Data(Data):
 
         image = gippy.GeoImage(datafiles)
         image.SetNoData(0) # inferred rather than taken from spec
-
         sensor = self.assets['L1C'].sensor
-        # dict describing specification for all the bands in the asset
-        data_spec = self.assets['L1C']._sensors[sensor]
-
         colors = self.assets['L1C']._sensors[sensor]['colors']
-        filenames = self.metadata['filenames']
-
-        assert len(filenames) == len(colors) # sanity check
 
         # go through all the files/bands in the image object and set values for each one
         for i, color in zip(range(1, len(colors) + 1), colors):
@@ -343,10 +336,14 @@ class sentinel2Data(Data):
 
 
     def _time_report(self, msg, reset_clock=False):
+        """Provide the user with progress reports, including elapsed time.
+
+        Reset elapsed time with reset_clock=True.
+        """
         start = getattr(self, '_time_report_start', None)
         if reset_clock or start is None:
             start = self._time_report_start = datetime.datetime.now()
-        utils.verbose_out('{}; time elapsed: {}'.format(msg, datetime.datetime.now() - start), 3)
+        utils.verbose_out('{}:  {}'.format(datetime.datetime.now() - start, msg, 3))
 
 
     def process(self, products=None, overwrite=False, **kwargs):
@@ -364,7 +361,11 @@ class sentinel2Data(Data):
             return
         for val in products.requested.values():
             toa = (self._products[val[0]].get('toa', False) or 'toa' in val)
+            # for now users must use `-p` to get toa versions of products; getting all products in
+            # one go AND defaulting to toa doesn't seem to be supported.
             if not toa:
+                utils.verbose_out('Please specify products with eg "-p ref-toa"', 1,
+                                  stream=sys.stderr)
 		raise NotImplementedError('only toa products are supported for now')
 
         asset_type = 'L1C' # only one in the driver for now, conveniently
@@ -391,6 +392,8 @@ class sentinel2Data(Data):
         # for all bands of interest.
         # TODO if the current date's ref-toa is already produced, open that instead, for performance
         # compile a list of the files needed for the proto-product
+        # TODO don't do this for the bands that are already at the right resolution, just use the
+        # already-opened geoimage raster bands from self.read_raw()
         src_filenames = [f for f in self.metadata['abs-filenames']
                 if f[-6:-4] in data_spec['indices-bands']]
         # upsample each one in turn (some don't need it but do them all for simplicity)
@@ -400,8 +403,8 @@ class sentinel2Data(Data):
             for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
                 cmd_str = 'gdalwarp -tr 10 10 {} {}'.format(in_fn, out_fn)
                 cmd_args = shlex.split(cmd_str)
+                self._time_report('Upsampling:  ' + cmd_str, 3)
                 p = subprocess.Popen(cmd_args)
-                utils.verbose_out('Upscaling command: ' + cmd_str, 3)
                 p.communicate()
                 if p.returncode != 0:
                     raise IOError("Expected gdalwarp exit status 0, got {}".format(
@@ -418,7 +421,6 @@ class sentinel2Data(Data):
 
         # Process standard products
         for key, val in products.groups()['Standard'].items():
-            start = datetime.datetime.now()
             with utils.error_handler('Error creating product {} for {}'.format(
                                             key, os.path.basename(self.assets[asset_type].filename),
                                      continuable=True)):
@@ -440,9 +442,7 @@ class sentinel2Data(Data):
             fnames = {indices[key][0]: filename_prefix + key for key in indices}
             prodout = gippy.algorithms.Indices(upsampled_img, fnames, md)
             [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
-            utils.verbose_out(' -> %s: processed %s in %s' % (
-                    self.basename, indices.keys(), datetime.datetime.now() - start), 1)
-            self._time_report('Indices complete')
+            self._time_report(' -> %s: processed %s' % (self.basename, indices.keys()))
         img = None # clue for the gc to reap img; probably needed due to C++/swig weirdness
         prodout = None # more gc hinting; may not be as necessary as img
         # cleanup directory here if necessary
