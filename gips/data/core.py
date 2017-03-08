@@ -39,7 +39,8 @@ import commands
 import gippy
 from gippy.algorithms import CookieCutter
 from gips import __version__
-from gips.utils import settings, VerboseOut, RemoveFiles, File2List, List2File, Colors, basename, mkdir, open_vector
+from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File, Colors,
+        basename, mkdir, open_vector)
 from gips import utils
 from ..inventory import dbinv, orm
 
@@ -68,6 +69,7 @@ class Repository(object):
         """ Get tile designation from a geospatial feature (i.e. a row) """
         fldindex = feature.GetFieldIndex(cls._tile_attribute)
         return str(feature.GetField(fldindex))
+
 
     ##########################################################################
     # Override these functions if not using a tile/date directory structure
@@ -600,6 +602,19 @@ class Data(object):
         test = lambda x: x not in assetnames and os.path.splitext(f)[1] not in badexts
         filenames[:] = [f for f in filenames if test(f)]
         return filenames
+
+
+    @classmethod
+    def normalize_tile_string(cls, tile_string):
+        """Override this method to provide custom processing of tile names.
+
+        This method should raise an exception if the tile string is
+        invalid, but should return a corrected string instead if
+        possible.  So for modis, 'H03V01' should return 'h03v01', while
+        'H03V' should raise an exception.
+        """
+        return tile_string
+
 
     ##########################################################################
     # Child classes should not generally have to override anything below here

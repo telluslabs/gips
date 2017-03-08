@@ -74,8 +74,6 @@ class sentinel2Asset(Asset):
                 [60, 10, 10, 10, 20, 20,
                  20, 10, 20, 60, 60, 20, 20],
             # 'E': None  # S.B. Pulled from asset metadata file
-            # 'K1': [0, 0, 0, 0, 0, 607.76, 0],  For conversion of LW bands to Kelvin
-            # 'K2': [0, 0, 0, 0, 0, 1260.56, 0], For conversion of LW bands to Kelvin
             # 'tcap': _tcapcoef,
 
             # colors needed for computing indices products such as NDVI
@@ -284,6 +282,20 @@ class sentinel2Data(Data):
             'assets': ['L1C'],
         },
     }
+
+
+    @classmethod
+    def normalize_tile_string(cls, tile_string):
+        """Sentinel-2 customized tile-string normalizer.
+
+        Raises an exception if the tile string doesn't match MGRS
+        format, and converts the tile string to uppercase.
+        """
+        if not re.match(r'^\d\d[a-zA-Z]{3}$', tile_string):
+            err_msg = "Tile string '{}' doesn't match MGRS format (eg '04QFJ')".format(tile_string)
+            raise IOError(err_msg)
+        return tile_string.upper()
+
 
     @classmethod
     def meta_dict(cls):
