@@ -419,6 +419,8 @@ class landsatData(Data):
             'description': 'Water-Leaving Radiance-Reflectance',
             'acolite-product': 'rhow_vnir',
             'acolite-key': 'RHOW',
+            'gain': 0.0001,
+            'offset': 0.,
             'dtype': 'int16',
             'toa': True,
         },
@@ -437,6 +439,8 @@ class landsatData(Data):
             'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 483 & 561',
             'acolite-product': 'CHL_OC2',
             'acolite-key': 'CHL_OC2',
+            'gain': 0.0125,
+            'offset': 250.,
             'dtype': 'int16',
             'toa': True,
         },
@@ -445,7 +449,9 @@ class landsatData(Data):
             'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561',
             'acolite-product': 'CHL_OC3',
             'acolite-key': 'CHL_OC3',
-            'dtype': 'float32',
+            'gain': 0.0125,
+            'offset': 250.,
+            'dtype': 'int16',
             'toa': True,
         },
         'fai': {
@@ -469,7 +475,9 @@ class landsatData(Data):
             'description': 'Suspended Sediment Concentration 655nm',
             'acolite-product': 'SPM_NECHAD_655',
             'acolite-key': 'SPM_NECHAD_655',
-            'dtype': 'float32',
+            'offset': 50.,
+            'gain': 0.005,
+            'dtype': 'int16',
             'toa': True,
         },
         'turbidity': {
@@ -477,7 +485,9 @@ class landsatData(Data):
             'description': 'Blended Turbidity',
             'acolite-product': 'T_DOGLIOTTI',
             'acolite-key': 'T_DOGLIOTTI',
-            'dtype': 'float32',
+            'offset': 50.,
+            'gain': 0.005,
+            'dtype': 'int16',
             'toa': True,
         },
     }
@@ -488,7 +498,6 @@ class landsatData(Data):
         TODO: Ensure this is genericized to work for S2 or Landsat.
         '''
         import netCDF4
-
         ACOLITEPATHS = {
             'ACO_DIR': settings().REPOS['landsat']['ACOLITE_DIR'],
             # N.B.: only seems to work when run from the ACO_DIR
@@ -555,7 +564,7 @@ class landsatData(Data):
         cmd = (
             ('cd {ACO_DIR} ; '
              '{IDLPATH} -IDL_CPU_TPOOL_NTHREADS 1 '
-             '-rt={ACOLITE_BINARY} '
+             '-rt={ACOLITE_BINARY} run=1 '
              '-args settings={ACOLITE_SETTINGS} '
              'output={OUTPUT} image={IMAGES}')
             .format(
@@ -585,49 +594,42 @@ class landsatData(Data):
             ))
             npdtype = products[key]['dtype']
             dtype, missing = IMG_PARAMS[npdtype]
+            gain = products[key].get('gain', 1.0)
+            offset = products[key].get('offset', 0.0)
+            imgout = gippy.GeoImage(ofname, tmp, dtype, len(bands))
+            # # TODO: add units to products dictionary and use here.
+            # imgout.SetUnits(products[key]['units'])
+            pmeta = dict()
+            pmeta.update(imeta)
+            pmeta = {
+                mdi: products[key][mdi]
+                for mdi in ['acolite-key', 'description']
+            }
+            pmeta['source_asset'] = os.path.basename(asset.filename)
+            imgout.SetMeta(pmeta)
+            for i, b in enumerate(bands):
+                imgout.SetBandName(str(b), i + 1)
 
-            # This block may be generalized sufficiently for RHOAM, but
-            # not tested for RHOAM due to ACOLITE processing issues
-            if len(bands) > 1:
-                imgout = gippy.GeoImage(ofname, tmp, dtype, len(bands))
-                imgout.SetGain(0.0001)
-                imgout.SetNoData(missing)
-                # # TODO: add units to products dictionary and use here.
-                # imgout.SetUnits(products[key]['units'])
-                pmeta = dict()
-                pmeta.update(imeta)
-                pmeta = {
-                    mdi: products[key][mdi]
-                    for mdi in ['acolite-key', 'description']
-                }
-                pmeta['source_asset'] = os.path.basename(asset.filename)
-                imgout.SetMeta(pmeta)
-                for i, b in enumerate(bands):
-                    imgout.SetBandName(str(b), i + 1)
-
-                for i, b in enumerate(bands):
-                    var = dsroot.variables[b][:]
-                    var._sharedmask = False
-                    var.data[var.mask] = missing
-                    imgout[i].Write(numpy.array(var.data).astype(npdtype))
-            else:  # single band product
-                assert len(bands) == 1, (
-                    '{} expected 1 file and found {}'.format(key, len(bands))
-                )
-                imgout = gippy.GeoImage(ofname, tmp, dtype, 1)
-                imgout.SetBandName(products[key]['acolite-key'], 1)
-                imgout.SetNoData(missing)
-                # # TODO: add units to products dictionary and use here.
-                # imgout.SetUnits(products[key]['units'])
-                var = dsroot.variables[aco_key][:]
-                if type(var) is numpy.ma.MaskedArray:
-                    var._sharedmask = False
-                    var[var.mask] = missing
-                imgout[0].Write(numpy.array(var.data).astype(npdtype))
+            for i, b in enumerate(bands):
+                var = dsroot.variables[b][:]
+                arr = numpy.array(var)
+                if hasattr(dsroot.variables[b], '_FillValue'):
+                    fill = dsroot.variables[b]._FillValue
+                else:
+                    fill = ACOLITE_NDV
+                mask = arr != fill
+                arr[numpy.invert(mask)] = missing
+                # if key == 'rhow':
+                #     set_trace()
+                arr[mask] = ((arr[mask] - offset) / gain)
+                imgout[i].Write(arr.astype(npdtype))
 
             prodout[key] = imgout.Filename()
             imgout = None
-            imgs = None
+            imgout = gippy.GeoImage(ofname, True)
+            imgout.SetGain(gain)
+            imgout.SetOffset(offset)
+            imgout.SetNoData(missing)
         return prodout
 
 
