@@ -1,6 +1,7 @@
 """Unit tests for code found in gips.utils."""
 
 import sys
+import datetime
 
 import pytest
 
@@ -63,6 +64,30 @@ def t_open_vector_error_handling(mocker):
     fname = 'fakedbsetting:bar'
     utils.open_vector(fname)
     m_GeoVector.return_value.SetPrimaryKey.assert_called_once_with("")
+
+
+@pytest.mark.parametrize('dt, variant, expected', (
+    # standard julian day
+    (datetime.datetime(1950, 6, 1, 17, 0), None, 2433434.208333),
+    (datetime.datetime(2005, 10, 10, 3, 15), None, 2453653.635417),
+    (datetime.datetime(2016, 2, 29, 11, 59), None, 2457447.999306), # leap year
+    # modified julian day
+    (datetime.datetime(1950, 6, 1, 17, 0), 'modified',   33433.708333),
+    (datetime.datetime(2005, 10, 10, 3, 15), 'modified', 53653.135417),
+    (datetime.datetime(2016, 2, 29, 11, 59), 'modified', 57447.499306), # leap year
+    # CNES julian day (based on 1950/1/1, 0h)
+    (datetime.datetime(1950, 6, 1, 17, 0), 'cnes',   151.708333),
+    (datetime.datetime(2005, 10, 10, 3, 15), 'cnes', 20371.135417),
+    (datetime.datetime(2016, 2, 29, 11, 59), 'cnes', 24165.499306), # leap year
+))
+def t_julian_date(dt, variant, expected):
+    """Test the gloriously pure function, julian_date.
+
+    Expectations established by USNO's website:
+    http://aa.usno.navy.mil/data/docs/JulianDate.php
+    """
+    # rounding chosen to match USNO calculator page ---------v
+    assert expected == round(utils.julian_date(dt, variant), 6)
 
 
 @pytest.yield_fixture

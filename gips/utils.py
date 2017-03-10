@@ -31,6 +31,7 @@ import tempfile
 import commands
 import shutil
 import traceback
+import datetime
 
 import gippy
 from gippy import GeoVector
@@ -375,6 +376,32 @@ def mosaic(images, outfile, vector):
     imgout.CopyColorTable(images[0])
     return crop2vector(imgout, vector)
 
+
+def julian_date(date_and_time, variant=None):
+    """Returns the julian date for the given datetime object.
+
+    If no variant is chosen, the original julian date is given (days
+    since noon, Jan 1, 4713 BC, fractions included).  If a variant is
+    chosen, that julian date is returned instead.  Supported variants:
+    'modified' (JD - 2400000.5) and 'cnes' (JD - 2433282.5).  See
+    https://en.wikipedia.org/wiki/Julian_day for more details.
+    """
+    mjd_td = date_and_time - datetime.datetime(1858, 11, 17)
+    # note day-length isn't constant under UTC due to leap seconds; hopefully this is close enough
+    mjd = mjd_td.days + mjd_td.seconds / 86400.0
+
+    offsets = {
+        None:       2400000.5,
+        'modified': 0.0,
+        'cnes':     -33282.0,
+    }
+
+    return mjd + offsets[variant]
+
+
+##############################################################################
+# Error handling and script setup & teardown
+##############################################################################
 
 _traceback_verbosity = 4    # only print a traceback if the user selects this verbosity or higher
 _accumulated_errors = []    # used for tracking success/failure & doing final error reporting when

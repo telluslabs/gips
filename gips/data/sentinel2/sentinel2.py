@@ -119,7 +119,8 @@ class sentinel2Asset(Asset):
         # the shortened name format in use after Dec 6 2016 is supported:
         # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
         asset_name_pattern = ('^(?P<sensor>S2[AB])_MSIL1C_' # sensor
-                              '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)T\d{6}' # year, month, day
+                              '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
+                              'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
                               '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$') # tile
         match = re.match(asset_name_pattern, base_filename)
         if match is None:
@@ -128,6 +129,9 @@ class sentinel2Asset(Asset):
         self.sensor = match.group('sensor')
         self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
+        self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
+        self.julian_date = utils.julian_date(
+                datetime.datetime.combine(self.date, self.time), 'cnes')
 
 
     @classmethod
