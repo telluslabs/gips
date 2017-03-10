@@ -1211,11 +1211,31 @@ class landsatData(Data):
             image.SetBandName(colors[bi], bi + 1)
             # need to do this or can we index correctly?
             band = image[bi]
-            band.SetGain(self.metadata['gain'][bi])
+            gain = self.metadata['gain'][bi]
+            band.SetGain(gain)
             band.SetOffset(self.metadata['offset'][bi])
             dynrange = self.metadata['dynrange'][bi]
-            band.SetDynamicRange(dynrange[0], dynrange[1])
-            image[bi] = band
+            # #band.SetDynamicRange(dynrange[0], dynrange[1])
+            # dynrange[0] was used internally to for conversion to radiance
+            # from DN in GeoRaster.Read:
+            #   img = Gain() * (img-_minDC) + Offset();  # (1)
+            # and with the removal of _minDC and _maxDC it is now:
+            #   img = Gain() * img + Offset();           # (2)
+            # And 1 can be re-written as:
+            #   img = Gain() * img - Gain() *
+            #                       _minDC + Offset();   # (3)
+            #       = Gain() * img + Offset
+            #                      - _min * Gain() ;     # (4)
+            # So, since the gippy now has line (2), we can add
+            # the final term of (4) [as below] to keep that functionality.
+            image[bi] = band - dynrange[0] * gain
+            # I verified this by example.  With old gippy.GeoRaster:
+            #     In [8]: a.min()
+            #     Out[8]: -64.927711
+            # with new version.
+            #     In [20]: ascale.min() - 1*0.01298554277169103
+            #     Out[20]: -64.927711800095906
+
 
         VerboseOut('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image
