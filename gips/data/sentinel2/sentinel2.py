@@ -20,6 +20,7 @@
 
 from __future__ import print_function
 
+import math
 import os
 import shutil
 import sys
@@ -30,6 +31,7 @@ import subprocess
 import json
 import tempfile
 import zipfile
+from xml.etree import ElementTree
 
 import gippy
 import gippy.algorithms
@@ -130,8 +132,6 @@ class sentinel2Asset(Asset):
         self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
         self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
-        self.julian_date = utils.julian_date(
-                datetime.datetime.combine(self.date, self.time), 'cnes')
 
 
     @classmethod
@@ -208,6 +208,81 @@ class sentinel2Asset(Asset):
                 self.version < newasset.version)
 
 
+    def solar_irradiances(self):
+        """Loads solar irradiances from asset metadata and returns them.
+
+        The order of the list matches the band list above.  Irradiance
+        values are in watts/(m^2 * micrometers).
+        """
+        asset_contents = self.datafiles()
+        # python idiom for "first item in list that satisfies a condition"; should only be one
+        metadata_fn = next(n for n in asset_contents
+                if re.match(r'^.*/DATASTRIP/.*/MTD_DS.xml$', n))
+        with zipfile.ZipFile(self.filename) as asset_zf:
+            with asset_zf.open(metadata_fn) as metadata_zf:
+		tree = ElementTree.parse(metadata_zf)
+                sil_elem = next(tree.iter('Solar_Irradiance_List')) # should only be one
+                values_tags = sil_elem.findall('SOLAR_IRRADIANCE')
+                # sanity check that the bands are in the right order
+                assert range(13) == [int(vt.attrib['bandId']) for vt in values_tags]
+                return [float(vt.text) for vt in values_tags]
+
+
+    def mean_zenith_angle(self):
+        """Loads zenith angle from asset metadata, and returns it.
+
+        Return value is in degrees.
+        """
+        asset_contents = self.datafiles()
+        # should only be one
+        metadata_fn = next(n for n in asset_contents if re.match('^.*/GRANULE/.*/MTD_TL.xml$', n))
+        with zipfile.ZipFile(self.filename) as asset_zf:
+            with asset_zf.open(metadata_fn) as metadata_zf:
+		tree = ElementTree.parse(metadata_zf)
+                msa_elem = next(tree.iter('Mean_Sun_Angle')) # should only be one
+                return float(msa_elem.find('ZENITH_ANGLE').text)
+
+
+    #def gridded_zenith_angle(self):
+    #    """Loads and returns zenith angle from the asset metadata.
+    #
+    #    These are stored in MTD_TL.xml, in degrees, at 5km x 5km resolution.
+    #    """
+    #    asset_contents = self.datafiles()
+    #    # python idiom for "first item in list that satisfies a condition"; should only be one
+    #    metadata_fn = next(n for n in asset_contents if re.match('^.*/GRANULE/.*/MTD_TL.xml$', n))
+    #    with zipfile.ZipFile(self.filename) as asset_zf:
+    #        with asset_zf.open(metadata_fn) as metadata_zf:
+    #            tree = ElementTree.parse(metadata_zf)
+    #            sag_elem = next(tree.iter('Sun_Angles_Grid')) # should only be one
+    #            values_tags = sag_elem.find('Zenith').find('Values_List').findall('VALUES')
+    #            text_rows = [vt.text for vt in values_tags]
+    #            zenith_grid = []
+    #            for tr in text_rows:
+    #                numerical_row = [float(t) for t in tr.split()]
+    #                zenith_grid.append(numerical_row)
+    #    return zenith_grid
+
+
+    def radiance_factors(self):
+        """Computes values needed for converting L1C to TOA radiance.
+
+        Sentinel-2's L1C is a TOA reflectance product.  That can be
+        reverted to a TOA radiance product by multiplying each data
+        point by a constant factor.  The factor is constant for each
+        band of a given asset; the ordering in the returned list is the
+        same as the order of the bands in _sensors given above.  See:
+        https://sentinel.esa.int/web/sentinel/technical-guides/sentinel-2-msi/level-1c/algorithm
+        """
+        mza = math.radians(self.mean_zenith_angle())
+        solar_irrads = self.solar_irradiances()
+        julian_date = utils.julian_date(datetime.datetime.combine(self.date, self.time), 'cnes')
+        return [(1 - 0.01673 * math.cos(0.0172 * (julian_date - 2)))**-2 # solar distance term
+                * math.cos(mza) / math.pi # solar angle term
+                * si # "equivalent extra-terrestrial solar spectrum" term; aka solar irradiance
+                for si in solar_irrads]
+
+
 class sentinel2Data(Data):
     name = 'Sentinel2'
     version = '0.1.0'
@@ -219,6 +294,10 @@ class sentinel2Data(Data):
     }
     _products = {
         # standard products
+        'rad': {
+            'description': 'Surface-leaving radiance',
+            'assets': ['L1C'],
+        },
         'ref': {
             'description': 'Surface reflectance',
             'assets': ['L1C'],
