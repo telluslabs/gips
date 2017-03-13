@@ -430,15 +430,37 @@ class sentinel2Data(Data):
         return image
 
 
-    def _time_report(self, msg, reset_clock=False):
+    def _time_report(self, msg, reset_clock=False, verbosity=None):
         """Provide the user with progress reports, including elapsed time.
 
-        Reset elapsed time with reset_clock=True.
+        Reset elapsed time with reset_clock=True; when starting or
+        resetting the clock, specify a verbosity, or else accept the
+        default of 3.
         """
         start = getattr(self, '_time_report_start', None)
         if reset_clock or start is None:
             start = self._time_report_start = datetime.datetime.now()
-        utils.verbose_out('{}:  {}'.format(datetime.datetime.now() - start, msg, 3))
+            self._time_report_verbosity = 3 if verbosity is None else verbosity
+        elif verbosity is not None:
+            raise ValueError('Changing verbosity is only permitted when resetting the clock')
+        utils.verbose_out('{}:  {}'.format(
+            datetime.datetime.now() - start, msg, self._time_report_verbosity))
+
+
+    def process_rad(self, *args):
+        #asset_instance = self.assets[asset_type] # sentinel2Asset
+        #radiance_factors = asset_instance.radiance_factors()
+        raise NotImplementedError('rad product not yet ready')
+
+
+    def process_ref(self, proto_product, sensor, product, filename):
+        """Produce a standard reflectance product.
+
+        prod_string is the product plus its 'arguments', eg 'ref-toa'."""
+        # TODO note that this will need editing when atmo correction is implemented
+        # proto_product is identical to the ref product, just annoint it as such
+        proto_product.Process(filename)
+        self.AddFile(sensor, product, filename)
 
 
     def process(self, products=None, overwrite=False, **kwargs):
@@ -498,7 +520,7 @@ class sentinel2Data(Data):
             for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
                 cmd_str = 'gdalwarp -tr 10 10 {} {}'.format(in_fn, out_fn)
                 cmd_args = shlex.split(cmd_str)
-                self._time_report('Upsampling:  ' + cmd_str, 3)
+                self._time_report('Upsampling:  ' + cmd_str)
                 p = subprocess.Popen(cmd_args)
                 p.communicate()
                 if p.returncode != 0:
@@ -519,12 +541,9 @@ class sentinel2Data(Data):
             with utils.error_handler('Error creating product {} for {}'.format(
                                             key, os.path.basename(self.assets[asset_type].filename),
                                      continuable=True)):
-                # putting the conditional in now so more products can be added later
-                if val[0] == 'ref':
-                    # TODO note that this will need editing when atmo correction is implemented
-                    # upsampled_img is identical to the ref product, just annoint it as such
-                    upsampled_img.Process(filename_prefix + key)
-                    self.AddFile(sensor, key, filename_prefix + key)
+                # locate the processing method for this product and call it
+                getattr(self, 'process_' + val[0])(
+                        upsampled_img, sensor, key, filename_prefix + key)
 
         self._time_report('Completed standard product processing')
 
