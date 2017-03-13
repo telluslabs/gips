@@ -13,8 +13,11 @@ def t_remove_files(mocker):
     filenames = ['a.hdf', 'b.hdf']
     extensions = ['.index', '.aux.xml']
     removals = ('a.hdf', 'a.hdf.index', 'a.hdf.aux.xml', 'b.hdf', 'b.hdf.index', 'b.hdf.aux.xml')
+    m_isfile = mocker.patch.object(utils.os.path, 'isfile')
+    m_isfile.return_value = True
     m_os_remove = mocker.patch.object(utils.os, 'remove')
     utils.remove_files(filenames, extensions)
+    [m_isfile.assert_any_call(r) for r in removals]
     [m_os_remove.assert_any_call(r) for r in removals]
     assert m_os_remove.call_count == 6
 
@@ -23,9 +26,12 @@ def t_remove_files_no_ext(mocker):
     """remove_files should work correctly when `extensions` is defaulted."""
     filenames = ['a.hdf', 'b.hdf']
     removals = ('a.hdf', 'b.hdf')
+    m_isfile = mocker.patch.object(utils.os.path, 'isfile')
+    m_isfile.return_value = True
     m_os_remove = mocker.patch.object(utils.os, 'remove')
     utils.remove_files(filenames)
     [m_os_remove.assert_any_call(r) for r in removals]
+    [m_isfile.assert_any_call(r) for r in removals]
     assert m_os_remove.call_count == 2
 
 

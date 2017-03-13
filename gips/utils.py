@@ -103,9 +103,9 @@ def List2File(lst, filename):
 def remove_files(filenames, extensions=()):
     """Remove the given files and all permutations with the given extensions.
 
-    So RemoveFiles(['a.hdf', 'b.hdf'], ['.index', '.aux.xml']) attempts to
+    So remove_files(['a.hdf', 'b.hdf'], ['.index', '.aux.xml']) attempts to
     these files:  a.hdf, b.hdf, a.hdf.index, a.hdf.aux.xml, b.hdf,
-    b.hdf.index, and b.hdf.aux.xml.
+    b.hdf.index, and b.hdf.aux.xml.  Doesn't raise an error if any file doesn't exist.
     """
     for f in (list(filenames) + [f + e for f in filenames for e in extensions]):
         with error_handler(continuable=True, msg_prefix="Error removing '{}'".format(f)):
