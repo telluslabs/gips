@@ -463,6 +463,51 @@ class sentinel2Data(Data):
         self.AddFile(sensor, product, filename)
 
 
+    def produce_proto_product(self, sensor, data_spec, overwrite):
+        """Make a proto-product which acts as a basis for several products.
+
+        It is equivalent to ref-toa; it's needed because the asset's
+        spatial resolution must be resampled to be equal for all bands
+        of interest.  Due to equivalence with ref-toa, if that product
+        exists in the filesystem, it's opened and returned in a GeoImage
+        instead of newly upsampled data.
+        """
+        # if the current date's ref-toa is already produced, open that instead, for performance
+        if 'ref-toa' in self.products and not overwrite:
+            self._time_report('Previoulsy upsampled data present (ref-toa); re-using.')
+            filename = self.filenames[(sensor, 'ref-toa')]
+            return gippy.GeoImage(filename + '.tif') # TODO tif part means wrongness elsewhere?
+
+        # TODO data_spec can be refactored out of argslist; only depends on self & asset_type ('L1C')
+        self._time_report('Starting upsample of Sentinel-2 asset bands')
+        # TODO this upsamples everything, when only two bands need it.  The first attempt to remedy
+        # this was actually slower, however; see branch 200-optimize-upsampling, commit 2e97ba0.
+        # compile a list of the files needed for the proto-product
+        src_filenames = [f for f in self.metadata['abs-filenames']
+                if f[-6:-4] in data_spec['indices-bands']]
+        # upsample each one in turn (some don't need it but do them all for simplicity)
+        with utils.make_temp_dir() as tmpdir:
+            upsampled_filenames = [os.path.join(tmpdir, os.path.basename(f) + '.tif')
+                    for f in src_filenames]
+            for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
+                cmd_str = 'gdalwarp -tr 10 10 {} {}'.format(in_fn, out_fn)
+                cmd_args = shlex.split(cmd_str)
+                self._time_report('Upsampling:  ' + cmd_str)
+                p = subprocess.Popen(cmd_args)
+                p.communicate()
+                if p.returncode != 0:
+                    raise IOError("Expected gdalwarp exit status 0, got {}".format(
+                            p.returncode))
+            upsampled_img = gippy.GeoImage(upsampled_filenames)
+            upsampled_img.SetMeta(self.meta_dict())
+            for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
+                band_index = data_spec['band-strings'].index(band_string) # starts at 0
+                color_name = data_spec['colors'][band_index]
+                upsampled_img.SetBandName(color_name, band_num)
+        self._time_report('Completed upsampling of Sentinel-2 asset bands')
+        return upsampled_img
+
+
     def process(self, products=None, overwrite=False, **kwargs):
         """Produce data products and save them to files.
 
@@ -498,42 +543,13 @@ class sentinel2Data(Data):
 
         md = self.meta_dict()
 
-        self._time_report('Starting upsample of Sentinel-2 asset bands')
-
         sensor = self.sensors[asset_type]
         # dict describing specification for all the bands in the asset
         data_spec = self.assets[asset_type]._sensors[sensor]
 
-        # Make a proto-product which acts as a basis for several products, and is equivalent to
-        # ref-toa; it's needed because the asset's spatial resolution must be resampled to be equal
-        # for all bands of interest.
-        # TODO if the current date's ref-toa is already produced, open that instead, for performance
-        # compile a list of the files needed for the proto-product
-        # TODO this upsamples everything, when only two bands need it.  The first attempt to remedy
-        # this was actually slower, however; see branch 200-optimize-upsampling, commit 2e97ba0.
-        src_filenames = [f for f in self.metadata['abs-filenames']
-                if f[-6:-4] in data_spec['indices-bands']]
-        # upsample each one in turn (some don't need it but do them all for simplicity)
-        with utils.make_temp_dir() as tmpdir:
-            upsampled_filenames = [os.path.join(tmpdir, os.path.basename(f) + '.tif')
-                    for f in src_filenames]
-            for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
-                cmd_str = 'gdalwarp -tr 10 10 {} {}'.format(in_fn, out_fn)
-                cmd_args = shlex.split(cmd_str)
-                self._time_report('Upsampling:  ' + cmd_str)
-                p = subprocess.Popen(cmd_args)
-                p.communicate()
-                if p.returncode != 0:
-                    raise IOError("Expected gdalwarp exit status 0, got {}".format(
-                            p.returncode))
-            upsampled_img = gippy.GeoImage(upsampled_filenames)
-            upsampled_img.SetMeta(md)
-            for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
-                band_index = data_spec['band-strings'].index(band_string) # starts at 0
-                color_name = data_spec['colors'][band_index]
-                upsampled_img.SetBandName(color_name, band_num)
+        proto_prod = self.produce_proto_product(sensor, data_spec, overwrite)
+        upsampled_img = proto_prod
 
-        self._time_report('Completed upsampling of Sentinel-2 asset bands')
         self._time_report('Starting on standard product processing')
 
         # Process standard products
