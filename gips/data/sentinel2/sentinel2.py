@@ -476,7 +476,7 @@ class sentinel2Data(Data):
         if 'ref-toa' in self.products and not overwrite:
             self._time_report('Previoulsy upsampled data present (ref-toa); re-using.')
             filename = self.filenames[(sensor, 'ref-toa')]
-            return gippy.GeoImage(filename + '.tif') # TODO tif part means wrongness elsewhere?
+            return gippy.GeoImage(filename)
 
         # TODO data_spec can be refactored out of argslist; only depends on self & asset_type ('L1C')
         self._time_report('Starting upsample of Sentinel-2 asset bands')
@@ -557,6 +557,7 @@ class sentinel2Data(Data):
             with utils.error_handler('Error creating product {} for {}'.format(
                                             key, os.path.basename(self.assets[asset_type].filename),
                                      continuable=True)):
+                filename = filename_prefix + key + '.tif'
                 # locate the processing method for this product and call it
                 getattr(self, 'process_' + val[0])(
                         upsampled_img, sensor, key, filename_prefix + key)
@@ -569,7 +570,7 @@ class sentinel2Data(Data):
             self._time_report('Starting indices processing')
             # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
             # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
-            fnames = {indices[key][0]: filename_prefix + key for key in indices}
+            fnames = {indices[key][0]: filename_prefix + key + '.tif' for key in indices}
             prodout = gippy.algorithms.Indices(upsampled_img, fnames, md)
             [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
             self._time_report(' -> %s: processed %s' % (self.basename, indices.keys()))
