@@ -280,6 +280,7 @@ class sentinel2Asset(Asset):
         return [(1 - 0.01673 * math.cos(0.0172 * (julian_date - 2)))**-2 # solar distance term
                 * math.cos(mza) / math.pi # solar angle term
                 * si # "equivalent extra-terrestrial solar spectrum" term; aka solar irradiance
+                / 1000.0 # revert scaling factor so 16-bit ints aren't overflowed
                 for si in solar_irrads]
 
 
@@ -447,13 +448,29 @@ class sentinel2Data(Data):
             datetime.datetime.now() - start, msg, self._time_report_verbosity))
 
 
-    def process_rad(self, *args):
-        #asset_instance = self.assets[asset_type] # sentinel2Asset
-        #radiance_factors = asset_instance.radiance_factors()
-        raise NotImplementedError('rad product not yet ready')
+    def process_rad(self, asset_type, proto_product, sensor, product, filename):
+        """Reverse-engineer TOA ref data back into a TOA radiance product."""
+        self._time_report('Starting TOA radiance processing')
+        asset_instance = self.assets[asset_type] # sentinel2Asset
+        colors = asset_instance._sensors[sensor]['colors']
+
+        radiance_factors = asset_instance.radiance_factors()
+
+        rad_image = gippy.GeoImage(proto_product)
+
+        for i in range(len(rad_image)):
+            color = rad_image[i].Description()
+            rf = radiance_factors[colors.index(color)]
+            self._time_report(
+                'TOA radiance conversion factor for {} (band {}): {}'.format(color, i + 1, rf))
+            rad_image[i] *= rf
+        self._time_report('Performing computations and saving to ' + filename)
+        rad_image.Process(filename)
+        self.AddFile(sensor, product, filename)
+        self._time_report('Finished TOA radiance processing')
 
 
-    def process_ref(self, proto_product, sensor, product, filename):
+    def process_ref(self, asset_type, proto_product, sensor, product, filename):
         """Produce a standard reflectance product.
 
         prod_string is the product plus its 'arguments', eg 'ref-toa'."""
@@ -559,8 +576,7 @@ class sentinel2Data(Data):
                                      continuable=True)):
                 filename = filename_prefix + key + '.tif'
                 # locate the processing method for this product and call it
-                getattr(self, 'process_' + val[0])(
-                        upsampled_img, sensor, key, filename_prefix + key)
+                getattr(self, 'process_' + val[0])(asset_type, upsampled_img, sensor, key, filename)
 
         self._time_report('Completed standard product processing')
 
