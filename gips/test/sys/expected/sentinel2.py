@@ -96,7 +96,7 @@ Sentinel2 Products v0.1.0\x1b[0m
 \x1b[1m
 Index Products
 \x1b[0m   bi          Brightness Index                        
-   brgt        Brightness index:  Visible to near infrared reflectance weighted by approximate energy distribution of the solar spectrum. A proxy for broadband albedo.
+   brgt        VIS and NIR reflectance, weighted by solar energy distribution.
    crc         Crop Residue Cover (uses BLUE)          
    crcm        Crop Residue Cover, Modified (uses GREEN)
    evi         Enhanced Vegetation Index               
@@ -111,29 +111,31 @@ Index Products
    vari        Visible Atmospherically Resistant Index 
 \x1b[1m
 Standard Products
-\x1b[0m   ref         Surface reflectance                     
+\x1b[0m   rad         Surface-leaving radiance                
+   ref         Surface reflectance                     
 """
 }
 
 
 t_project = {
+    'compare_stderr': False,
     'created': {
-        '0': None,
-        '0/2017010_S2A_ref-toa.tif': 56081467,
-        '0/2017010_S2A_bi-toa.tif': -531404086,
-        '0/2017010_S2A_brgt-toa.tif': 1949224049,
-        '0/2017010_S2A_crc-toa.tif': -1921980023,
-        '0/2017010_S2A_crcm-toa.tif': -620088516,
-        '0/2017010_S2A_evi-toa.tif': 1327644820,
-        '0/2017010_S2A_isti-toa.tif': -621591635,
-        '0/2017010_S2A_lswi-toa.tif': 1687749861,
-        '0/2017010_S2A_msavi2-toa.tif': -1672549497,
-        '0/2017010_S2A_ndsi-toa.tif': 1678838722,
-        '0/2017010_S2A_ndti-toa.tif': -1245896923,
-        '0/2017010_S2A_ndvi-toa.tif': 754895178,
-        '0/2017010_S2A_satvi-toa.tif': -339325105,
-        '0/2017010_S2A_sti-toa.tif': 528679666,
-        '0/2017010_S2A_vari-toa.tif': -915656392,
+	'0': None,
+	'0/2017010_S2A_bi-toa.tif': -915656392,
+	'0/2017010_S2A_brgt-toa.tif': 1687749861,
+	'0/2017010_S2A_crc-toa.tif': -620088516,
+	'0/2017010_S2A_crcm-toa.tif': -1921980023,
+	'0/2017010_S2A_evi-toa.tif': 754895178,
+	'0/2017010_S2A_isti-toa.tif': 528679666,
+	'0/2017010_S2A_lswi-toa.tif': -531404086,
+	'0/2017010_S2A_msavi2-toa.tif': -1672549497,
+	'0/2017010_S2A_ndsi-toa.tif': -339325105,
+	'0/2017010_S2A_ndti-toa.tif': -621591635,
+	'0/2017010_S2A_ndvi-toa.tif': 1327644820,
+	'0/2017010_S2A_ref-toa.tif': 56081467,
+	'0/2017010_S2A_satvi-toa.tif': 1678838722,
+	'0/2017010_S2A_sti-toa.tif': 1949224049,
+	'0/2017010_S2A_vari-toa.tif': -1245896923,
     },
 }
 
