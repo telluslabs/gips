@@ -463,8 +463,9 @@ class sentinel2Data(Data):
             rf = radiance_factors[colors.index(color)]
             self._time_report(
                 'TOA radiance conversion factor for {} (band {}): {}'.format(color, i + 1, rf))
-            rad_image[i] *= rf
+            rad_image[i] = rad_image[i] * rf
         self._time_report('Performing computations and saving to ' + filename)
+        rad_image.SetNoData(0)
         rad_image.Process(filename)
         self.AddFile(sensor, product, filename)
         self._time_report('Finished TOA radiance processing')
@@ -477,6 +478,7 @@ class sentinel2Data(Data):
         # TODO note that this will need editing when atmo correction is implemented
         # proto_product is identical to the ref product, just annoint it as such
         proto_product.Process(filename)
+        proto_product.SetNoData(0)
         self.AddFile(sensor, product, filename)
 
 
@@ -517,6 +519,7 @@ class sentinel2Data(Data):
                             p.returncode))
             upsampled_img = gippy.GeoImage(upsampled_filenames)
             upsampled_img.SetMeta(self.meta_dict())
+            upsampled_img.SetNoData(0)
             for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
                 band_index = data_spec['band-strings'].index(band_string) # starts at 0
                 color_name = data_spec['colors'][band_index]
