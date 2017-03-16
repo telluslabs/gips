@@ -8,17 +8,21 @@ import os, shutil
 from django.db import transaction, IntegrityError
 
 from gips import utils
-from gips.datahandler import api
 from gips.core import SpatialExtent, TemporalExtent
+from gips.datahandler import api, torque
+from gips.datahandler.logger import Logger
 from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import dbinv, orm
 from gips.scripts.spatial_wrapper import aggregate
 
+def _de_u(u):
+    return u.encode('ascii', 'ignore')
 
-def query (job):
+
+def query (job_id):
     """Determine which assets to fetch and products to process"""
     with transaction.atomic():
-        job = dbinv.models.Job.objects.get(pk=job)
+        job = dbinv.models.Job.objects.get(pk=job_id)
         if job.status != 'initializing':
             # TODO log/msg about giving up here
             return job # not sure this is useful for anything
@@ -42,13 +46,13 @@ def query (job):
     return job
 
 
-def fetch(driver, asset_type, tile, date):
+def fetch(asset_id):
     """Fetch the asset file specified."""
     # Notify everyone that this process is doing the fetch.
+    Logger().log("begin")
     with transaction.atomic():
         # TODO confirm transaction.atomic prevents DB writes while it's active
-        asset = dbinv.models.Asset.objects.get(
-                driver=driver, asset=asset_type, tile=tile, date=date)
+        asset = dbinv.models.Asset.objects.get(pk=asset_id)
         if asset.status != 'scheduled':
             # TODO log/msg about giving up here
             return asset
@@ -56,18 +60,20 @@ def fetch(driver, asset_type, tile, date):
         asset.status = 'in-progress'
         asset.save()
 
+    Logger().log("fetching {} {} {} {}".format(asset.driver, asset.asset, asset.tile, asset.date))
     # locate the correct fetch function & execute it, then archive the file and update the DB
-    DataClass  = utils.import_data_class(driver)
+    DataClass  = utils.import_data_class(asset.driver)
     AssetClass = DataClass.Asset
-    filenames  = AssetClass.fetch(asset_type, tile, date)
+    filenames  = AssetClass.fetch(asset.asset, asset.tile, asset.date)
     if len(filenames) == 0:
-        asset.status = 'failed'
+        asset.status = 'retry'
         asset.save()
         return asset  # TODO: seems odd that this function returns
                       #       asset...discuss with tolson and fisk.
 
     a_obj = AssetClass._archivefile(filenames[0])[0] # for now neglect the 'update' case
 
+    Logger().log('fetched')
     # update DB now that the work is done; no need for an atomic transaction
     # because the only critical action is Model.save(), which is already atomic
     asset.refresh_from_db()
@@ -80,26 +86,26 @@ def fetch(driver, asset_type, tile, date):
     asset.status = 'complete'
     asset.save()
 
+    Logger().log('done')
     if len(filenames) > 1:
         err_msg = 'Expected to fetch one asset but fetched {} instead'.format(len(filenames))
         raise ValueError(err_msg, filenames)
     return asset
 
 
-def process(driver, product_type, tile, date):
+def process(product_id):
     """Produce the specified product file."""
     # Notify everyone that this process is doing the fetch.
     with transaction.atomic():
-        product = dbinv.models.Product.objects.get(
-                driver=driver, product=product_type, tile=tile, date=date)
+        product = dbinv.models.Product.objects.get(pk=product_id)
         if product.status != 'scheduled':
             return product
         product.status = 'in-progress'
         product.save()
 
-    DataClass = utils.import_data_class(driver)
-    data = DataClass(tile, date) # should autopopulate with the right assets
-    data.process([product_type])
+    DataClass = utils.import_data_class(_de_u(product.driver))
+    data = DataClass(_de_u(product.tile), product.date) # should autopopulate with the right assets
+    data.process([_de_u(product.product)])
 
     # sanity check
     product.refresh_from_db()
@@ -112,7 +118,8 @@ def process(driver, product_type, tile, date):
 
 
 def _export(driver, spatial_spec, temporal_spec, products, outdir,
-            notld=True, suffix='', **kwargs):
+            notld=True, suffix='', nproc=1, start_ext=None, end_ext=None,
+            **kwargs):
     """Performs a 'gips_project' with the given paramenters."""
 
     DataClass = utils.import_data_class(driver)
@@ -120,6 +127,8 @@ def _export(driver, spatial_spec, temporal_spec, products, outdir,
     # TODO trash and recreate output dir
 
     extents = SpatialExtent.factory(DataClass, **spatial_spec)
+    if start_ext is not None and end_ext is not None:
+        extents = extents[start_ext:end_ext]
 
     # create tld: SITENAME--KEY_DATATYPE_SUFFIX
     if notld:
@@ -140,7 +149,7 @@ def _export(driver, spatial_spec, temporal_spec, products, outdir,
 
     t_extent = TemporalExtent(**temporal_spec)
 
-    for extent in extents:
+    def _mosaic(extent):
         inv = DataInventory(DataClass, extent, t_extent, products, **kwargs)
         datadir = os.path.join(tld, extent.site.Value())
         if inv.numfiles > 0:
@@ -151,6 +160,13 @@ def _export(driver, spatial_spec, temporal_spec, products, outdir,
                 .format(str(t_extent), str(t_extent)),
                 2,
             )
+
+    if nproc == 1:
+        map(_mosaic, extents)
+    else:
+        pool = Pool(processes=nproc)
+        pool.map(_mosaic, extents)
+        
     # TODO nothing meaningful to return?
 
 
@@ -158,41 +174,51 @@ def _aggregate(job, outdir, nproc=1):
     aggregate(job, outdir,  nproc)
 
 
-def export_and_aggregate(job_id, nprocs=1, outdir=None, **mosaic_kwargs):
+def export_and_aggregate(job_id, start_ext, end_ext,
+                         nprocs=1, outdir=None, **mosaic_kwargs):
     """Entirely TBD but does the same things as gips_project + zonal summary."""
     with transaction.atomic():
-        job = dbinv.models.Job.objects.get(pk=job_id)
-        if job.status != 'pp-scheduled':
+        job = dbinv.models.Job.objects.get(
+            pk=job_id,
+        )
+        task = job.postprocessjobs_set.get(
+            args=repr((job_id, start_ext, end_ext))
+        )
+        if task.status != 'scheduled':
             # TODO log/msg about giving up here
-            return job # not sure this is useful for anything
-        job.status = 'post-processing'
-        job.save()
+            return task # not sure this is useful for anything
+        task.status = 'in-progress'
+        task.save()
 
     # setup output dir
     if outdir is None:
-        outdir = os.path.join(utils.settings().EXPORT_DIR, str(job_id))
+        outdir = os.path.join(utils.settings().EXPORT_DIR,
+                              os.environ['PBS_JOBID'],
+                              str(job_id),)
     # poor man's binary semaphore since mkdir is atomic;
     # exception on a priori existence is what we want here
     os.makedirs(outdir)
 
-    # run
+    mosaic_kwargs['alltouch'] = True
     _export(
-        job.variable.driver,
-        eval(job.spatial),
-        eval(job.temporal),
-        [job.variable.product],
+        task.job.variable.driver,
+        eval(task.job.spatial),
+        eval(task.job.temporal),
+        [_de_u(task.job.variable.product)],
         outdir,
+        start_ext=start_ext,
+        end_ext=end_ext,
         **mosaic_kwargs
     )
     _aggregate(job, outdir, nprocs)
 
     # bookkeeping & cleanup
-    job.refresh_from_db()
-    if job.status != 'post-processing':
+    task.refresh_from_db()
+    if task.status != 'in-progress':
         # sanity check; have to keep going, but whine about it
         err_msg = "Expected Job status to be 'post-processing', but got {}"
         utils.verbose_out(err_msg.format(job.status), 1)
-    job.status = 'complete'
-    job.save()
+    task.status = 'complete'
+    task.save()
 
     shutil.rmtree(outdir)

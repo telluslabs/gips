@@ -894,6 +894,7 @@ class Data(object):
         available_assets = cls.query_service(
             products, tiles, textent, update
         )
+        fetched = []
         for asset_info in available_assets:
             asset = asset_info['asset']
             tile = asset_info['tile']

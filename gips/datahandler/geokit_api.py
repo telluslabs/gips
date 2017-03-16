@@ -14,7 +14,9 @@ def get_datacatalog ():
     dv_list = []
     dvs = DataVariable.objects.all()
     for dv in dvs:
-        dv_list.append(model_to_dict(dv))
+        d = model_to_dict(dv)
+        d['asset'] = eval(d['asset'])
+        dv_list.append(d)
     return dv_list
 
 
@@ -24,12 +26,23 @@ def submit_job(site, variable, spatial_spec, temporal_spec):
     In the future, will take more geokit-friendly args and translate to
     whatever gips needs.
     """
+    if 'key' not in spatial_spec:
+        spatial_spec['key'] = 'shaid'
     return api.submit_job(site, variable, spatial_spec, temporal_spec)
 
 
 def job_status(job_id):
-    pass
+    job_status, product_status = api.job_status(job_id)
 
+    # for now, get rid of the statuses not applicable to products
+    product_status.pop('remote', None)
+    product_status.pop('retry', None)
+    product_status.pop('post-processing', None)
+    product_status.pop('pp-scheduled', None)
+    product_status.pop('initializing', None)
+
+    return job_status, product_status
+    
 
 def stats_request_results(request_id):
     """Get all the results in the specified result set.

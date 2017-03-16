@@ -247,12 +247,14 @@ def get_data_variables():
         for product in data_class._products.keys():
             product_dict = data_class._products[product]
             description = product_dict['description']
+            assets = repr(product_dict['assets'])
             for band,bandname in enumerate(product_dict['bands']):
                 data_variable = {
                     'driver': driver,
                     'description': description,
                     'product': product,
                     'name': "{}_{}_{}".format(driver, product, bandname),
+                    'asset': assets,
                     'band_number': band,
                     'band': bandname,
                 }
