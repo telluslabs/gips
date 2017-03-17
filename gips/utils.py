@@ -476,7 +476,8 @@ def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
     set_error_handler(cli_error_handler)
     from gips.inventory import orm # avoids a circular import
     with error_handler():
+        if driver_string is not None:
+            data_class = import_data_class(driver_string) # must run before orm.setup
         if setup_orm:
             orm.setup()
-        if driver_string is not None:
-            return import_data_class(driver_string)
+        return data_class
