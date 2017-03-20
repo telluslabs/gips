@@ -355,6 +355,32 @@ class sentinel2Asset(Asset):
                 for si in solar_irrads]
 
 
+    def generate_atmo_corrector(self):
+        """Generate & return a SIXS object appropriate for this asset."""
+        sensor_md = self._sensors[self.sensor]
+        # TODO visbands correct here? just copying contents from landsat
+        #visbands = sensor_md['indices-bands']
+        visbands = ['COASTAL', 'BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'CIRRUS']
+        vb_indices = [sensor_md['colors'].index(vb) for vb in visbands]
+        # assemble list of relevant band boundaries
+        wvlens = [sensor_md['bandbounds'][i] for i in vb_indices]
+        # assemble geometries
+        (viewing_zn, viewing_az) = self.mean_viewing_angle()
+        (solar_zn, solar_az) = self.mean_solar_angle()
+        (w_lon, e_lon, s_lat, n_lat) = self.tile_lat_lon()
+        geo = {
+            'zenith': viewing_zn,
+            'azimuth': viewing_az,
+            'solarzenith': solar_zn,
+            'solarazimuth': solar_az,
+            'lon': (w_lon + e_lon) / 2.0, # copy landsat - use center of tile
+            'lat': (s_lat + n_lat) / 2.0, # copy landsat - use center of tile
+        }
+        dt = datetime.datetime.combine(self.date, self.time)
+        s = atmosphere.SIXS(visbands, wvlens, geo, dt, sensor=self.sensor)
+        return s
+
+
 class sentinel2Data(Data):
     name = 'Sentinel2'
     version = '0.1.0'

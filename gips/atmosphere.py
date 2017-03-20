@@ -270,7 +270,7 @@ class SIXS():
                     s.run()
                     outputs.append(s.outputs)
         except Exception, e:
-            # TODO error-handling-fix: add existing exception to the new one; see notes for technique AND TROLOLOLOLO
+            # TODO error-handling-fix: add existing exception to the new one
             sys.stdout = stdout
             raise AtmCorrException("Error running 6S: %s" % e)
 
