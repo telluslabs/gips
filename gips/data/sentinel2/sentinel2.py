@@ -33,11 +33,14 @@ import tempfile
 import zipfile
 from xml.etree import ElementTree
 
+import numpy
+
 import gippy
 import gippy.algorithms
 
 from gips.data.core import Repository, Asset, Data
 from gips import utils
+from gips import atmosphere
 
 
 class sentinel2Repository(Repository):
@@ -63,14 +66,22 @@ class sentinel2Asset(Asset):
             'colors':
                 ["COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
                  "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"],
-            # 'probably' center wavelength of band in micrometers
+            # center wavelength of band in micrometers, CF:
+            # https://earth.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/radiometric
             'bandlocs':
                 [0.443, 0.490, 0.560, 0.665, 0.705, 0.740,
                  0.783, 0.842, 0.865, 0.945, 1.375, 1.610, 2.190],
-            # 'probably' width of band, evenly split in the center by bandloc
+            # width of band, evenly split in the center by bandloc:
+            # https://earth.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/radiometric
             'bandwidths':
                 [0.020, 0.065, 0.035, 0.030, 0.015, 0.015,
                  0.020, 0.115, 0.020, 0.020, 0.030, 0.090, 0.180],
+            'bandbounds':
+                # low and high boundaries of each band; formatted this way to match other lists
+                [(0.433, 0.453), (0.4575, 0.5225), (0.5425, 0.5775), (0.65, 0.68),
+                    (0.6975, 0.7125), (0.7325, 0.7475),
+                 (0.773, 0.793), (0.7845, 0.8995), (0.855, 0.875), (0.935, 0.955), (1.36, 1.39),
+                    (1.565, 1.655), (2.1, 2.28)],
             # in meters per https://sentinel.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/spatial
             'spatial-resolutions':
                 [60, 10, 10, 10, 20, 20,
@@ -80,7 +91,7 @@ class sentinel2Asset(Asset):
 
             # colors needed for computing indices products such as NDVI
             # color names are ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2']
-	    'indices-bands': ['02', '03', '04', '08', '11', '12'],
+            'indices-bands': ['02', '03', '04', '08', '11', '12'],
         },
     }
     _sensors['S2B'] = {'description': 'Sentinel-2, Satellite B'}
@@ -214,13 +225,14 @@ class sentinel2Asset(Asset):
         The order of the list matches the band list above.  Irradiance
         values are in watts/(m^2 * micrometers).
         """
+        # TODO significant code duplication in methods that read metadata, consider refactoring
         asset_contents = self.datafiles()
         # python idiom for "first item in list that satisfies a condition"; should only be one
         metadata_fn = next(n for n in asset_contents
                 if re.match(r'^.*/DATASTRIP/.*/MTD_DS.xml$', n))
         with zipfile.ZipFile(self.filename) as asset_zf:
             with asset_zf.open(metadata_fn) as metadata_zf:
-		tree = ElementTree.parse(metadata_zf)
+                tree = ElementTree.parse(metadata_zf)
                 sil_elem = next(tree.iter('Solar_Irradiance_List')) # should only be one
                 values_tags = sil_elem.findall('SOLAR_IRRADIANCE')
                 # sanity check that the bands are in the right order
@@ -228,19 +240,78 @@ class sentinel2Asset(Asset):
                 return [float(vt.text) for vt in values_tags]
 
 
-    def mean_zenith_angle(self):
-        """Loads zenith angle from asset metadata, and returns it.
+    def mean_viewing_angle(self, angle='both'):
+        """Loads & returns mean viewing angle:  (zenith, azimuth).
 
-        Return value is in degrees.
+        Queries and returns asset metadata for these values.  Return
+        value is in degrees.
         """
+        if angle != 'both':
+            raise NotImplementedError('getting zenith or azimuth separately is not supported')
         asset_contents = self.datafiles()
         # should only be one
         metadata_fn = next(n for n in asset_contents if re.match('^.*/GRANULE/.*/MTD_TL.xml$', n))
         with zipfile.ZipFile(self.filename) as asset_zf:
             with asset_zf.open(metadata_fn) as metadata_zf:
-		tree = ElementTree.parse(metadata_zf)
+                tree = ElementTree.parse(metadata_zf)
+                # should only be one list, with 13 elems, each with 2 angles, a zen and an az
+                angles = next(tree.iter(
+                    'Mean_Viewing_Incidence_Angle_List')).findall('Mean_Viewing_Incidence_Angle')
+                mean_zen = numpy.mean([float(e.find('ZENITH_ANGLE' ).text) for e in angles])
+                mean_az  = numpy.mean([float(e.find('AZIMUTH_ANGLE').text) for e in angles])
+                return (mean_zen, mean_az)
+
+
+    def mean_solar_angle(self, angle='both'):
+        """Loads & returns solar zenith and/or azimuth angle.
+
+        Queries and returns asset metadata for these values.  Set angle
+        to 'zenith' or 'azimuth' to get single values, or 'both' to get
+        (zenith, azimuth).  Return value is in degrees.
+        """
+        assert angle in ('both', 'zenith', 'azimuth') # sanity check
+        asset_contents = self.datafiles()
+        # should only be one
+        metadata_fn = next(n for n in asset_contents if re.match('^.*/GRANULE/.*/MTD_TL.xml$', n))
+        with zipfile.ZipFile(self.filename) as asset_zf:
+            with asset_zf.open(metadata_fn) as metadata_zf:
+                tree = ElementTree.parse(metadata_zf)
                 msa_elem = next(tree.iter('Mean_Sun_Angle')) # should only be one
-                return float(msa_elem.find('ZENITH_ANGLE').text)
+                get_angle = lambda tag: float(msa_elem.find(tag).text)
+                if angle == 'both':
+                    return (get_angle('ZENITH_ANGLE'), get_angle('AZIMUTH_ANGLE'))
+                if angle == 'zenith':
+                    return get_angle('ZENITH_ANGLE')
+                if angle == 'azimuth':
+                    return get_angle('AZIMUTH_ANGLE')
+
+
+    def tile_lat_lon(self):
+        """Loads & returns boundaries for this asset's tile.
+
+        Taken from asset metadata; tuple is (w-lon, e-lon, s-lat, n-lat),
+        in degrees.  Structure for the lat/lons in INSPIRE.xml is, deep
+        in the file:
+            <gmd:EX_GeographicBoundingBox>
+                <gmd:westBoundLongitude>
+                    <gco:Decimal>-71.46678204877877</gco:Decimal>
+                </gmd:westBoundLongitude>
+                . . . and so on for 3 more values . . .
+            </gmd:EX_GeographicBoundingBox>
+        """
+        gmd = '{http://www.isotc211.org/2005/gmd}' # xml namespace foolishness
+        gco = '{http://www.isotc211.org/2005/gco}'
+        asset_contents = self.datafiles()
+        metadata_fn = next(n for n in asset_contents if re.match('^.*/INSPIRE.xml$', n))
+        with zipfile.ZipFile(self.filename) as asset_zf:
+            with asset_zf.open(metadata_fn) as metadata_zf:
+                tree = ElementTree.parse(metadata_zf)
+                gbb_elem = next(tree.iter(gmd + 'EX_GeographicBoundingBox')) # only one
+                latlons = tuple(float(gbb_elem.find(gmd + s).find(gco + 'Decimal').text) for s in (
+                        'westBoundLongitude', 'eastBoundLongitude',
+                        'southBoundLatitude', 'northBoundLatitude',
+                ))
+                return latlons
 
 
     #def gridded_zenith_angle(self):
@@ -274,7 +345,7 @@ class sentinel2Asset(Asset):
         same as the order of the bands in _sensors given above.  See:
         https://sentinel.esa.int/web/sentinel/technical-guides/sentinel-2-msi/level-1c/algorithm
         """
-        mza = math.radians(self.mean_zenith_angle())
+        mza = math.radians(self.mean_solar_angle('zenith'))
         solar_irrads = self.solar_irradiances()
         julian_date = utils.julian_date(datetime.datetime.combine(self.date, self.time), 'cnes')
         return [(1 - 0.01673 * math.cos(0.0172 * (julian_date - 2)))**-2 # solar distance term
@@ -536,6 +607,7 @@ class sentinel2Data(Data):
         are found.  Products are saved to a well-known or else specified
         directory.  kwargs is unused, and is present for compatibility.
         """
+        asset_type = 'L1C' # only one in the driver for now, conveniently
         self._time_report('Starting processing for this temporal-spatial unit')
         products = self.needed_products(products, overwrite)
         if len(products) == 0:
