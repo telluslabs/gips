@@ -92,6 +92,9 @@ class sentinel2Asset(Asset):
             # colors needed for computing indices products such as NDVI
             # color names are ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2']
             'indices-bands': ['02', '03', '04', '08', '11', '12'],
+            # similar to landsat's "visbands"
+            'indices-colors': ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'],
+            # landsat version: ['COASTAL', 'BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'CIRRUS'],
         },
     }
     _sensors['S2B'] = {'description': 'Sentinel-2, Satellite B'}
@@ -358,9 +361,7 @@ class sentinel2Asset(Asset):
     def generate_atmo_corrector(self):
         """Generate & return a SIXS object appropriate for this asset."""
         sensor_md = self._sensors[self.sensor]
-        # TODO visbands correct here? just copying contents from landsat
-        #visbands = sensor_md['indices-bands']
-        visbands = ['COASTAL', 'BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'CIRRUS']
+        visbands = sensor_md['indices-colors'] # TODO visbands isn't really the right name
         vb_indices = [sensor_md['colors'].index(vb) for vb in visbands]
         # assemble list of relevant band boundaries
         wvlens = [sensor_md['bandbounds'][i] for i in vb_indices]
@@ -516,6 +517,7 @@ class sentinel2Data(Data):
                     for f in self.metadata['filenames']]
         self.metadata['abs-filenames'] = datafiles
 
+        # TODO unused here down?
         image = gippy.GeoImage(datafiles)
         image.SetNoData(0) # inferred rather than taken from spec
         sensor = self.assets['L1C'].sensor
@@ -591,7 +593,7 @@ class sentinel2Data(Data):
         return upsampled_img
 
 
-    def rad_rev_img(self, asset_type, upsampled_img, sensor):
+    def rad_rev_img(self, asset_type, sensor, upsampled_img):
         """Reverse-engineer TOA ref data back into a TOA radiance product.
 
         This is used as intermediary data but is congruent to the rad-toa
@@ -618,6 +620,21 @@ class sentinel2Data(Data):
         return rad_image
 
 
+    def surface_ref_img(self, asset_type, sensor, rad_rev_img, atm6s):
+        """Generate a surface reflectance image.
+
+        Made from a rad-toa image (the reverted ref-toa data sentinel-2 L1C
+        provides), put through an atmospheric correction process.  CF landsat.
+        """
+        scaling_factor = 0.001 # to prevent chunky small ints
+        sr_image = gippy.GeoImage(rad_rev_img)
+        for c in self.assets[asset_type]._sensors[sensor]['indices-colors']:
+            (T, Lu, Ld) = atm6s.results[c]
+            TLdS = T * Ld * scaling_factor # don't do it every pixel; believed to be faster
+            sr_image[c] = (rad_rev_img[c] - Lu) / TLdS
+        return sr_image
+
+
     def process(self, products=None, overwrite=False, **kwargs):
         """Produce data products and save them to files.
 
@@ -637,6 +654,10 @@ class sentinel2Data(Data):
             toa = (self._products[val[0]].get('toa', False) or 'toa' in val)
             if not toa:
                 atm6s = self.assets[asset_type].generate_atmo_corrector()
+                # TODO only do atmo correction metadata if the product calls for it?
+                # TODO and confirm md is used for something?
+                #md["AOD Source"] = str(atm6s.aod[0])
+                #md["AOD Value"] = str(atm6s.aod[1])
 
         # construct as much of the product filename as we can right now
         filename_prefix = os.path.join(
@@ -654,9 +675,9 @@ class sentinel2Data(Data):
         # generate prerequisites
         upsampled_img = self.upsample_std_bands(sensor, data_spec, overwrite)
         if not toa or 'rad-toa' in products.requested.keys():
-            rad_rev_img = self.rad_rev_img(asset_type, upsampled_img, sensor)
-        #if not toa:
-        #    atmo_corrected_img = self.atmo_corrected_img(asset_type, rad_rev_img)
+            rad_rev_img = self.rad_rev_img(asset_type, sensor, upsampled_img)
+        if not toa:
+            surface_ref_img = self.surface_ref_img(asset_type, sensor, rad_rev_img, atm6s)
 
         self._time_report('Starting on standard product processing')
 
@@ -672,7 +693,7 @@ class sentinel2Data(Data):
                 elif key == 'rad-toa':
                     rad_rev_img.Process(filename)
                 elif key == 'ref':
-                    raise NotImplementedError('aaaah')
+                    surface_ref_img.Process(filename)
                 self.AddFile(sensor, key, filename)
                 self._time_report('Finished {} processing'.format(key))
 
