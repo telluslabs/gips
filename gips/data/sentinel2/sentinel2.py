@@ -545,41 +545,7 @@ class sentinel2Data(Data):
             datetime.datetime.now() - start, msg, self._time_report_verbosity))
 
 
-    def process_rad(self, asset_type, proto_product, sensor, product, filename):
-        """Reverse-engineer TOA ref data back into a TOA radiance product."""
-        self._time_report('Starting TOA radiance processing')
-        asset_instance = self.assets[asset_type] # sentinel2Asset
-        colors = asset_instance._sensors[sensor]['colors']
-
-        radiance_factors = asset_instance.radiance_factors()
-
-        rad_image = gippy.GeoImage(proto_product)
-
-        for i in range(len(rad_image)):
-            color = rad_image[i].Description()
-            rf = radiance_factors[colors.index(color)]
-            self._time_report(
-                'TOA radiance conversion factor for {} (band {}): {}'.format(color, i + 1, rf))
-            rad_image[i] = rad_image[i] * rf
-        self._time_report('Performing computations and saving to ' + filename)
-        rad_image.SetNoData(0)
-        rad_image.Process(filename)
-        self.AddFile(sensor, product, filename)
-        self._time_report('Finished TOA radiance processing')
-
-
-    def process_ref(self, asset_type, proto_product, sensor, product, filename):
-        """Produce a standard reflectance product.
-
-        prod_string is the product plus its 'arguments', eg 'ref-toa'."""
-        # TODO note that this will need editing when atmo correction is implemented
-        # proto_product is identical to the ref product, just annoint it as such
-        proto_product.Process(filename)
-        proto_product.SetNoData(0)
-        self.AddFile(sensor, product, filename)
-
-
-    def produce_proto_product(self, sensor, data_spec, overwrite):
+    def upsample_std_bands(self, sensor, data_spec, overwrite):
         """Make a proto-product which acts as a basis for several products.
 
         It is equivalent to ref-toa; it's needed because the asset's
@@ -625,6 +591,33 @@ class sentinel2Data(Data):
         return upsampled_img
 
 
+    def rad_rev_img(self, asset_type, upsampled_img, sensor):
+        """Reverse-engineer TOA ref data back into a TOA radiance product.
+
+        This is used as intermediary data but is congruent to the rad-toa
+        product.
+        """
+        self._time_report('Starting reversion to TOA radiance.')
+        asset_instance = self.assets[asset_type] # sentinel2Asset
+        colors = asset_instance._sensors[sensor]['colors']
+
+        radiance_factors = asset_instance.radiance_factors()
+
+        rad_image = gippy.GeoImage(upsampled_img)
+
+        for i in range(len(rad_image)):
+            color = rad_image[i].Description()
+            rf = radiance_factors[colors.index(color)]
+            self._time_report(
+                'TOA radiance reversion factor for {} (band {}): {}'.format(color, i + 1, rf))
+            rad_image[i] = rad_image[i] * rf
+        # self._time_report('Performing computations')
+        rad_image.SetNoData(0)
+        # TODO needed? --> rad_image.Process()
+        # TODO only if process is needed --> self._time_report('Finished TOA radiance reversion')
+        return rad_image
+
+
     def process(self, products=None, overwrite=False, **kwargs):
         """Produce data products and save them to files.
 
@@ -639,16 +632,11 @@ class sentinel2Data(Data):
         if len(products) == 0:
             utils.verbose_out('No new processing required.')
             return
+        md = self.meta_dict()
         for val in products.requested.values():
             toa = (self._products[val[0]].get('toa', False) or 'toa' in val)
-            # for now users must use `-p` to get toa versions of products; getting all products in
-            # one go AND defaulting to toa doesn't seem to be supported.
             if not toa:
-                utils.verbose_out('Please specify products with eg "-p ref-toa"', 1,
-                                  stream=sys.stderr)
-		raise NotImplementedError('only toa products are supported for now')
-
-        asset_type = 'L1C' # only one in the driver for now, conveniently
+                atm6s = self.assets[asset_type].generate_atmo_corrector()
 
         # construct as much of the product filename as we can right now
         filename_prefix = os.path.join(
@@ -659,14 +647,16 @@ class sentinel2Data(Data):
                                  + utils.basename(self.assets[asset_type].filename)):
             self.read_raw() # returns a GeoImage, presently unused
 
-        md = self.meta_dict()
-
         sensor = self.sensors[asset_type]
         # dict describing specification for all the bands in the asset
         data_spec = self.assets[asset_type]._sensors[sensor]
 
-        proto_prod = self.produce_proto_product(sensor, data_spec, overwrite)
-        upsampled_img = proto_prod
+        # generate prerequisites
+        upsampled_img = self.upsample_std_bands(sensor, data_spec, overwrite)
+        if not toa or 'rad-toa' in products.requested.keys():
+            rad_rev_img = self.rad_rev_img(asset_type, upsampled_img, sensor)
+        #if not toa:
+        #    atmo_corrected_img = self.atmo_corrected_img(asset_type, rad_rev_img)
 
         self._time_report('Starting on standard product processing')
 
@@ -675,9 +665,16 @@ class sentinel2Data(Data):
             with utils.error_handler('Error creating product {} for {}'.format(
                                             key, os.path.basename(self.assets[asset_type].filename),
                                      continuable=True)):
+                self._time_report('Starting {} processing'.format(key))
                 filename = filename_prefix + key + '.tif'
-                # locate the processing method for this product and call it
-                getattr(self, 'process_' + val[0])(asset_type, upsampled_img, sensor, key, filename)
+                if key == 'ref-toa':
+                    upsampled_img.Process(filename)
+                elif key == 'rad-toa':
+                    rad_rev_img.Process(filename)
+                elif key == 'ref':
+                    raise NotImplementedError('aaaah')
+                self.AddFile(sensor, key, filename)
+                self._time_report('Finished {} processing'.format(key))
 
         self._time_report('Completed standard product processing')
 
