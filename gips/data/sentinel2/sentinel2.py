@@ -650,14 +650,6 @@ class sentinel2Data(Data):
             utils.verbose_out('No new processing required.')
             return
         md = self.meta_dict()
-        for val in products.requested.values():
-            toa = (self._products[val[0]].get('toa', False) or 'toa' in val)
-            if not toa:
-                atm6s = self.assets[asset_type].generate_atmo_corrector()
-                # TODO only do atmo correction metadata if the product calls for it?
-                # TODO and confirm md is used for something?
-                #md["AOD Source"] = str(atm6s.aod[0])
-                #md["AOD Value"] = str(atm6s.aod[1])
 
         # construct as much of the product filename as we can right now
         filename_prefix = os.path.join(
@@ -673,10 +665,18 @@ class sentinel2Data(Data):
         data_spec = self.assets[asset_type]._sensors[sensor]
 
         # generate prerequisites
+        # always need to upsample
         upsampled_img = self.upsample_std_bands(sensor, data_spec, overwrite)
-        if not toa or 'rad-toa' in products.requested.keys():
+
+        need_surf = any(['toa' not in v for v in products.requested.values()])
+        if need_surf or 'rad-toa' in products.requested.keys():
             rad_rev_img = self.rad_rev_img(asset_type, sensor, upsampled_img)
-        if not toa:
+        if need_surf:
+            atm6s = self.assets[asset_type].generate_atmo_corrector()
+            # TODO have to add atmo metadata only to products that require atmo correction
+            # TODO also how to add this metadata to non-indices products?
+            #md["AOD Source"] = str(atm6s.aod[0])
+            #md["AOD Value"] = str(atm6s.aod[1])
             surface_ref_img = self.surface_ref_img(asset_type, sensor, rad_rev_img, atm6s)
 
         self._time_report('Starting on standard product processing')
@@ -709,7 +709,6 @@ class sentinel2Data(Data):
             prodout = gippy.algorithms.Indices(upsampled_img, fnames, md)
             [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
             self._time_report(' -> %s: processed %s' % (self.basename, indices.keys()))
-        img = None # clue for the gc to reap img; probably needed due to C++/swig weirdness
-        prodout = None # more gc hinting; may not be as necessary as img
-        # cleanup directory here if necessary
+        # hint for gc to reap images; may be needed due to C++/swig weirdness
+        (upsampled_img, rad_rev_img, surface_ref_img, prodout) = (None,) * 4
         self._time_report('Processing complete for this spatial-temporal unit')
