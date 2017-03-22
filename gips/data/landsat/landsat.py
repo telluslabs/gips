@@ -501,7 +501,7 @@ class landsatData(Data):
         ACOLITEPATHS = {
             'ACO_DIR': settings().REPOS['landsat']['ACOLITE_DIR'],
             # N.B.: only seems to work when run from the ACO_DIR
-            'IDLPATH': './idl84/bin/idl',
+            'IDLPATH': 'idl',
             'ACOLITE_BINARY': 'acolite.sav',
             # TODO: template may be the only piece that needs
             #       to be moved for driver-independence.
@@ -564,8 +564,9 @@ class landsatData(Data):
         cmd = (
             ('cd {ACO_DIR} ; '
              '{IDLPATH} -IDL_CPU_TPOOL_NTHREADS 1 '
-             '-rt={ACOLITE_BINARY} run=1 '
+             '-rt={ACOLITE_BINARY} '
              '-args settings={ACOLITE_SETTINGS} '
+             'run=1 '
              'output={OUTPUT} image={IMAGES}')
             .format(
                 OUTPUT=aco_proc_dir,
