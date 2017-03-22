@@ -393,7 +393,7 @@ class sentinel2Data(Data):
     }
     _products = {
         # standard products
-        'rad': {
+        'rad': { # TODO `gips_process sentinel2 -p rad` isn't allowed, how to represent this?
             'description': 'Surface-leaving radiance',
             'assets': ['L1C'],
         },
@@ -464,6 +464,55 @@ class sentinel2Data(Data):
             'assets': ['L1C'],
         },
     }
+    _product_dependencies = {
+        'indices':      'ref',
+        'indices-toa':  'ref-toa',
+        'ref':          'rad-toa',
+        'rad-toa':      'ref-toa',
+        'ref-toa':      None, # has no deps but the asset
+    }
+
+    def plan_work(self, requested_products, overwrite):
+        """Plan processing run using requested products & their dependencies.
+
+        Returns a set of processing steps needed to generate
+        requested_products.  For instance, 'rad-toa' depends on
+        'ref-toa', so if the user requests 'rad-toa', set(['rad-toa',
+        'ref-toa']) is returned.  But if 'ref-toa' is already in the
+        inventory, it is omitted, unless overwrite is True.
+        requested_products should contain strings matching
+        _product_dependencies above.
+        """
+        surf_indices = self._productgroups['Index']
+        toa_indices  = [i + '-toa' for i in self._productgroups['Index']]
+        _pd = self._product_dependencies
+        work = set()
+        for rp in requested_products:
+            # handle indices specially
+            if rp in surf_indices:
+                prereq = 'indices'
+            elif rp in toa_indices:
+                prereq = 'indices-toa'
+            else:
+                prereq = rp
+            # go thru each prereq and add it in if it's not already present, respecting overwrite.
+            while prereq in _pd and (overwrite or prereq not in self.products):
+                work.add(prereq)
+                prereq = _pd[prereq]
+        return work
+
+
+    def load_image(self, sensor, product):
+        """Load a product file into a GeoImage and return it
+
+        The GeoImage is instead fetched from a cache if possible.
+        (sensor, product) should match an entry from self.filenames.
+        """
+        if product in self._product_images:
+            return self._product_images[product]
+        image = gippy.GeoImage(self.filenames[(sensor, product)])
+        self._product_images[product] = image
+        return image
 
 
     @classmethod
@@ -547,7 +596,7 @@ class sentinel2Data(Data):
             datetime.datetime.now() - start, msg, self._time_report_verbosity))
 
 
-    def upsample_std_bands(self, sensor, data_spec, overwrite):
+    def ref_toa_geoimage(self, sensor, data_spec):
         """Make a proto-product which acts as a basis for several products.
 
         It is equivalent to ref-toa; it's needed because the asset's
@@ -556,12 +605,6 @@ class sentinel2Data(Data):
         exists in the filesystem, it's opened and returned in a GeoImage
         instead of newly upsampled data.
         """
-        # if the current date's ref-toa is already produced, open that instead, for performance
-        if 'ref-toa' in self.products and not overwrite:
-            self._time_report('Previoulsy upsampled data present (ref-toa); re-using.')
-            filename = self.filenames[(sensor, 'ref-toa')]
-            return gippy.GeoImage(filename)
-
         # TODO data_spec can be refactored out of argslist; only depends on self & asset_type ('L1C')
         self._time_report('Starting upsample of Sentinel-2 asset bands')
         # TODO this upsamples everything, when only two bands need it.  The first attempt to remedy
@@ -589,17 +632,18 @@ class sentinel2Data(Data):
                 band_index = data_spec['band-strings'].index(band_string) # starts at 0
                 color_name = data_spec['colors'][band_index]
                 upsampled_img.SetBandName(color_name, band_num)
+        self._product_images['ref-toa'] = upsampled_img
         self._time_report('Completed upsampling of Sentinel-2 asset bands')
-        return upsampled_img
 
 
-    def rad_rev_img(self, asset_type, sensor, upsampled_img):
+    def rad_toa_geoimage(self, asset_type, sensor):
         """Reverse-engineer TOA ref data back into a TOA radiance product.
 
         This is used as intermediary data but is congruent to the rad-toa
         product.
         """
         self._time_report('Starting reversion to TOA radiance.')
+        upsampled_img = self.load_image(sensor, 'ref-toa')
         asset_instance = self.assets[asset_type] # sentinel2Asset
         colors = asset_instance._sensors[sensor]['colors']
 
@@ -613,26 +657,42 @@ class sentinel2Data(Data):
             self._time_report(
                 'TOA radiance reversion factor for {} (band {}): {}'.format(color, i + 1, rf))
             rad_image[i] = rad_image[i] * rf
-        # self._time_report('Performing computations')
         rad_image.SetNoData(0)
-        # TODO needed? --> rad_image.Process()
-        # TODO only if process is needed --> self._time_report('Finished TOA radiance reversion')
-        return rad_image
+        self._product_images['rad-toa'] = rad_image
 
 
-    def surface_ref_img(self, asset_type, sensor, rad_rev_img, atm6s):
+    def process_indices(self, mode, sensor, filename_prefix, metadata, indices):
+        """Generate the given indices.
+
+        gippy.algorithms.Indices is called for the given indices, using
+        an image appropriate for the given mode ('toa' or not).
+        """
+        image = self.load_image(sensor, 'ref-toa' if mode == 'toa' else 'ref')
+        if len(indices) > 0:
+            self._time_report('Starting indices processing for: {}'.format(indices.keys()))
+            # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
+            # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
+            fnames = {indices[key][0]: filename_prefix + key + '.tif' for key in indices}
+            prodout = gippy.algorithms.Indices(image, fnames, metadata)
+            [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
+            self._time_report(' -> %s: processed %s' % (self.basename, indices))
+
+
+    def ref_geoimage(self, asset_type, sensor, atm6s):
         """Generate a surface reflectance image.
 
         Made from a rad-toa image (the reverted ref-toa data sentinel-2 L1C
         provides), put through an atmospheric correction process.  CF landsat.
         """
+        self._time_report('Computing atmospheric corrections for surface reflectance')
         scaling_factor = 0.001 # to prevent chunky small ints
+        rad_rev_img = self.load_image(sensor, 'rad-toa')
         sr_image = gippy.GeoImage(rad_rev_img)
         for c in self.assets[asset_type]._sensors[sensor]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c]
             TLdS = T * Ld * scaling_factor # don't do it every pixel; believed to be faster
             sr_image[c] = (rad_rev_img[c] - Lu) / TLdS
-        return sr_image
+        self._product_images['ref'] = sr_image
 
 
     def process(self, products=None, overwrite=False, **kwargs):
@@ -649,6 +709,7 @@ class sentinel2Data(Data):
         if len(products) == 0:
             utils.verbose_out('No new processing required.')
             return
+        self._product_images = {}
         md = self.meta_dict()
 
         # construct as much of the product filename as we can right now
@@ -664,20 +725,19 @@ class sentinel2Data(Data):
         # dict describing specification for all the bands in the asset
         data_spec = self.assets[asset_type]._sensors[sensor]
 
-        # generate prerequisites
-        # always need to upsample
-        upsampled_img = self.upsample_std_bands(sensor, data_spec, overwrite)
+        work = self.plan_work(products.requested.keys(), overwrite) # see if we can save any work
 
-        need_surf = any(['toa' not in v for v in products.requested.values()])
-        if need_surf or 'rad-toa' in products.requested.keys():
-            rad_rev_img = self.rad_rev_img(asset_type, sensor, upsampled_img)
-        if need_surf:
+        # only do the bits that need doing
+        if 'ref-toa' in work:
+            self.ref_toa_geoimage(sensor, data_spec)
+        if 'rad-toa' in work:
+            self.rad_toa_geoimage(asset_type, sensor)
+        if 'ref' in work:
             atm6s = self.assets[asset_type].generate_atmo_corrector()
-            # TODO have to add atmo metadata only to products that require atmo correction
-            # TODO also how to add this metadata to non-indices products?
+            # TODO ought to add atmo metadata to indices products that require atmo correction
             #md["AOD Source"] = str(atm6s.aod[0])
             #md["AOD Value"] = str(atm6s.aod[1])
-            surface_ref_img = self.surface_ref_img(asset_type, sensor, rad_rev_img, atm6s)
+            self.ref_geoimage(asset_type, sensor, atm6s)
 
         self._time_report('Starting on standard product processing')
 
@@ -688,27 +748,19 @@ class sentinel2Data(Data):
                                      continuable=True)):
                 self._time_report('Starting {} processing'.format(key))
                 filename = filename_prefix + key + '.tif'
-                if key == 'ref-toa':
-                    upsampled_img.Process(filename)
-                elif key == 'rad-toa':
-                    rad_rev_img.Process(filename)
-                elif key == 'ref':
-                    surface_ref_img.Process(filename)
+                self._product_images[key].Process(filename) # make gippy actually do the work now
                 self.AddFile(sensor, key, filename)
                 self._time_report('Finished {} processing'.format(key))
 
         self._time_report('Completed standard product processing')
 
-        # Process Indices
+        # process indices in two groups:  toa and surf
         indices = products.groups()['Index']
-        if len(indices) > 0:
-            self._time_report('Starting indices processing')
-            # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
-            # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
-            fnames = {indices[key][0]: filename_prefix + key + '.tif' for key in indices}
-            prodout = gippy.algorithms.Indices(upsampled_img, fnames, md)
-            [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
-            self._time_report(' -> %s: processed %s' % (self.basename, indices.keys()))
-        # hint for gc to reap images; may be needed due to C++/swig weirdness
-        (upsampled_img, rad_rev_img, surface_ref_img, prodout) = (None,) * 4
+        toa_indices  = {k: v for (k, v) in indices.items() if 'toa' in v}
+        self.process_indices('toa', sensor, filename_prefix, md, toa_indices)
+
+        surf_indices  = {k: v for (k, v) in indices.items() if 'toa' not in v}
+        self.process_indices('surf', sensor, filename_prefix, md, surf_indices)
+
+        self._product_images = {} # hint for gc; may be needed due to C++/swig weirdness
         self._time_report('Processing complete for this spatial-temporal unit')
