@@ -99,10 +99,6 @@ class sentinel2Asset(Asset):
     }
     _sensors['S2B'] = {'description': 'Sentinel-2, Satellite B'}
 
-    # TODO move this someplace useful
-    # example url:
-    # https://scihub.copernicus.eu/dhus/search?q=filename:S2?_MSIL1C_20170202T??????_N????_R???_T19TCH_*.SAFE
-
     _assets = {
         'L1C': {
             # 'pattern' is used for searching the repository of locally-managed assets
@@ -111,6 +107,9 @@ class sentinel2Asset(Asset):
             'pattern': 'S2?_MSIL1C_????????T??????_N????_R???_T?????_*.zip',
             # used by fetch() to search for assets
             # TODO add filename pattern to end of this string?
+            # example url:
+            # https://scihub.copernicus.eu/dhus/
+            #   search?q=filename:S2?_MSIL1C_20170202T??????_N????_R???_T19TCH_*.SAFE
             'url': 'https://scihub.copernicus.eu/dhus/search?q=filename:',
             'startdate': datetime.date(2016, 12, 06), # used to prevent impossible searches
             'latency': 3  # TODO actually seems to be 3,7,3,7..., but this value seems to be unused?
@@ -661,33 +660,48 @@ class sentinel2Data(Data):
         self._product_images['rad-toa'] = rad_image
 
 
-    def process_indices(self, mode, sensor, filename_prefix, metadata, indices):
+    def process_indices(self, mode, sensor, filename_prefix, indices):
         """Generate the given indices.
 
         gippy.algorithms.Indices is called for the given indices, using
         an image appropriate for the given mode ('toa' or not).
         """
-        image = self.load_image(sensor, 'ref-toa' if mode == 'toa' else 'ref')
-        if len(indices) > 0:
-            self._time_report('Starting indices processing for: {}'.format(indices.keys()))
-            # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
-            # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
-            fnames = {indices[key][0]: filename_prefix + key + '.tif' for key in indices}
-            prodout = gippy.algorithms.Indices(image, fnames, metadata)
-            [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
-            self._time_report(' -> %s: processed %s' % (self.basename, indices))
+        if len(indices) == 0:
+            return
+
+        self._time_report('Starting indices processing for: {}'.format(indices.keys()))
+
+        metadata = self.meta_dict()
+        if mode != 'toa':
+            image = self.load_image(sensor, 'ref')
+            # this faff is needed because gippy shares metadata across images behind your back
+            metadata['AOD Source'] = getattr(image, '_aod_source', image.Meta('AOD Source'))
+            metadata['AOD Value']  = getattr(image, '_aod_value',  image.Meta('AOD Value'))
+        else:
+            image = self.load_image(sensor, 'ref-toa')
+
+        # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
+        # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
+        fnames = {indices[key][0]: filename_prefix + key + '.tif' for key in indices}
+        prodout = gippy.algorithms.Indices(image, fnames, metadata)
+        [self.AddFile(sensor, key, fname) for key, fname in zip(indices, prodout.values())]
+        self._time_report(' -> %s: processed %s' % (self.basename, indices))
 
 
-    def ref_geoimage(self, asset_type, sensor, atm6s):
+    def ref_geoimage(self, asset_type, sensor):
         """Generate a surface reflectance image.
 
         Made from a rad-toa image (the reverted ref-toa data sentinel-2 L1C
         provides), put through an atmospheric correction process.  CF landsat.
         """
         self._time_report('Computing atmospheric corrections for surface reflectance')
+        atm6s = self.assets[asset_type].generate_atmo_corrector()
         scaling_factor = 0.001 # to prevent chunky small ints
         rad_rev_img = self.load_image(sensor, 'rad-toa')
         sr_image = gippy.GeoImage(rad_rev_img)
+        # set meta to pass along to indices
+        sr_image._aod_source = str(atm6s.aod[0])
+        sr_image._aod_value  = str(atm6s.aod[1])
         for c in self.assets[asset_type]._sensors[sensor]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c]
             TLdS = T * Ld * scaling_factor # don't do it every pixel; believed to be faster
@@ -710,8 +724,6 @@ class sentinel2Data(Data):
             utils.verbose_out('No new processing required.')
             return
         self._product_images = {}
-        md = self.meta_dict()
-
         # construct as much of the product filename as we can right now
         filename_prefix = os.path.join(
                 self.path, self.basename + '_' + self.sensors[asset_type] + '_')
@@ -733,34 +745,49 @@ class sentinel2Data(Data):
         if 'rad-toa' in work:
             self.rad_toa_geoimage(asset_type, sensor)
         if 'ref' in work:
-            atm6s = self.assets[asset_type].generate_atmo_corrector()
-            # TODO ought to add atmo metadata to indices products that require atmo correction
-            #md["AOD Source"] = str(atm6s.aod[0])
-            #md["AOD Value"] = str(atm6s.aod[1])
-            self.ref_geoimage(asset_type, sensor, atm6s)
+            self.ref_geoimage(asset_type, sensor)
 
         self._time_report('Starting on standard product processing')
 
         # Process standard products
         for key, val in products.groups()['Standard'].items():
-            with utils.error_handler('Error creating product {} for {}'.format(
-                                            key, os.path.basename(self.assets[asset_type].filename),
-                                     continuable=True)):
+            err_msg = 'Error creating product {} for {}'.format(
+                    key, os.path.basename(self.assets[asset_type].filename))
+            with utils.error_handler(err_msg, continuable=True):
                 self._time_report('Starting {} processing'.format(key))
                 filename = filename_prefix + key + '.tif'
-                self._product_images[key].Process(filename) # make gippy actually do the work now
-                self.AddFile(sensor, key, filename)
-                self._time_report('Finished {} processing'.format(key))
 
+                # have to reproduce the whole object because gippy refuses to write metadata when
+                # you do image.Process(filename).
+                try:
+                    source_image = self._product_images[key]
+                    output_image = gippy.GeoImage(filename, source_image)
+                    output_image.SetNoData(0)
+                    output_image.SetMeta(self.meta_dict()) # add standard metadata
+                    if key == 'ref': # ref has special metadata
+                        output_image.SetMeta('AOD Source', source_image._aod_source)
+                        output_image.SetMeta('AOD Value',  source_image._aod_value)
+                    for b_num, b_name in enumerate(source_image.BandNames(), 1):
+                        output_image.SetBandName(b_name, b_num)
+                    # process bandwise because gippy had an error doing it all at once
+                    for i in range(len(source_image)):
+                        source_image[i].Process(output_image[i])
+                    self.AddFile(sensor, key, filename)
+                except Exception:
+                    utils.remove_files([filename])
+                    raise
+
+            self._time_report('Finished {} processing'.format(key))
+            (source_image, output_image) = (None, None) # gc hint due to C++/swig weirdness
         self._time_report('Completed standard product processing')
 
         # process indices in two groups:  toa and surf
         indices = products.groups()['Index']
         toa_indices  = {k: v for (k, v) in indices.items() if 'toa' in v}
-        self.process_indices('toa', sensor, filename_prefix, md, toa_indices)
+        self.process_indices('toa', sensor, filename_prefix, toa_indices)
 
         surf_indices  = {k: v for (k, v) in indices.items() if 'toa' not in v}
-        self.process_indices('surf', sensor, filename_prefix, md, surf_indices)
+        self.process_indices('surf', sensor, filename_prefix, surf_indices)
 
         self._product_images = {} # hint for gc; may be needed due to C++/swig weirdness
         self._time_report('Processing complete for this spatial-temporal unit')
