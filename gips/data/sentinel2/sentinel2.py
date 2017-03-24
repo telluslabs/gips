@@ -42,6 +42,18 @@ from gips.data.core import Repository, Asset, Data
 from gips import utils
 from gips import atmosphere
 
+"""Steps for adding a product to this driver:
+
+* add the product to the _products dict
+* make a $prod_geoimage() method to generate the GeoImage; follow pattern of others.
+* add a stanza to the conditional below where $prod_geoimage is called.
+* add the product to the dependency dict above.
+* if atmo correction is in use:
+    * save its metadata (see 'ref' for a pattern)
+    * add the product to the conditional for metadata in the file-saving block
+* update system tests
+"""
+
 
 class sentinel2Repository(Repository):
     name = 'Sentinel2'
@@ -358,7 +370,14 @@ class sentinel2Asset(Asset):
 
 
     def generate_atmo_corrector(self):
-        """Generate & return a SIXS object appropriate for this asset."""
+        """Generate & return a SIXS object appropriate for this asset.
+
+        Re-usees a previously created object if possible.
+        """
+        if hasattr(self, '_atmo_corrector'):
+            utils.verbose_out('Found existing atmospheric correction object, reusing it.', 4)
+            return self._atmo_corrector
+        utils.verbose_out('Generating atmospheric correction object.', 4)
         sensor_md = self._sensors[self.sensor]
         visbands = sensor_md['indices-colors'] # TODO visbands isn't really the right name
         vb_indices = [sensor_md['colors'].index(vb) for vb in visbands]
@@ -377,8 +396,8 @@ class sentinel2Asset(Asset):
             'lat': (s_lat + n_lat) / 2.0, # copy landsat - use center of tile
         }
         dt = datetime.datetime.combine(self.date, self.time)
-        s = atmosphere.SIXS(visbands, wvlens, geo, dt, sensor=self.sensor)
-        return s
+        self._atmo_corrector = atmosphere.SIXS(visbands, wvlens, geo, dt, sensor=self.sensor)
+        return self._atmo_corrector
 
 
 class sentinel2Data(Data):
@@ -386,13 +405,15 @@ class sentinel2Data(Data):
     version = '0.1.0'
     Asset = sentinel2Asset
 
+    _asset_type = 'L1C' # only one for the whole driver for now
+
     _productgroups = {
         'Index': ['ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari', 'brgt',
                   'ndti', 'crc', 'crcm', 'isti', 'sti'] # <-- tillage indices
     }
     _products = {
         # standard products
-        'rad': { # TODO `gips_process sentinel2 -p rad` isn't allowed, how to represent this?
+        'rad': {
             'description': 'Surface-leaving radiance',
             'assets': ['L1C'],
         },
@@ -467,6 +488,7 @@ class sentinel2Data(Data):
         'indices':      'ref',
         'indices-toa':  'ref-toa',
         'ref':          'rad-toa',
+        'rad':          'rad-toa',
         'rad-toa':      'ref-toa',
         'ref-toa':      None, # has no deps but the asset
     }
@@ -500,8 +522,14 @@ class sentinel2Data(Data):
                 prereq = _pd[prereq]
         return work
 
+    def current_asset(self):
+        return self.assets[self._asset_type]
 
-    def load_image(self, sensor, product):
+    def current_sensor(self):
+        return self.sensors[self._asset_type]
+
+
+    def load_image(self, product):
         """Load a product file into a GeoImage and return it
 
         The GeoImage is instead fetched from a cache if possible.
@@ -509,7 +537,7 @@ class sentinel2Data(Data):
         """
         if product in self._product_images:
             return self._product_images[product]
-        image = gippy.GeoImage(self.filenames[(sensor, product)])
+        image = gippy.GeoImage(self.filenames[(self.current_sensor(), product)])
         self._product_images[product] = image
         return image
 
@@ -591,8 +619,8 @@ class sentinel2Data(Data):
             self._time_report_verbosity = 3 if verbosity is None else verbosity
         elif verbosity is not None:
             raise ValueError('Changing verbosity is only permitted when resetting the clock')
-        utils.verbose_out('{}:  {}'.format(
-            datetime.datetime.now() - start, msg, self._time_report_verbosity))
+        utils.verbose_out('{}:  {}'.format(datetime.datetime.now() - start, msg),
+                self._time_report_verbosity)
 
 
     def ref_toa_geoimage(self, sensor, data_spec):
@@ -642,7 +670,7 @@ class sentinel2Data(Data):
         product.
         """
         self._time_report('Starting reversion to TOA radiance.')
-        upsampled_img = self.load_image(sensor, 'ref-toa')
+        upsampled_img = self.load_image('ref-toa')
         asset_instance = self.assets[asset_type] # sentinel2Asset
         colors = asset_instance._sensors[sensor]['colors']
 
@@ -660,6 +688,24 @@ class sentinel2Data(Data):
         self._product_images['rad-toa'] = rad_image
 
 
+    def rad_geoimage(self):
+        """Transmute TOA radiance product into a surface radiance product."""
+        self._time_report('Setting up for converting radiance from TOA to surface')
+        rad_toa_img = self.load_image('rad-toa')
+        ca = self.current_asset()
+        atm6s = ca.generate_atmo_corrector()
+
+        rad_image = gippy.GeoImage(rad_toa_img)
+        # set meta to pass along to indices
+        rad_image._aod_source = str(atm6s.aod[0])
+        rad_image._aod_value  = str(atm6s.aod[1])
+
+        for c in ca._sensors[self.current_sensor()]['indices-colors']:
+            (T, Lu, Ld) = atm6s.results[c] # Ld is unused for this product
+            rad_image[c] = (rad_toa_img[c] - Lu) / T
+        self._product_images['rad'] = rad_image
+
+
     def process_indices(self, mode, sensor, filename_prefix, indices):
         """Generate the given indices.
 
@@ -673,12 +719,12 @@ class sentinel2Data(Data):
 
         metadata = self.meta_dict()
         if mode != 'toa':
-            image = self.load_image(sensor, 'ref')
+            image = self.load_image('ref')
             # this faff is needed because gippy shares metadata across images behind your back
             metadata['AOD Source'] = getattr(image, '_aod_source', image.Meta('AOD Source'))
             metadata['AOD Value']  = getattr(image, '_aod_value',  image.Meta('AOD Value'))
         else:
-            image = self.load_image(sensor, 'ref-toa')
+            image = self.load_image('ref-toa')
 
         # fnames = mapping of product-to-output-filenames, minus filename extension (probably .tif)
         # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
@@ -697,7 +743,7 @@ class sentinel2Data(Data):
         self._time_report('Computing atmospheric corrections for surface reflectance')
         atm6s = self.assets[asset_type].generate_atmo_corrector()
         scaling_factor = 0.001 # to prevent chunky small ints
-        rad_rev_img = self.load_image(sensor, 'rad-toa')
+        rad_rev_img = self.load_image('rad-toa')
         sr_image = gippy.GeoImage(rad_rev_img)
         # set meta to pass along to indices
         sr_image._aod_source = str(atm6s.aod[0])
@@ -744,6 +790,8 @@ class sentinel2Data(Data):
             self.ref_toa_geoimage(sensor, data_spec)
         if 'rad-toa' in work:
             self.rad_toa_geoimage(asset_type, sensor)
+        if 'rad' in work:
+            self.rad_geoimage()
         if 'ref' in work:
             self.ref_geoimage(asset_type, sensor)
 
@@ -764,7 +812,7 @@ class sentinel2Data(Data):
                     output_image = gippy.GeoImage(filename, source_image)
                     output_image.SetNoData(0)
                     output_image.SetMeta(self.meta_dict()) # add standard metadata
-                    if key == 'ref': # ref has special metadata
+                    if key in ('ref', 'rad'): # atmo-correction metadata
                         output_image.SetMeta('AOD Source', source_image._aod_source)
                         output_image.SetMeta('AOD Value',  source_image._aod_value)
                     for b_num, b_name in enumerate(source_image.BandNames(), 1):
