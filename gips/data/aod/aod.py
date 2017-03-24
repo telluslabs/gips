@@ -102,10 +102,16 @@ class aodAsset(Asset):
         doy = bname[14:17]
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
         self.sensor = bname[:3]
+        cnum = float(bname[18:21])
+        self.modis_collection = cnum / 10 ** numpy.floor(numpy.log10(cnum))
         prefix = 'HDF4_EOS:EOS_GRID:"'
+        sds = {
+            5: 'Optical_Depth_Land_And_Ocean_Mean',
+            6: 'Aerosol_Optical_Depth_Land_Ocean_Mean',
+        }
         self.products = {
             'aod': (prefix + filename +
-                    '":mod08:Aerosol_Optical_Depth_Land_Ocean_Mean')
+                    '":mod08:{}'.format(sds[int(self.modis_collection)]))
         }
 
     def datafiles(self):
@@ -135,8 +141,8 @@ class aodAsset(Asset):
 
 
 class aodData(Data):
-    name = 'MODAOD'
-    version = '0.9.0'
+    name = 'AOD'
+    version = '0.9.1'
     Asset = aodAsset
 
     _products = {

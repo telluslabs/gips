@@ -12,11 +12,12 @@ _log = logging.getLogger(__name__)
 
 def set_constants(config):
     """Use pytest config API to set globals pointing at needed file paths."""
-    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH, DURHAM_SHP_PATH
+    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH, DURHAM_SHP_PATH, NE_SHP_PATH
     TEST_DATA_DIR  = str(config.rootdir.join('gips/test'))
     DATA_REPO_ROOT = config.getini('data-repo')
     OUTPUT_DIR     = config.getini('output-dir')
     NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
+    NE_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NE.shp')
     DURHAM_SHP_PATH = os.path.join(TEST_DATA_DIR, 'durham.shp')
 
 slow = pytest.mark.skipif('not config.getoption("slow")',
