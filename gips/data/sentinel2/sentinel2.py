@@ -233,25 +233,31 @@ class sentinel2Asset(Asset):
                 self.version < newasset.version)
 
 
+    def xml_subtree(self, file_pattern, subtree_tag):
+        """Loads XML, then returns the given Element from it.
+
+        File to read is given by a regex; first match is opened.
+        The first matching tag in the XML tree is returned.
+        """
+        # python idiom for "first item in list that satisfies a condition"
+        metadata_fn = next(fn for fn in self.datafiles() if re.match(file_pattern, fn))
+        with zipfile.ZipFile(self.filename) as asset_zf:
+            with asset_zf.open(metadata_fn) as metadata_zf:
+                tree = ElementTree.parse(metadata_zf)
+                return next(tree.iter(subtree_tag))
+
+
     def solar_irradiances(self):
         """Loads solar irradiances from asset metadata and returns them.
 
         The order of the list matches the band list above.  Irradiance
         values are in watts/(m^2 * micrometers).
         """
-        # TODO significant code duplication in methods that read metadata, consider refactoring
-        asset_contents = self.datafiles()
-        # python idiom for "first item in list that satisfies a condition"; should only be one
-        metadata_fn = next(n for n in asset_contents
-                if re.match(r'^.*/DATASTRIP/.*/MTD_DS.xml$', n))
-        with zipfile.ZipFile(self.filename) as asset_zf:
-            with asset_zf.open(metadata_fn) as metadata_zf:
-                tree = ElementTree.parse(metadata_zf)
-                sil_elem = next(tree.iter('Solar_Irradiance_List')) # should only be one
-                values_tags = sil_elem.findall('SOLAR_IRRADIANCE')
-                # sanity check that the bands are in the right order
-                assert range(13) == [int(vt.attrib['bandId']) for vt in values_tags]
-                return [float(vt.text) for vt in values_tags]
+        sil_elem = self.xml_subtree('^.*/DATASTRIP/.*/MTD_DS.xml$', 'Solar_Irradiance_List')
+        values_tags = sil_elem.findall('SOLAR_IRRADIANCE')
+        # sanity check that the bands are in the right order
+        assert range(13) == [int(vt.attrib['bandId']) for vt in values_tags]
+        return [float(vt.text) for vt in values_tags]
 
 
     def mean_viewing_angle(self, angle='both'):
@@ -262,18 +268,13 @@ class sentinel2Asset(Asset):
         """
         if angle != 'both':
             raise NotImplementedError('getting zenith or azimuth separately is not supported')
-        asset_contents = self.datafiles()
-        # should only be one
-        metadata_fn = next(n for n in asset_contents if re.match('^.*/GRANULE/.*/MTD_TL.xml$', n))
-        with zipfile.ZipFile(self.filename) as asset_zf:
-            with asset_zf.open(metadata_fn) as metadata_zf:
-                tree = ElementTree.parse(metadata_zf)
-                # should only be one list, with 13 elems, each with 2 angles, a zen and an az
-                angles = next(tree.iter(
-                    'Mean_Viewing_Incidence_Angle_List')).findall('Mean_Viewing_Incidence_Angle')
-                mean_zen = numpy.mean([float(e.find('ZENITH_ANGLE' ).text) for e in angles])
-                mean_az  = numpy.mean([float(e.find('AZIMUTH_ANGLE').text) for e in angles])
-                return (mean_zen, mean_az)
+        mvial_elem = self.xml_subtree(
+                '^.*/GRANULE/.*/MTD_TL.xml$', 'Mean_Viewing_Incidence_Angle_List')
+        # should only be one list, with 13 elems, each with 2 angles, a zen and an az
+        angles = mvial_elem.findall('Mean_Viewing_Incidence_Angle')
+        mean_zen = numpy.mean([float(e.find('ZENITH_ANGLE' ).text) for e in angles])
+        mean_az  = numpy.mean([float(e.find('AZIMUTH_ANGLE').text) for e in angles])
+        return (mean_zen, mean_az)
 
 
     def mean_solar_angle(self, angle='both'):
@@ -284,20 +285,14 @@ class sentinel2Asset(Asset):
         (zenith, azimuth).  Return value is in degrees.
         """
         assert angle in ('both', 'zenith', 'azimuth') # sanity check
-        asset_contents = self.datafiles()
-        # should only be one
-        metadata_fn = next(n for n in asset_contents if re.match('^.*/GRANULE/.*/MTD_TL.xml$', n))
-        with zipfile.ZipFile(self.filename) as asset_zf:
-            with asset_zf.open(metadata_fn) as metadata_zf:
-                tree = ElementTree.parse(metadata_zf)
-                msa_elem = next(tree.iter('Mean_Sun_Angle')) # should only be one
-                get_angle = lambda tag: float(msa_elem.find(tag).text)
-                if angle == 'both':
-                    return (get_angle('ZENITH_ANGLE'), get_angle('AZIMUTH_ANGLE'))
-                if angle == 'zenith':
-                    return get_angle('ZENITH_ANGLE')
-                if angle == 'azimuth':
-                    return get_angle('AZIMUTH_ANGLE')
+        msa_elem = self.xml_subtree('^.*/GRANULE/.*/MTD_TL.xml$', 'Mean_Sun_Angle')
+        get_angle = lambda tag: float(msa_elem.find(tag).text)
+        if angle == 'both':
+            return (get_angle('ZENITH_ANGLE'), get_angle('AZIMUTH_ANGLE'))
+        if angle == 'zenith':
+            return get_angle('ZENITH_ANGLE')
+        if angle == 'azimuth':
+            return get_angle('AZIMUTH_ANGLE')
 
 
     def tile_lat_lon(self):
@@ -315,17 +310,11 @@ class sentinel2Asset(Asset):
         """
         gmd = '{http://www.isotc211.org/2005/gmd}' # xml namespace foolishness
         gco = '{http://www.isotc211.org/2005/gco}'
-        asset_contents = self.datafiles()
-        metadata_fn = next(n for n in asset_contents if re.match('^.*/INSPIRE.xml$', n))
-        with zipfile.ZipFile(self.filename) as asset_zf:
-            with asset_zf.open(metadata_fn) as metadata_zf:
-                tree = ElementTree.parse(metadata_zf)
-                gbb_elem = next(tree.iter(gmd + 'EX_GeographicBoundingBox')) # only one
-                latlons = tuple(float(gbb_elem.find(gmd + s).find(gco + 'Decimal').text) for s in (
-                        'westBoundLongitude', 'eastBoundLongitude',
-                        'southBoundLatitude', 'northBoundLatitude',
-                ))
-                return latlons
+        gbb_elem = self.xml_subtree('^.*/INSPIRE.xml$', gmd + 'EX_GeographicBoundingBox')
+        return tuple(float(gbb_elem.find(gmd + s).find(gco + 'Decimal').text) for s in (
+                'westBoundLongitude', 'eastBoundLongitude',
+                'southBoundLatitude', 'northBoundLatitude',
+        ))
 
 
     #def gridded_zenith_angle(self):
