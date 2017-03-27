@@ -123,11 +123,30 @@ class sentinel2Asset(Asset):
             # https://scihub.copernicus.eu/dhus/
             #   search?q=filename:S2?_MSIL1C_20170202T??????_N????_R???_T19TCH_*.SAFE
             'url': 'https://scihub.copernicus.eu/dhus/search?q=filename:',
-            'startdate': datetime.date(2016, 12, 06), # used to prevent impossible searches
+            'startdate': datetime.date(2016, 12, 07), # used to prevent impossible searches
             'latency': 3  # TODO actually seems to be 3,7,3,7..., but this value seems to be unused?
                           # only needed by Asset.end_date and Asset.available, but those are never called?
         },
 
+    }
+
+    # regexes for verifying filename correctness & extracting metadata; convention:
+    # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
+    _asset_styles = {
+        #'original': TODO
+        '20161207': {
+            'name-re': ( # pattern for the asset file name
+                '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
+                '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
+                'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
+                '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$'), # tile
+            # internal metadata file patterns
+            'datastrip-md-re': '^.*/DATASTRIP/.*/MTD_DS.xml$',
+            'tile-md-re': '^.*/GRANULE/.*/MTD_TL.xml$',
+            # Two files with asset-global metadata, this is one of them:
+            # for INSPIRE.xml see http://inspire.ec.europa.eu/XML-Schemas/Data-Specifications/2892
+            'inspire-md-re': '^.*/INSPIRE.xml$',
+        },
     }
 
     # default resultant resolution for resampling during to Data().copy()
@@ -142,19 +161,18 @@ class sentinel2Asset(Asset):
         super(sentinel2Asset, self).__init__(filename)
         zipfile.ZipFile(filename) # sanity check; exception if file isn't a valid zip
         base_filename = os.path.basename(filename)
-        # regex for verifying filename correctness & extracting metadata; note that for now, only
-        # the shortened name format in use after Dec 6 2016 is supported:
-        # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
-        asset_name_pattern = ('^(?P<sensor>S2[AB])_MSIL1C_' # sensor
-                              '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
-                              'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
-                              '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$') # tile
-        match = re.match(asset_name_pattern, base_filename)
+
+        for style, style_dict in self._asset_styles.items():
+            match = re.match(style_dict['name-re'], base_filename)
+            if match is not None:
+                break
         if match is None:
             raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(base_filename))
+        self.style = style
+        self.style_res = self._asset_styles[style]
         self.asset = 'L1C' # only supported asset type
         self.sensor = match.group('sensor')
-        self.tile = match.group('tile')
+        self.tile = match.group('tile') # TODO for original style, find tile in path maybe?
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
         self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
 
@@ -233,12 +251,14 @@ class sentinel2Asset(Asset):
                 self.version < newasset.version)
 
 
-    def xml_subtree(self, file_pattern, subtree_tag):
+    def xml_subtree(self, md_file_type, subtree_tag):
         """Loads XML, then returns the given Element from it.
 
-        File to read is given by a regex; first match is opened.
-        The first matching tag in the XML tree is returned.
+        File to read is specified by type eg 'tile' or 'datastrip'.  The first
+        matching tag in the XML tree is returned.  The metadata file is located
+        in self.style_res eg 'tile' results in 'tile-md-re' being used.
         """
+        file_pattern = self.style_res[md_file_type + '-md-re']
         # python idiom for "first item in list that satisfies a condition"
         metadata_fn = next(fn for fn in self.datafiles() if re.match(file_pattern, fn))
         with zipfile.ZipFile(self.filename) as asset_zf:
@@ -253,7 +273,7 @@ class sentinel2Asset(Asset):
         The order of the list matches the band list above.  Irradiance
         values are in watts/(m^2 * micrometers).
         """
-        sil_elem = self.xml_subtree('^.*/DATASTRIP/.*/MTD_DS.xml$', 'Solar_Irradiance_List')
+        sil_elem = self.xml_subtree('datastrip', 'Solar_Irradiance_List')
         values_tags = sil_elem.findall('SOLAR_IRRADIANCE')
         # sanity check that the bands are in the right order
         assert range(13) == [int(vt.attrib['bandId']) for vt in values_tags]
@@ -268,8 +288,7 @@ class sentinel2Asset(Asset):
         """
         if angle != 'both':
             raise NotImplementedError('getting zenith or azimuth separately is not supported')
-        mvial_elem = self.xml_subtree(
-                '^.*/GRANULE/.*/MTD_TL.xml$', 'Mean_Viewing_Incidence_Angle_List')
+        mvial_elem = self.xml_subtree('tile', 'Mean_Viewing_Incidence_Angle_List')
         # should only be one list, with 13 elems, each with 2 angles, a zen and an az
         angles = mvial_elem.findall('Mean_Viewing_Incidence_Angle')
         mean_zen = numpy.mean([float(e.find('ZENITH_ANGLE' ).text) for e in angles])
@@ -285,7 +304,7 @@ class sentinel2Asset(Asset):
         (zenith, azimuth).  Return value is in degrees.
         """
         assert angle in ('both', 'zenith', 'azimuth') # sanity check
-        msa_elem = self.xml_subtree('^.*/GRANULE/.*/MTD_TL.xml$', 'Mean_Sun_Angle')
+        msa_elem = self.xml_subtree('tile', 'Mean_Sun_Angle')
         get_angle = lambda tag: float(msa_elem.find(tag).text)
         if angle == 'both':
             return (get_angle('ZENITH_ANGLE'), get_angle('AZIMUTH_ANGLE'))
@@ -310,7 +329,7 @@ class sentinel2Asset(Asset):
         """
         gmd = '{http://www.isotc211.org/2005/gmd}' # xml namespace foolishness
         gco = '{http://www.isotc211.org/2005/gco}'
-        gbb_elem = self.xml_subtree('^.*/INSPIRE.xml$', gmd + 'EX_GeographicBoundingBox')
+        gbb_elem = self.xml_subtree('inspire', gmd + 'EX_GeographicBoundingBox')
         return tuple(float(gbb_elem.find(gmd + s).find(gco + 'Decimal').text) for s in (
                 'westBoundLongitude', 'eastBoundLongitude',
                 'southBoundLatitude', 'northBoundLatitude',
