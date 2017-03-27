@@ -113,10 +113,9 @@ class sentinel2Asset(Asset):
 
     _assets = {
         'L1C': {
-            # 'pattern' is used for searching the repository of locally-managed assets
-            #                      sense datetime              tile
-            #                     (YYYYMMDDTHHMMSS)            (MGRS)
-            'pattern': 'S2?_MSIL1C_????????T??????_N????_R???_T?????_*.zip',
+            # 'pattern' is used for searching the repository of locally-managed assets; this pattern
+            # is used for both original and shortened post-2016-12-07 assets.
+            'pattern': 'S2?_*MSIL1C_*????????T??????_*R???_*.zip',
             # used by fetch() to search for assets
             # TODO add filename pattern to end of this string?
             # example url:
@@ -133,13 +132,34 @@ class sentinel2Asset(Asset):
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
     _asset_styles = {
-        #'original': TODO
+        'original': {
+            'name-re': ( # pattern for the asset file name
+                # example: S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
+                '^(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
+                '_\d{8}T\d{6}' # processing date (don't care)
+                '_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
+                # observation datetime:
+                '_V(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
+                'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
+                '_\d{8}T\d{6}.zip'), # repeated observation datetime; probably don't care
+            # raster file pattern
+            'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B\d[\dA].jp2$',
+            # TODO
+            ## internal metadata file patterns
+            #'datastrip-md-re': '^.*/DATASTRIP/.*/MTD_DS.xml$',
+            #'tile-md-re': '^.*/GRANULE/.*/MTD_TL.xml$',
+            ## Two files with asset-global metadata, this is one of them:
+            ## for INSPIRE.xml see http://inspire.ec.europa.eu/XML-Schemas/Data-Specifications/2892
+            #'inspire-md-re': '^.*/INSPIRE.xml$',
+        },
         '20161207': {
             'name-re': ( # pattern for the asset file name
                 '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
                 '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
                 'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
                 '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$'), # tile
+            # raster file pattern
+            'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B\d[\dA].jp2$',
             # internal metadata file patterns
             'datastrip-md-re': '^.*/DATASTRIP/.*/MTD_DS.xml$',
             'tile-md-re': '^.*/GRANULE/.*/MTD_TL.xml$',
@@ -172,7 +192,11 @@ class sentinel2Asset(Asset):
         self.style_res = self._asset_styles[style]
         self.asset = 'L1C' # only supported asset type
         self.sensor = match.group('sensor')
-        self.tile = match.group('tile') # TODO for original style, find tile in path maybe?
+        if style == 'original':
+            # original-style assets contain multiple tiles, so must guess based on the path
+            self.tile = os.path.basename(os.path.dirname(os.path.dirname(filename)))
+        else:
+            self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
         self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
 
@@ -327,6 +351,8 @@ class sentinel2Asset(Asset):
                 . . . and so on for 3 more values . . .
             </gmd:EX_GeographicBoundingBox>
         """
+        # TODO this will have to be adapted for 'original' as the lat-lon can't be specific to a
+        # tile:
         gmd = '{http://www.isotc211.org/2005/gmd}' # xml namespace foolishness
         gco = '{http://www.isotc211.org/2005/gco}'
         gbb_elem = self.xml_subtree('inspire', gmd + 'EX_GeographicBoundingBox')
@@ -580,7 +606,8 @@ class sentinel2Data(Data):
         datafiles = self.assets[asset_type].datafiles()
 
         # restrict filenames known to just the raster layers
-        raster_fn_pat = '^.*/GRANULE/.*/IMG_DATA/.*_B\d[\dA].jp2$'
+        asset = self.current_asset()
+        raster_fn_pat = asset.style_res['raster-re'].format(tileid=asset.tile)
         fnl = [df for df in datafiles if re.match(raster_fn_pat, df)]
         # have to sort the list or else gippy will get confused about which band is which
         band_strings = sentinel2Asset._sensors[self.sensors[asset_type]]['band-strings']
@@ -792,6 +819,8 @@ class sentinel2Data(Data):
         data_spec = self.assets[asset_type]._sensors[sensor]
 
         work = self.plan_work(products.requested.keys(), overwrite) # see if we can save any work
+
+        # TODO here down unsure if safe for 'original' style assets
 
         # only do the bits that need doing
         if 'ref-toa' in work:
