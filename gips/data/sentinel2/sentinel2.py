@@ -116,18 +116,14 @@ class sentinel2Asset(Asset):
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both original and shortened post-2016-12-07 assets.
             'pattern': 'S2?_*MSIL1C_*????????T??????_*R???_*.zip',
-            # used by fetch() to search for assets
-            # TODO add filename pattern to end of this string?
-            # example url:
-            # https://scihub.copernicus.eu/dhus/
-            #   search?q=filename:S2?_MSIL1C_20170202T??????_N????_R???_T19TCH_*.SAFE
-            'url': 'https://scihub.copernicus.eu/dhus/search?q=filename:',
             'startdate': datetime.date(2016, 12, 07), # used to prevent impossible searches
             'latency': 3  # TODO actually seems to be 3,7,3,7..., but this value seems to be unused?
                           # only needed by Asset.end_date and Asset.available, but those are never called?
         },
 
     }
+
+    _2016_12_07 = datetime.datetime(2016, 12, 7, 0, 0) # first day of new-style assets, UTC
 
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
@@ -152,7 +148,7 @@ class sentinel2Asset(Asset):
             ## for INSPIRE.xml see http://inspire.ec.europa.eu/XML-Schemas/Data-Specifications/2892
             #'inspire-md-re': '^.*/INSPIRE.xml$',
         },
-        '20161207': {
+        _2016_12_07: {
             'name-re': ( # pattern for the asset file name
                 '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
                 '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
@@ -209,11 +205,30 @@ class sentinel2Asset(Asset):
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
 
+        style = 'original' if date < cls._2016_12_07 else cls._2016_12_07
+
+        url_head = 'https://scihub.copernicus.eu/dhus/search?q='
+        url_tail = '&format=json'
+        if style == 'original':
+            # compute the center coordinate of the tile
+            tiles_shp_fn = cls.Repository.get_setting('tiles')
+            key = cls.Repository._tile_attribute
+            vector = utils.open_vector(tiles_shp_fn, key) # type is gippy GeoFeature
+            feature = vector[tile] # type is gippy GeoFeature
+            extent = feature.Extent()
+            lon = (extent.x0() + extent.x1())/2
+            lat = (extent.y0() + extent.y1())/2
+            #                                                  year mon  day
+            url_search_string = ('filename:S2?_OPER_PRD_MSIL1C_*_{}{:02}{:02}T??????.SAFE'
+                                 '%20AND%20footprint:%22Intersects({},%20{})%22') # <-- lat/lon
+            search_url = url_head + url_search_string.format(year, month, day, lat, lon) + url_tail
+        else:
+            #                                      year mon  day                    tile
+            url_search_string = 'filename:S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'
+            search_url = url_head + url_search_string.format(year, month, day, tile) + url_tail
+
         # search for the asset's URL with wget call (using a suprocess call to wget instead of a
         # more conventional call to a lib because available libs are perceived to be inferior).
-        #                              year mon day                    tile
-        url_search_string = 'S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE&format=json'
-        search_url = cls._assets[asset]['url'] + url_search_string.format(year, month, day, tile)
         search_cmd = (
                 'wget --no-verbose --no-check-certificate --user="{}" --password="{}" --timeout 30'
                 ' --output-document=/dev/stdout "{}"').format(username, password, search_url)
