@@ -3,4 +3,5 @@ requests
 django==1.10
 psycopg2==2.6
 netCDF4
-
+matplotlib>=1.5.3
+python-dateutil>=2.5.1
