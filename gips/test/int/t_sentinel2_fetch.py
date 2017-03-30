@@ -251,3 +251,6 @@ def t_tile_list(test_asset_fn):
     "Use the test asset file to confirm tile_list()."""
     tiles = sentinel2.sentinel2Asset.tile_list(test_asset_fn)
     assert expected_tiles == tiles
+
+# TODO test behavior of:
+# archived_assets = dataclass.Asset.archive(Repository.path('stage'), update=self.update)

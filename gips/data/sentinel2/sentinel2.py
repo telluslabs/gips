@@ -115,7 +115,8 @@ class sentinel2Asset(Asset):
         'L1C': {
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both original and shortened post-2016-12-07 assets.
-            'pattern': 'S2?_*MSIL1C_*????????T??????_*R???_*.zip',
+            # TODO test this line
+            'pattern': '*S2?_*MSIL1C_*????????T??????_*R???_*.zip',
             'startdate': datetime.date(2016, 12, 07), # used to prevent impossible searches
             'latency': 3  # TODO actually seems to be 3,7,3,7..., but this value seems to be unused?
                           # only needed by Asset.end_date and Asset.available, but those are never called?
@@ -130,8 +131,9 @@ class sentinel2Asset(Asset):
     _asset_styles = {
         'original': {
             'name-re': ( # pattern for the asset file name
-                # example: S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
-                '^(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
+                # example: 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
+                # TODO test this line
+                '^(?P<tile>\d\d[A-Z]{3})_(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # tile & sensor
                 '_\d{8}T\d{6}' # processing date (don't care)
                 '_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
                 # observation datetime:
@@ -188,11 +190,8 @@ class sentinel2Asset(Asset):
         self.style_res = self._asset_styles[style]
         self.asset = 'L1C' # only supported asset type
         self.sensor = match.group('sensor')
-        if style == 'original':
-            # original-style assets contain multiple tiles, so must guess based on the path
-            self.tile = os.path.basename(os.path.dirname(os.path.dirname(filename)))
-        else:
-            self.tile = match.group('tile')
+        # TODO test this line
+        self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
         self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
 
@@ -254,6 +253,16 @@ class sentinel2Asset(Asset):
                 raise IOError("Unexpected 'rel' attribute in search link", link)
             asset_url = link['href']
             output_file_name = entry['title'] + '.zip'
+
+        # TODO test this stanza:  place output_file_name in place in filesystem as test begins
+        ## old-style assets cover many tiles, so there may be duplication of effort:
+        #stage_full_path = os.path.join(cls.Repository.path('stage'), output_file_name)
+        ## vague-ify the parts of the filename that may vary, such as processing date and location
+        #stage_glob = re.sub(r'_\w{4}_\d{8}T\d{6}_', r'_????_????????T??????_', stage_full_path, 1)
+        #if len(glob.glob(stage_glob)) > 0:
+        #    utils.verbose_out('Asset `{}` located but already in stage/, skipping.'.format(
+        #            output_file_name))
+        #    return
 
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage
         # if the download is successful (this is necessary to avoid a race condition between
