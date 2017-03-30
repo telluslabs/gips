@@ -31,7 +31,7 @@ import subprocess
 import json
 import tempfile
 import zipfile
-from xml.etree import ElementTree
+from xml.etree import ElementTree, cElementTree
 
 import numpy
 
@@ -274,10 +274,38 @@ class sentinel2Asset(Asset):
                 p.communicate()
                 if p.returncode != 0:
                     raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-                stage_full_path = os.path.join(cls.Repository.path('stage'), output_file_name)
-                os.rename(output_full_path, stage_full_path) # on POSIX, if it works, it's atomic
+                stage_path = cls.Repository.path('stage')
+                if style == 'original':
+                    # copy enough links into stage to do the thing successfully
+                    # the way to do this is by extracting the tile list from the asset
+                    tile_list = cls.tile_list(output_full_path)
+                    for tile in tile_list:
+                        stage_fp = os.path.join(stage_path, tile + '_' + output_file_name)
+                        os.link(output_full_path, stage_fp)
+                else:
+                    stage_full_path = os.path.join(stage_path, output_file_name)
+                    os.rename(output_full_path, stage_full_path) # on POSIX, if it works, it's atomic
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
+
+
+    @classmethod
+    def tile_list(cls, file_name):
+        """Extract a list of tiles from the given old-style asset."""
+        # TODO confirm via filename examination that this asset is old-style
+        # "the only XML file one directory down from DATASTRIP/"
+        file_pattern = '^.*/DATASTRIP/[^/]+/[^/]+\.xml$'
+        subtree_tag = 'Tile_List'
+        with zipfile.ZipFile(file_name) as asset_zf:
+            metadata_fn = next(fn for fn in asset_zf.namelist() if re.match(file_pattern, fn))
+            with asset_zf.open(metadata_fn) as metadata_zf:
+                tree = cElementTree.parse(metadata_zf)
+                tl_elem = next(tree.iter(subtree_tag))
+                tiles_tags = tl_elem.findall('Tile')
+                # from this:  S2A_OPER_MSI_L1C_TL_EPA__20170221T200353_A002192_T35UNQ_N02.04
+                # want this:  35UNQ
+                return [tt.attrib['tileId'].split('_')[-2][1:] for tt in tiles_tags]
+
 
     def updated(self, newasset):
         '''
