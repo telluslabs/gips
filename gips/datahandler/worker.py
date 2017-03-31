@@ -175,7 +175,7 @@ def _aggregate(job, outdir, nproc=1):
 
 
 def export_and_aggregate(job_id, start_ext, end_ext,
-                         nprocs=1, outdir=None, **mosaic_kwargs):
+                         nprocs=1, outdir=None, cleanup=False, **mosaic_kwargs):
     """Entirely TBD but does the same things as gips_project + zonal summary."""
     with transaction.atomic():
         job = dbinv.models.Job.objects.get(
@@ -221,4 +221,5 @@ def export_and_aggregate(job_id, start_ext, end_ext,
     task.status = 'complete'
     task.save()
 
-    shutil.rmtree(outdir)
+    if cleanup:
+        shutil.rmtree(outdir)
