@@ -29,6 +29,7 @@ import sys
 import datetime
 import time
 
+import tempfile
 import urllib
 import requests
 import signal
@@ -38,7 +39,7 @@ from netCDF4 import Dataset
 
 import gippy
 from gips.data.core import Repository, Asset, Data
-from gips.utils import VerboseOut, basename, open_vector
+from gips.utils import basename, open_vector
 from gips import utils
 
 from pdb import set_trace
@@ -169,6 +170,7 @@ class merraAsset(Asset):
         super(merraAsset, self).__init__(filename)
         self.sensor = 'merra'
         self.tile = 'h01v01'
+
         parts = basename(filename).split('.')
         self.asset = parts[1].split('_')[2].upper()
         self.version = int(parts[0].split('_')[1])
@@ -205,15 +207,15 @@ class merraAsset(Asset):
                 available.append({'basename': basename, 'url': url})
         if len(available) == 0:
             msg = 'Unable to find a remote match for {} at {}'
-            VerboseOut(msg.format(pattern, mainurl), 4)
+            utils.verbose_out(msg.format(pattern, mainurl), 4)
         return available
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        
+
         if asset == "ASM" and date.date() != cls._assets[asset]['startdate']:
             #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
-            VerboseOut('constants are available for %s only' % cls._assets[asset]['startdate'])
+            utils.verbose_out('constants are available for %s only' % cls._assets[asset]['startdate'])
             return
 
         available_assets = cls.query_service(asset, tile, date)
@@ -223,23 +225,41 @@ class merraAsset(Asset):
             basename = asset_info['basename']
             url = asset_info['url']
             outpath = os.path.join(cls.Repository.path('stage'), basename)
-            
+
             with utils.error_handler("Asset fetch error", continuable=True):
                 kw = {'timeout': 30}
                 username = cls.Repository.get_setting('username')
                 password = cls.Repository.get_setting('password')
                 kw['auth'] = (username, password)
-                response = requests.get(url, **kw)                
+                response = requests.get(url, **kw)
                 if response.status_code != requests.codes.ok:
                     print('Download of', basename, 'failed:', response.status_code,
                           response.reason, '\nFull URL:', url, file=sys.stderr)
                     return
-                with open(outpath, 'wb') as fd:
+                # download to a temp file
+                tmp_outpath = tempfile.mkstemp(
+                    suffix='.nc4', prefix='downloading',
+                    dir=cls.Repository.path('stage')
+                )[1]
+                with open(tmp_outpath, 'w') as fd:
                     for chunk in response.iter_content():
                         fd.write(chunk)
 
+                # Verify that it is a netcdf file
+                try:
+                    ncroot = Dataset(tmp_outpath)
+                    os.rename(tmp_outpath, outpath)
+                except Exception as e:
+                    text = ''
+                    if e.message.endswith('Unknown file format'):
+                        token = 'Authorize NASA GESDISC DATA ARCHIVE'
+                        html = open(filename, 'r').read(100000)
+                        if token in html:
+                            text = ('\n\nYou need to {t} \nfor your NASA '
+                                    'EarthData login.\n').format(t=token)
+                    raise Exception(e.message + text)
+            retrieved_filenames.append(outpath)
             utils.verbose_out('Retrieved %s' % basename, 2)
-            retrieved_filenames.append(outpath)        
 
         return retrieved_filenames
 
@@ -262,7 +282,7 @@ class merraData(Data):
 
     _geotransform = (-180.3125, 0.625, 0.0, 90.25, 0.0, -0.5)
     _projection = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.01745329251994328,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]'
-    
+
     _products = {
 
         'tave': {
@@ -346,7 +366,7 @@ class merraData(Data):
         #}
     }
 
-    
+
     # @classmethod
     # def process_composites(cls, inventory, products, **kwargs):
     #     for product in products:
@@ -405,9 +425,9 @@ class merraData(Data):
     #    }
     #    return data
 
-    
+
     def getlonlat(self):
-        """ return the center coordinates of the MERRA tile 
+        """ return the center coordinates of the MERRA tile
             used only by product temp_modis
         """
         hcoord = int(self.id[1:3])
@@ -434,14 +454,14 @@ class merraData(Data):
         var = ncroot.variables[layername]
         missing = float(var.missing_value)
         scale = var.scale_factor
-        assert scale == 1.0, "Handle non-unity scale functions"        
+        assert scale == 1.0, "Handle non-unity scale functions"
         hourly = np.ma.MaskedArray(var[:])
         hourly.mask = (hourly == missing)
         nb, ny, nx = hourly.shape
         # apply reduce rule
         daily = fun(hourly)
         daily[daily.mask] = missing
-        VerboseOut('writing %s' % fout, 4)
+        utils.verbose_out('writing %s' % fout, 4)
         imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
         imgout[0].Write(np.array(np.flipud(daily)).astype('float32'))
         imgout.SetBandName(prod, 1)
@@ -463,7 +483,7 @@ class merraData(Data):
             meta = {}
             VERSION = "1.0"
             meta['VERSION'] = VERSION
-                
+
             if val[0] == "tave":
                 fun = lambda x: x.mean(axis=0) - 273.15
                 units = "C"
@@ -480,8 +500,8 @@ class merraData(Data):
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "prcp":
-                # TODO: check this units conversion from (kg m-2 s-1) to (mm d-1)
-                fun = lambda x: x.mean(axis=0)*36.*24.*1000.
+                # conversion from (kg m-2 s-1) to (mm d-1)
+                fun = lambda x: x.mean(axis=0)*36.*24.*100.
                 units = "mm d-1"
                 self.write_reduced(val[0], fun, fout, meta, units)
 
@@ -494,7 +514,7 @@ class merraData(Data):
                 fun = lambda x: x.mean(axis=0)
                 units = "m s-1"
                 self.write_reduced(val[0], fun, fout, meta, units)
-                
+
             elif val[0] == "shum":
                 fun = lambda x: x.mean(axis=0)
                 units = "kg kg-1"
@@ -514,10 +534,10 @@ class merraData(Data):
                 ncroot = Dataset(assetfile)
                 qv2m = ncroot.variables['QV2M']
                 ps = ncroot.variables['PS']
-                t2m = ncroot.variables['T2M']               
+                t2m = ncroot.variables['T2M']
                 missing = float(qv2m.missing_value)
                 assert missing == float(ps.missing_value)
-                assert missing == float(t2m.missing_value)    
+                assert missing == float(t2m.missing_value)
                 assert qv2m.scale_factor == 1.
                 assert ps.scale_factor == 1.
                 assert t2m.scale_factor == 1.
@@ -538,8 +558,8 @@ class merraData(Data):
                 rh[rh < 0.] = 0.
                 rhday = rh.mean(axis=0)
                 rhday[rhday.mask] = missing
-                VerboseOut('writing %s' % fout, 4)
-                imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)                
+                utils.verbose_out('writing %s' % fout, 4)
+                imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
                 imgout[0].Write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.SetBandName(val[0], 1)
                 imgout.SetUnits('%')
@@ -550,7 +570,7 @@ class merraData(Data):
             elif val[0] == "frland":
                 startdate = merraAsset._assets[self._products[val[0]]['assets'][0]]['startdate']
                 if self.date != startdate:
-                    VerboseOut('constants are available for %s only' % startdate)
+                    utils.verbose_out('constants are available for %s only' % startdate)
                     continue
                 prod = val[0]
                 bandnames = self._products[prod]['bands']
@@ -567,7 +587,7 @@ class merraData(Data):
                 frland = frland.squeeze()
                 if frland.mask.sum() > 0:
                     frland[frland.mask] = missing
-                VerboseOut('writing %s' % fout, 4)
+                utils.verbose_out('writing %s' % fout, 4)
                 imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
                 imgout[0].Write(np.array(np.flipud(frland)).astype('float32'))
                 imgout.SetBandName(prod, 1)
@@ -617,4 +637,3 @@ class merraData(Data):
 
             # add product to inventory
             self.AddFile(sensor, key, fout)
-

@@ -35,14 +35,15 @@ from gips.core import SpatialExtent, TemporalExtent
 
 from gips.data.core import Repository, Asset, Data
 
-from gips.utils import settings, VerboseOut, List2File
+from gips.utils import settings, List2File
+from gips import utils
 
 from gippy import GeoImage
 
 from numpy import mean
 
 __author__ = "Ian Cooke <icooke@ags.io>"
-__version__ = '0.0.1'
+__version__ = '0.1.1'
 
 
 class prismRepository(Repository):
@@ -51,7 +52,6 @@ class prismRepository(Repository):
     _datedir = '%Y%m%d'
     _defaultresolution = [4000.0, 4000.0]
     _tile_attribute = 'id'
-
 
 
 class prismAsset(Asset):
@@ -96,10 +96,9 @@ class prismAsset(Asset):
         url = cls._assets[asset].get('url', '')
         if url == '':
             raise Exception("%s: URL not defined for asset %s" % (cls.__name__, asset))
-        VerboseOut('%s: fetch tile %s for %s' % (asset, tile, date), 3)
+        utils.verbose_out('%s: fetch tile %s for %s' % (asset, tile, date), 3)
         if url.startswith('ftp://'):
-            #drop ftp:// if given
-            url = url[6:]
+            url = url[6:]  # drop ftp:// if given
         ftpurl = url.split('/')[0]
         ftpdir = url[len(ftpurl):]
         try:
@@ -124,7 +123,7 @@ class prismAsset(Asset):
                 dir=cls.Repository.path('stage')
             )
             ofilename = os.path.join(stagedir, filename)
-            VerboseOut("Downloading %s" % filename, 2)
+            utils.verbose_out("Downloading %s" % filename, 2)
             with open(ofilename, "wb") as ofile:
                 ftp.retrbinary('RETR %s' % filename, ofile.write)
             ftp.close()
@@ -156,7 +155,6 @@ class prismAsset(Asset):
         scale = re.sub(r'(.+)D[0-9]+', r'\1', scalever)
         version = re.sub(r'.+(D[0-9]+)', r'\1', scalever)
         self.date = datetime.strptime(date, '%Y%m%d')
-        #self.products[variable] = filename
         self.asset = '_' + variable
         self.sensor = 'prism'
         self.scale = scale
@@ -182,7 +180,7 @@ class prismAsset(Asset):
         datafiles = filter(lambda x: x.lower().endswith('.bil'), datafiles)
         if len(datafiles) > 0:
             indexfile = self.filename + '.index'
-            print('indexfile: {}'.format(indexfile))
+            utils.verbose_out('indexfile: {}'.format(indexfile), 3)
             List2File(datafiles, indexfile)
             return datafiles
 
@@ -190,7 +188,7 @@ class prismAsset(Asset):
 class prismData(Data):
     """ A tile (CONUS State) of PRISM """
     name = 'PRISM'
-    version = '0.0.1'
+    version = __version__
     Asset = prismAsset
     _products = {
         'ppt': {
@@ -222,43 +220,45 @@ class prismData(Data):
         products = super(prismData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
+        # overwrite = kwargs.get('overwrite', False)
+        # utils.verbose_out('\n\noverwrite = {}\n'.format(overwrite), 2)
+        # TODO: overwrite doesn't play well with pptsum -- wonder if it would
+        #       if it was made into a composite product (which it is)
         bname = os.path.join(self.path, self.basename)
-        assert len(prismAsset._sensors) == 1 # sanity check to force this code to stay current
+        assert len(prismAsset._sensors) == 1  # sanity check to force this code to stay current
         sensor = prismAsset._sensors.keys()[0]
+
+        def get_bil_vsifile(d, a):
+            with utils.error_handler('Error accessing asset {}'
+                                     .format(d), continuable=True):
+                return os.path.join(
+                    '/vsizip/' + d.assets[a].filename,
+                    d.assets[a].datafiles()[0])
 
         for key, val in products.requested.items():
             start = datetime.now()
-
             # check that we have required assets
             requiredassets = self.products2assets([val[0]])
             # val[0] s.b. key w/o product args
             missingassets = []
             availassets = []
-
             vsinames = {}
 
-            def get_bil_file(d, a):
-                return filter(
-                    lambda f: f.endswith('.bil'),
-                    d.assets[a].datafiles(),
-                )[0]
-
             for asset in requiredassets:
-                try:
-                    bil = get_bil_file(self, asset)
-                except KeyError:
-                    # TODO error-handling-fix: this doesn't have to be a try/except; use a conditional
+                bil = get_bil_vsifile(self, asset)
+                if bil is None:
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)
-                    vsinames[asset] = bil
+                     vsinames[asset] = os.path.join(
+                         '/vsizip/' + self.assets[asset].filename,
+                         bil
+                     )
 
             if not availassets:
-                VerboseOut(
+                utils.verbose_out(
                     'There are no available assets ({}) on {} for tile {}'
-                    .format(
-                        str(missingassets), str(self.date), str(self.id),
-                    ),
+                    .format(str(missingassets), str(self.date), str(self.id)),
                     5,
                 )
                 continue
@@ -282,59 +282,42 @@ class prismData(Data):
                     # default lag of 3 days SB configurable.
                     lag = 3
                     fname = re.sub(r'\.tif$', '-{}.tif'.format(lag), fname)
-                    VerboseOut('Using default lag of {} days.'.format(lag), 2)
+                    utils.verbose_out('Using default lag of {} days.'
+                                      .format(lag), 2)
+
+                date_spec = '{},{}'.format(
+                    datetime.strftime(
+                        self.date - timedelta(days=lag), '%Y-%m-%d',
+                    ),
+                    datetime.strftime(self.date, '%Y-%m-%d'),
+                )
+                inv = self.inventory(dates=date_spec, products=['ppt'],)
+                inv.process()
+                # because DataInventory object doesn't update
+                inv = self.inventory(dates=date_spec, products=['ppt'],)
+                if len(inv.data) < lag:
+                    utils.verbose_out(
+                        '{}: requires {} preceding days ppt ({} found).'
+                        .format(key, lag, len(inv.data)),
+                        3,
+                    )
+                    continue  # go to next product to process
+                imgs = []
+                for tileobj in inv.data.values():
+                    datobj = tileobj.tiles.values()[0]
+                    imgs.append(GeoImage(get_bil_vsifile(datobj, '_ppt')))
 
                 if os.path.exists(fname):
                     os.remove(fname)
 
-                inv = self.inventory(
-                    dates='{},{}'.format(
-                        datetime.strftime(
-                            self.date - timedelta(days=lag - 1), '%Y-%m-%d',
-                        ),
-                        datetime.strftime(self.date, '%Y-%m-%d'),
-                    ),
-                    products=['ppt'],
-                )
-                inv.process()
-                inv = self.inventory(
-                    dates='{},{}'.format(
-                        datetime.strftime(
-                            self.date - timedelta(days=lag - 1), '%Y-%m-%d',
-                        ),
-                        datetime.strftime(self.date, '%Y-%m-%d'),
-                    ),
-                    products=['ppt'],
-                )
-                if len(inv.data) < lag:
-                    raise Exception(
-                        key + ': requires {} preceding days ppt assets.'
-                        .format(lag) +
-                        '\nOnly {} days found.'.format(len(inv.data))
-                    )
-                imgs = []
-                for tileobj in inv.data.values():
-                    datobj = tileobj.tiles.values()[0]
-                    imgs.append(datobj.open_assets('ppt'))
                 oimg = GeoImage(fname, imgs[0])
                 for chunk in oimg.Chunks():
                     oarr = oimg[0].Read(chunk) * 0.0
                     for img in imgs:
-                        print('mean value of image: {}'.format(mean(img[0].Read())))
                         oarr += img[0].Read(chunk)
                     oimg[0].Write(oarr, chunk)
                 oimg.Process()
-                #oimg = None
-                print('nih')
+                oimg = None  # help swig+gdal with GC
                 products.requested.pop(key)
-            self.AddFile(sensor, key, fname) # add product to inventory
+            self.AddFile(sensor, key, fname)  # add product to inventory
         return products
-
-    # def __init__(self, tile=None, date=None, path=None):
-    #     super(prismData, self).__init__(tile, date, path)
-    #     for k in self.filenames:
-    #         self.filenames[k] = os.path.join(
-    #             '/vsizip/' + self.filenames[k],
-    #             os.path.basename(self.filenames[k])[:-3] + 'bil'
-    #         )
-    #     print self.filenames
