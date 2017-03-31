@@ -220,7 +220,10 @@ class Asset(object):
     # Child classes should not generally have to override anything below here
     ##########################################################################
     def datafiles(self):
-        """ Get list of readable datafiles from asset (multiple filenames if tar or hdf file) """
+        """Get list of readable datafiles from asset.
+
+        A 'datafile' in this context is a file contained within the
+        asset file, such as for tar, zip, and hdf files."""
         path = os.path.dirname(self.filename)
         indexfile = os.path.join(path, self.filename + '.index')
         if os.path.exists(indexfile):
@@ -234,8 +237,7 @@ class Asset(object):
                 datafiles = tfile.getnames()
             elif zipfile.is_zipfile(self.filename):
                 zfile = zipfile.ZipFile(self.filename)
-                datafiles = ['/vsizip/' + os.path.join(self.filename, f)
-                             for f in zfile.namelist()]
+                datafiles = zfile.namelist()
             else:
                 # Try subdatasets
                 fh = gdal.Open(self.filename)
@@ -248,12 +250,17 @@ class Asset(object):
                 return [self.filename]
 
 
-    def extract(self, filenames=[]):
-        """ Extract filenames from asset (if archive file) """
+    def extract(self, filenames=tuple()):
+        """Extract given files from asset (if it's a tar or zip).
+
+        Extracted files are placed in the same dir as the asset file.
+        """
         if tarfile.is_tarfile(self.filename):
-            tfile = tarfile.open(self.filename)
+            open_file = tarfile.open(self.filename)
+        elif zipfile.is_zipfile(self.filename):
+            open_file = zipfile.ZipFile(self.filename)
         else:
-            raise Exception('%s is not a valid tar file' % self.filename)
+            raise Exception('%s is not a valid tar or zip file' % self.filename)
         path = os.path.dirname(self.filename)
         if len(filenames) == 0:
             filenames = self.datafiles()
@@ -262,7 +269,7 @@ class Asset(object):
             fname = os.path.join(path, f)
             if not os.path.exists(fname):
                 VerboseOut("Extracting %s" % f, 3)
-                tfile.extract(f, path)
+                open_file.extract(f, path)
             with utils.error_handler('Error processing ' + fname, continuable=True):
                 # this ensures we have permissions on extracted files
                 if not os.path.isdir(fname):
@@ -318,6 +325,7 @@ class Asset(object):
 
     @classmethod
     def end_date(cls, asset):
+        # TODO this method never seems to be called?
         """ Get ending date for this asset """
         edate = cls._assets[asset].get('enddate', None)
         if edate is None:
@@ -327,6 +335,7 @@ class Asset(object):
 
     @classmethod
     def available(cls, asset, date):
+        # TODO this method never seems to be called?
         """ Check availability of an asset for given date """
         date1 = cls._assets[asset].get(['startdate'], None)
         date2 = cls._assets[asset].get(['enddate'], None)
@@ -492,7 +501,13 @@ class Asset(object):
 
 
 class Data(object):
-    """ Collection of assets/products for single date and spatial region """
+    """Collection of assets/products for single date and tile.
+
+    If the data isn't given in tiles, then another discrete spatial
+    region may be used instead.  In general, only one asset of each
+    asset type is permitted (self.assets is a dict keyed by asset type,
+    whose values are Asset objects).
+    """
     name = 'Data'
     version = '0.0.0'
     Asset = Asset
@@ -505,13 +520,18 @@ class Data(object):
         """ Retrieve metadata for this tile """
         return {}
 
-    def process(self, products, overwrite=False, **kwargs):
+    def needed_products(self, products, overwrite):
         """ Make sure all products exist and return those that need processing """
-        # TODO - clean up this messy thing
+        # TODO calling RequestedProducts twice is strange; rework into something clean
         products = self.RequestedProducts(products)
         products = self.RequestedProducts([p for p in products.products if p not in self.products or overwrite])
         # TODO - this doesnt know that some products aren't available for all dates
         return products
+
+    def process(self, products, overwrite=False, **kwargs):
+        """ Make sure all products exist and return those that need processing """
+        # TODO replace all calls to this method by subclasses with needed_products, then delete.
+        return self.needed_products(products, overwrite)
 
     @classmethod
     def process_composites(cls, inventory, products, **kwargs):
@@ -598,8 +618,8 @@ class Data(object):
         self.id = tile
         self.date = date
         self.path = path
-        self.basename = ''              # this is used by child classes
-        self.assets = {}                # dict of asset name: Asset instance
+        self.basename = ''              # product file name prefix, form is <tile>_<date>
+        self.assets = {}                # dict of <asset type string>: <Asset instance>
         self.filenames = {}             # dict of (sensor, product): product filename
         self.sensors = {}               # dict of asset/product: sensor
         if tile is not None and date is not None:

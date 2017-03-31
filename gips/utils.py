@@ -104,9 +104,9 @@ def List2File(lst, filename):
 def remove_files(filenames, extensions=()):
     """Remove the given files and all permutations with the given extensions.
 
-    So RemoveFiles(['a.hdf', 'b.hdf'], ['.index', '.aux.xml']) attempts to
+    So remove_files(['a.hdf', 'b.hdf'], ['.index', '.aux.xml']) attempts to
     these files:  a.hdf, b.hdf, a.hdf.index, a.hdf.aux.xml, b.hdf,
-    b.hdf.index, and b.hdf.aux.xml.
+    b.hdf.index, and b.hdf.aux.xml.  Doesn't raise an error if any file doesn't exist.
     """
     for f in (list(filenames) + [f + e for f in filenames for e in extensions]):
         with error_handler(continuable=True, msg_prefix="Error removing '{}'".format(f)):
@@ -141,6 +141,22 @@ def link(src, dst, hard=False):
     else:
         os.symlink(os.path.relpath(src, os.path.dirname(dst)), os.path.abspath(dst))
     return dst
+
+@contextmanager
+def make_temp_dir(suffix='', prefix='tmp', dir=None):
+    """Context manager to create then delete a temporary directory.
+
+    Arguments are the same as tempfile.mkdtemp, which it calls.  Yields
+    the absolute pathname to the new directory.  Deletes the directory
+    at the exit of the context, regardless of exceptions raised in the
+    context.
+    """
+    absolute_pathname = tempfile.mkdtemp(suffix, prefix, dir)
+    try:
+        yield absolute_pathname
+    finally:
+        shutil.rmtree(absolute_pathname)
+
 
 ##############################################################################
 # Settings functions
