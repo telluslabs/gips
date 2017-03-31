@@ -3,9 +3,11 @@
 # originally copied from:
 # https://raw.githubusercontent.com/jdherman/hpc-submission-scripts/master/submit-pbs-loop.py
 
-from subprocess import Popen, PIPE
+import os
+from subprocess import check_output, Popen, PIPE, CalledProcessError
 
 from gips import utils
+from gips.datahandler.logger import Logger
 
 pbs_directives = [
     # for meaning of directives see
@@ -15,8 +17,7 @@ pbs_directives = [
     '-k oe',
     '-j oe',
     '-V',
-    '-l walltime=1:00:00',
-    '-l nodes=1:ppn=1',
+    '-l walltime=8:00:00',
 ]
 
 import_block = """
@@ -33,11 +34,35 @@ gippy.Options.SetVerbose(4) # substantial verbosity for testing purposes
 orm.setup()
 """
 
+def get_job_name ():
+    return os.environ['PBS_JOBID']
+
+
+def is_job_alive (sched_id):
+    try:
+        result = check_output(['qstat', sched_id])
+    except CalledProcessError as e:
+        return False
+
+    lines = result.split('\n')
+    status = lines[2].split()[4]
+    print status
+    if status == 'C':
+        return False
+    else:
+        return True;
+
+
 def generate_script(operation, args_batch):
     """Produce torque script from given worker function and arguments."""
     lines = []
     lines.append('#!' + utils.settings().REMOTE_PYTHON) # shebang
     lines += ['#PBS ' + d for d in pbs_directives]      # #PBS directives
+    try:
+        outfile = utils.settings().TORQUE_OUTPUT
+        lines.append('#PBS -o ' + outfile)
+    except:
+        pass
     lines.append(import_block)  # python imports, std lib, 3rd party, and gips
     lines.append(setup_block)   # config & setup code
 
@@ -53,20 +78,23 @@ def generate_script(operation, args_batch):
     return '\n'.join(lines) # stitch into single string & return
 
 
-def submit(operation, args_ioi, batch_size=None, nproc=1):
+def submit(operation, args_ioi, batch_size=None, nproc=1, chain=False):
     """Submit jobs to the configured Torque system.
 
     Return value is a list of tuples, one for each batch:
-        (exit status of qsub, qsub's stdout, qsub's stderr)
+        (job identifier, exit status of qsub, qsub's stdout, qsub's stderr)
 
     operation:  Defines which function will be performed, and must be one of
         'fetch', 'process', 'export', or 'postprocess'.
     args_ioi:  An iterable of iterables; each inner iterable gives the
         arguments to one call to the chosen function.
+        The first item in the inner iterable needs to be the pk of the
+        item to be fetched/queried/exported/etc.
     batch_size:  The work is divided among torque jobs; each job receives
         batch_size function calls to perform in a loop.  Leave None for one job
         that works the whole batch.
     nproc: number of processors to request
+    chain: if True, chain batches to run in sequence
     """
     if operation not in ('query', 'fetch', 'process', 'export', 'export_and_aggregate'):
         # TODO: this error message does not match the 'operations'
@@ -83,20 +111,43 @@ def submit(operation, args_ioi, batch_size=None, nproc=1):
     chunks.append([i for i in chunks.pop() if i is not None])
 
     outcomes = []
+    last_id = None  # used to chain jobs, if requested
 
     qsub_cmd = ['qsub']
-    if utils.settings().TORQUE_QUEUE:
-        qsub_cmd.append('-q' + utils.settings().TORQUE_QUEUE)
-    qsub_cmd.append('-lnodes=1:ppn={}'.format(nproc))
+    try:
+        queue = '-q' + utils.settings().TORQUE_QUEUE
+        qsub_cmd.append(queue)
+    except:
+        pass
+
+    try:
+        node = utils.settings().TORQUE_NODE
+    except:
+        node = 1
+    qsub_cmd.append('-lnodes={}:ppn={}'.format(node, nproc))
     
     for chunk in chunks:
         job_script = generate_script(operation, chunk)
 
+        if chain and last_id is not None:
+            qsub = list(qsub_cmd)
+            qsub.append('-Wdepend=afterany:{}'.format(last_id))
+        else:
+            qsub = qsub_cmd
+
         # open a pipe to the qsub command, then end job_string to it
-        proc = Popen(qsub_cmd, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
+        proc = Popen(qsub, stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
         proc.stdin.write(job_script)
         out, err = proc.communicate()
-        outcomes.append((proc.returncode, out, err))
+        if proc.returncode != 0:
+            utils.verbose_out("qsub failed:\n" + err, 1)
+            sched_id = None
+            ids = None
+        else:
+            sched_id = out.strip()
+            if chain:
+                last_id = sched_id
+        outcomes.append((sched_id, chunk, proc.returncode, out, err))
 
     # TODO confirm qsub exited 0 (raise otherwise)
     # TODO return best thing for checking on status

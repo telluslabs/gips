@@ -20,8 +20,9 @@ def make_result(result, job):
     bands = result[1]
 
     date = key[0]
-    fid = int(key[2])
-    shaid = bands.pop('passthrough')['shaid']
+    #fid = int(key[2])
+    #shaid = bands.pop('passthrough')['shaid']
+    shaid = key[2]
 
     for band in bands.keys():
         stats = bands[band]
@@ -32,7 +33,6 @@ def make_result(result, job):
         sd = float(stats[3]) if stats[3] != 'nan' else None
         skew = float(stats[4]) if stats[4] != 'nan' else None
         count = float(stats[5]) if stats[5] != 'nan' else None
-
         r = Result(
             date=date,
             shaid=shaid,
@@ -46,16 +46,18 @@ def make_result(result, job):
         )
         try:
             r.save()
-        except django.db.utils.IntegrityError:
+        except orm.django.db.utils.IntegrityError:
             # Result already exists, skip it
+            # TODO: overwrite?
             pass
 
 
 def get_job(job):
+
     from gips.inventory.dbinv.models import Job
     try:
         job = Job.objects.get(id=job)
-    except django.core.exceptions.ObjectDoesNotExist:
+    except orm.django.core.exceptions.ObjectDoesNotExist:
         VerboseOut('Job with id {} does not exist'.format(job))
         exit(1)
 
@@ -69,8 +71,7 @@ def aggregate(job, projdir, nprocs=1):
         'products': [job.variable.product],
         'projdir': projdir,
         'processes': nprocs,
-        'passthrough': true.
-
+        #'passthrough': True,
     }
 
     results = SpatialAggregator.aggregate(**args)

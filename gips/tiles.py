@@ -93,6 +93,13 @@ class Tiles(object):
                 with utils.error_handler("Error mosaicking " + fout, continuable=True):
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
+                    """
+                    if alltouch and res is None:
+                        timg = gippy.GeoImage(filenames[0])
+                        res = []
+                        res[0] = abs(timg.Affine()[1])
+                        res[1] = abs(timg.Affine()[5])
+                    """
                     if self.spatial.site is not None and res is not None:
                         CookieCutter(
                             images, self.spatial.site, str(fout), res[0], res[1],

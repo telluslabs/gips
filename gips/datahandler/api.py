@@ -1,15 +1,17 @@
 """GIPS scheduler API, for scheduling work and checking status of same."""
 
 from datetime import timedelta
-from pprint import pprint
+from pprint import pprint, pformat
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.db.models import Count
 
 from gips import utils
 from gips.core import SpatialExtent, TemporalExtent
 
 from gips.inventory import dbinv, orm
+from gips.datahandler.logger import Logger
 from gips.datahandler import torque
 
 #from pdb import set_trace
@@ -24,6 +26,8 @@ def submit_job (site, variable, spatial, temporal):
                     (see gips.core.SpatialExtent.factory)
     temporal:       dictionary of TemporalExtent parameters ('dates' and 'days')
     """
+    Logger().log("submit_job: {} {} {} {}".format(site, variable,
+                                                  spatial, temporal))
     orm.setup()
     job = dbinv.models.Job.objects.create(
         site=site,
@@ -33,103 +37,8 @@ def submit_job (site, variable, spatial, temporal):
         status='requested',
     )
 
+    Logger().log("submit_job: returned jobid {}".format(job.pk))
     return job.pk
-
-
-def schedule_query ():
-    '''
-    Submit to torque (or other) query job for any new 'job'.
-    Runs query_service(...) to determine assets that need to be
-    fetched and products that need to be processed.
-
-    Will be called by a cron'd scheduler job.
-    '''
-    orm.setup()
-    with transaction.atomic():
-        jobs = dbinv.models.Job.objects.filter(status='requested')
-        if jobs.exists():
-            query_args = [ [j.pk] for j in jobs ]
-            jobs.update(status='initializing')
-            return torque.submit('query', query_args, 1)
-
-
-def schedule_fetch ():
-    '''
-    Submit to torque (or other) fetch jobs for any assets that
-    are 'requested'. Mark scheduled assets as 'scheduled'.
-
-    Will be called by a cron'd scheduler job.
-    '''
-
-    orm.setup()
-    # TODO: this needs to be throttleable
-    with transaction.atomic():
-        assets = dbinv.models.Asset.objects.filter(status='requested')
-        if assets.exists():
-            fetch_args = [ [a.driver, a.asset, a.tile, a.date]
-                           for a in assets ]
-            assets.update(status='scheduled')
-            return torque.submit('fetch', fetch_args) # for now, submit all to same job
-
-
-def schedule_process ():
-    '''
-    Submit to torque (or other?) jobs to process any products that are
-    ready to be processed - i.e. are 'requested' and all asset
-    dependencies are 'complete'. Mark scheduled products as 'scheduled'.
-
-    Will be called by a cron'd scheduler job
-    '''
-
-    orm.setup()
-    from django.db.models import Q
-    with transaction.atomic():
-        products = dbinv.models.Product.objects.filter(
-            status='requested'
-        ).exclude(
-            ~Q(assetdependency__asset__status='complete')
-        )
-        if products.exists():
-            # TODO: process() fails if passed unicode strings. why?
-            def de_u(u):
-                return u.encode('ascii', 'ignore')
-            process_args = [ [de_u(p.driver), de_u(p.product), de_u(p.tile), p.date]
-                             for p in products ]
-            products.update(status='scheduled')
-            return torque.submit('process', process_args, 2)
-
-
-def schedule_export_and_aggregate ():
-    '''
-    Check all Jobs to see if  ready for post-processing (all assets fetched and
-    all products processed). If so, submit export and aggregate jobs
-    to torque (or other?) 
-
-    Will be called by a cron'd scheduler job
-
-    '''
-    orm.setup()
-    with transaction.atomic():
-        jobs = dbinv.models.Job.objects.filter(status='in-progress')
-        for job in jobs:
-            status = processing_status(
-                job.variable.driver.encode('ascii', 'ignore'),
-                eval(job.spatial),
-                eval(job.temporal),
-                [job.variable.product.encode('ascii', 'ignore')]
-            )
-            if (
-                    status['requested'] == 0
-                    and status['scheduled'] == 0
-                    and status['in-progress'] == 0
-            ):
-                # nothing being worked on. must be done pre-processing
-                print "Submitting job", job.pk, "for export and aggregate"
-                job.status = 'pp-scheduled'
-                job.save()
-                # TODO: need a better way to configure / determine nproc
-                nproc = 4
-                torque.submit('export_and_aggregate', [[job.pk, nproc]], nproc=nproc)
 
 
 def processing_status(driver_name, spatial_spec, temporal_spec, products):
@@ -167,6 +76,25 @@ def processing_status(driver_name, spatial_spec, temporal_spec, products):
                 status[p.status] += 1
         return status
 
+
+def job_status(jobid):
+    orm.setup()
+    try:
+        job = dbinv.models.Job.objects.get(pk=jobid)
+    except dbinv.models.Job.DoesNotExist:
+        return "jobid does not exist", {}
+
+    if job.status in('requested', 'initializing', 'scheduled'):
+        return job.status, {}
+    else:
+        return job.status, processing_status(
+            job.variable.driver.encode('ascii', 'ignore'),
+            eval(job.spatial),
+            eval(job.temporal),
+            [job.variable.product.encode('ascii', 'ignore')]
+        )
+            
+    
 
 def query_service(driver_name, spatial, temporal, products,
                   query_type='missing', action='request-product'):
@@ -267,7 +195,6 @@ def query_service(driver_name, spatial, temporal, products,
         (p, t, d) = i
         assets = []
         for a in items[i]:
-            print a
             if request_asset:
                 params = {
                     'driver': driver_name, 'asset': a['asset'],

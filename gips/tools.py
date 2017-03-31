@@ -417,7 +417,7 @@ class SpatialAggregator(object):
                     args['key'] = (date, product, fid)
                     args['req_stats'] = req_stats
                     args['coe'] = continue_on_error
-
+                    print "*****", fid, "*****"
                     worker_args.append(args)
 
         if num_procs == 1:
