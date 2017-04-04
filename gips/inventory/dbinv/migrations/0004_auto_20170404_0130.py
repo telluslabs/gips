@@ -12,10 +12,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        #migrations.RemoveField(
-        #    model_name='result',
-        #    name='fid',
-        #),
+        migrations.RemoveField(
+            model_name='result',
+            name='fid',
+        ),
         migrations.AlterUniqueTogether(
             name='postprocessjobs',
             unique_together=set([('job', 'args')]),
