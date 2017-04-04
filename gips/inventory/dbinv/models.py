@@ -215,3 +215,7 @@ class PostProcessJobs(models.Model):
     status   = models.TextField()
     time     = models.DateTimeField(auto_now_add=True)
     sched_id = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ('job', 'args')
+        

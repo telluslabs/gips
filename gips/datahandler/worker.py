@@ -193,7 +193,7 @@ def export_and_aggregate(job_id, start_ext, end_ext,
     # setup output dir
     if outdir is None:
         outdir = os.path.join(utils.settings().EXPORT_DIR,
-                              os.environ['PBS_JOBID'],
+                              torque.get_job_name(),
                               str(job_id),)
     # poor man's binary semaphore since mkdir is atomic;
     # exception on a priori existence is what we want here
