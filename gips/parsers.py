@@ -69,7 +69,7 @@ class GIPSParser(argparse.ArgumentParser):
         )
         group.add_argument(
             '--numprocs', help='Desired number of processors (if allowed)',
-            default=2, type=int
+            default=1, type=int
         )
         self.parent_parsers.append(parser)
         return parser
