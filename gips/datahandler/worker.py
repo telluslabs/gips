@@ -199,6 +199,8 @@ def export_and_aggregate(job_id, start_ext, end_ext,
     # exception on a priori existence is what we want here
     os.makedirs(outdir)
 
+    # force alltouch to be true for the geokit API
+    # TODO: GIPS API should expose spatial options
     mosaic_kwargs['alltouch'] = True
     _export(
         task.job.variable.driver,
