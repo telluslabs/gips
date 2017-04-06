@@ -118,7 +118,10 @@ def query_service(driver_name, spatial, temporal, products,
         + 'get-info' - do nothing but return that which would have been requested.
     '''
     from time import time
+    log = Logger().log
 
+    log("query_service starting; args: " + repr((
+        driver_name, spatial, temporal, products, query_type, action)))
     def tprint(tslist):
         last = tslist[0]
         print('---')
@@ -164,7 +167,7 @@ def query_service(driver_name, spatial, temporal, products,
     else:
         raise NotImplemented('query_service: query_type "{}" not implemented'
                              .format(query_type))
-    # query data service
+    # query data service for assets
     items = datacls.query_service(
         products, tiles, temporal_ext,
         update=update, force=force, grouped=True

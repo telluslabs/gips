@@ -149,6 +149,13 @@ def submit(operation, args_ioi, batch_size=None, nproc=1, chain=False):
                 last_id = sched_id
         outcomes.append((sched_id, chunk, proc.returncode, out, err))
 
+        # if debug mode, print the generated torque script to a file
+        if utils.get_setting('DH_DEBUG'):
+            dfn = '{}-{}-job-script.py'.format(operation, sched_id)
+            utils.verbose_out('dumping to ' + dfn, 1)
+            with open(dfn, 'w') as dump_file:
+                dump_file.write(job_script)
+
     # TODO confirm qsub exited 0 (raise otherwise)
     # TODO return best thing for checking on status
     # TODO log err someplace

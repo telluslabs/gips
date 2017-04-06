@@ -3,6 +3,46 @@ from __future__ import unicode_literals
 from django.db import models
 from django.core.exceptions import ValidationError
 
+"""
+STATUS STRINGS AND WHERE TO FIND THEM:  'remote' isn't used at all, and Products are never
+marked 'failed'.  Jobs have two states unique to them:  'initializing' and 'post-processing'.
+Jobs also use 'scheduled' differently than the other three types.  Assets have a unique state,
+'retry'.
+
+string          used on     meaning
+===================================
+remote          nobody
+
+requested       Job         set by api.submit_job at job creation time
+                Asset       set by worker.query_service; asset is desired by some Job
+                Product     set by worker.query_service; product is desired by some Job
+
+initializing    Job         set by scheduler.schedule_query just before submitting a query torque job
+
+scheduled       Job         set by worker.query at beginning of query work
+                Asset       scheduler is about to submit a torque fetch job for this asset
+                Product     same as asset but for product
+            PostProcessJobs same as asset but for PPJ
+
+in-progress     Job         set by worker.query; means query() is finished
+                Asset       set by worker.fetch when download is about to commence
+                Product     set by worker.process when product generation is about to commence
+                PPJ         set by worker.export_and_aggregate when work is about to start
+
+post-processing Job         set by scheduler when E&A has been submitted to torque for a given job
+
+complete        Job         set by scheduler.schedule_export_and_aggregate when its PPJs are complete
+                Asset       set by worker.fetch when it's finished fetching
+                Product     same as Asset; set by worker.process
+                PPJ         same as Asset; set by worker.export_and_aggregate
+
+retry           Asset       set by worker.fetch when an asset fails to fetch
+
+failed          Asset       set by scheduler when retry count exceeds hardcoded threshold (3)
+                PPJ         set by scheduler when it observes an E&A task is busted
+                Job         set on the parent Job of a PPJ when its E&A task is marked failed
+"""
+
 status_strings = ('remote',
                   'requested',
                   'initializing',  # this is only used at the job level
