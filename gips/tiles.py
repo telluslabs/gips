@@ -100,13 +100,11 @@ class Tiles(object):
                             crop, interpolation, {}, alltouch,
                         )
                     else:
-                        if alltouch is True:
+                        product_res = None
+                        if alltouch:
                             # get the product res, this will indicate that we want "alltouch"
-                            timg = gippy.GeoImage(filenames[0])
                             affine = images[0].Affine()
                             product_res = (affine[1], affine[5])
-                        else:
-                            product_res = None
                         mosaic(images, fout, self.spatial.site, product_res=product_res)
 
         t = datetime.now() - start
