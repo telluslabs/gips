@@ -377,7 +377,7 @@ def crop2vector(img, vector):
     return img
 
 
-def mosaic(images, outfile, vector):
+def mosaic(images, outfile, vector, product_res=None):
     """ Mosaic multiple files together, but do not warp """
     nd = images[0][0].NoDataValue()
     srs = images[0].Projection()
@@ -389,15 +389,27 @@ def mosaic(images, outfile, vector):
         filenames.append(images[f].Filename())
     # transform vector to image projection
     geom = wktloads(transform_shape(vector.WKT(), vector.Projection(), srs))
-
     extent = geom.bounds
-    ullr = "%f %f %f %f" % (extent[0], extent[3], extent[2], extent[1])
-
-    # run merge command
+    # part of the command string
     nodatastr = '-n %s -a_nodata %s -init %s' % (nd, nd, nd)
-    cmd = 'gdal_merge.py -o %s -ul_lr %s %s %s' % (outfile, ullr, nodatastr, " ".join(filenames))
-    result = commands.getstatusoutput(cmd)
-    VerboseOut('%s: %s' % (cmd, result), 4)
+    # might reuse the gdal merge command
+    def gdal_merge(x0, y0, x1, y1):
+        ullr = "%f %f %f %f" % (x0, y0, x1, y1)
+        cmd = 'gdal_merge.py -o %s -ul_lr %s %s %s' % (outfile, ullr, nodatastr, " ".join(filenames))
+        result = commands.getstatusoutput(cmd)
+        VerboseOut('%s: %s' % (cmd, result), 4)
+        return result[0] == 0
+
+    merge_ok = gdal_merge(extent[0], extent[3], extent[2], extent[1])
+
+    if merge_ok is False and product_res is not None:
+        # possibly awful solution to the so-called alltouch problem
+        x0, y0, x1, y1 = (extent[0], extent[3], extent[2], extent[1])
+        x1 += product_res[0]
+        y1 += product_res[1]
+        # TODO: catch if this one does not work
+        merge_ok = gdal_merge(x0, y0, x1, y1)
+
     imgout = gippy.GeoImage(str(outfile), True)
     for b in range(0, images[0].NumBands()):
         imgout[b].CopyMeta(images[0][b])
