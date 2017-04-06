@@ -211,12 +211,11 @@ def schedule_export_and_aggregate ():
                         for i in range(int(math.ceil(num_ext / ext_per)))]
             with transaction.atomic():
                 for j in job_args:
-                    pp = dbinv.models.PostProcessJobs(
+                    pp = dbinv.models.PostProcessJobs.objects.update_or_create(
+                        defaults = {'status': 'scheduled'},
                         job = job,
                         args = repr(tuple(j)),
-                        status = 'scheduled',
                     )
-                    pp.save()
             # put this in a seperate transaction. the postprocessjobs need to exist before
             # submitting jobs
             with transaction.atomic():
