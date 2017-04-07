@@ -115,10 +115,10 @@ class sentinel2Asset(Asset):
         'L1C': {
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both original and shortened post-2016-12-07 assets.
-            # TODO test this line
+            # TODO test this line after assets are archived (ie during Asset.discover)
             'pattern': '*S2?_*MSIL1C_*????????T??????_*R???_*.zip',
             'startdate': datetime.date(2016, 12, 07), # used to prevent impossible searches
-            'latency': 3  # TODO actually seems to be 3,7,3,7..., but this value seems to be unused?
+            'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
                           # only needed by Asset.end_date and Asset.available, but those are never called?
         },
 
@@ -131,8 +131,8 @@ class sentinel2Asset(Asset):
     _asset_styles = {
         'original': {
             'name-re': ( # pattern for the asset file name
-                # example: 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
-                # TODO test this line
+                # example, note that leading tile code is spliced in by Asset.fetch:
+                # 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
                 '^(?P<tile>\d\d[A-Z]{3})_(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # tile & sensor
                 '_\d{8}T\d{6}' # processing date (don't care)
                 '_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
@@ -190,7 +190,6 @@ class sentinel2Asset(Asset):
         self.style_res = self._asset_styles[style]
         self.asset = 'L1C' # only supported asset type
         self.sensor = match.group('sensor')
-        # TODO test this line
         self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
         self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
@@ -283,25 +282,34 @@ class sentinel2Asset(Asset):
                 p.communicate()
                 if p.returncode != 0:
                     raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-                stage_path = cls.Repository.path('stage')
-                if style == 'original':
-                    # copy enough links into stage to do the thing successfully
-                    # the way to do this is by extracting the tile list from the asset
-                    tile_list = cls.tile_list(output_full_path)
-                    for tile in tile_list:
-                        stage_fp = os.path.join(stage_path, tile + '_' + output_file_name)
-                        os.link(output_full_path, stage_fp)
-                else:
-                    stage_full_path = os.path.join(stage_path, output_file_name)
-                    os.rename(output_full_path, stage_full_path) # on POSIX, if it works, it's atomic
+                cls.stage_asset(style, output_full_path, output_file_name)
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
 
 
     @classmethod
+    def stage_asset(cls, style, asset_full_path, asset_base_name):
+        """Copy the given asset to the stage.
+
+        If the file is an old-style asset, it's exploded into many names,
+        one per tile, so that the archivation process will behave properly.
+        """
+        stage_path = cls.Repository.path('stage')
+        if style == 'original':
+            # copy enough links into stage to do the thing successfully
+            # the way to do this is by extracting the tile list from the asset
+            tile_list = cls.tile_list(asset_full_path)
+            for tile in tile_list:
+                stage_fp = os.path.join(stage_path, tile + '_' + asset_base_name)
+                os.link(asset_full_path, stage_fp)
+        else:
+            stage_full_path = os.path.join(stage_path, asset_base_name)
+            os.rename(asset_full_path, stage_full_path) # on POSIX, if it works, it's atomic
+
+
+    @classmethod
     def tile_list(cls, file_name):
         """Extract a list of tiles from the given old-style asset."""
-        # TODO confirm via filename examination that this asset is old-style
         # "the only XML file one directory down from DATASTRIP/"
         file_pattern = '^.*/DATASTRIP/[^/]+/[^/]+\.xml$'
         subtree_tag = 'Tile_List'

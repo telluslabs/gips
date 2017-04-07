@@ -248,9 +248,69 @@ def t_fetch_old_asset(fetch_mocks):
 
 
 def t_tile_list(test_asset_fn):
-    "Use the test asset file to confirm tile_list()."""
+    """Use the test asset file to confirm tile_list()."""
     tiles = sentinel2.sentinel2Asset.tile_list(test_asset_fn)
     assert expected_tiles == tiles
 
-# TODO test behavior of:
-# archived_assets = dataclass.Asset.archive(Repository.path('stage'), update=self.update)
+
+@pytest.fixture
+def archive_setup(test_asset_fn):
+    """Set up to archive test_asset_fn.
+
+    Make sure tiles/ is clear.  Copy the asset into the stage.
+    Clean it out from stage/ and tiles/ afterwards.
+    """
+    # set up source & destination filesystem paths
+    stage_path = sentinel2.sentinel2Repository.path('stage')
+    tiles_path = sentinel2.sentinel2Repository.path('tiles')
+
+    staged_asset_bn = '19TCH_' + test_asset_bn
+
+    staged_asset_fn   = os.path.join(stage_path, staged_asset_bn)
+    archived_asset_fn = os.path.join(tiles_path, '19TCH', '2016019', staged_asset_bn)
+
+    # do some pre-test checks
+    if os.path.exists(staged_asset_fn):
+        raise IOError('`{}` exists, aborting'.format(staged_asset_fn))
+    if os.path.exists(archived_asset_fn):
+        raise IOError('`{}` exists, aborting'.format(archived_asset_fn))
+
+    # finish setup by moving the asset into the stage
+    shutil.copy(test_asset_fn, staged_asset_fn)
+
+    # let the test run
+    try:
+        yield (stage_path, staged_asset_fn, archived_asset_fn)
+    finally:
+        # clean up by removing the asset from both the stage and the archive
+        if os.path.exists(staged_asset_fn): # usually is removed by code under test
+            os.remove(staged_asset_fn)
+        os.remove(archived_asset_fn)
+
+
+def t_archive_old_asset(archive_setup):
+    """Confirm old-style assets archive properly."""
+    stage_path, staged_asset_fn, archived_asset_fn = archive_setup
+
+    archived_assets = sentinel2.sentinel2Asset.archive(stage_path)
+
+    assert os.path.exists(archived_asset_fn) and not os.path.exists(staged_asset_fn)
+
+
+def t_stage_asset_old_style(test_asset_fn):
+    """Confirm old-style assets are tile-exploded into stage/ properly."""
+    # setup
+    stage_path = sentinel2.sentinel2Repository.path('stage')
+    expected_files = [os.path.join(stage_path, t + '_' + test_asset_bn) for t in expected_tiles]
+    # safety check
+    extant_files = [ef for ef in expected_files if os.path.exists(ef)]
+    if len(extant_files) > 0:
+        raise IOError("Files exist, aborting: {}".format(extant_files))
+
+    try:
+        sentinel2.sentinel2Asset.stage_asset('original', test_asset_fn, test_asset_bn)
+        actual_files = [ef for ef in expected_files if os.path.exists(ef)]
+        assert expected_files == actual_files
+    finally:
+        # clean up in any case; this may break if something went wrong
+        [os.remove(ef) for ef in expected_files]
