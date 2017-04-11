@@ -12,7 +12,6 @@ from gips.core import SpatialExtent, TemporalExtent
 
 from gips.inventory import dbinv, orm
 from gips.datahandler.logger import Logger
-from gips.datahandler import torque
 
 #from pdb import set_trace
 

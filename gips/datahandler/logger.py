@@ -33,8 +33,10 @@ class Logger(object):
     def __init__(self):
         self.extra = {}
         try:
+            # TODO this can't work for RQ
             self.extra['jobid'] = os.environ['PBS_JOBID']
         except:
+            # TODO is this correct?
             self.extra['jobid'] = os.path.split(sys.argv[0])[1]
         
         

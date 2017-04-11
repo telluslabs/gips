@@ -1,7 +1,6 @@
 """Worker functions for GIPS scheduled tasks.
 
-Called inside worker processes; first implementation is expected to be torque
-jobs.
+These functions are called inside worker processes.
 """
 import os, shutil
 
@@ -9,7 +8,8 @@ from django.db import transaction, IntegrityError
 
 from gips import utils
 from gips.core import SpatialExtent, TemporalExtent
-from gips.datahandler import api, torque
+from gips.datahandler import api
+from . import queue
 from gips.datahandler.logger import Logger
 from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import dbinv, orm
@@ -194,7 +194,7 @@ def export_and_aggregate(job_id, start_ext, end_ext,
     # setup output dir
     if outdir is None:
         outdir = os.path.join(utils.settings().EXPORT_DIR,
-                              torque.get_job_name(),
+                              queue.get_job_name(),
                               str(job_id),)
     # poor man's binary semaphore since mkdir is atomic;
     # exception on a priori existence is what we want here
