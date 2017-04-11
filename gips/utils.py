@@ -176,6 +176,15 @@ def settings():
         return gips.settings
 
 
+def get_setting(setting, default=None):
+    """Fetch a GIPS setting named by the given string.
+
+    If the setting isn't present in gips settings, the default is
+    returned instead.
+    """
+    return settings().__dict__.get(setting, default)
+
+
 def create_environment_settings(repos_path, email=''):
     """ Create settings file and data directory """
     from gips.settings_template import __file__ as src

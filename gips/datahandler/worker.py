@@ -24,7 +24,8 @@ def query (job_id):
     with transaction.atomic():
         job = dbinv.models.Job.objects.get(pk=job_id)
         if job.status != 'initializing':
-            # TODO log/msg about giving up here
+            err_msg = "Expected Job status to be 'initializing', but got {}"
+            utils.verbose_out(err_msg.format(job.status), 1)
             return job # not sure this is useful for anything
         job.status = 'scheduled'
         job.save()
