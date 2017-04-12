@@ -41,6 +41,7 @@ class aodRepository(Repository):
         'tiles', 'stage', 'quarantine', 'composites',
         'composites/ltad'
     ]
+    _the_tile = 'h01v01'
 
     @classmethod
     def data_path(cls, tile='', date=''):
@@ -51,7 +52,7 @@ class aodRepository(Repository):
 
     @classmethod
     def find_tiles(cls):
-        return ['h01v01']
+        return [cls._the_tile]
 
     @classmethod
     def find_dates(cls, tile=''):
@@ -102,8 +103,11 @@ class aodAsset(Asset):
         doy = bname[14:17]
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
         self.sensor = bname[:3]
-        cnum = float(bname[18:21])
-        self.modis_collection = cnum / 10 ** numpy.floor(numpy.log10(cnum))
+        collection_number = float(bname[18:21])
+        # collection number is encoded in the filename as 005, 006, 051, or
+        # 055.  So, we take it as a float, and then divide by the order of
+        # magnitude to get the modis_collection number
+        self.modis_collection = collection_number / 10 ** numpy.floor(numpy.log10(cnum))
         prefix = 'HDF4_EOS:EOS_GRID:"'
         sds = {
             5: 'Optical_Depth_Land_And_Ocean_Mean',
@@ -203,7 +207,7 @@ class aodData(Data):
         DataInventory class.
         '''
         # since it is broken
-        raise Exception('Composite processing is currently broken')
+        raise NotImplementedError('Composite processing is currently broken')
         cls.initialize_composites()
         for product in products:
             cpath = os.path.join(cls.Asset.Repository.path('composites'), 'ltad')
