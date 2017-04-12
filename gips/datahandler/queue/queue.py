@@ -30,5 +30,9 @@ def get_job_name(*args, **kwargs):
 def is_job_alive(*args, **kwargs):
     return get_queue().is_job_alive(*args, **kwargs)
 
-def submit(*args, **kwargs):
-    return get_queue().submit(*args, **kwargs)
+
+valid_ops = ('query', 'fetch', 'process', 'export', 'export_and_aggregate')
+
+def submit(operation, *args, **kwargs):
+    assert operation in valid_ops, '{} is not a valid operation'.format(operation)
+    return get_queue().submit(operation, *args, **kwargs)

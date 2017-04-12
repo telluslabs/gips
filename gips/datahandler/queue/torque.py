@@ -96,12 +96,6 @@ def submit(operation, args_ioi, batch_size=None, nproc=1, chain=False):
     nproc: number of processors to request
     chain: if True, chain batches to run in sequence
     """
-    if operation not in ('query', 'fetch', 'process', 'export', 'export_and_aggregate'):
-        # TODO: this error message does not match the 'operations'
-        err_msg = ("'{}' is an invalid operation (valid operations are "
-                   "'fetch', 'process', 'export', and 'postprocess')".format(operation))
-        raise ValueError(err_msg)
-
     if batch_size is None:
         chunks = [args_ioi]
     else:
