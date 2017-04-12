@@ -69,7 +69,7 @@ class aodRepository(Repository):
     @classmethod
     def vector2tiles(cls, *args, **kwargs):
         """ There are no tiles -- so use the "one tile" style """
-        return {'h01v01': (1, 1)}
+        return {cls._the_tile: (1, 1)}
 
 
 class aodAsset(Asset):
@@ -98,7 +98,7 @@ class aodAsset(Asset):
 
         bname = os.path.basename(filename)
         self.asset = bname[0:5]
-        self.tile = 'h01v01'
+        self.tile = self._the_tile
         year = bname[10:14]
         doy = bname[14:17]
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
@@ -195,7 +195,7 @@ class aodData(Data):
         if os.path.exists(lta_tif) and len(ltad_tifs) == 366:
             utils.verbose_out('lta composites already initialized', 2)
             return
-        a = inv[inv.dates[0]].tiles['h01v01'].open('aod')
+        a = inv[inv.dates[0]].tiles[cls._the_tile].open('aod')
         a[0] = a[0] * 0 + a[0].NoDataValue()
         a.Process(ltatif)
 
@@ -222,7 +222,7 @@ class aodData(Data):
                 # ):
                 for day in range(inventory.start_day, inventory.end_day + 1):
                     dates = [d for d in inventory.dates if int(d.strftime('%j')) == day]
-                    filenames = [inventory[d].tiles['h01v01'].filenames['MOD', 'aod'] for d in dates]
+                    filenames = [inventory[d].tiles[cls._the_tile].filenames['MOD', 'aod'] for d in dates]
                     fout = path + '%s.tif' % str(day).zfill(3)
                     cls.process_mean(filenames, fout)
             # Calculate single average per pixel (all days and years)
@@ -305,7 +305,7 @@ class aodData(Data):
         try:
             # this is just for fetching the data
             inv = cls.inventory(dates=date.strftime('%Y-%j'), fetch=fetch, products=['aod'])
-            img = inv[date].tiles['h01v01'].open('aod')
+            img = inv[date].tiles[cls._the_tile].open('aod')
             vals = img[0].Read(roi)
             # TODO - do this automagically in swig wrapper
             vals[numpy.where(vals == img[0].NoDataValue())] = numpy.nan
