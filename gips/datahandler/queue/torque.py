@@ -71,7 +71,7 @@ def generate_script(operation, args_batch):
     #       i switched to double quotes because repr seems to generate singles in most cases
     lines.append('print "{}"'.format(repr(args_batch[0])))
 
-    # star of the show, the actual fetch
+    # star of the show, the actual operation
     for args in args_batch:
         lines.append("worker.{}{}".format(operation, tuple(args)))
 
@@ -82,7 +82,7 @@ def submit(operation, args_ioi, batch_size=None, nproc=1, chain=False):
     """Submit jobs to the configured Torque system.
 
     Return value is a list of tuples, one for each batch:
-        (job identifier, exit status of qsub, qsub's stdout, qsub's stderr)
+        (job identifier, that batch's part of args_ioi, exit status of qsub, qsub's stdout, qsub's stderr)
 
     operation:  Defines which function will be performed, and must be one of
         'fetch', 'process', 'export', or 'postprocess'.
