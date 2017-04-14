@@ -55,9 +55,11 @@ def submit(operation, call_signatures, batch_size=None, nproc=1, chain=False):
 
     # here down is full of hacks to avoid fixing hacks in torque and scheduler
     if tq_setting() == 'torque':
-        outcomes = qm.submit(operation, call_signatures, batch_size=None, nproc=1, chain=False)
+        outcomes = qm.submit(operation, call_signatures, batch_size, nproc, chain)
         return outcomes
 
     if tq_setting() == 'rq':
-        outcomes = qm.submit(operation, call_signatures, chain=False)
-        return outcomes
+        outcomes = qm.submit(operation, call_signatures, chain)
+        # scheduler wants db_id, but it expects batches of call signatures, hence [[db_id]]
+        digestible_by_scheduler = [(job_id, [[db_id]]) for (job_id, db_id) in outcomes]
+        return digestible_by_scheduler

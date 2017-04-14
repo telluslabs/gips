@@ -33,15 +33,27 @@ def schedule_query ():
     scheduler job.
     """
     orm.setup()
+    log = Logger().log
+    jfilter = dbinv.models.Job.objects.filter
+    # locate work-ready Jobs and reserve them
     with transaction.atomic():
-        jobs = dbinv.models.Job.objects.filter(status='requested')
-        if jobs.exists():
-            query_args = [ [j.pk] for j in jobs ]
-            jobs.update(status='initializing')
-            outcomes = queue.submit('query', query_args, 1)
-            # TODO hmm --v
-            ids = [{'torque_id': o[0], 'db_id': o[1][0][0]} for o in outcomes]
-            Logger().log("Submitted query for job(s):\n{}".format(pformat(ids)))
+        jobs = jfilter(status='requested')
+        if not jobs.exists():
+            return
+        job_pks = [j.pk for j in jobs] # this has to go first, else QuerySet weirdness
+        jobs.update(status='initializing')
+
+    # submit the work to the queue, but unreserve the Jobs if anything breaks
+    try:
+        call_signatures = [[pk] for pk in job_pks]
+        outcomes = queue.submit('query', call_signatures, 1)
+    except Exception as e:
+        log("Error submitting query for jobs, IDs {}:\n{}".format(job_pks, e))
+        # possibly better to go to 'failed' instead?
+        jfilter(pk__in=job_pks, status='initializing').update(status='requested')
+        raise
+    ids = [{'torque_id': o[0], 'db_id': o[1][0][0]} for o in outcomes]
+    log("Submitted query for job(s):\n{}".format(pformat(ids)))
 
 
 def schedule_fetch (driver):
@@ -116,7 +128,6 @@ def schedule_fetch (driver):
             dbinv.models.update_status(assets, 'scheduled')
             ids = [
                 {
-                    # TODO --v
                     'torque_id': o[0],
                     'assets': [a[0] for a in o[1]],
                 }
@@ -126,7 +137,6 @@ def schedule_fetch (driver):
                 a = dbinv.models.Asset.objects.filter(
                     id__in=i['assets']
                 ).update(
-                    # TODO --------v
                     sched_id=i['torque_id']
                 )
                 print "len", a
@@ -154,7 +164,6 @@ def schedule_process ():
             dbinv.models.update_status(products, 'scheduled')
             ids = [
                 {
-                    # TODO --v
                     'torque_id': o[0],
                     'products': [p[0] for p in o[1]]
                 }
@@ -164,7 +173,6 @@ def schedule_process ():
                 p = dbinv.models.Product.objects.filter(
                     id__in=i['products']
                 ).update(
-                    # TODO --------v
                     sched_id=i['torque_id']
                 )
             Logger().log('scheduled process job(s):\n{}'.format(pformat(ids)))

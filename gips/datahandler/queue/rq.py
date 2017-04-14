@@ -1,33 +1,46 @@
 from __future__ import absolute_import # otherwise this file shadows rq library
 
+import os
+
 import rq
 import redis
+import gippy
 
 from .. import worker
 from gips import utils
+from gips.inventory import orm
+
+
+def work(operation, *args):
+    """Set up a good environment, then call worker.operation(*args).
+
+    Meant to be executed in an RQ worker process."""
+    os.environ['GIPS_ORM'] = 'true'
+    gippy.Options.SetVerbose(4) # substantial verbosity for testing purposes
+    orm.setup()
+    return worker.__dict__[operation](*args)
 
 
 def submit(operation, call_signatures, chain=False):
     """Submit jobs to RQ workers via Redis acting as a message queue.
 
-    Return value is a list of tuples, one for each batch:
-        (job identifier, list of db item IDs) <-- eg IDs for Asset or Product models
+    Return value is a list of tuples:
+        (job identifier, db item ID) <-- eg IDs for Asset or Product models
 
-    operation:  Defines which function will be performed; see queue.submit().
-    call_signatures:  An iterable of iterables; each inner iterable gives the
-        arguments to one call of the given function; needs to be in a
-        format expected by ..worker functions.
+    operation:  Defines which function will be performed; see
+        queue.submit().
+    call_signatures:  An iterable of iterables; each inner iterable
+        gives the arguments to one call of the given function; needs to
+        be in a format expected by ..worker functions (first item is
+        always a model ID).
     chain: If True, chain jobs to run in sequence.  Otherwise they may
         be worked in parallel depending on the RQ worker setup.
     """
-    # assert batch_size is None, 'batch_size not supported for RQ (got {})'.format(nproc)
-    # TODO log, don't print
-    print 'operation:', operation
-    print 'call_signatures:', repr(call_signatures)
-    print 'chain:', repr(chain)
     # TODO support everything
     if operation != 'query':
         raise NotImplementedError('query only for now (and even this is fake)')
+    if chain:
+        raise NotImplementedError('chain=True is a TODO')
 
     # tell RQ what Redis connection to use
     redis_conn = redis.Redis(
@@ -42,13 +55,10 @@ def submit(operation, call_signatures, chain=False):
             connection=redis_conn)
 
     # delay execution
-    task_function = worker.__dict__[operation]
-    job = q.enqueue(worker.look_busy, 1)
+    outcomes = []
+    for cs in call_signatures:
+        job = q.enqueue(work, operation, *cs)
+        # reminder: cs[0] ought to be the primary key of a model in dbinv.models
+        outcomes.append((job.id, cs[0]))
 
-    # job.id = UUID of job
-    # job.result = return value of job (None before it finishes, dunno what happens if it fails)
-    print 'job enqueued (id = {}), sleeping for 2 sec'.format(job.id)
-    import time
-    time.sleep(2) # Now, wait a while, until the worker is finished
-    print 'woke from sleep, job.results: "{}"'.format(job.result) # => snarky remark + '1'
-    raise NotImplementedError('return value is TBD')
+    return outcomes
