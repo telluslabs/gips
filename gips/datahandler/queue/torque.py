@@ -8,6 +8,7 @@ from subprocess import check_output, Popen, PIPE, CalledProcessError
 
 from gips import utils
 from gips.datahandler.logger import Logger
+from .. import queue
 
 pbs_directives = [
     # for meaning of directives see
@@ -35,6 +36,9 @@ orm.setup()
 """
 
 def get_job_name ():
+    """Returns the current job ID, if one exists."""
+    if 'PBS_JOBID' not in os.environ:
+        raise queue.NoCurrentJobError('PBS_JOBID not set; no current job found')
     return os.environ['PBS_JOBID']
 
 

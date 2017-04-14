@@ -6,9 +6,21 @@ import rq
 import redis
 import gippy
 
-from .. import worker
 from gips import utils
 from gips.inventory import orm
+from .. import worker
+from .. import queue
+
+def get_job_name():
+    """Returns the current job ID, if one exists."""
+    job = rq.get_current_job()
+    if job is None:
+        raise queue.NoCurrentJobError('rq.get_current_job() returned None; no current job found')
+    return job.id
+
+
+def is_job_alive(sched_id):
+    raise NotImplementedError('NO support for this yet')
 
 
 def work(operation, *args):

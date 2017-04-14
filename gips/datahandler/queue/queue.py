@@ -12,6 +12,12 @@ valid_tq_settings = ('torque', 'rq')
 
 _tq_setting = None
 
+
+class NoCurrentJobError(RuntimeError):
+    """When code expects to be "in" a running job, but is not."""
+    pass
+
+
 def tq_setting():
     """Return the value of gips setting TASK_QUEUE (a string).
 
@@ -34,13 +40,14 @@ def get_queue_module():
         from . import rq
         return rq
 
+    raise RuntimeError("Unreachable line reached; valid_tq_settings need updating?")
+
 
 def get_job_name(*args, **kwargs):
     return get_queue_module().get_job_name(*args, **kwargs)
 
 def is_job_alive(*args, **kwargs):
     return get_queue_module().is_job_alive(*args, **kwargs)
-
 
 
 def submit(operation, call_signatures, batch_size=None, nproc=1, chain=False):
@@ -63,3 +70,5 @@ def submit(operation, call_signatures, batch_size=None, nproc=1, chain=False):
         # scheduler wants db_id, but it expects batches of call signatures, hence [[db_id]]
         digestible_by_scheduler = [(job_id, [[db_id]]) for (job_id, db_id) in outcomes]
         return digestible_by_scheduler
+
+    raise RuntimeError("Unreachable line reached; valid_tq_settings need updating?")

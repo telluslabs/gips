@@ -226,10 +226,3 @@ def export_and_aggregate(job_id, start_ext, end_ext,
 
     if cleanup:
         shutil.rmtree(outdir)
-
-
-def look_busy(duration=5):
-    """Go to sleep for `duration` seconds."""
-    import time
-    time.sleep(duration)
-    return "I was just resting my eyes, for {} seconds.".format(duration)
