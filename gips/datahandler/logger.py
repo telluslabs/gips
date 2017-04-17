@@ -3,6 +3,8 @@ import os
 import sys
 
 from gips import utils
+from . import queue
+
 
 class Logger(object):
     __instance = None
@@ -13,7 +15,7 @@ class Logger(object):
                 port = utils.settings().LOG_PORT
             except:
                 port = logging.handlers.DEFAULT_TCP_LOGGING_PORT
-                
+
             try:
                 server = utils.settings().GEOKIT_SERVER
             except:
@@ -29,15 +31,15 @@ class Logger(object):
             socketHandler = logging.handlers.SocketHandler(server, port)
             rootLogger.addHandler(socketHandler)
         return Logger.__instance
-                                    
+
     def __init__(self):
         self.extra = {}
         try:
-            self.extra['jobid'] = os.environ['PBS_JOBID']
-        except:
+            self.extra['jobid'] = queue.get_job_name()
+        except queue.NoCurrentJobError:
             self.extra['jobid'] = os.path.split(sys.argv[0])[1]
-        
-        
+
+
     def log (self, message, level=1):
         utils.verbose_out(message, level)
         extra = self.extra.copy()

@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# `install.sh` to perform a dev install.
+# `install.sh dhrq` for a dev install that includes RQ & Redis for the datahandler.
+# note that other configuration, such as gips settings, may require manual edits
+
+# TODO validate arguments here
+
 set -e
 
 # this script needs to run in the clone dir
@@ -39,6 +45,20 @@ pip install 'https://github.com/Applied-GeoSolutions/gippy/tarball/v0.3.x#egg=gi
 echo === install GIPS itself ===
 # TODO --process-dependency-links is deprecated
 pip install --process-dependency-links -e .
+
+echo === install optional components ===
+for opt in "$@"; do
+    case "$opt" in
+        dhrq)
+            sudo apt-get install redis-server
+            pip install -e '.[rq]'
+            ;;
+        *)
+            echo >/dev/stderr Unkonwn option: "'$1'"
+            exit 1
+            ;;
+    esac
+done
 
 # help user with configuration
 echo "Install complete.  GIPS configuration:"

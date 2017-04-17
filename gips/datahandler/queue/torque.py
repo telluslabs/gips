@@ -8,6 +8,7 @@ from subprocess import check_output, Popen, PIPE, CalledProcessError
 
 from gips import utils
 from gips.datahandler.logger import Logger
+from .. import queue
 
 pbs_directives = [
     # for meaning of directives see
@@ -35,6 +36,9 @@ orm.setup()
 """
 
 def get_job_name ():
+    """Returns the current job ID, if one exists."""
+    if 'PBS_JOBID' not in os.environ:
+        raise queue.NoCurrentJobError('PBS_JOBID not set; no current job found')
     return os.environ['PBS_JOBID']
 
 
@@ -71,7 +75,7 @@ def generate_script(operation, args_batch):
     #       i switched to double quotes because repr seems to generate singles in most cases
     lines.append('print "{}"'.format(repr(args_batch[0])))
 
-    # star of the show, the actual fetch
+    # star of the show, the actual operation
     for args in args_batch:
         lines.append("worker.{}{}".format(operation, tuple(args)))
 
@@ -82,7 +86,7 @@ def submit(operation, args_ioi, batch_size=None, nproc=1, chain=False):
     """Submit jobs to the configured Torque system.
 
     Return value is a list of tuples, one for each batch:
-        (job identifier, exit status of qsub, qsub's stdout, qsub's stderr)
+        (job identifier, that batch's part of args_ioi, exit status of qsub, qsub's stdout, qsub's stderr)
 
     operation:  Defines which function will be performed, and must be one of
         'fetch', 'process', 'export', or 'postprocess'.
@@ -96,12 +100,6 @@ def submit(operation, args_ioi, batch_size=None, nproc=1, chain=False):
     nproc: number of processors to request
     chain: if True, chain batches to run in sequence
     """
-    if operation not in ('query', 'fetch', 'process', 'export', 'export_and_aggregate'):
-        # TODO: this error message does not match the 'operations'
-        err_msg = ("'{}' is an invalid operation (valid operations are "
-                   "'fetch', 'process', 'export', and 'postprocess')".format(operation))
-        raise ValueError(err_msg)
-
     if batch_size is None:
         chunks = [args_ioi]
     else:

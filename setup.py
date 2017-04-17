@@ -45,7 +45,6 @@ for f in glob.glob('gips/scripts/*.py'):
     except:
         print traceback.format_exc()
 
-
 setup(
     name='gips',
     version=__version__,
@@ -63,6 +62,9 @@ setup(
         'pysolar==0.6',
         'landsat-util==0.8.0ircwaves0',
     ],
+    extras_require={
+        'rq': ['rq'],
+    },
     dependency_links=[
         'http://github.com/ircwaves/landsat-util/tarball/landsat_util#egg=landsat-util-0.8.0ircwaves0'
     ],

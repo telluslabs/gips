@@ -1,5 +1,15 @@
 #!/usr/bin/env python
 
+"""This is "the cron job" that facilitates work moving through the system.
+
+It's intended to run periodically.  When it does, it looks for work that
+is ready to be performed, and submits that work to work queues.  Each
+'schedule_something' function handles one part of the work of a Job,
+which always has four parts, which must run in sequence:  query, fetch,
+process, and post-process.  The post-process step is also known as
+export-and-aggregate.
+"""
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count
@@ -12,36 +22,42 @@ from gips.core import SpatialExtent, TemporalExtent
 from gips.inventory import dbinv, orm
 from gips.datahandler import api
 from gips.datahandler.logger import Logger
-from gips.datahandler import torque
+from gips.datahandler import queue
 
 
 def schedule_query ():
-    '''
-    Submit to torque (or other) query job for any new 'job'.
-    Runs query_service(...) to determine assets that need to be
-    fetched and products that need to be processed.
+    """Find new (ie unworked) Jobs and submit them to a work queue.
 
-    Will be called by a cron'd scheduler job.
-    '''
+    The first step is determining assets that need to be fetched and
+    products that need to be processed.  Will be called by a cron'd
+    scheduler job.
+    """
     orm.setup()
+    log = Logger().log
+    jfilter = dbinv.models.Job.objects.filter
+    # locate work-ready Jobs and reserve them
     with transaction.atomic():
-        jobs = dbinv.models.Job.objects.filter(status='requested')
-        if jobs.exists():
-            query_args = [ [j.pk] for j in jobs ]
-            jobs.update(status='initializing')
-            outcomes = torque.submit('query', query_args, 1)
-            ids = [{'torque_id': o[0], 'db_id': o[1][0][0]} for o in outcomes]
-            Logger().log("Submitted query for job(s):\n{}".format(pformat(ids)))
+        jobs = jfilter(status='requested')
+        if not jobs.exists():
+            return
+        job_pks = [j.pk for j in jobs] # this has to go first, else QuerySet weirdness
+        jobs.update(status='initializing')
+
+    # submit the work to the queue, but unreserve the Jobs if anything breaks
+    try:
+        call_signatures = [[pk] for pk in job_pks]
+        outcomes = queue.submit('query', call_signatures, 1)
+    except Exception as e:
+        log("Error submitting query for jobs, IDs {}:\n{}".format(job_pks, e))
+        # possibly better to go to 'failed' instead?
+        jfilter(pk__in=job_pks, status='initializing').update(status='requested')
+        raise
+    ids = [{'torque_id': o[0], 'db_id': o[1][0][0]} for o in outcomes]
+    log("Submitted query for job(s):\n{}".format(pformat(ids)))
 
 
 def schedule_fetch (driver):
-    '''
-    Submit to torque (or other) fetch jobs for any assets that
-    are 'requested'. Mark scheduled assets as 'scheduled'.
-
-    Will be called by a cron'd scheduler job.
-    '''
-
+    """Find unworked fetch tasks and submit them to a work queue."""
     orm.setup()
 
     with transaction.atomic():
@@ -54,13 +70,13 @@ def schedule_fetch (driver):
         # check if jobs still alive
         active_jobs = active.order_by('sched_id').distinct('sched_id')
         for j in active_jobs:
-            if j.sched_id and torque.is_job_alive(j.sched_id):
+            if j.sched_id and queue.is_job_alive(j.sched_id):
                 Logger().log(
                     'Previous {} fetch job still running. Moving on...'
                     .format(driver)
                 )
                 return
-        
+
         # if anything leftover, clean it up
         needs_cleanup = active.filter(
             assetstatuschange__status='requested',
@@ -96,7 +112,7 @@ def schedule_fetch (driver):
                     .format(pformat([(r.id, r.driver, r.asset, r.tile, r.date)
                                      for r in retries]))
                 )
-                
+
     with transaction.atomic():
         # TODO: these should be configured elsewhere
         num_jobs = 10
@@ -107,7 +123,7 @@ def schedule_fetch (driver):
         ).order_by('id')[:num_jobs*per_job]
         if assets.exists():
             fetch_args = [ [a.pk] for a in assets ]
-            outcomes = torque.submit('fetch', fetch_args, per_job, chain=True)
+            outcomes = queue.submit('fetch', fetch_args, per_job, chain=True)
             print outcomes
             dbinv.models.update_status(assets, 'scheduled')
             ids = [
@@ -128,14 +144,11 @@ def schedule_fetch (driver):
 
 
 def schedule_process ():
-    '''
-    Submit to torque (or other?) jobs to process any products that are
-    ready to be processed - i.e. are 'requested' and all asset
-    dependencies are 'complete'. Mark scheduled products as 'scheduled'.
+    """Find ready processing tasks and submit them to a work queue.
 
-x    Will be called by a cron'd scheduler job
-    '''
-
+    To be ready means the task hasn't been started already, and all its
+    prerequisite assets are in place.
+    """
     orm.setup()
     from django.db.models import Q
     with transaction.atomic():
@@ -146,7 +159,7 @@ x    Will be called by a cron'd scheduler job
         )
         if products.exists():
             process_args = [ [p.pk] for p in products ]
-            outcomes = torque.submit('process', process_args, 5)
+            outcomes = queue.submit('process', process_args, 5)
             print outcomes
             dbinv.models.update_status(products, 'scheduled')
             ids = [
@@ -166,14 +179,12 @@ x    Will be called by a cron'd scheduler job
 
 
 def schedule_export_and_aggregate ():
-    '''
-    Check all Jobs to see if  ready for post-processing (all assets fetched and
-    all products processed). If so, submit export and aggregate jobs
-    to torque (or other?) 
+    """Find ready post-processing tasks and submit them to a work queue.
 
-    Will be called by a cron'd scheduler job
-
-    '''
+    To be ready means that the task is unworked and its prerequisites
+    are in place, in this case the products created by the processing
+    step.
+    """
     orm.setup()
     # check if any in-progress jobs have finished fetch/process
     jobs = dbinv.models.Job.objects.filter(
@@ -197,7 +208,7 @@ def schedule_export_and_aggregate ():
             DataClass = utils.import_data_class(job.variable.driver.encode('ascii', 'ignore'))
             spatial_spec = eval(job.spatial)
             extents = SpatialExtent.factory(DataClass, **spatial_spec)
-                
+
             num_ext = len(extents)
             print "num_ext", num_ext
             # TODO: make this configurable
@@ -219,7 +230,7 @@ def schedule_export_and_aggregate ():
             # put this in a seperate transaction. the postprocessjobs need to exist before
             # submitting jobs
             with transaction.atomic():
-                outcomes = torque.submit('export_and_aggregate', job_args, 1)
+                outcomes = queue.submit('export_and_aggregate', job_args, 1)
                 for o in outcomes:
                     pp = dbinv.models.PostProcessJobs.objects.select_for_update().get(
                         job = job,
@@ -231,7 +242,7 @@ def schedule_export_and_aggregate ():
                 job.status = 'post-processing'
                 job.save()
 
-                Logger().log('scheduled postprocess job(s):\n{}'.format(pformat(outcomes)))
+                Logger().log('scheduled post-process job(s):\n{}'.format(pformat(outcomes)))
 
     # check whether any post-processing jobs have finished
     with transaction.atomic():
@@ -247,7 +258,7 @@ def schedule_export_and_aggregate ():
                     complete = False
                 if task.status in ('scheduled', 'in-progress'):
                     # make sure jobs are still queued / running
-                    if not torque.is_job_alive(task.sched_id):
+                    if not queue.is_job_alive(task.sched_id):
                         Logger().log("task {} for job {} failed to complete"
                                      .format(task.sched_id, job.pk))
                         task.status = 'failed'
@@ -255,8 +266,8 @@ def schedule_export_and_aggregate ():
                         failed = True
                     else:
                         # something is still working. move on
-                        break 
-                    
+                        break
+
             if failed:
                 job.status = 'failed'
                 job.save()
@@ -287,6 +298,3 @@ def main ():
 
 if __name__ == '__main__':
     main()
-
-    
- 
