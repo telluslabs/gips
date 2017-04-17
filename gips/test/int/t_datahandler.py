@@ -118,37 +118,6 @@ def t_export_helper(disable_db_blocker):
 
     os.environ['GIPS_ORM'] = 'true'
 
-    kwargs = { # same arguments used by system test for gips config
-        'alltouch': False,
-        'batchout': None,
-        'chunksize': 128.0,
-        'driver': 'modis',
-        'crop': False,
-        'dates': '2012-12-01,2012-12-03',
-        'days': None,
-        'fetch': False,
-        'format': 'GTiff',
-        'interpolation': 0,
-        'key': '',
-        'notld': True,
-        'numprocs': 2,
-        'outdir': util.OUTPUT_DIR,
-        'overwrite': False,
-        'pcov': 0,
-        'products': None,
-        'ptile': 0,
-        'res': [100.0, 100.0],
-        'sensors': None,
-        'site': util.NH_SHP_PATH,
-        'stop_on_error': False,
-        'suffix': '',
-        'tiles': None,
-        'tree': False,
-        'update': False,
-        'verbose': 4,
-        'where': ''
-    }
-
     # setup - check for prereqs then clear test directory
     prerequisites = [os.path.join(util.DATA_REPO_ROOT, f) for f in (
         'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_fsnow.tif',
@@ -180,14 +149,25 @@ def t_export_helper(disable_db_blocker):
             dbinv.models.Product.objects.get(name=p) # raises on failure, which is desired here
             assert os.path.lexists(p)
         except:
-            print ("Prerequisite not meant, try: "
+            print ("Prerequisite not met, try: "
                    "`py.test --sys --clear-repo -k 'modis and process' -s --ll debug`")
             raise
-    if os.path.exists(kwargs['outdir']): # remove the output dir if it's present
-        shutil.rmtree(kwargs['outdir'])
+    if os.path.exists(util.OUTPUT_DIR): # remove the output dir if it's present
+        shutil.rmtree(util.OUTPUT_DIR)
+
+    # set up args for the call
+    # some of the same arguments used by system test for gips config
+    kwargs = {'alltouch': False, 'crop': False, 'interpolation': 0, 'overwrite': False,
+              'res': [100.0, 100.0], 'tree': False}
+
+    spatial_spec = {'ptile': 0, 'pcov': 0, 'tiles': None, 'where': '', 'key': '',
+                    'site': util.NH_SHP_PATH}
 
     # run the test
-    worker._export(**kwargs)
+    worker._export(driver='modis', spatial_spec=spatial_spec,
+                   temporal_spec={'days': None, 'dates': '2012-12-01,2012-12-03'},
+                   products=None, outdir=util.OUTPUT_DIR, notld=True,
+                   **kwargs)
     expected = set((
         '2012336_MCD_fsnow.tif',
         '2012336_MCD_indices.tif',
