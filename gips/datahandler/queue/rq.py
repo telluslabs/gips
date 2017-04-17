@@ -75,7 +75,7 @@ def submit(operation, call_signatures, chain=False):
         be worked in parallel depending on the RQ worker setup.
     """
     # TODO support everything
-    if operation not in ('query', 'fetch'):
+    if operation not in ('query', 'fetch', 'process'):
         raise NotImplementedError('Not all methods supported')
 
     q = get_queue()

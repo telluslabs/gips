@@ -157,32 +157,39 @@ def schedule_process ():
     prerequisite assets are in place.
     """
     orm.setup()
-    from django.db.models import Q
+    psfu = dbinv.models.Product.objects.select_for_update
     with transaction.atomic():
-        products = dbinv.models.Product.objects.select_for_update().filter(
+        products = psfu().filter(
             status='requested'
         ).exclude(
-            ~Q(assetdependency__asset__status='complete')
+            ~models.Q(assetdependency__asset__status='complete')
         )
-        if products.exists():
-            process_args = [ [p.pk] for p in products ]
-            outcomes = queue.submit('process', process_args, 5)
-            print outcomes
-            dbinv.models.update_status(products, 'scheduled')
-            ids = [
-                {
-                    'torque_id': o[0],
-                    'products': [p[0] for p in o[1]]
-                }
-                for o in outcomes
-            ]
-            for i in ids:
-                p = dbinv.models.Product.objects.filter(
-                    id__in=i['products']
-                ).update(
-                    sched_id=i['torque_id']
-                )
-            Logger().log('scheduled process job(s):\n{}'.format(pformat(ids)))
+        if not products.exists():
+            return
+        dbinv.models.update_status(products, 'scheduled')
+        product_pks = [p.pk for p in products]
+
+    # submit the work to the queue, but unreserve the Products if anything breaks
+    try:
+        call_signatures = [[pk] for pk in product_pks]
+        outcomes = queue.submit('process', call_signatures, 5)
+        print outcomes
+    except Exception as e:
+        Logger().log("Error submitting products for processing, IDs {}:\n{}".format(product_pks, e))
+        # possibly better to go to 'failed' instead?
+        with transaction.atomic():
+            products = psfu().filter(pk__in=product_pks, status='scheduled')
+            dbinv.models.update_status(products, 'requested')
+        raise
+
+    # finally, bookkeeping:  Remember which job is working on which product
+    # glean the mapping of job IDs to product IDs from the submit() return value
+    ids = [{'torque_id': o[0], 'products': [p[0] for p in o[1]]} for o in outcomes]
+    with transaction.atomic():
+        for i in ids:
+            products = dbinv.models.Product.objects.filter(id__in=i['products'])
+            products.update(sched_id=i['torque_id'])
+    Logger().log('scheduled process job(s):\n{}'.format(pformat(ids)))
 
 
 def schedule_export_and_aggregate ():
