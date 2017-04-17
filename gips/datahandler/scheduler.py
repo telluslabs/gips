@@ -12,7 +12,7 @@ export-and-aggregate.
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Count
+from django.db import models
 
 import math
 from pprint import pprint, pformat
@@ -33,7 +33,6 @@ def schedule_query ():
     scheduler job.
     """
     orm.setup()
-    log = Logger().log
     jfilter = dbinv.models.Job.objects.filter
     # locate work-ready Jobs and reserve them
     with transaction.atomic():
@@ -48,12 +47,12 @@ def schedule_query ():
         call_signatures = [[pk] for pk in job_pks]
         outcomes = queue.submit('query', call_signatures, 1)
     except Exception as e:
-        log("Error submitting query for jobs, IDs {}:\n{}".format(job_pks, e))
+        Logger().log("Error submitting query for jobs, IDs {}:\n{}".format(job_pks, e))
         # possibly better to go to 'failed' instead?
         jfilter(pk__in=job_pks, status='initializing').update(status='requested')
         raise
     ids = [{'torque_id': o[0], 'db_id': o[1][0][0]} for o in outcomes]
-    log("Submitted query for job(s):\n{}".format(pformat(ids)))
+    Logger().log("Submitted query for job(s):\n{}".format(pformat(ids)))
 
 
 def schedule_fetch (driver):
@@ -81,7 +80,7 @@ def schedule_fetch (driver):
         needs_cleanup = active.filter(
             assetstatuschange__status='requested',
         ).annotate(
-            num_retries=Count('assetstatuschange__status'),
+            num_retries=models.Count('assetstatuschange__status'),
         )
         if needs_cleanup.exists():
             # something went wrong. not 'complete', but no running/scheduled job
@@ -113,34 +112,42 @@ def schedule_fetch (driver):
                                      for r in retries]))
                 )
 
+    # TODO: these should be configured elsewhere
+    num_jobs = 10
+    per_job = 10
+    asfu = dbinv.models.Asset.objects.select_for_update
+    # locate fetch-ready Assets and reserve them
     with transaction.atomic():
-        # TODO: these should be configured elsewhere
-        num_jobs = 10
-        per_job = 10
-        assets = dbinv.models.Asset.objects.select_for_update().filter(
+        assets = asfu().filter(
             driver=driver,
             status='requested',
         ).order_by('id')[:num_jobs*per_job]
-        if assets.exists():
-            fetch_args = [ [a.pk] for a in assets ]
-            outcomes = queue.submit('fetch', fetch_args, per_job, chain=True)
-            print outcomes
-            dbinv.models.update_status(assets, 'scheduled')
-            ids = [
-                {
-                    'torque_id': o[0],
-                    'assets': [a[0] for a in o[1]],
-                }
-                for o in outcomes
-            ]
-            for i in ids:
-                a = dbinv.models.Asset.objects.filter(
-                    id__in=i['assets']
-                ).update(
-                    sched_id=i['torque_id']
-                )
-                print "len", a
-            Logger().log('scheduled fetch job(s):\n{}'.format(pformat(ids)))
+        if not assets.exists():
+            return
+        asset_pks = [a.pk for a in assets]
+        dbinv.models.update_status(assets, 'scheduled')
+
+    # submit the work to the queue, but unreserve the Assets if anything breaks
+    try:
+        call_signatures = [[pk] for pk in asset_pks]
+        outcomes = queue.submit('fetch', call_signatures, per_job, chain=True)
+        print outcomes
+    except Exception as e:
+        Logger().log("Error submitting asset for jobs, IDs {}:\n{}".format(asset_pks, e))
+        # possibly better to go to 'failed' instead?
+        with transaction.atomic():
+            assets = asfu().filter(pk__in=asset_pks, status='scheduled')
+            dbinv.models.update_status(assets, 'requested')
+        raise
+
+    # finally, bookkeeping:  Remember which fetch job is working on which asset
+    # glean the mapping of job IDs to asset IDs from the submit() return value
+    ids = [{'job_id': o[0], 'assets': [a[0] for a in o[1]]} for o in outcomes]
+    with transaction.atomic():
+        for i in ids:
+            a = asfu().filter(id__in=i['assets']).update(sched_id=i['job_id'])
+            print "len", a
+    Logger().log('scheduled fetch job(s):\n{}'.format(pformat(ids)))
 
 
 def schedule_process ():
