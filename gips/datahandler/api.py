@@ -41,39 +41,43 @@ def submit_job (site, variable, spatial, temporal):
 
 
 def processing_status(driver_name, spatial_spec, temporal_spec, products):
-        """ status of products matching this time-space-product query
-        :drivername: The name of the Data class to use (e.g., landsat, modis)
-        :spatial_spec: The dict of SpatialExtent.factory parameters
-        :temporal_spec: The TemporalExtent constructor parameters
-        :products: List of requested products of interest
-        """
-        orm.setup()
-        dataclass = utils.import_data_class(driver_name)
-        spatial = SpatialExtent.factory(dataclass, **spatial_spec)
-        temporal = TemporalExtent(**temporal_spec)
+    """Status of products matching the given criteria:
 
-        # convert spatial_extents into just a stack of tiles
-        tiles = set()
-        for se in spatial:
-            tiles = tiles.union(se.tiles)
-            
+    :driver_name:   eg 'landsat' or 'modis'; used to choose a Data class.
+    :spatial_spec:  Dict; used for SpatialExtent.factory(..., **spatial_spec)
+    :temporal_spec: Dict; used for TemporalExtent(**temporal_spec)
+    :products:      List of requested product types, eg ['fsnow', ...]
 
-        status = {s: 0 for s in dbinv.models.status_strings}
-        criteria = {
-            'driver': driver_name,
-            'tile__in': tiles,
-            'date__gte': temporal.datebounds[0],
-            'date__lte': temporal.datebounds[1],
-            'product__in': products,
-        }
-        for p in dbinv.models.Product.objects.filter(**criteria):
-            # TODO: check for daybounds should be built in to query!
-            if (
-                    p.date.timetuple().tm_yday >= temporal.daybounds[0]
-                    and p.date.timetuple().tm_yday <= temporal.daybounds[1]
-            ):
-                status[p.status] += 1
-        return status
+    The return value is a dict mapping status strings to counts of
+    products with that status.  For instance:
+    {'requested': 1, 'complete': 2, ...}.
+    """
+    orm.setup()
+    dataclass = utils.import_data_class(driver_name)
+    spatial = SpatialExtent.factory(dataclass, **spatial_spec)
+    temporal = TemporalExtent(**temporal_spec)
+
+    # convert spatial_extents into just a stack of tiles
+    tiles = set()
+    for se in spatial:
+        tiles = tiles.union(se.tiles)
+
+    status = {s: 0 for s in dbinv.models.status_strings}
+    criteria = {
+        'driver': driver_name,
+        'tile__in': tiles,
+        'date__gte': temporal.datebounds[0],
+        'date__lte': temporal.datebounds[1],
+        'product__in': products,
+    }
+    for p in dbinv.models.Product.objects.filter(**criteria):
+        # TODO: check for daybounds should be built in to query!
+        if (
+                p.date.timetuple().tm_yday >= temporal.daybounds[0]
+                and p.date.timetuple().tm_yday <= temporal.daybounds[1]
+        ):
+            status[p.status] += 1
+    return status
 
 
 def job_status(jobid):

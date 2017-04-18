@@ -62,8 +62,7 @@ def work(operation, *args):
 def submit(operation, call_signatures, chain=False):
     """Submit jobs to RQ workers via Redis acting as a message queue.
 
-    Return value is a list of tuples:
-        (job identifier, db item ID) <-- eg IDs for Asset or Product models
+    Return value is a list of RQ task IDs.
 
     operation:  Defines which function will be performed; see
         queue.submit().
@@ -74,16 +73,10 @@ def submit(operation, call_signatures, chain=False):
     chain: If True, chain jobs to run in sequence.  Otherwise they may
         be worked in parallel depending on the RQ worker setup.
     """
-    # TODO support everything
-    if operation not in ('query', 'fetch', 'process'):
-        raise NotImplementedError('Not all methods supported')
-
     q = get_queue()
-    outcomes = []
+    task_ids = []
     job = None # prime the pump for chain=True
     for cs in call_signatures:
         job = q.enqueue(work, operation, *cs, depends_on=(job if chain else None))
-        # reminder: cs[0] ought to be the primary key of a model in dbinv.models
-        outcomes.append((job.id, cs[0]))
-
-    return outcomes
+        task_ids.append(job.id)
+    return task_ids

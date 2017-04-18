@@ -234,6 +234,7 @@ def schedule_export_and_aggregate ():
             ]
             job_args = [make_args(i)
                         for i in range(int(math.ceil(num_ext / ext_per)))]
+            # create the PostProcessJobs rows in the DB before calling the remote worker
             with transaction.atomic():
                 for j in job_args:
                     pp = dbinv.models.PostProcessJobs.objects.update_or_create(
@@ -241,8 +242,7 @@ def schedule_export_and_aggregate ():
                         job = job,
                         args = repr(tuple(j)),
                     )
-            # put this in a seperate transaction. the postprocessjobs need to exist before
-            # submitting jobs
+            # call the remote worker to work the PPJ(s?) then update the Job status
             with transaction.atomic():
                 outcomes = queue.submit('export_and_aggregate', job_args, 1)
                 for o in outcomes:

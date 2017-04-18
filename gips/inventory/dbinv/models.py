@@ -174,11 +174,13 @@ class ProductStatusChange(models.Model):
 
 
 class DataVariable(models.Model):
-    """Inventory of Data Variables.
+    """Inventory of product types & metadata as specified by each driver.
 
-    Data variables are individual product bands specified by the driver
+    This table is a strict duplication of information that is stored in
+    gips/data/<driver>/<driver>.py, specifically class <driver>Data.  It
+    is usually referenced by the 'name' which will be programmatically
+    generated to be unique, eg 'modis_indices_lswi'.
     """
-
     name        = models.CharField(max_length=255, unique=True)
     asset_link  = models.TextField(null=True, blank=True)
     asset       = models.CharField(max_length=255, null=True, blank=True)
