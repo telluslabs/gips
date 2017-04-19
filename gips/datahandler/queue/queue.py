@@ -44,9 +44,16 @@ def get_queue_module():
 
 
 def get_job_name(*args, **kwargs):
-    return get_queue_module().get_job_name(*args, **kwargs)
+    """Return the job's name as given by its queueing system."""
+    # need to return an ascii string because, way down the line, gippy can't handle unicode
+    return get_queue_module().get_job_name(*args, **kwargs).encode('ascii')
 
 def is_job_alive(*args, **kwargs):
+    """Returns True only if the job exists and is not yet completed.
+
+    This means that a 'living' job can running, or can be in a work queue but
+    not yet started.
+    """
     return get_queue_module().is_job_alive(*args, **kwargs)
 
 
@@ -66,9 +73,9 @@ def submit(operation, call_signatures, batch_size=None, nproc=1, chain=False):
         return outcomes
 
     if tq_setting() == 'rq':
-        outcomes = qm.submit(operation, call_signatures, chain)
-        # scheduler wants db_id, but it expects batches of call signatures, hence [[db_id]]
-        digestible_by_scheduler = [(job_id, [[db_id]]) for (job_id, db_id) in outcomes]
+        task_ids = qm.submit(operation, call_signatures, chain)
+        # scheduler expects batches of signatures per task ID, hence [cs]
+        digestible_by_scheduler = zip(task_ids, [[cs] for cs in call_signatures])
         return digestible_by_scheduler
 
     raise RuntimeError("Unreachable line reached; valid_tq_settings need updating?")

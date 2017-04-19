@@ -12,7 +12,7 @@ export-and-aggregate.
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Count
+from django.db import models
 
 import math
 from pprint import pprint, pformat
@@ -33,7 +33,6 @@ def schedule_query ():
     scheduler job.
     """
     orm.setup()
-    log = Logger().log
     jfilter = dbinv.models.Job.objects.filter
     # locate work-ready Jobs and reserve them
     with transaction.atomic():
@@ -48,12 +47,12 @@ def schedule_query ():
         call_signatures = [[pk] for pk in job_pks]
         outcomes = queue.submit('query', call_signatures, 1)
     except Exception as e:
-        log("Error submitting query for jobs, IDs {}:\n{}".format(job_pks, e))
+        Logger().log("Error submitting query for jobs, IDs {}:\n{}".format(job_pks, e))
         # possibly better to go to 'failed' instead?
         jfilter(pk__in=job_pks, status='initializing').update(status='requested')
         raise
     ids = [{'torque_id': o[0], 'db_id': o[1][0][0]} for o in outcomes]
-    log("Submitted query for job(s):\n{}".format(pformat(ids)))
+    Logger().log("Submitted query for job(s):\n{}".format(pformat(ids)))
 
 
 def schedule_fetch (driver):
@@ -81,7 +80,7 @@ def schedule_fetch (driver):
         needs_cleanup = active.filter(
             assetstatuschange__status='requested',
         ).annotate(
-            num_retries=Count('assetstatuschange__status'),
+            num_retries=models.Count('assetstatuschange__status'),
         )
         if needs_cleanup.exists():
             # something went wrong. not 'complete', but no running/scheduled job
@@ -113,34 +112,42 @@ def schedule_fetch (driver):
                                      for r in retries]))
                 )
 
+    # TODO: these should be configured elsewhere
+    num_jobs = 10
+    per_job = 10
+    asfu = dbinv.models.Asset.objects.select_for_update
+    # locate fetch-ready Assets and reserve them
     with transaction.atomic():
-        # TODO: these should be configured elsewhere
-        num_jobs = 10
-        per_job = 10
-        assets = dbinv.models.Asset.objects.select_for_update().filter(
+        assets = asfu().filter(
             driver=driver,
             status='requested',
         ).order_by('id')[:num_jobs*per_job]
-        if assets.exists():
-            fetch_args = [ [a.pk] for a in assets ]
-            outcomes = queue.submit('fetch', fetch_args, per_job, chain=True)
-            print outcomes
-            dbinv.models.update_status(assets, 'scheduled')
-            ids = [
-                {
-                    'torque_id': o[0],
-                    'assets': [a[0] for a in o[1]],
-                }
-                for o in outcomes
-            ]
-            for i in ids:
-                a = dbinv.models.Asset.objects.filter(
-                    id__in=i['assets']
-                ).update(
-                    sched_id=i['torque_id']
-                )
-                print "len", a
-            Logger().log('scheduled fetch job(s):\n{}'.format(pformat(ids)))
+        if not assets.exists():
+            return
+        asset_pks = [a.pk for a in assets]
+        dbinv.models.update_status(assets, 'scheduled')
+
+    # submit the work to the queue, but unreserve the Assets if anything breaks
+    try:
+        call_signatures = [[pk] for pk in asset_pks]
+        outcomes = queue.submit('fetch', call_signatures, per_job, chain=True)
+        print outcomes
+    except Exception as e:
+        Logger().log("Error submitting asset for jobs, IDs {}:\n{}".format(asset_pks, e))
+        # possibly better to go to 'failed' instead?
+        with transaction.atomic():
+            assets = asfu().filter(pk__in=asset_pks, status='scheduled')
+            dbinv.models.update_status(assets, 'requested')
+        raise
+
+    # finally, bookkeeping:  Remember which fetch job is working on which asset
+    # glean the mapping of job IDs to asset IDs from the submit() return value
+    ids = [{'job_id': o[0], 'assets': [a[0] for a in o[1]]} for o in outcomes]
+    with transaction.atomic():
+        for i in ids:
+            a = asfu().filter(id__in=i['assets']).update(sched_id=i['job_id'])
+            print "len", a
+    Logger().log('scheduled fetch job(s):\n{}'.format(pformat(ids)))
 
 
 def schedule_process ():
@@ -150,32 +157,39 @@ def schedule_process ():
     prerequisite assets are in place.
     """
     orm.setup()
-    from django.db.models import Q
+    psfu = dbinv.models.Product.objects.select_for_update
     with transaction.atomic():
-        products = dbinv.models.Product.objects.select_for_update().filter(
+        products = psfu().filter(
             status='requested'
         ).exclude(
-            ~Q(assetdependency__asset__status='complete')
+            ~models.Q(assetdependency__asset__status='complete')
         )
-        if products.exists():
-            process_args = [ [p.pk] for p in products ]
-            outcomes = queue.submit('process', process_args, 5)
-            print outcomes
-            dbinv.models.update_status(products, 'scheduled')
-            ids = [
-                {
-                    'torque_id': o[0],
-                    'products': [p[0] for p in o[1]]
-                }
-                for o in outcomes
-            ]
-            for i in ids:
-                p = dbinv.models.Product.objects.filter(
-                    id__in=i['products']
-                ).update(
-                    sched_id=i['torque_id']
-                )
-            Logger().log('scheduled process job(s):\n{}'.format(pformat(ids)))
+        if not products.exists():
+            return
+        dbinv.models.update_status(products, 'scheduled')
+        product_pks = [p.pk for p in products]
+
+    # submit the work to the queue, but unreserve the Products if anything breaks
+    try:
+        call_signatures = [[pk] for pk in product_pks]
+        outcomes = queue.submit('process', call_signatures, 5)
+        print outcomes
+    except Exception as e:
+        Logger().log("Error submitting products for processing, IDs {}:\n{}".format(product_pks, e))
+        # possibly better to go to 'failed' instead?
+        with transaction.atomic():
+            products = psfu().filter(pk__in=product_pks, status='scheduled')
+            dbinv.models.update_status(products, 'requested')
+        raise
+
+    # finally, bookkeeping:  Remember which job is working on which product
+    # glean the mapping of job IDs to product IDs from the submit() return value
+    ids = [{'torque_id': o[0], 'products': [p[0] for p in o[1]]} for o in outcomes]
+    with transaction.atomic():
+        for i in ids:
+            products = dbinv.models.Product.objects.filter(id__in=i['products'])
+            products.update(sched_id=i['torque_id'])
+    Logger().log('scheduled process job(s):\n{}'.format(pformat(ids)))
 
 
 def schedule_export_and_aggregate ():
@@ -220,6 +234,7 @@ def schedule_export_and_aggregate ():
             ]
             job_args = [make_args(i)
                         for i in range(int(math.ceil(num_ext / ext_per)))]
+            # create the PostProcessJobs rows in the DB before calling the remote worker
             with transaction.atomic():
                 for j in job_args:
                     pp = dbinv.models.PostProcessJobs.objects.update_or_create(
@@ -227,8 +242,7 @@ def schedule_export_and_aggregate ():
                         job = job,
                         args = repr(tuple(j)),
                     )
-            # put this in a seperate transaction. the postprocessjobs need to exist before
-            # submitting jobs
+            # call the remote worker to work the PPJ(s?) then update the Job status
             with transaction.atomic():
                 outcomes = queue.submit('export_and_aggregate', job_args, 1)
                 for o in outcomes:

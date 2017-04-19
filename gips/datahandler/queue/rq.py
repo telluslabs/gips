@@ -18,9 +18,35 @@ def get_job_name():
         raise queue.NoCurrentJobError('rq.get_current_job() returned None; no current job found')
     return job.id
 
+def is_job_alive(job_id):
+    """Tells whether the given job is currently running.
 
-def is_job_alive(sched_id):
-    raise NotImplementedError('NO support for this yet')
+    Job metadata in RQ has a TTL, so if no job matches the job ID,
+    False is returned because it's assumed the ID matched a job whose
+    metadata has since been removed from Redis.
+    """
+    job = get_queue().fetch_job(job_id)
+    return job is not None and (job.is_started or job.is_queued)
+
+
+_queue = None
+
+def get_queue():
+    """Set up the RQ Queue object and return it.  Uses GIPS settings."""
+    # tell RQ what Redis connection to use
+    global _queue
+    if _queue is None:
+        redis_conn = redis.Redis(
+                host=utils.get_setting('RQ_REDIS_HOST', 'localhost'),
+                port=utils.get_setting('RQ_REDIS_PORT', 6379),
+                db=utils.get_setting('RQ_REDIS_DB', 0),
+                password=utils.get_setting('RQ_REDIS_PASSWORD', None)) # no password by default
+        _queue = rq.Queue(
+                name=utils.get_setting('RQ_QUEUE_NAME', 'datahandler'),
+                # copy 8h walltime from torque
+                default_timeout=utils.get_setting('RQ_TASK_TIMEOUT', 8 * 3600),
+                connection=redis_conn)
+    return _queue
 
 
 def work(operation, *args):
@@ -36,8 +62,7 @@ def work(operation, *args):
 def submit(operation, call_signatures, chain=False):
     """Submit jobs to RQ workers via Redis acting as a message queue.
 
-    Return value is a list of tuples:
-        (job identifier, db item ID) <-- eg IDs for Asset or Product models
+    Return value is a list of RQ task IDs.
 
     operation:  Defines which function will be performed; see
         queue.submit().
@@ -48,29 +73,10 @@ def submit(operation, call_signatures, chain=False):
     chain: If True, chain jobs to run in sequence.  Otherwise they may
         be worked in parallel depending on the RQ worker setup.
     """
-    # TODO support everything
-    if operation != 'query':
-        raise NotImplementedError('query only for now (and even this is fake)')
-    if chain:
-        raise NotImplementedError('chain=True is a TODO')
-
-    # tell RQ what Redis connection to use
-    redis_conn = redis.Redis(
-            host=utils.get_setting('RQ_REDIS_HOST', 'localhost'),
-            port=utils.get_setting('RQ_REDIS_PORT', 6379),
-            db=utils.get_setting('RQ_REDIS_DB', 0),
-            password=utils.get_setting('RQ_REDIS_PASSWORD', None)) # no password by default
-    q = rq.Queue(
-            name=utils.get_setting('RQ_QUEUE_NAME', 'datahandler'),
-            # copy 8h walltime from torque
-            default_timeout=utils.get_setting('RQ_TASK_TIMEOUT', 8 * 3600),
-            connection=redis_conn)
-
-    # delay execution
-    outcomes = []
+    q = get_queue()
+    task_ids = []
+    job = None # prime the pump for chain=True
     for cs in call_signatures:
-        job = q.enqueue(work, operation, *cs)
-        # reminder: cs[0] ought to be the primary key of a model in dbinv.models
-        outcomes.append((job.id, cs[0]))
-
-    return outcomes
+        job = q.enqueue(work, operation, *cs, depends_on=(job if chain else None))
+        task_ids.append(job.id)
+    return task_ids
