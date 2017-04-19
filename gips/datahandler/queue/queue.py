@@ -44,10 +44,16 @@ def get_queue_module():
 
 
 def get_job_name(*args, **kwargs):
+    """Return the job's name as given by its queueing system."""
     # need to return an ascii string because, way down the line, gippy can't handle unicode
     return get_queue_module().get_job_name(*args, **kwargs).encode('ascii')
 
 def is_job_alive(*args, **kwargs):
+    """Returns True only if the job exists and is not yet completed.
+
+    This means that a 'living' job can running, or can be in a work queue but
+    not yet started.
+    """
     return get_queue_module().is_job_alive(*args, **kwargs)
 
 

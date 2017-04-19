@@ -26,7 +26,7 @@ def is_job_alive(job_id):
     metadata has since been removed from Redis.
     """
     job = get_queue().fetch_job(job_id)
-    return job is not None and job.is_started
+    return job is not None and (job.is_started or job.is_queued)
 
 
 _queue = None
