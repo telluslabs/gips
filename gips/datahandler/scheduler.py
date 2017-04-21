@@ -14,6 +14,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db import models
 
+import fcntl
 import math
 from pprint import pprint, pformat
 
@@ -23,6 +24,23 @@ from gips.inventory import dbinv, orm
 from gips.datahandler import api
 from gips.datahandler.logger import Logger
 from gips.datahandler import queue
+
+
+class Lock:
+    def __init__(self, filename):
+        self.filename = filename
+        # This will create it if it does not exist already
+        self.handle = open(filename, 'w')
+
+    # Bitwise OR fcntl.LOCK_NB if you need a non-blocking lock
+    def acquire(self):
+        fcntl.flock(self.handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def release(self):
+        fcntl.flock(self.handle, fcntl.LOCK_UN)
+
+    def __del__(self):
+        self.handle.close()
 
 
 def schedule_query ():
@@ -297,6 +315,13 @@ def print_outcomes(kind, outcomes):
 
 
 def main ():
+    lock = Lock('/tmp/geokitd.lock')
+    try:
+        lock.acquire()
+    except IOError:
+        Logger().log("previous scheduler process still running")
+        exit(1)
+    
     outcomes = schedule_query()
     print_outcomes('Query', outcomes)
 
@@ -309,6 +334,8 @@ def main ():
 
     outcomes = schedule_export_and_aggregate()
     print_outcomes('Export & Aggregate', outcomes)
+
+    lock.release()
 
 if __name__ == '__main__':
     main()
