@@ -3,7 +3,7 @@
 #    GIPS: Geospatial Image Processing System
 #
 #    AUTHOR: Matthew Hanson
-#    EMAIL:  matt.a.hanson@gmail.com 
+#    EMAIL:  matt.a.hanson@gmail.com
 #
 #    Copyright (C) 2014 Applied Geosolutions
 #
@@ -308,27 +308,37 @@ class modisData(Data):
             'description': 'Land indices',
             'assets': ['MCD43A4'],
             'bands': ['ndvi', 'lswi', 'vari', 'brgt', 'satvi', 'evi'],
+            'startdate': datetime.date(2000, 2, 18),
+            'latency': 15
         },
         'quality': {
             'description': 'MCD Product Quality',
             'assets': ['MCD43A2'],
-            'bands': ['quality']
+            'bands': ['quality'],
+            'startdate': datetime.date(2000, 2, 18),
+            'latency': 15
         },
         'landcover': {
             'description': 'MCD Annual Land Cover',
             'assets': ['MCD12Q1'],
             'bands': ['landcover'],
+            'startdate': datetime.date(2002, 7, 4),
+            'latency': 3
         },
         # Daily
         'fsnow': {
             'description': 'Fractional snow cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
             'bands': ['fractional-snow-cover'],
+            'startdate': datetime.date(2000, 2, 24),
+            'latency': 3
         },
         'snow': {
             'description': 'Snow and ice cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
             'bands': ['snow-cover', 'fractional-snow-cover'],
+            'startdate': datetime.date(2000, 2, 24),
+            'latency': 3
         },
         'temp': {
             'description': 'Surface temperature data',
@@ -340,6 +350,8 @@ class modisData(Data):
                 'temperature-nighttime-aqua',
                 'temperature-best-quality',
             ],
+            'startdate': datetime.date(2000, 3, 5),
+            'latency': 1
         },
         'obstime': {
             'description': 'MODIS Terra/Aqua overpass time',
@@ -350,27 +362,37 @@ class modisData(Data):
                 'observation-time-daytime-aqua',
                 'observation-time-nighttime-aqua'
             ],
+            'startdate': datetime.date(2000, 3, 5),
+            'latency': 1
         },
         # Misc
         'ndvi8': {
             'description': 'Normalized Difference Vegetation Index: 250m',
             'assets': ['MOD09Q1'],
             'bands': ['red', 'nir'],
+            'startdate': datetime.date(2000, 2, 18),
+            'latency': 7,
         },
         'temp8td': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
             'bands': ['temp8td'],
+            'startdate': datetime.date(2000, 3, 5),
+            'latency': 7
         },
         'temp8tn': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
             'bands': ['temp8tn'],
+            'startdate': datetime.date(2000, 3, 5),
+            'latency': 7
         },
         'clouds': {
             'description': 'Cloud Mask',
             'assets': ['MOD10A1'],
             'bands': ['cloud-cover'],
+            'startdate': datetime.date(2000, 2, 24),
+            'latency': 3
         }
     }
 
@@ -558,7 +580,7 @@ class modisData(Data):
                     (grnqcimg == 255) | (mirqcimg == 255) | (swrqcimg == 255)
                 )
                 qc[w0] = 0  # mark as good if they are all good
-                qc[w255] = missing  # mark as missing if any are missing 
+                qc[w255] = missing  # mark as missing if any are missing
 
                 # create output gippy image
                 print("writing", fname)
@@ -569,7 +591,7 @@ class modisData(Data):
                 imgout.SetOffset(0.0)
                 imgout.SetGain(0.0001)
                 imgout[6].SetGain(1.0)
-                
+
                 imgout[0].Write(ndvi)
                 imgout[1].Write(lswi)
                 imgout[2].Write(vari)

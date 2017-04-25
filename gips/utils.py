@@ -269,11 +269,14 @@ def get_data_variables():
     # ex asset = modis
     for driver in sources.keys():
         data_class = import_data_class(driver)
+        print(data_class)
         for product in data_class._products.keys():
             product_dict = data_class._products[product]
             description = product_dict['description']
             assets = repr(product_dict['assets'])
-            for band,bandname in enumerate(product_dict['bands']):
+            start_date = product_dict.get('startdate')
+            latency = product_dict.get('latency')
+            for band,bandname in enumerate(product_dict.get('bands', [])):
                 data_variable = {
                     'driver': driver,
                     'description': description,
@@ -282,6 +285,8 @@ def get_data_variables():
                     'asset': assets,
                     'band_number': band,
                     'band': bandname,
+                    'start_date': start_date,
+                    'latency': latency
                 }
 
                 data_variables.append(data_variable)
