@@ -271,25 +271,28 @@ def get_data_variables():
         data_class = import_data_class(driver)
         print(data_class)
         for product in data_class._products.keys():
-            product_dict = data_class._products[product]
-            description = product_dict['description']
-            assets = repr(product_dict['assets'])
-            start_date = product_dict.get('startdate')
-            latency = product_dict.get('latency')
-            for band,bandname in enumerate(product_dict.get('bands', [])):
-                data_variable = {
-                    'driver': driver,
-                    'description': description,
-                    'product': product,
-                    'name': "{}_{}_{}".format(driver, product, bandname),
-                    'asset': assets,
-                    'band_number': band,
-                    'band': bandname,
-                    'start_date': start_date,
-                    'latency': latency
-                }
+            with error_handler(
+                    msg_prefix="Error adding product {}:{}".format(driver,product),
+                    continuable=True):
+                product_dict = data_class._products[product]
+                description = product_dict['description']
+                assets = repr(product_dict['assets'])
+                start_date = product_dict.get('startdate')
+                latency = product_dict.get('latency')
+                for band,bandname in enumerate(product_dict['bands']):
+                    data_variable = {
+                        'driver': driver,
+                        'description': description,
+                        'product': product,
+                        'name': "{}_{}_{}".format(driver, product, bandname),
+                        'asset': assets,
+                        'band_number': band,
+                        'band': bandname,
+                        'start_date': start_date,
+                        'latency': latency
+                    }
 
-                data_variables.append(data_variable)
+                    data_variables.append(data_variable)
     return data_variables
 
 
