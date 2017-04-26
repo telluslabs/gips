@@ -260,7 +260,7 @@ class landsatData(Data):
     Asset = landsatAsset
 
     _lt5_startdate = date(1984, 3, 1)
-    _ls8_startdate = date(2013, 5, 30)
+    _lc8_startdate = date(2013, 5, 30)
 
     # Group products belong to ('Standard' if not specified)
     _productgroups = {
@@ -351,7 +351,7 @@ class landsatData(Data):
             'assets': ['DN'],
             'description': 'LC8 band quality',
             'toa': True,
-            'startdate': _ls8_startdate,
+            'startdate': _lc8_startdate,
             'latency': 1,
         },
         'bqashadow': {
@@ -364,7 +364,7 @@ class landsatData(Data):
             ],
             'nargs': '*',
             'toa': True,
-            'startdate': _ls8_startdate,
+            'startdate': _lc8_startdate,
             'latency': 1,
         },
         #'Indices': {
@@ -457,13 +457,13 @@ class landsatData(Data):
         'ndvi8sr': {
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
-            'startdate': _ls8_startdate,
+            'startdate': _lc8_startdate,
             'latency': 1,
         },
         'landmask': {
             'assets': ['SR'],
             'description': 'Land mask from LC8SR',
-            'startdate': _ls8_startdate,
+            'startdate': _lc8_startdate,
             'latency': 1,
         },
         # ACOLITE products

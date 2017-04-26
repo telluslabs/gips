@@ -167,6 +167,10 @@ class daymetData(Data):
     version = '0.1'
     Asset = daymetAsset
 
+    _latency = 0
+    _startdate = datetime.date(1980, 1, 1)
+
+
     _products = {
         'tmin': {
             'description': 'Daily minimum air temperature (C)',

@@ -258,7 +258,7 @@ class prismData(Data):
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)
-                     vsinames[asset] = os.path.join(
+                    vsinames[asset] = os.path.join(
                          '/vsizip/' + self.assets[asset].filename,
                          bil
                      )
