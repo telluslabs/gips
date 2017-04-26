@@ -322,7 +322,7 @@ class landsatData(Data):
             'startdate': date(1984, 3, 1),
             'latency': 1,
         },
-        'dt': {
+        'dn': {
             'assets': ['DN'],
             'description': 'Raw digital numbers',
             'toa': True,
@@ -348,7 +348,7 @@ class landsatData(Data):
             'assets': ['DN'],
             'description': 'LC8 band quality',
             'toa': True,
-            'startdate': date(1984, 3, 1),
+            'startdate': date(2013, 5, 30),
             'latency': 1,
         },
         'bqashadow': {
@@ -361,7 +361,7 @@ class landsatData(Data):
             ],
             'nargs': '*',
             'toa': True,
-            'startdate': date(1984, 3, 1),
+            'startdate': date(2013, 5, 30),
             'latency': 1,
         },
         #'Indices': {
@@ -454,13 +454,13 @@ class landsatData(Data):
         'ndvi8sr': {
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
-            'startdate': date(1984, 3, 1),
+            'startdate': date(2013, 5, 30),
             'latency': 1,
         },
         'landmask': {
             'assets': ['SR'],
             'description': 'Land mask from LC8SR',
-            'startdate': date(1984, 3, 1),
+            'startdate': date(2013, 5, 30),
             'latency': 1,
         },
         # ACOLITE products
