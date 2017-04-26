@@ -304,7 +304,7 @@ class landsatData(Data):
             ],
             'nargs': '*',
             'toa': True,
-            'startdate': date(1984, 3, 1),
+            'startdate': date(2013, 5, 30),
             'latency': 1,
         },
         'fmask': {

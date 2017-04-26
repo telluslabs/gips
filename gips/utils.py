@@ -269,7 +269,6 @@ def get_data_variables():
     # ex asset = modis
     for driver in sources.keys():
         data_class = import_data_class(driver)
-        print(data_class)
         for product in data_class._products.keys():
             with error_handler(
                     msg_prefix="Error adding product {}:{}".format(driver,product),
