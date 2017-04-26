@@ -78,16 +78,21 @@ class GIPSParser(argparse.ArgumentParser):
         group.add_argument('-s', '--site', help=h, default=None, required=site_required)
         h = 'Attribute to use as lookup in in vector file (defaults to index)'
         group.add_argument('-k', '--key', help=h, default="")
-        group.add_argument('-w', '--where', help="attribute=value pairs to limit features", default='')
+        group.add_argument('-w', '--where', help="attribute=value pairs to limit features",
+                           default='')
         group.add_argument('-t', '--tiles', nargs='*', help='Tile designations', default=None)
         group.add_argument('-d', '--dates', help='Range of dates (YYYY-MM-DD,YYYY-MM-DD)')
-        group.add_argument('--days', help='Include data within these days of year (doy1,doy2)', default=None)
+        group.add_argument('--days', help='Include data within these days of year (doy1,doy2)',
+                           default=None)
         group.add_argument('--sensors', help='Sensors to include', nargs='*', default=None)
-        group.add_argument('--%cov', dest='pcov', help='Threshold of %% tile coverage over site', default=0, type=int)
-        group.add_argument('--%tile', dest='ptile', help='Threshold of %% tile used', default=0, type=int)
+        group.add_argument('--%cov', dest='pcov', help='Threshold of %% tile coverage over site',
+                           default=0, type=int)
+        group.add_argument('--%tile', dest='ptile', help='Threshold of %% tile used', default=0,
+                           type=int)
         group.add_argument('--fetch', help='Fetch any missing data (if supported)',
                            default=False, action='store_true')
-        group.add_argument('--update', help='Force fetch and/ or update data (if supported)', default=False, action='store_true')
+        group.add_argument('--update', help='Force fetch and/ or update data (if supported)',
+                           default=False, action='store_true')
 
         group.add_argument('-p', '--products', help='Requested Products', nargs='*')
         self.parent_parsers.append(parser)
@@ -100,9 +105,11 @@ class GIPSParser(argparse.ArgumentParser):
         else:
             parser = self
         group = parser.add_argument_group('processing options')
-        group.add_argument('--overwrite', help='Overwrite existing output file(s)', default=False, action='store_true')
+        group.add_argument('--overwrite', help='Overwrite existing output file(s)',
+                           default=False, action='store_true')
         group.add_argument('--chunksize', help='Chunk size in MB', default=128.0, type=float)
-        group.add_argument('--numprocs', help='Desired number of processors (if allowed)', default=2, type=int)
+        group.add_argument('--numprocs', help='Desired number of processors (if allowed)',
+                           default=2, type=int)
         group.add_argument('--format', help='Format for output file', default="GTiff")
         h = ('Don\'t process. Instead, generate batch file with single '
              'gips_process command on each line.  \'overwrite\', '
@@ -121,7 +128,8 @@ class GIPSParser(argparse.ArgumentParser):
         group = parser.add_argument_group('project directory options')
         h = 'Directory to store project(s) (default to current directory)'
         group.add_argument('--outdir', help=h, default='')
-        group.add_argument('--suffix', help='Suffix to add to auto generated output directory', default='')
+        group.add_argument('--suffix', help='Suffix to add to auto generated output directory',
+                           default='')
         h = 'Do not create a top-level directory to hold project directories'
         group.add_argument('--notld', help=h, default=False, action='store_true')
         h = 'Create project directories in tree form'
