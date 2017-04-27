@@ -289,61 +289,81 @@ class merraData(Data):
             'description': 'Ave daily air temperature data (K)',
             'assets': ['SLV'],
             'layers': ['T2M'],
-            'bands': ['tave']
+            'bands': ['tave'],
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': 60,
         },
         'tmin': {
             'description': 'Min daily air temperature data',
             'assets': ['SLV'],
             'layers': ['T2M'],
-            'bands': ['tmin']
+            'bands': ['tmin'],
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': 60,
         },
         'tmax': {
             'description': 'Max daily air temperature data',
             'assets': ['SLV'],
             'layers': ['T2M'],
-            'bands': ['tmax']
+            'bands': ['tmax'],
+	    'startdate': datetime.date(1980, 1, 1),
+            'latency': 60,
         },
         'patm': {
             'description': 'Surface atmospheric pressure (mb)',
             'assets': ['SLV'],
             'layers': ['PS'],
-            'bands': ['patm']
+            'bands': ['patm'],
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': 60,
         },
         'shum': {
             'description': 'Relative humidity (kg kg-1)',
             'assets': ['SLV'],
             'layers': ['QV2M'],
-            'bands': ['shum']
+            'bands': ['shum'],
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': 60,
         },
         'rhum': {
             'description': 'Relative humidity (%)',
             'assets': ['SLV'],
             'layers': ['QV2M', 'PS', 'T2M'],
-            'bands': ['rhum']
+            'bands': ['rhum'],
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': 60,
         },
         'prcp': {
             'description': 'Daily total precipitation (mm day-1)',
             'assets': ['FLX'],
             'layers': ['PRECTOT'],
-            'bands': ['prcp']
+            'bands': ['prcp'],
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': 60,
         },
         'wind': {
             'description': 'Daily mean wind speed (m s-1)',
             'assets': ['FLX'],
             'layers': ['SPEED'],
-            'bands': ['wind']
+            'bands': ['wind'],
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': 60,
         },
         'srad': {
             'description': 'Incident solar radiation (W m-2)',
             'assets': ['RAD'],
             'layers': ['SWGDN'],
-            'bands': ['srad']
+            'bands': ['srad'],
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': 60,
         },
         'frland': {
             'description': 'Fraction of land (fraction)',
             'assets': ['ASM'],
             'layers': ['FRLAND'],
-            'bands': ['frland']
+            'bands': ['frland'],
+            'startdate': datetime.date(1980, 1, 1),
+            'latency': 0,
         }
         # TODO:
         # 'temp_modis': {

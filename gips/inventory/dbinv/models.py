@@ -191,6 +191,8 @@ class DataVariable(models.Model):
     band        = models.CharField(max_length=255)
     band_number = models.IntegerField(default=0)
     unit        = models.CharField(max_length=255, null=True, blank=True)
+    start_date  = models.DateField(null=True, blank=True)
+    latency     = models.IntegerField(default=1)
 
 
 class Result(models.Model):
@@ -260,4 +262,4 @@ class PostProcessJobs(models.Model):
 
     class Meta:
         unique_together = ('job', 'args')
-        
+

@@ -24,7 +24,7 @@
 
 import os
 import re
-from datetime import datetime
+from datetime import datetime, date
 import shutil
 import glob
 from fnmatch import fnmatchcase
@@ -259,6 +259,9 @@ class landsatData(Data):
 
     Asset = landsatAsset
 
+    _lt5_startdate = date(1984, 3, 1)
+    _lc8_startdate = date(2013, 5, 30)
+
     # Group products belong to ('Standard' if not specified)
     _productgroups = {
         'Index': ['bi', 'evi', 'lswi', 'msavi2', 'ndsi', 'ndvi', 'ndwi', 'satvi'],
@@ -276,17 +279,23 @@ class landsatData(Data):
         'rad': {
             'assets': ['DN'],
             'description': 'Surface-leaving radiance',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'ref': {
             'assets': ['DN'],
             'description': 'Surface reflectance',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+	    'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'temp': {
             'assets': ['DN'],
             'description': 'Brightness (apparent) temperature',
-            'toa': True
+            'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'acca': {
             'assets': ['DN'],
@@ -297,39 +306,53 @@ class landsatData(Data):
                 'Z: cloud height in meters (default: 4000)'
             ],
             'nargs': '*',
-            'toa': True
+            'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'fmask': {
             'assets': ['DN'],
             'description': 'Fmask cloud cover',
             'nargs': '*',
-            'toa': True
+            'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'tcap': {
             'assets': ['DN'],
             'description': 'Tassled cap transformation',
-            'toa': True
+            'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'dn': {
             'assets': ['DN'],
             'description': 'Raw digital numbers',
-            'toa': True
+            'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'volref': {
             'assets': ['DN'],
             'description': 'Volumetric water reflectance - valid for water only',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'wtemp': {
             'assets': ['DN'],
             'description': 'Water temperature (atmospherically correct) - valid for water only',
             # It's not really TOA, but the product code will take care of atm correction itself
-            'toa': True
+            'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'bqa': {
             'assets': ['DN'],
             'description': 'LC8 band quality',
-            'toa': True
+            'toa': True,
+            'startdate': _lc8_startdate,
+            'latency': 1,
         },
         'bqashadow': {
             'assets': ['DN'],
@@ -340,78 +363,108 @@ class landsatData(Data):
                 'Z: cloud height in meters (default: 4000)'
             ],
             'nargs': '*',
-            'toa': True
+            'toa': True,
+            'startdate': _lc8_startdate,
+            'latency': 1,
         },
         #'Indices': {
         'bi': {
             'assets': ['DN'],
             'description': 'Brightness Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'evi': {
             'assets': ['DN'],
             'description': 'Enhanced Vegetation Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'lswi': {
             'assets': ['DN'],
             'description': 'Land Surface Water Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'msavi2': {
             'assets': ['DN'],
             'description': 'Modified Soil-Adjusted Vegetation Index (revised)',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'ndsi': {
             'assets': ['DN'],
             'description': 'Normalized Difference Snow Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'ndvi': {
             'assets': ['DN'],
             'description': 'Normalized Difference Vegetation Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'ndwi': {
             'assets': ['DN'],
             'description': 'Normalized Difference Water Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'satvi': {
             'assets': ['DN'],
             'description': 'Soil-Adjusted Total Vegetation Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         #'Tillage Indices': {
         'ndti': {
             'assets': ['DN'],
             'description': 'Normalized Difference Tillage Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'crc': {
             'assets': ['DN'],
             'description': 'Crop Residue Cover',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'sti': {
             'assets': ['DN'],
             'description': 'Standard Tillage Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'isti': {
             'assets': ['DN'],
             'description': 'Inverse Standard Tillage Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         # NEW!!!
         'ndvi8sr': {
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
+            'startdate': _lc8_startdate,
+            'latency': 1,
         },
         'landmask': {
             'assets': ['SR'],
             'description': 'Land mask from LC8SR',
+            'startdate': _lc8_startdate,
+            'latency': 1,
         },
         # ACOLITE products
         'rhow': {
@@ -423,6 +476,8 @@ class landsatData(Data):
             'offset': 0.,
             'dtype': 'int16',
             'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         # Not sure what the issue is with this product, but it doesn't seem to
         # work as expected (multiband vis+nir product)
@@ -443,6 +498,8 @@ class landsatData(Data):
             'offset': 250.,
             'dtype': 'int16',
             'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'oc3chl': {
             'assets': ['DN'],
@@ -453,6 +510,8 @@ class landsatData(Data):
             'offset': 250.,
             'dtype': 'int16',
             'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'fai': {
             'assets': ['DN'],
@@ -461,6 +520,8 @@ class landsatData(Data):
             'acolite-key': 'FAI',
             'dtype': 'float32',
             'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'acoflags': {
             'assets': ['DN'],
@@ -469,6 +530,8 @@ class landsatData(Data):
             'acolite-key': 'FLAGS',
             'dtype': 'uint8',
             'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'spm655': {
             'assets': ['DN'],
@@ -479,6 +542,8 @@ class landsatData(Data):
             'gain': 0.005,
             'dtype': 'int16',
             'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
         'turbidity': {
             'assets': ['DN'],
@@ -489,6 +554,8 @@ class landsatData(Data):
             'gain': 0.005,
             'dtype': 'int16',
             'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
         },
     }
 
@@ -540,7 +607,7 @@ class landsatData(Data):
                 products[k]['acolite-product']
                 for k in products
                 if k != 'acoflags'  # acoflags is always internally generated
-                                    # by ACOLITE, 
+                                    # by ACOLITE,
             ]
         )
         if len(acolite_products) == 0:

@@ -194,21 +194,29 @@ class prismData(Data):
         'ppt': {
             'description': 'Precipitate',
             'assets': ['_ppt'],
+            'startdate': date(1981, 1, 1),
+            'latency': 7,
         },
         'pptsum': {
             'description': 'Cumulative Precipitate',
             'assets': ['_ppt'],
             'arguments': [
                 'days: temporal window width (default: 3 days) .',
-            ]
+            ],
+            'startdate': date(1981, 1, 1),
+            'latency': 7,
         },
         'tmin': {
             'description': 'Daily Minimum Temperature',
-            'assets': ['_tmin']
+            'assets': ['_tmin'],
+            'startdate': date(1981, 1, 1),
+            'latency': 7,
         },
         'tmax': {
             'description': 'Daily Maximum Temperature',
-            'assets': ['_tmax']
+            'assets': ['_tmax'],
+            'startdate': date(1981, 1, 1),
+            'latency': 7,
         },
     }
 
@@ -250,7 +258,7 @@ class prismData(Data):
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)
-                     vsinames[asset] = os.path.join(
+                    vsinames[asset] = os.path.join(
                          '/vsizip/' + self.assets[asset].filename,
                          bil
                      )
