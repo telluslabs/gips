@@ -62,9 +62,8 @@ def rectify_assets(asset_class):
     def rectify_asset(f_name):  # work function for _chunky_transaction()
         a = asset_class(f_name)
         (asset, created) = mao.update_or_create(
-            asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-            name=f_name, driver=driver, status='complete'
-        )
+                driver=driver, asset=a.asset, tile=a.tile, date=a.date,
+                defaults=dict(sensor=a.sensor, name=f_name, status='complete'))
         asset.save()
         touched_rows.add(asset.pk)
         if created:
@@ -154,9 +153,8 @@ def rectify_products(data_class):
             return
 
         (product, created) = mpo.update_or_create(
-            product=product, sensor=sensor, tile=tile, date=date,
-            driver=driver, name=full_fn, status='complete'
-        )
+                driver=driver, product=product, tile=tile, date=date,
+                defaults=dict(sensor=sensor, name=full_fn, status='complete'))
         product.save()
         # TODO can subtract this item from starting_keys each time and possibly save some memory and time
         touched_rows.add(product.pk)
