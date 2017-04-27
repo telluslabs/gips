@@ -56,12 +56,11 @@ def create_data_variables():
     data_variables = get_data_variables()
 
     for dv in data_variables:
-        dv_model = DataVariable(**dv)
-        try:
-            dv_model.save()
-        except django.db.IntegrityError:
-            # Name was not unique
-            continue
+        name = dv.pop('name')
+        dv_model, created = DataVariable.objects.update_or_create(
+            name=name, defaults=dv
+        )
+        dv_model.save()
 
 
 def main():
