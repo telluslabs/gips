@@ -5,8 +5,6 @@ Currently the datahandler xmlrpc and logging daemon from an upstart script:
 usage: `sudo service geokitd start`
 
 ```
-(dh_venv)[jfisk@schedtst:datahandler]$ vi /etc/init/geokitd.conf 
-
 # start geokitd 
 # shawn patti
 
