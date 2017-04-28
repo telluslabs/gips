@@ -180,7 +180,8 @@ def get_setting(setting, default=None):
     """Fetch a GIPS setting named by the given string.
 
     If the setting isn't present in gips settings, the default is
-    returned instead.
+    returned instead.  If an exception should be raised due to absence
+    of the given setting, settings().SETTING should be used instead.
     """
     return settings().__dict__.get(setting, default)
 
