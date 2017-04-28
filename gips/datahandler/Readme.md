@@ -2,9 +2,9 @@
 
 Currently the datahandler xmlrpc and logging daemon are started from an upstart script:
 
-`/etc/init/geokitd.conf`
-
 usage: `sudo service geokitd start`
+
+`/etc/init/geokitd.conf`
 
 ```
 # start geokitd 

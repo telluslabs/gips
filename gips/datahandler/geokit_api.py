@@ -16,6 +16,8 @@ def get_datacatalog ():
     for dv in dvs:
         d = model_to_dict(dv)
         d['asset'] = eval(d['asset'])
+        # xmlrpclib doesn't like datetime.date, convert to datetime.datetime
+        d['start_date'] = datetime.datetime.fromordinal(d['start_date'].toordinal())
         dv_list.append(d)
     return dv_list
 
