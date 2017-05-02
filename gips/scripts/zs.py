@@ -51,6 +51,8 @@ from gips.scripts.util import vprint
 
 title = 'GIPS Zonal Summary (v' + gipsversion + ')'
 
+result_field_names = (
+        'id', 'job', 'date', 'site', 'count', 'minimum', 'maximum', 'mean', 'skew', 'sd', 'shaid')
 
 def rpc_conn():
     """Return a connection to the RPC server; uses gips setting DH_API_SERVER."""
@@ -82,7 +84,7 @@ def parse_args():
     result_p = sp.add_parser('result', help='Print job results, if available')
     result_p.add_argument('job_id', help='ID of the job to check up on')
     result_p.add_argument('-f', '--file', help='Destination for CSV results (default: stdout)',
-                       default=sys.stdout)
+                       default='/dev/stdout')
 
     # all commands need --verbose; for this simple case parents=[..] isn't worthy
     for p in submit_p, status_p, result_p:
@@ -108,32 +110,26 @@ def submit(site_name, data_spec, site, dates):
 
 def status(job_id):
     """Performs status check; returns current status."""
-    # TODO handle cases(?):
-    #   no such job
-    #   finished & succeeded - and show the outcome data
-    #   finished & failed
-    #   job is ongoing
+    status, product_status = rpc_conn().job_status(job_id)
+    if len(product_status) != 0:
+        vprint(1, 'Product Status:')
+        for state in 'requested', 'scheduled', 'in-progress', 'complete', 'failed':
+            vprint(1, '  {:11} {:>4}'.format(state, product_status.get(state, 0)))
+    vprint(1, 'Job Status:', status)
+
+
+def result(job_id, file_name):
+    """Look up a job's results and print to CSV."""
+    status, _ = rpc_conn().job_status(job_id)
+    if status != 'complete':
+        vprint(1, "Can't continue, job status:", status)
+        return
+
     results = rpc_conn().stats_request_results({'job': job_id})
-    # expected results:
-    '''
-    [
-        { . . . }, # one dict per day
-        {
-            'count': 10118,
-            'skew': -4.1808,
-            'maximum': 0.7466,
-            'site': '',
-            'job': 68,
-            'minimum': -1.0002,
-            `date': datetime.datetime(2013, 4, 28, 0, 0),
-            'mean': 0.541821,
-            'shaid': '1',
-            'id': 1487043,
-            'sd': 0.105745,
-        },
-    ]
-    '''
-    vprint(results)
+    with open(file_name, 'w') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=result_field_names)
+        writer.writeheader()
+        [writer.writerow(row) for row in results]
 
 
 def main():
@@ -144,6 +140,8 @@ def main():
         submit(a.site_name, a.data_spec, a.site, a.dates)
     elif a.cmd == 'status':
         status(a.job_id)
+    elif a.cmd == 'result':
+        result(a.job_id, a.file)
     else:
         raise RuntimeError('Unreachable line reached')
 
