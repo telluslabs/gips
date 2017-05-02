@@ -41,6 +41,8 @@ import sys
 import os
 import argparse
 import xmlrpclib
+import csv
+import pprint
 
 from gips import __version__ as gipsversion
 from gips import utils as gips_utils
@@ -61,7 +63,7 @@ def parse_args():
     epilog = 'For help on each command: {} {{submit,status}} -h'.format(
             os.path.basename(sys.argv[0]))
     cmd_parser = argparse.ArgumentParser(description=title, epilog=epilog)
-    sp = cmd_parser.add_subparsers(dest='cmd', help='Whether to submit or check on job')
+    sp = cmd_parser.add_subparsers(dest='cmd', help='Choose an operation')
 
     # set up for 'submit' command
     submit_p = sp.add_parser('submit', help='Submit a new job')
@@ -76,8 +78,14 @@ def parse_args():
     status_p = sp.add_parser('status', help='Show status of an existing job')
     status_p.add_argument('job_id', help='ID of the job to check up on')
 
-    # both commands need --verbose; for this simple case parents=[..] isn't worthy
-    for p in submit_p, status_p:
+    # set up for 'result' command
+    result_p = sp.add_parser('result', help='Print job results, if available')
+    result_p.add_argument('job_id', help='ID of the job to check up on')
+    result_p.add_argument('-f', '--file', help='Destination for CSV results (default: stdout)',
+                       default=sys.stdout)
+
+    # all commands need --verbose; for this simple case parents=[..] isn't worthy
+    for p in submit_p, status_p, result_p:
         p.add_argument('-v', '--verbose', help='Verbosity - 0: quiet, 1: normal, 2+: debug',
                        default=1, type=int, choices=range(0, 7))
 
@@ -87,15 +95,7 @@ def parse_args():
     vprint(2, 'Verbosity level:', args.verbose)
     vprint(3, 'Arguments & options:')
     vprint(3, '  command:', args.cmd)
-    if args.cmd == 'submit':
-        vprint(3, '  site_name:', args.site_name)
-        vprint(3, '  data_spec:', args.data_spec)
-        vprint(3, '  site:', args.site)
-        vprint(3, '  dates:', args.dates)
-    elif args.cmd == 'status':
-        vprint('  job_id:', args.job_id)
-    else:
-        raise RuntimeError('Unreachable line reached')
+    vprint(3, pprint.pformat(vars(args)))
     return args
 
 
