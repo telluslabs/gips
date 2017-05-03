@@ -27,6 +27,7 @@ import sys
 import datetime
 import shlex
 import re
+import glob
 import subprocess
 import json
 import tempfile
@@ -117,7 +118,10 @@ class sentinel2Asset(Asset):
             # is used for both original and shortened post-2016-12-07 assets.
             # TODO test this line after assets are archived (ie during Asset.discover)
             'pattern': '*S2?_*MSIL1C_*????????T??????_*R???_*.zip',
-            'startdate': datetime.date(2016, 12, 07), # used to prevent impossible searches
+            # TODO find real start date for S2 data:
+            # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
+            # (change to orderby=ingestiondate%20desc if needed)
+            'startdate': datetime.date(2015, 1, 1), # used to prevent impossible searches
             'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
                           # only needed by Asset.end_date and Asset.available, but those are never called?
         },
@@ -255,15 +259,15 @@ class sentinel2Asset(Asset):
             asset_url = link['href']
             output_file_name = entry['title'] + '.zip'
 
-        # TODO test this stanza:  place output_file_name in place in filesystem as test begins
-        ## old-style assets cover many tiles, so there may be duplication of effort:
-        #stage_full_path = os.path.join(cls.Repository.path('stage'), output_file_name)
-        ## vague-ify the parts of the filename that may vary, such as processing date and location
-        #stage_glob = re.sub(r'_\w{4}_\d{8}T\d{6}_', r'_????_????????T??????_', stage_full_path, 1)
-        #if len(glob.glob(stage_glob)) > 0:
-        #    utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
-        #            output_file_name))
-        #    return
+        # old-style assets cover many tiles, so there may be duplication of effort; avoid that by
+        # aborting if the stage already contains content for the desired asset/tile/date:
+        ofn_glob = (tile.upper() + '_'
+                    + re.sub(r'_\w{4}_\d{8}T\d{6}_', r'_????_????????T??????_', output_file_name, 1))
+        stage_glob = os.path.join(cls.Repository.path('stage'), ofn_glob)
+        if len(glob.glob(stage_glob)) > 0:
+            utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
+                    output_file_name))
+            return
 
         # TODO when issue #131 comes around, this is the beginning of the 'download' step
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage

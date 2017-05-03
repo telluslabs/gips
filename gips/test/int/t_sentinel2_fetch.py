@@ -1,4 +1,4 @@
-"""Unit tests for data.modis.modis.modisAsset.fetch."""
+"""Integration tests for sentinel2Asset.fetch and its friends."""
 
 import os
 import shutil
@@ -229,7 +229,6 @@ def t_fetch_old_asset(fetch_mocks):
     Uses the test semi-real asset in data/ for this purpose.
     """
     # setup & mocks
-    m_popen = fetch_mocks # more mocks are expected
     expected_staged_bns = set([t + '_' + test_asset_bn for t in expected_tiles])
     stage_path = sentinel2.sentinel2Repository.path('stage')
     # check for possible interference in the stage directory
@@ -247,6 +246,33 @@ def t_fetch_old_asset(fetch_mocks):
         for f in expected_staged_bns:
             full_fn = os.path.join(stage_path, f)
             os.path.exists(full_fn) and os.remove(full_fn)
+
+
+def t_fetch_old_asset_duplicate(fetch_mocks, mocker):
+    """Integration test for sentinel2Asset.fetch.
+
+    Checks that assets aren't downloaded when it's clear they're already
+    in the stage.  Uses the test semi-real asset in data/ for this
+    purpose.
+    """
+    # setup & mocks
+    stage_path = sentinel2.sentinel2Repository.path('stage')
+    staged_bn = '19TCH_' + test_asset_bn
+    staged_fn = os.path.join(stage_path, staged_bn)
+
+    if os.path.exists(staged_fn):
+        raise IOError('Cannot run test:  item in the way: ' + staged_bn)
+    open(staged_fn, 'a').close() # python idiom for `touch`
+
+    m_popen = fetch_mocks # for asserting 2nd call (download) was not made
+    m_mkdtemp = mocker.patch.object(sentinel2.tempfile, 'mkdtemp')
+
+    # call, assertion, cleanup
+    try:
+        sentinel2.sentinel2Asset.fetch('L1C', '19TCH', dt(2016, 1, 19))
+        assert (m_popen.call_count, m_mkdtemp.call_count) == (1, 0)
+    finally:
+        os.path.exists(staged_fn) and os.remove(staged_fn)
 
 
 def t_tile_list(test_asset_fn):
