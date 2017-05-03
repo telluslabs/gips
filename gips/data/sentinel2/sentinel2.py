@@ -173,7 +173,7 @@ class sentinel2Asset(Asset):
     def __init__(self, filename):
         """Inspect a single file and set some metadata.
 
-        Note that for now, only the shortened name format in use after Dec 6 2016 is supported:
+        Both shortened and original longer file name & content structure are supported:
         https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
         """
         super(sentinel2Asset, self).__init__(filename)
@@ -205,6 +205,8 @@ class sentinel2Asset(Asset):
 
         style = 'original' if date < cls._2016_12_07 else cls._2016_12_07
 
+        # TODO when issue #131 comes around, this is the beginning of the 'query' step
+        # search step:  locate the asset corresponding to (asset, tile, date)
         url_head = 'https://scihub.copernicus.eu/dhus/search?q='
         url_tail = '&format=json'
         if style == 'original':
@@ -259,10 +261,11 @@ class sentinel2Asset(Asset):
         ## vague-ify the parts of the filename that may vary, such as processing date and location
         #stage_glob = re.sub(r'_\w{4}_\d{8}T\d{6}_', r'_????_????????T??????_', stage_full_path, 1)
         #if len(glob.glob(stage_glob)) > 0:
-        #    utils.verbose_out('Asset `{}` located but already in stage/, skipping.'.format(
+        #    utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
         #            output_file_name))
         #    return
 
+        # TODO when issue #131 comes around, this is the beginning of the 'download' step
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage
         # if the download is successful (this is necessary to avoid a race condition between
         # archive actions and fetch actions by concurrent processes)

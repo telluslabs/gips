@@ -244,7 +244,9 @@ def t_fetch_old_asset(fetch_mocks):
         actual = set(os.listdir(stage_path))
         assert expected_staged_bns.issubset(actual)
     finally:
-        [os.remove(os.path.join(stage_path, f)) for f in expected_staged_bns]
+        for f in expected_staged_bns:
+            full_fn = os.path.join(stage_path, f)
+            os.path.exists(full_fn) and os.remove(full_fn)
 
 
 def t_tile_list(test_asset_fn):
@@ -283,9 +285,8 @@ def archive_setup(test_asset_fn):
         yield (stage_path, staged_asset_fn, archived_asset_fn)
     finally:
         # clean up by removing the asset from both the stage and the archive
-        if os.path.exists(staged_asset_fn): # usually is removed by code under test
-            os.remove(staged_asset_fn)
-        os.remove(archived_asset_fn)
+        os.path.exists(staged_asset_fn) and os.remove(staged_asset_fn)
+        os.path.exists(archived_asset_fn) and os.remove(archived_asset_fn)
 
 
 def t_archive_old_asset(archive_setup):
@@ -312,5 +313,5 @@ def t_stage_asset_old_style(test_asset_fn):
         actual_files = [ef for ef in expected_files if os.path.exists(ef)]
         assert expected_files == actual_files
     finally:
-        # clean up in any case; this may break if something went wrong
-        [os.remove(ef) for ef in expected_files]
+        # clean up in any case; this may break depending on what went wrong
+        [os.path.exists(ef) and os.remove(ef) for ef in expected_files]
