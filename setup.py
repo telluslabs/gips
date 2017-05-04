@@ -47,24 +47,26 @@ for f in glob.glob('gips/scripts/*.py'):
 
 # GIPS requirements should be added at the level appropriate
 #  lib - required to install and import gips.core classes
-
-_lib_req = ['gippy>=0.3.8,<0.4.0']
-_base_req = [
+# full - required to use gips.data.* drivers (file-system based)
+#  orm - required to use DB based gips
+#   dh - required to run the gips.datahandler
+_lib_requirements = [
+    'gippy>=0.3.8,<0.4.0',
     'shapely',
     'python-dateutil',
 ]
-_full_req = _base_req + [
+_full_requirements = _lib_requirements + [
     'landsat-util==0.8.0ircwaves0',
     'Py6S>=1.5.0',
     'requests',
     'pydap<=3.2',
     'netCDF4',
 ]
-_orm_req = _full_req + [
+_orm_requirements = _full_requirements + [
     'django==1.10',
     'psycopg2<=2.6',
 ]
-_dh_req = _orm_req + [
+_dh_requirements = _orm_requirements + [
     'rq',
 ]
 
@@ -80,10 +82,9 @@ setup(
     package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf']},
     install_requires=_lib_req,
     extras_require={
-        'base': _base_req,
-        'full': _full_req,
-        'orm': _orm_req,
-        'dh-rq': _dh_req,
+        'full': _full_requirements,
+        'orm': _orm_requirements,
+        'dh-rq': _dh_requirements,
     },
     dependency_links=[
         'http://github.com/ircwaves/landsat-util/tarball/landsat_util#egg=landsat-util-0.8.0ircwaves0',
