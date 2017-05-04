@@ -7,7 +7,7 @@ usage: `sudo service geokitd start`
 `/etc/init/geokitd.conf`
 
 ```
-# start geokitd 
+# start geokitd
 # shawn patti
 
 start on runlevel [2345]
@@ -44,6 +44,40 @@ package, and to install RQ into the python virtualenv.
 
 The ORM is required to run the datahandler, therefore set the environment variable `GIPS_ORM=true`.
 
+### Configuring the Datahandler
+
+Set these gips settings; the values given are useful for a local dev setup:
+
+```
+GEOKIT_SERVER = 'localhost'
+XMLRPC_PORT   = 9000
+LOG_PORT      = 9001
+LOG_LEVEL     = 1
+EXPORT_DIR = '/path/to/export'
+
+# for gips acting as a front-end, attempting to send API requests,
+# where can it find the installed API server?
+DH_API_SERVER = 'http://localhost:9000/'
+```
+
+### Configuring TORQUE
+
+To use TORQUE set these settings:
+
+```
+# path to the correct python binary on the worker node
+REMOTE_PYTHON = '/path/to/.worker-venv/bin/python'
+# named queue to which jobs should be submitted
+TORQUE_QUEUE  = 'somequeue@someserver.io'
+# prints out the generated torque jobs; may enable more debugging in the future
+DH_DEBUG = True
+# see nodes entry in:
+# http://docs.adaptivecomputing.com/torque/4-0-2/Content/topics/2-jobs/requestingRes.htm
+TORQUE_NODE   = 'worker-node'
+# place to put torque job output files
+TORQUE_OUTPUT = '/path/to/torque-output'
+```
+
 ### Configuring RQ
 
 Set this GIPS setting to choose RQ & Redis as the job queueing system instead of TORQUE:
@@ -65,7 +99,9 @@ RQ_REDIS_DB       = 0
 RQ_REDIS_PASSWORD = None        # ie no password
 ```
 
-### Development Mode
+#### Development Mode
+
+It is assumed that a python virtualenv is activated, the one created by `install.sh`.
 
 Once the redis system package is installed, redis should be running.  Its defaults should
 match RQ's defaults, thus no additional config is necessary.  Start an RQ worker to listen for
@@ -92,4 +128,11 @@ four_years_ago = datetime.datetime.now() - datetime.timedelta(years=4)
 job_id = api.submit_job('tolson-test-site', product_name,
         {'key':'shaid', 'site': shp_full_path}, {'dates': four_years_ago.strftime('%Y-%j')})
 print "Got a job id: ", job_id
+```
+
+After that, one may manually run the scheduler to emulate the cron job that periodically checks for
+new work and schedules it:
+
+```
+$ python gips/datahandler/scheduler.py
 ```
