@@ -224,7 +224,7 @@ def create_environment_settings(
                 # get the settings_template file for the selected driver
                 if driver in built_in_drivers:
                     cfgfile = os.path.join(
-                        gd_path, 'settings_template.py')
+                        gd_path, driver, 'settings_template.py')
                 elif os.path.isdir(driver) and os.path.isabs(driver):
                     # full path to a driver directory
                     cfgfile = os.path.join(driver, 'settings_template.py')
