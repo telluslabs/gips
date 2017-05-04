@@ -20,7 +20,7 @@ class ThreadedRPC(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
     pass
 
 class RequestHandler (SimpleXMLRPCRequestHandler):
-    rpc_paths = ('/RPC2',)
+    pass
 
 
 class LogRecordStreamHandler (SocketServer.StreamRequestHandler):
@@ -94,8 +94,13 @@ class LogRecordSocketReceiver (SocketServer.ThreadingTCPServer):
 
 
 def serve_log (host, port):
+    # TODO 3rd party libs log too, and don't pass in `extras`, so KeyError.  Fix by using one
+    # formatter for most logs, and a special one that shows jobid for worker logging.  Note also
+    # funcName:  datahandler.Logger.log() calls logging.log, so funcName is often just 'log', which
+    # isn't helpful.
     logging.basicConfig(format = (
-        '---- %(asctime)s %(jobid)s %(caller)s -----\n'
+        #'---- %(asctime)s %(jobid)s %(caller)s -----\n'
+        '---- %(asctime)s ---------- %(funcName)s ------\n'
         '%(message)s\n'
         '--------------------------------------------------------'
     ))
