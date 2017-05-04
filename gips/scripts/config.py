@@ -103,18 +103,7 @@ def main():
         default=False, action='store_true',
     )
     p = subparser.add_parser('user', help='Configure GIPS repositories for this user (for per user customizations)')
-    p.add_argument(
-        '-U', '--user',
-        help='Set username for EARTHDATA login', default=''
-    )
-    p.add_argument(
-        '-P', '--password',
-        help='Set password for EARTHDATA login', default=''
-    )
-    p.add_argument(
-        '-e', '--email',
-        help='Set email address (used for anonymous FTP sources)'
-    )
+    #p.add_argument('-e', '--email', help='Set email address (used for anonymous FTP sources)')
     #h = 'Install full configuration file without inheriting from environment settings'
     #p.add_argument('-f', '--full', help=h, default=False, action='store_true')
     args = parser.parse_args()
