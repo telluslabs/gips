@@ -138,7 +138,9 @@ def main():
     elif args.command == 'env':
         try:
             cfgfile = create_environment_settings(
-                args.repos, email=args.email, drivers=args.drivers
+                args.repos, email=args.email, drivers=args.drivers,
+                earthdata_user=args.user, earthdata_password=args.password,
+                update_config=args.update
             )
             print 'Environment settings file: %s' % cfgfile
             print 'Creating repository directories'
