@@ -58,6 +58,7 @@ _full_req = _base_req + [
     'Py6S>=1.5.0',
     'requests',
     'pydap<=3.2',
+    'netCDF4',
 ]
 _orm_req = _full_req + [
     'django==1.10',
