@@ -43,8 +43,8 @@ DATABASES = {
 }
 
 # For NASA EarthData Authentication
-EARTHDATA_USER = ""
-EARTHDATA_PASS = ""
+EARTHDATA_USER = "$EARTHDATA_USER"
+EARTHDATA_PASSWORD = "$EARTHDATA_PASSWORD"
 
 REPOS = dict()
 
@@ -63,4 +63,5 @@ REPOS['dataname'] = {
         #'tiles': 'mydatabase:mydatatype_tiles',        # database format
         #'tiles': '~/randomdir/dataname_tiles.shp'      # file format
     }
+# Driver specific system configurations need to be made manually
 """
