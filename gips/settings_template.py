@@ -46,59 +46,19 @@ DATABASES = {
 EARTHDATA_USER = ""
 EARTHDATA_PASS = ""
 
-REPOS = {
-    'aod': {
-        'repository': '$TLD/aod',
-    },
-    'landsat': {
-        'repository': '$TLD/landsat',
-        # Landsat specific settings
-        '6S': False,            # atm correction for VIS/NIR/SWIR bands
-        'MODTRAN': False,       # atm correction for LWIR
-        'extract': False,       # extract files from tar.gz before processing instead of direct access
-        # 'ACOLITE_DIR':  '',   # ACOLITE installation for atm correction over water
-    },
-    'modis': {
-        'repository': '$TLD/modis',
-        'username': EARTHDATA_USER,
-        'password': EARTHDATA_PASS
-    },
-    'sentinel2': {
-        'repository': '$TLD/sentinel2',
-        # sign up for access to data source here:  https://scihub.copernicus.eu/dhus/#/self-registration
-        'username': '',
-        'password': '',
-        'extract': False,  # extract files from tar.gz before processing instead of direct access
-    },
-    # these drivers tend to more specialized and experimental so turned off by default
-    #'cdl': {
-    #    'repository': '$TLD/cdl',
-    #},
-    #'sar': {
-    #    'repository': '$TLD/sar',
-    #},
-    #'sarannual': {
-    #    'repository': '$TLD/sarannual',
-    #},
-    'merra': {
-        'repository': '$TLD/merra',
-        'username': EARTHDATA_USER,
-        'password': EARTHDATA_PASS
-    },
-    #'daymet': {
-    #    'repository': '$TLD/daymet',
-    #},
-}
+REPOS = dict()
 
 
 """
-# to add repository add new key to the REPOS dictionary
-    'dataname': {
-        # path to driver directory location (default to gips/data/dataname/ if not given)
+# to add repository add a `${driver_dir}/settings_template.py` of the form
+REPOS['dataname'] = {
+        # REQUIRED: path to top level directory of data
+        'repository': '$TLD/dataname',
+        # OPTIONAL: path to driver directory location
+        #(default to gips/data/dataname/ if not given)
         'driver': '',
-        # path to top level directory of data
-        'repository': '',
-        # override location of tiles vector (default to gips/data/dataname/tiles.shp)
+        # OPTIONAL: override location of tiles vector
+        # (default to gips/data/dataname/tiles.shp)
        'tiles': '',
         #'tiles': 'mydatabase:mydatatype_tiles',        # database format
         #'tiles': '~/randomdir/dataname_tiles.shp'      # file format
