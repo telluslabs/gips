@@ -357,6 +357,18 @@ class Asset(object):
         dates = [dt for dt in datearr if days[0] <= int(dt.strftime('%j')) <= days[1]]
         return dates
 
+
+    @classmethod
+    def query_service(cls, asset, tile, date):
+        """Wrap call to emulate existing convention."""
+        if not hasattr(cls, 'query_provider'):
+            raise NotImplementedError('Query/fetch bifurcation not supported for ' + cls.__name__)
+        bn, url = cls.query_provider(asset, tile, date)
+        if (bn, url) == (None, None):
+            return []
+        return [{'basename': bn, 'url': url}]
+
+
     @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
