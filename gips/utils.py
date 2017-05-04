@@ -186,25 +186,58 @@ def get_setting(setting, default=None):
     return settings().__dict__.get(setting, default)
 
 
-def create_environment_settings(repos_path, email=''):
+def create_environment_settings(
+        repos_path, email, drivers, earthdata_user='', earthdata_password='',
+        update_config=False
+):
     """ Create settings file and data directory """
     from gips.settings_template import __file__ as src
-    cfgpath = os.path.dirname(__file__)
-    cfgfile = os.path.join(cfgpath, 'settings.py')
+    gipspath = os.path.dirname(__file__)
+    cfgfile = os.path.join(gipspath, 'settings.py')
     if src[-1] == 'c':
         src = src[:-1]
-    try:
-        if not os.path.exists(cfgfile):
-            with open(cfgfile, 'w') as fout:
-                with open(src, 'r') as fin:
+    # try:
+    if not os.path.exists(cfgfile) or update_config:
+        with open(cfgfile, 'w') as fout:
+            with open(src, 'r') as fin:
+                for line in fin:
+                    fout.write(
+                        line.replace(
+                            '$TLD', repos_path
+                        ).replace(
+                            '$EMAIL', email
+                        ).replace(
+                            '$EARTHDATA_USER', earthdata_user
+                        ).replace(
+                            '$EARTHDATA_PASSWORD', earthdata_password
+                        )
+                    )
+            for driver in drivers:
+                from . import data as gipsdata
+                gd_path = gipsdata.__path__[0]
+                built_in_drivers = filter(
+                    lambda e: (not e.endswith('.py') and
+                               not e.endswith('.pyc')),
+                    os.listdir(gd_path)
+                )
+
+                # get the settings_template file for the selected driver
+                if driver in built_in_drivers:
+                    cfgfile = os.path.join(
+                        gd_path, 'settings_template.py')
+                elif os.path.isdir(driver) and os.path.isabs(driver):
+                    # full path to a driver directory
+                    cfgfile = os.path.join(driver, 'settings_template.py')
+                else:
+                    # try import, dirname, and checking for template
+                    import imp
+                    fmtup = imp.find_module(driver)
+                    cfgfile = os.path.join(fmtup[1], 'settings_template.py')
+
+                with open(cfgfile, 'r') as fin:
                     for line in fin:
-                        fout.write(line.replace('$TLD', repos_path).replace('$EMAIL', email))
-        return cfgfile
-    except OSError:
-        # no permissions, so no environment level config installed
-        #print traceback.format_exck()
-        # TODO error-handling-fix: report on specifics of error then continue; no error handler here
-        return None
+                        fout.write(line.replace('$TLD', repos_path))
+    return cfgfile
 
 
 def create_user_settings(email=''):
@@ -212,10 +245,10 @@ def create_user_settings(email=''):
     from gips.user_settings_template import __file__ as src
     if src[-1] == 'c':
         src = src[:-1]
-    cfgpath = os.path.expanduser('~/.gips')
-    if not os.path.exists(cfgpath):
-        os.mkdir(cfgpath)
-    cfgfile = os.path.join(cfgpath, 'settings.py')
+    dotgips = os.path.expanduser('~/.gips')
+    if not os.path.exists(dotgips):
+        os.mkdir(dotgips)
+    cfgfile = os.path.join(dotgips, 'settings.py')
     if os.path.exists(cfgfile):
         raise Exception('User settings file already exists: %s' % cfgfile)
     with open(cfgfile, 'w') as fout:
