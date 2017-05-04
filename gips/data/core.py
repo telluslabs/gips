@@ -907,9 +907,12 @@ class Data(object):
                                 'query_service for {}, {}, {}'
                                 .format(a, t, date_str)
                             )
-                            with utils.error_handler(msg_prefix, continuable=True):
+                            with utils.error_handler(msg_prefix, continuable=False):
                                 resp = cls.Asset.query_service(a, t, d)
-                                assert len(resp) == 1, 'should only be one asset'
+                                if len(resp) == 0:
+                                    continue
+                                elif len(resp) > 1:
+                                    raise Exception('should only be one asset')
                                 aobj = cls.Asset(resp[0]['basename'])
 
                                 if (force or len(local_assets) == 0 or
