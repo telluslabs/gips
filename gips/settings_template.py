@@ -50,7 +50,8 @@ REPOS = dict()
 
 
 """
-# to add repository add a `${driver_dir}/settings_template.py` of the form
+# To enable a data-driver add a `${driver_dir}/settings_template.py` of the
+# form below to the driver
 REPOS['dataname'] = {
         # REQUIRED: path to top level directory of data
         'repository': '$TLD/dataname',
