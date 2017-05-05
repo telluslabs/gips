@@ -65,6 +65,27 @@ def create_data_variables():
         dv_model.save()
 
 
+def configure_environment(repos_path, email, drivers, earthdata_user,
+                          earthdata_password, update, **kwargs):
+    try:
+        cfgfile = create_environment_settings(
+            repos_path, email, drivers,
+            earthdata_user, earthdata_password,
+            update_config=args.update
+        )
+        print 'Environment settings file: %s' % cfgfile
+        print 'Creating repository directories'
+        create_repos()
+        migrate_database()
+        create_data_variables()
+    except Exception, e:
+        # TODO error-handling-fix: standard script-level handler
+        print traceback.format_exc()
+        print 'Could not create environment settings: %s' % e
+        sys.exit(1)
+
+
+
 def main():
     import gips
     title = 'GIPS Configuration Utility (v%s)' % (version)
@@ -125,23 +146,7 @@ def main():
             sys.exit(1)
 
     elif args.command == 'env':
-        try:
-            cfgfile = create_environment_settings(
-                args.repos, email=args.email, drivers=args.drivers,
-                earthdata_user=args.user, earthdata_password=args.password,
-                update_config=args.update
-            )
-            print 'Environment settings file: %s' % cfgfile
-            print 'Creating repository directories'
-            create_repos()
-            migrate_database()
-            create_data_variables()
-        except Exception, e:
-            # TODO error-handling-fix: standard script-level handler
-            print traceback.format_exc()
-            print 'Could not create environment settings: %s' % e
-            sys.exit(1)
-
+        configure_environment(**args)
     elif args.command == 'user':
         try:
             # first try importing environment settings
