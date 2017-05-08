@@ -105,6 +105,7 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXSLV',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Single-Level Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4',
+            'documentation': '',
             'pattern': _asset_pattern.format(name='tavg1_2d_slv_Nx'),
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_slv_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -117,6 +118,7 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXFLX',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Surface Flux Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXFLX.5.12.4',
+            'documentation': '',
             'pattern': _asset_pattern.format(name='tavg1_2d_flx_Nx'),
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_flx_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -128,6 +130,7 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXRAD',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Radiation Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXRAD.5.12.4',
+            'documentation': '',
             'pattern': _asset_pattern.format(name='tavg1_2d_rad_Nx'),
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_rad_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -139,6 +142,7 @@ class merraAsset(Asset):
             'shortname': 'M2C0NXASM',
             'description': '2d, constants V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980',
+            'documentation': '',
             'pattern': _asset_pattern.format(name='const_2d_asm_Nx'),
             're_pattern': _asset_re_pattern.format(name='const_2d_asm_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -149,6 +153,7 @@ class merraAsset(Asset):
         #     'description': 'Atmospheric Profile',
         #     'pattern': 'MAI6NVANA_PROFILE_*.tif',
         #     'url': 'http://goldsmr5.sci.gsfc.nasa.gov/opendap/MERRA2/M2I6NVANA.5.12.4',
+        #     'documentation': '',
         #     'source': 'MERRA2_%s.inst6_3d_ana_Nv.%04d%02d%02d.nc4',
         #     'startdate': datetime.date(1980, 1, 1),
         #     'latency': 60,
@@ -158,6 +163,7 @@ class merraAsset(Asset):
         #     'description': 'Atmospheric Profile',
         #     'pattern': 'MAI6NVANA_PROFILE_*.tif',
         #     'url': 'http://goldsmr3.sci.gsfc.nasa.gov:80/opendap/MERRA/MAI6NPANA.5.2.0',
+        #     'documentation': '',
         #     'source': 'MERRA%s.prod.assim.inst6_3d_ana_Np.%04d%02d%02d.hdf',
         #     'startdate': datetime.date(1980, 1, 1),
         #     'latency': 60,
@@ -289,7 +295,13 @@ class merraData(Data):
             'description': 'Ave daily air temperature data (K)',
             'assets': ['SLV'],
             'layers': ['T2M'],
-            'bands': ['tave'],
+            'bands': [
+                {
+                    'name':'tave',
+                    'units': '',
+                }
+            ],
+            'category': '',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -297,7 +309,13 @@ class merraData(Data):
             'description': 'Min daily air temperature data',
             'assets': ['SLV'],
             'layers': ['T2M'],
-            'bands': ['tmin'],
+            'bands': [
+                {
+                    'name': 'tmin',
+                    'units': '',
+                }
+            ],
+            'category': '',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -305,7 +323,13 @@ class merraData(Data):
             'description': 'Max daily air temperature data',
             'assets': ['SLV'],
             'layers': ['T2M'],
-            'bands': ['tmax'],
+            'bands': [
+                {
+                    'name': 'tmax',
+                    'units': '',
+                }
+            ],
+            'category': '',
 	    'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -313,7 +337,13 @@ class merraData(Data):
             'description': 'Surface atmospheric pressure (mb)',
             'assets': ['SLV'],
             'layers': ['PS'],
-            'bands': ['patm'],
+            'bands': [
+                {
+                    'name':'patm',
+                    'units': '',
+                }
+            ],
+            'category': '',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -321,7 +351,13 @@ class merraData(Data):
             'description': 'Relative humidity (kg kg-1)',
             'assets': ['SLV'],
             'layers': ['QV2M'],
-            'bands': ['shum'],
+            'bands': [
+                {
+                    'name': 'shum',
+                    'units': '',
+                }
+            ],
+            'category': '',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -329,7 +365,13 @@ class merraData(Data):
             'description': 'Relative humidity (%)',
             'assets': ['SLV'],
             'layers': ['QV2M', 'PS', 'T2M'],
-            'bands': ['rhum'],
+            'bands': [
+                {
+                    'name': 'rhum',
+                    'units': '',
+                }
+            ],
+            'category': '',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -337,7 +379,13 @@ class merraData(Data):
             'description': 'Daily total precipitation (mm day-1)',
             'assets': ['FLX'],
             'layers': ['PRECTOT'],
-            'bands': ['prcp'],
+            'bands': [
+                {
+                    'name': 'prcp',
+                    'units': '',
+                }
+            ],
+            'category': '',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -345,7 +393,13 @@ class merraData(Data):
             'description': 'Daily mean wind speed (m s-1)',
             'assets': ['FLX'],
             'layers': ['SPEED'],
-            'bands': ['wind'],
+            'bands': [
+                {
+                    'name': 'wind',
+                    'units': '',
+                }
+            ],
+            'category': '',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -353,7 +407,13 @@ class merraData(Data):
             'description': 'Incident solar radiation (W m-2)',
             'assets': ['RAD'],
             'layers': ['SWGDN'],
-            'bands': ['srad'],
+            'bands': [
+                {
+                    'name': 'srad',
+                    'units': '',
+                }
+            ],
+            'category': '',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -361,7 +421,13 @@ class merraData(Data):
             'description': 'Fraction of land (fraction)',
             'assets': ['ASM'],
             'layers': ['FRLAND'],
-            'bands': ['frland'],
+            'bands': [
+                {
+                    'name': 'frland',
+                    'units': '',
+                }
+            ],
+            'category': '',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 0,
         }
@@ -468,7 +534,7 @@ class merraData(Data):
         """ apply a function to reduce to a daily value """
         assetname = self._products[prod]['assets'][0]
         layername = self._products[prod]['layers'][0]
-        bandnames = self._products[prod]['bands']
+        bandnames = [b['name'] for b in self._products[prod]['bands']]
         assetfile = self.assets[assetname].filename
         ncroot = Dataset(assetfile)
         var = ncroot.variables[layername]
@@ -548,7 +614,7 @@ class merraData(Data):
             elif val[0] == "rhum":
                 # uses layers QV2M PS T2M from asset SLV
                 prod = val[0]
-                bandnames = self._products[prod]['bands']
+                bandnames = [b['name'] for b in self._products[prod]['bands']]
                 assetname = self._products[prod]['assets'][0]
                 assetfile = self.assets[assetname].filename
                 ncroot = Dataset(assetfile)
@@ -593,7 +659,7 @@ class merraData(Data):
                     utils.verbose_out('constants are available for %s only' % startdate)
                     continue
                 prod = val[0]
-                bandnames = self._products[prod]['bands']
+                bandnames = [b['name'] for b in self._products[prod]['bands']]
                 assetname = self._products[prod]['assets'][0]
                 assetfile = self.assets[assetname].filename
                 ncroot = Dataset(assetfile)
