@@ -29,54 +29,30 @@ Tile Coverage
   h01v01      100.0%        0.0%
 
 \x1b[1m\x1b[4m    DATE       ASM       FLX       RAD       SLV     Product  \x1b[0m
-\x1b[1m1982        
-\x1b[0m    335                 100.0%     100.0%     100.0%   
-    336                 100.0%     100.0%     100.0%   
-    337                 100.0%     100.0%     100.0%   
+\x1b[1m2015        
+\x1b[0m    135                 100.0%     100.0%     100.0%   
 
 
-3 files on 3 dates
+1 files on 1 dates
 \x1b[1m
 SENSORS\x1b[0m
 \x1b[35mmerra: Modern Era Retrospective-analysis for Research and Applications\x1b[0m
-""",
+"""
 }
 
 
 t_process = {
-    'updated': {
-        'merra/tiles/h01v01/1982335': None,
-        'merra/tiles/h01v01/1982336': None,
-        'merra/tiles/h01v01/1982337': None,
-    },
+    'updated': {'merra/tiles/h01v01/2015135': None},
     'created': {
-        'merra/tiles/h01v01/1982335/h01v01_1982335_merra_patm.tif': 1814180181,
-        'merra/tiles/h01v01/1982335/h01v01_1982335_merra_prcp.tif': 1257409151,
-        'merra/tiles/h01v01/1982335/h01v01_1982335_merra_rhum.tif': -190565914,
-        'merra/tiles/h01v01/1982335/h01v01_1982335_merra_shum.tif': -2101265486,
-        'merra/tiles/h01v01/1982335/h01v01_1982335_merra_srad.tif': 954836669,
-        'merra/tiles/h01v01/1982335/h01v01_1982335_merra_tave.tif': 367878686,
-        'merra/tiles/h01v01/1982335/h01v01_1982335_merra_tmax.tif': -1258259608,
-        'merra/tiles/h01v01/1982335/h01v01_1982335_merra_tmin.tif': -1366992899,
-        'merra/tiles/h01v01/1982335/h01v01_1982335_merra_wind.tif': -926149814,
-        'merra/tiles/h01v01/1982336/h01v01_1982336_merra_patm.tif': -928795564,
-        'merra/tiles/h01v01/1982336/h01v01_1982336_merra_prcp.tif': -1127494438,
-        'merra/tiles/h01v01/1982336/h01v01_1982336_merra_rhum.tif': -951401242,
-        'merra/tiles/h01v01/1982336/h01v01_1982336_merra_shum.tif': -15455067,
-        'merra/tiles/h01v01/1982336/h01v01_1982336_merra_srad.tif': -1404405330,
-        'merra/tiles/h01v01/1982336/h01v01_1982336_merra_tave.tif': 34084621,
-        'merra/tiles/h01v01/1982336/h01v01_1982336_merra_tmax.tif': -1937877959,
-        'merra/tiles/h01v01/1982336/h01v01_1982336_merra_tmin.tif': -91167302,
-        'merra/tiles/h01v01/1982336/h01v01_1982336_merra_wind.tif': -1251411284,
-        'merra/tiles/h01v01/1982337/h01v01_1982337_merra_patm.tif': -503681924,
-        'merra/tiles/h01v01/1982337/h01v01_1982337_merra_prcp.tif': 806657839,
-        'merra/tiles/h01v01/1982337/h01v01_1982337_merra_rhum.tif': -1619657092,
-        'merra/tiles/h01v01/1982337/h01v01_1982337_merra_shum.tif': -1500337138,
-        'merra/tiles/h01v01/1982337/h01v01_1982337_merra_srad.tif': 1162560549,
-        'merra/tiles/h01v01/1982337/h01v01_1982337_merra_tave.tif': 1699111777,
-        'merra/tiles/h01v01/1982337/h01v01_1982337_merra_tmax.tif': -1046316006,
-        'merra/tiles/h01v01/1982337/h01v01_1982337_merra_tmin.tif': -795862706,
-        'merra/tiles/h01v01/1982337/h01v01_1982337_merra_wind.tif': 473398098,
+	'merra/tiles/h01v01/2015135/h01v01_2015135_merra_patm.tif': -832862627,
+	'merra/tiles/h01v01/2015135/h01v01_2015135_merra_prcp.tif': -1814551991,
+	'merra/tiles/h01v01/2015135/h01v01_2015135_merra_rhum.tif': 1203124684,
+	'merra/tiles/h01v01/2015135/h01v01_2015135_merra_shum.tif': -97846975,
+	'merra/tiles/h01v01/2015135/h01v01_2015135_merra_srad.tif': -1745572576,
+	'merra/tiles/h01v01/2015135/h01v01_2015135_merra_tave.tif': 165650774,
+	'merra/tiles/h01v01/2015135/h01v01_2015135_merra_tmax.tif': 463728356,
+	'merra/tiles/h01v01/2015135/h01v01_2015135_merra_tmin.tif': -1469140067,
+	'merra/tiles/h01v01/2015135/h01v01_2015135_merra_wind.tif': 1771906367,
     },
     'ignored': [
         'gips-inv-db.sqlite3',
@@ -91,13 +67,11 @@ Tile Coverage
   h01v01      100.0%        0.0%
 
 \x1b[1m\x1b[4m    DATE       ASM       FLX       RAD       SLV     Product  \x1b[0m
-\x1b[1m1982        
-\x1b[0m    335                 100.0%     100.0%     100.0%     \x1b[35mpatm\x1b[0m  \x1b[35mprcp\x1b[0m  \x1b[35mrhum\x1b[0m  \x1b[35mshum\x1b[0m  \x1b[35msrad\x1b[0m  \x1b[35mtave\x1b[0m  \x1b[35mtmax\x1b[0m  \x1b[35mtmin\x1b[0m  \x1b[35mwind\x1b[0m
-    336                 100.0%     100.0%     100.0%     \x1b[35mpatm\x1b[0m  \x1b[35mprcp\x1b[0m  \x1b[35mrhum\x1b[0m  \x1b[35mshum\x1b[0m  \x1b[35msrad\x1b[0m  \x1b[35mtave\x1b[0m  \x1b[35mtmax\x1b[0m  \x1b[35mtmin\x1b[0m  \x1b[35mwind\x1b[0m
-    337                 100.0%     100.0%     100.0%     \x1b[35mpatm\x1b[0m  \x1b[35mprcp\x1b[0m  \x1b[35mrhum\x1b[0m  \x1b[35mshum\x1b[0m  \x1b[35msrad\x1b[0m  \x1b[35mtave\x1b[0m  \x1b[35mtmax\x1b[0m  \x1b[35mtmin\x1b[0m  \x1b[35mwind\x1b[0m
+\x1b[1m2015        
+\x1b[0m    135                 100.0%     100.0%     100.0%     \x1b[35mpatm\x1b[0m  \x1b[35mprcp\x1b[0m  \x1b[35mrhum\x1b[0m  \x1b[35mshum\x1b[0m  \x1b[35msrad\x1b[0m  \x1b[35mtave\x1b[0m  \x1b[35mtmax\x1b[0m  \x1b[35mtmin\x1b[0m  \x1b[35mwind\x1b[0m
 
 
-3 files on 3 dates
+1 files on 1 dates
 \x1b[1m
 SENSORS\x1b[0m
 \x1b[35mmerra: Modern Era Retrospective-analysis for Research and Applications\x1b[0m
