@@ -452,7 +452,9 @@ class Asset(object):
         for d in dates:
             tpath = cls.Repository.data_path(asset.tile, d)
             newfilename = os.path.join(tpath, bname)
-            if not os.path.exists(newfilename):
+            if os.path.exists(newfilename):
+                raise RuntimeError('asset already in archive: {}'.format(bname), newfilename)
+            else:
                 # check if another asset exists
                 existing = cls.discover(asset.tile, d, asset.asset)
                 if len(existing) > 0 and (not update or not existing[0].updated(asset)):
@@ -491,8 +493,6 @@ class Asset(object):
                         asset.archived_filename = newfilename
                         VerboseOut(bname + ' -> ' + newfilename, 2)
                         numlinks = numlinks + 1
-            else:
-                VerboseOut('%s already in archive' % filename, 2)
         if otherversions and numlinks == 0:
             return (asset, -1)
         else:
