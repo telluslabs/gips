@@ -12,7 +12,7 @@ pytestmark = sys  # skip everything unless --sys
 # changing this will require changes in expected/
 driver = 'merra'
 STD_TILE = 'h01v01'
-STD_DATES = '1982-12-01,1982-12-03'
+STD_DATES = '2015-135'
 STD_ARGS = (driver, '-s', NH_SHP_PATH, '-d', STD_DATES, '-v', '4')
 
 
