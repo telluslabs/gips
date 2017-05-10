@@ -105,7 +105,7 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXSLV',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Single-Level Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4',
-            'documentation': '',
+            'documentary': 'https://disc.sci.gsfc.nasa.gov/uui/datasets/M2T1NXSLV_V5.12.4/summary',
             'pattern': _asset_pattern.format(name='tavg1_2d_slv_Nx'),
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_slv_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -118,7 +118,7 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXFLX',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Surface Flux Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXFLX.5.12.4',
-            'documentation': '',
+            'documentation': 'https://disc.sci.gsfc.nasa.gov/uui/datasets/M2T1NXFLX_V5.12.4/summary',
             'pattern': _asset_pattern.format(name='tavg1_2d_flx_Nx'),
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_flx_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -130,7 +130,7 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXRAD',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Radiation Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXRAD.5.12.4',
-            'documentation': '',
+            'documentation': 'https://disc.sci.gsfc.nasa.gov/uui/datasets/M2T1NXRAD_V5.12.4/summary',
             'pattern': _asset_pattern.format(name='tavg1_2d_rad_Nx'),
             're_pattern': _asset_re_pattern.format(name='tavg1_2d_rad_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -142,7 +142,7 @@ class merraAsset(Asset):
             'shortname': 'M2C0NXASM',
             'description': '2d, constants V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980',
-            'documentation': '',
+            'documentation': 'https://disc.sci.gsfc.nasa.gov/uui/datasets/M2C0NXASM_V5.12.4/summary',
             'pattern': _asset_pattern.format(name='const_2d_asm_Nx'),
             're_pattern': _asset_re_pattern.format(name='const_2d_asm_Nx'),
             'startdate': datetime.date(1980, 1, 1),
@@ -290,18 +290,17 @@ class merraData(Data):
     _projection = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.01745329251994328,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]'
 
     _products = {
-
         'tave': {
-            'description': 'Ave daily air temperature data (K)',
+            'description': 'Ave daily air temperature data',
             'assets': ['SLV'],
             'layers': ['T2M'],
             'bands': [
                 {
                     'name':'tave',
-                    'units': '',
+                    'units': 'degree Celsius',
                 }
             ],
-            'category': '',
+            'category': 'surface weather',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -312,10 +311,10 @@ class merraData(Data):
             'bands': [
                 {
                     'name': 'tmin',
-                    'units': '',
+                    'units': 'degree Celsius',
                 }
             ],
-            'category': '',
+            'category': 'surface weather',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -326,112 +325,113 @@ class merraData(Data):
             'bands': [
                 {
                     'name': 'tmax',
-                    'units': '',
+                    'units': 'degree Celsius',
                 }
             ],
-            'category': '',
+            'category': 'surface weather',
 	    'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
         'patm': {
-            'description': 'Surface atmospheric pressure (mb)',
+            'description': 'Surface atmospheric pressure',
             'assets': ['SLV'],
             'layers': ['PS'],
             'bands': [
                 {
                     'name':'patm',
-                    'units': '',
+                    'units': 'mb',
                 }
             ],
-            'category': '',
+            'category': 'surface weather',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
         'shum': {
-            'description': 'Relative humidity (kg kg-1)',
+            'description': 'Relative humidity',
             'assets': ['SLV'],
             'layers': ['QV2M'],
             'bands': [
                 {
                     'name': 'shum',
-                    'units': '',
+                    'units': 'kg kg-1',
                 }
             ],
-            'category': '',
+            'category': 'surface weather',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
         'rhum': {
-            'description': 'Relative humidity (%)',
+            'description': 'Relative humidity',
             'assets': ['SLV'],
             'layers': ['QV2M', 'PS', 'T2M'],
             'bands': [
                 {
                     'name': 'rhum',
-                    'units': '',
+                    'units': '%',
                 }
             ],
-            'category': '',
+            'category': 'surface weather',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
         'prcp': {
-            'description': 'Daily total precipitation (mm day-1)',
+            'description': 'Daily total precipitation',
             'assets': ['FLX'],
             'layers': ['PRECTOT'],
             'bands': [
                 {
                     'name': 'prcp',
-                    'units': '',
+                    'units': 'mm',
                 }
             ],
-            'category': '',
+            'category': 'surface weather',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
         'wind': {
-            'description': 'Daily mean wind speed (m s-1)',
+            'description': 'Daily mean wind speed',
             'assets': ['FLX'],
             'layers': ['SPEED'],
             'bands': [
                 {
                     'name': 'wind',
-                    'units': '',
+                    'units': 'm s-1',
                 }
             ],
-            'category': '',
+            'category': 'surface weather',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
         'srad': {
-            'description': 'Incident solar radiation (W m-2)',
+            'description': 'Incident solar radiation',
             'assets': ['RAD'],
             'layers': ['SWGDN'],
             'bands': [
                 {
                     'name': 'srad',
-                    'units': '',
+                    'units': 'W m-2',
                 }
             ],
-            'category': '',
+            'category': 'surface weather',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
         'frland': {
-            'description': 'Fraction of land (fraction)',
+            'description': 'Fraction of land',
             'assets': ['ASM'],
             'layers': ['FRLAND'],
             'bands': [
                 {
                     'name': 'frland',
-                    'units': '',
+                    'units': 'fraction',
                 }
             ],
-            'category': '',
+            'category': 'land characteristics',
             'startdate': datetime.date(1980, 1, 1),
             'latency': 0,
         }
-        # TODO:
+
+        # TODO: decide what to do with this
         # 'temp_modis': {
         #    'description': 'Fraction of land (fraction)',
         #    'assets': ['SLV'],
@@ -452,7 +452,7 @@ class merraData(Data):
         #}
     }
 
-
+    # TODO: decide what to do with this
     # @classmethod
     # def process_composites(cls, inventory, products, **kwargs):
     #     for product in products:
@@ -572,43 +572,43 @@ class merraData(Data):
 
             if val[0] == "tave":
                 fun = lambda x: x.mean(axis=0) - 273.15
-                units = "C"
+                units = self._products[val[0]]['bands'][0]['units']
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "tmin":
                 fun = lambda x: x.min(axis=0) - 273.15
-                units = "C"
+                units = self._products[val[0]]['bands'][0]['units']
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "tmax":
                 fun = lambda x: x.max(axis=0) - 273.15
-                units = "C"
+                units = self._products[val[0]]['bands'][0]['units']
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "prcp":
                 # conversion from (kg m-2 s-1) to (mm d-1)
                 fun = lambda x: x.mean(axis=0)*36.*24.*100.
-                units = "mm d-1"
+                units = self._products[val[0]]['bands'][0]['units']
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "srad":
                 fun = lambda x: x.mean(axis=0)
-                units = "W m-2"
+                units = self._products[val[0]]['bands'][0]['units']
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "wind":
                 fun = lambda x: x.mean(axis=0)
-                units = "m s-1"
+                units = self._products[val[0]]['bands'][0]['units']
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "shum":
                 fun = lambda x: x.mean(axis=0)
-                units = "kg kg-1"
+                units = self._products[val[0]]['bands'][0]['units']
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "patm":
                 fun = lambda x: x.mean(axis=0)/100.
-                units = "mb"
+                units = self._products[val[0]]['bands'][0]['units']
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "rhum":
