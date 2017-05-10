@@ -39,8 +39,6 @@ requirements =['pydap']
 
 PROJ = """PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433],AUTHORITY["EPSG","4326"]],PROJECTION["Lambert_Conformal_Conic_2SP"],PARAMETER["standard_parallel_1",25],PARAMETER["standard_parallel_2",60],PARAMETER["latitude_of_origin",42.5],PARAMETER["central_meridian",-100],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["metre",1,AUTHORITY["EPSG","9001"]]]"""
 
-# Cyanomap: tmax, tmin, tmean, ppt, solar rad, and vapor pressure
-
 # maximum temperature (C) - tmax.nc *
 # minimum temperature (C) - tmin.nc  *
 # precipitation (mm day-1) - prcp.nc *
@@ -75,6 +73,7 @@ class daymetAsset(Asset):
     _latency = 0
     _startdate = datetime.date(1980, 1, 1)
     _url = "https://thredds.daac.ornl.gov/thredds/dodsC/ornldaac/1328/tiles/%d/%s_%d"
+    _doc_url = "https://daymet.ornl.gov/datasupport.html"
 
     _assets = {
         'tmin': {
@@ -82,7 +81,7 @@ class daymetAsset(Asset):
             'pattern': 'daymet_tmin_*_???????.tif',
             'source': 'tmin.nc',
             'url': _url,
-            'documentation': '',
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -91,7 +90,7 @@ class daymetAsset(Asset):
             'pattern': 'daymet_tmax_*_???????.tif',
             'source': 'tmax.nc',
             'url': _url,
-            'documentation': '',
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -100,7 +99,7 @@ class daymetAsset(Asset):
             'pattern': 'daymet_prcp_*_???????.tif',
             'source': 'prcp.nc',
             'url': _url,
-            'documentation': '',
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -109,7 +108,7 @@ class daymetAsset(Asset):
             'pattern': 'daymet_srad_*_???????.tif',
             'source': 'srad.nc',
             'url': _url,
-            'documentation': '',
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -118,7 +117,7 @@ class daymetAsset(Asset):
             'pattern': 'daymet_vp_*_???????.tif',
             'source': 'vp.nc',
             'url': _url,
-            'documentation': '',
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -176,45 +175,44 @@ class daymetData(Data):
     _latency = 0
     _startdate = datetime.date(1980, 1, 1)
 
-
     _products = {
         'tmin': {
             'description': 'Daily minimum air temperature (C)',
             'assets': ['tmin'],
-            'bands': [{'name': 'tmin', 'units': ''}],
-            'category': '',
+            'bands': [{'name': 'tmin', 'units': 'degree Celsius'}],
+            'category': 'Surface weather',
             'startdate': _startdate,
             'latency': _latency,
         },
         'tmax': {
             'description': 'Daily maximum air temperature (C)',
             'assets': ['tmax'],
-            'bands': [{'name': 'tmax', 'units': ''}],
-            'category': '',
+            'bands': [{'name': 'tmax', 'units': 'degree Celsius'}],
+            'category': 'Surface weather',
             'startdate': _startdate,
             'latency': _latency,
         },
         'prcp': {
             'description': 'Daily precipitation (mm)',
             'assets': ['prcp'],
-            'bands': [{'name': 'prcp', 'units': ''}],
-            'category': '',
+            'bands': [{'name': 'prcp', 'units': 'mm'}],
+            'category': 'Surface weather',
             'startdate': _startdate,
             'latency': _latency,
         },
         'srad': {
             'description': 'Daily solar radiation (W m-2)',
             'assets': ['srad'],
-            'bands': [{'name': 'srad', 'units': ''}],
-            'category': '',
+            'bands': [{'name': 'srad', 'units': 'W m-2'}],
+            'category': 'Surface weather',
             'startdate': _startdate,
             'latency': _latency,
         },
         'vp': {
             'description': 'Daily vapor pressure (Pa)',
             'assets': ['vp'],
-            'bands': [{'name': 'vp', 'units': ''}],
-            'category': '',
+            'bands': [{'name': 'vp', 'units': 'Pa'}],
+            'category': 'Surface weather',
             'startdate': _startdate,
             'latency': _latency,
         },
