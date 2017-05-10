@@ -111,11 +111,11 @@ def main():
         help='List of drivers to enable for this installation',
     )
     p.add_argument(
-        '-U', '--user',
+        '-U', '--earthdata-user',
         help='Set username for EARTHDATA login', default=''
     )
     p.add_argument(
-        '-P', '--password',
+        '-P', '--earthdata-password',
         help='Set password for EARTHDATA login', default=''
     )
     p.add_argument(
@@ -146,7 +146,7 @@ def main():
             sys.exit(1)
 
     elif args.command == 'env':
-        configure_environment(**args)
+        configure_environment(**vars(args))
     elif args.command == 'user':
         try:
             # first try importing environment settings
