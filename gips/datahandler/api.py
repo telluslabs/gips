@@ -1,22 +1,36 @@
 """GIPS scheduler API, for scheduling work and checking status of same."""
 
-from datetime import timedelta
+from datetime import timedelta, datetime
 from pprint import pprint, pformat
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import Count
+from django.forms.models import model_to_dict
 
 from gips import utils
 from gips.core import SpatialExtent, TemporalExtent
 
 from gips.inventory import dbinv, orm
 from gips.datahandler.logger import Logger
-
 #from pdb import set_trace
 
 
-def submit_job (site, variable, spatial, temporal):
+def get_catalog ():
+    """Return list of installed DataVariables as dicts"""
+    orm.setup()
+    dv_list = []
+    dvs = dbinv.models.DataVariable.objects.all()
+    for dv in dvs:
+        d = model_to_dict(dv)
+        d['asset'] = eval(d['asset'])
+        # xmlrpclib doesn't like datetime.date, convert to datetime.datetime
+        d['start_date'] = datetime.fromordinal(d['start_date'].toordinal())
+        dv_list.append(d)
+    return dv_list
+
+
+def submit_request (site, variable, spatial, temporal):
     """Pass a work spec in to the scheduler, and the work will be done.
 
     site:           geokit site id
@@ -78,9 +92,9 @@ def processing_status(driver_name, spatial_spec, temporal_spec, products):
         ):
             status[p.status] += 1
     return status
+    
 
-
-def job_status(jobid):
+def get_status(jobid):
     orm.setup()
     try:
         job = dbinv.models.Job.objects.get(pk=jobid)
@@ -90,14 +104,41 @@ def job_status(jobid):
     if job.status in('requested', 'initializing', 'scheduled'):
         return job.status, {}
     else:
-        return job.status, processing_status(
+        product_status = processing_status(
             job.variable.driver.encode('ascii', 'ignore'),
             eval(job.spatial),
             eval(job.temporal),
             [job.variable.product.encode('ascii', 'ignore')]
         )
-            
+        # for now, get rid of the statuses not applicable to products
+        product_status.pop('remote', None)
+        product_status.pop('retry', None)
+        product_status.pop('post-processing', None)
+        product_status.pop('pp-scheduled', None)
+        product_status.pop('initializing', None)
+
+        return job.status, product_status            
     
+
+def get_results(job_id, filters=None):
+    """
+    Get all the results in the specified result set.
+
+    job_id -- Job primary key
+    """
+    orm.setup()
+    qs = dbinv.models.Result.objects.filter(job=job_id)
+    if filters:
+        qs = qs.filter(**filters)
+    result_list = []
+    for result in qs:
+        r = model_to_dict(result)
+        # xmlrpclib doesn't like datetime.date, convert to datetime.datetime
+        r['date'] = datetime.fromordinal(r['date'].toordinal())
+        result_list.append(r)
+
+    return result_list
+
 
 def query_service(driver_name, spatial, temporal, products,
                   query_type='missing', action='request-product'):
