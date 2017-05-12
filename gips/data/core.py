@@ -463,9 +463,8 @@ class Asset(object):
         except Exception, e:
             # if problem with inspection, move to quarantine
             utils.report_error(e, 'File error, quarantining ' + filename)
-            qname = os.path.join(cls.Repository.path('quarantine'), bname)
-            if not os.path.exists(qname):
-                os.link(os.path.abspath(filename), qname)
+            qfn = cls.Repository.quarantine_file(filename)
+            utils.verbose_out("Asset file quarantined to " + qfn, 1, sys.stderr)
             return (None, 0)
 
         # make an array out of asset.date if it isn't already
