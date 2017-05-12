@@ -41,8 +41,6 @@ from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, settings
 from gips import utils
 
-from pdb import set_trace
-
 
 def binmask(arr, bit):
     """ Return boolean array indicating which elements as binary have a 1 in
@@ -53,7 +51,10 @@ def binmask(arr, bit):
 
 class modisRepository(Repository):
     name = 'Modis'
-    description = 'MODIS Aqua and Terra'
+    description = 'NASA Moderate Resolution Imaging Spectroradiometer (MODIS)'
+
+    # NASA assets require special authentication
+    _manager_url = "https://urs.earthdata.nasa.gov"
 
     @classmethod
     def feature2tile(cls, feature):
@@ -95,19 +96,19 @@ class modisAsset(Asset):
         },
         'MOD09Q1': {
             'pattern': '^MOD09Q1' + _asset_re_tail,
-            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006/',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -7,
         },
         'MOD10A1': {
             'pattern': '^MOD10A1' + _asset_re_tail,
-            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A1.005/',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A1.005',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A1': {
             'pattern': '^MYD10A1' + _asset_re_tail,
-            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A1.005/',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A1.005',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
@@ -137,13 +138,13 @@ class modisAsset(Asset):
         },
         'MOD10A2': {
             'pattern': '^MOD10A2' + _asset_re_tail,
-            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A2.006/',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A2.006',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A2': {
             'pattern': '^MYD10A2' + _asset_re_tail,
-            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A2.006/',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A2.006',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
@@ -193,13 +194,6 @@ class modisAsset(Asset):
                               " are only available for Jan. 1", 1, stream=sys.stderr)
             return []
 
-        # if it's going to fail, let's find out early:
-        http_query = {'timeout': 30}
-        if asset not in cls._skip_auth:
-            username = cls.Repository.get_setting('username')
-            password = cls.Repository.get_setting('password')
-            http_query['auth'] = (username, password)
-
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
         cpattern = re.compile(pattern)
@@ -208,15 +202,17 @@ class modisAsset(Asset):
             err_msg = "Error downloading on a Wednesday; possible planned MODIS provider downtime: " + mainurl
         else:
             err_msg = "Error downloading: " + mainurl
+
         with utils.error_handler(err_msg):
-            listing = requests.get(mainurl, **http_query)
-            if listing.status_code != requests.codes.ok:
-                err_msg = '{} gave bad response code: {}'.format(mainurl, listing.status_code)
-                utils.verbose_out(err_msg, 1, stream=sys.stderr)
-                # return [] # TODO possibly do nothing here, as empty list case is handled below
+            response = cls.Repository.managed_request(mainurl)
+            if response.msg != "OK":
+                raise Exception, "Response code: {}".format(
+                    response.code)
+
+        listing = response.readlines()
 
         available = []
-        for item in listing.iter_lines():
+        for item in listing:
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
             # effectively random).
@@ -247,40 +243,30 @@ class modisAsset(Asset):
             outpath = os.path.join(cls.Repository.path('stage'), basename)
 
             with utils.error_handler(
-                    "Asset fetch error ({})".format(asset_info),
-                    continuable=True
-            ):
-                # tinkering:
-                # chunk size & stream=True in req
-                # cookies / cache auth
+                "Asset fetch error ({})".format(asset_info),
+                continuable=True):
 
-                # was if mainurl[0:3] == 'ftp':
                 if url.startswith('ftp'):
                     connection = urllib2.urlopen(url)
                     with open(outpath, 'wb') as fd:
                         fd.write(connection.read())
 
-                else:  # http
-                    kw = {'timeout': 10}
-                    if asset not in cls._skip_auth:
-                        username = cls.Repository.get_setting('username')
-                        password = cls.Repository.get_setting('password')
-                        kw['auth'] = (username, password)
-                    response = requests.get(url, **kw)
-
-                    if response.status_code != requests.codes.ok:
+                else:  # http(s)
+                    response = cls.Repository.managed_request(url)
+                    if response.msg != "OK":
                         utils.verbose_out(
-                            'Download failed({}): code={} reason="{}" url="{}"'
-                            .format(basename, response.status_code,
-                                    response.reason, url),
+                            'Download failed({}): code={} url="{}"'
+                            .format(basename, response.code, url),
                             2,
                             sys.stderr
                         )
-                        return retrieved_filenames  # might as well stop b/c the rest will probably fail too
+                        # TODO: is this correct?
+                        # stop because the other will also fail
+                        return retrieved_filenames
 
                     with open(outpath, 'wb') as fd:
-                        for chunk in response.iter_content():
-                            fd.write(chunk)
+                        fd.write(response.read())
+
                 utils.verbose_out('Retrieved %s' % basename, 2)
                 retrieved_filenames.append(outpath)
 
