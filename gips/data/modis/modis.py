@@ -183,9 +183,10 @@ class modisAsset(Asset):
     def query_service(cls, asset, tile, date):
         year, month, day = date.timetuple()[:3]
 
-        if asset == "MCD12Q1" and (month != 1 or day != 1):
-            print("Land cover data are only available for Jan. 1")
-            return
+        if asset == "MCD12Q1" and (month, day) != (1, 1):
+            utils.verbose_out("Cannot fetch MCD12Q1:  Land cover data"
+                              " are only available for Jan. 1", 1, stream=sys.stderr)
+            return []
 
         # if it's going to fail, let's find out early:
         http_query = {'timeout': 30}
