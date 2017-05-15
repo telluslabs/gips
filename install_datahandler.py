@@ -181,9 +181,9 @@ def main():
     ) 
     args = vars(p.parse_args())
     PKGS = GIPPY_PKGS
-    if task_queue == 'rq':
+    if args['task_queue'] == 'rq':
         PKGS += DH_RQ_PKGS
-    elif task_queue == 'torque':
+    elif args['task_queue'] == 'torque':
         PKGS += DH_TORQUE_PKGS
     else:
         raise Exception('Unknown task-queue specified "{}"'.format(task_queue))
@@ -192,7 +192,9 @@ def main():
         PKGS += PG_PKGS
 
     install_system_requirements(PKGS)
-    install_gips(gips_version=GIPS_VERSION, extras='dh-' + args['task_queue'])
+    install_gips(
+        gips_version=GIPS_VERSION, extras=('dh-' + args['task_queue'],)
+    )
 
     from gips.scripts.config import configure_environment
     configure_environment(**args)
