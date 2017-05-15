@@ -72,7 +72,7 @@ def configure_environment(repos_path, email, drivers, earthdata_user,
         cfgfile = create_environment_settings(
             repos_path, email, drivers,
             earthdata_user, earthdata_password,
-            update_config=update, **kwargs,
+            update_config=update, **kwargs
         )
         print 'Environment settings file: %s' % cfgfile
         print 'Creating repository directories'

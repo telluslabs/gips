@@ -201,7 +201,7 @@ def add_datahandler_settings(
 
 def create_environment_settings(
         repos_path, email, drivers, earthdata_user='', earthdata_password='',
-        update_config=False, **kwargs,
+        update_config=False, **kwargs
 ):
     """ Create settings file and data directory """
     from gips.settings_template import __file__ as src
