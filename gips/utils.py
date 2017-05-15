@@ -186,9 +186,22 @@ def get_setting(setting, default=None):
     return settings().__dict__.get(setting, default)
 
 
+def add_datahandler_settings(
+        task_queue, db_host, db_name, db_user, db_password, db_port,
+        dh_server='localhost', dh_port=9000, dh_log_port=9001,
+        dh_export_dir='/tmp/', update=False, **kwargs
+):
+    # TODO: filter all *settings_template.py files in the datahandler area,
+    #       updating the args of this funciton appropriately, and append them
+    #       to the system environment settings.  Probably defer queue specific
+    #       handling to a function for each queue type based on the value of
+    #       'task_queue'.
+    raise NotImplemented('see todo in gips.utils.add_datahandler_settings')
+
+
 def create_environment_settings(
         repos_path, email, drivers, earthdata_user='', earthdata_password='',
-        update_config=False
+        update_config=False, **kwargs,
 ):
     """ Create settings file and data directory """
     from gips.settings_template import __file__ as src
@@ -237,6 +250,8 @@ def create_environment_settings(
                 with open(cfgfile, 'r') as fin:
                     for line in fin:
                         fout.write(line.replace('$TLD', repos_path))
+            if 'task_queue' in kwargs:
+                add_datahandler_settings(**kwargs)
     return cfgfile
 
 

@@ -68,10 +68,11 @@ def create_data_variables():
 def configure_environment(repos_path, email, drivers, earthdata_user,
                           earthdata_password, update, **kwargs):
     try:
+        # kwargs added for datahandler enabling
         cfgfile = create_environment_settings(
             repos_path, email, drivers,
             earthdata_user, earthdata_password,
-            update_config=update
+            update_config=update, **kwargs)
         )
         print 'Environment settings file: %s' % cfgfile
         print 'Creating repository directories'
