@@ -13,7 +13,7 @@ import SocketServer
 import struct
 
 from gips import utils
-from gips.datahandler import geokit_api
+from gips.datahandler import api as dh_api
 
 
 class ThreadedRPC(SocketServer.ThreadingMixIn, SimpleXMLRPCServer):
@@ -117,11 +117,10 @@ def serve_xmlrpc (host, port):
     )
     server.register_introspection_functions()
 
-    server.register_function(geokit_api.get_datacatalog)
-    server.register_function(geokit_api.submit_job)
-    server.register_function(geokit_api.job_status)
-    server.register_function(geokit_api.stats_request_results)
-    server.register_function(geokit_api.stats_request_results_filter)
+    server.register_function(dh_api.get_catalog)
+    server.register_function(dh_api.submit_request)
+    server.register_function(dh_api.get_status)
+    server.register_function(dh_api.get_results)
 
     server.serve_forever()
 
