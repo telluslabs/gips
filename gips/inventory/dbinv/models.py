@@ -43,6 +43,11 @@ failed          Asset       set by scheduler when retry count exceeds hardcoded 
                 Job         set on the parent Job of a PPJ when its E&A task is marked failed
 """
 
+status_values = {
+    'asset':   ('requested', 'scheduled', 'in-progress', 'complete', 'retry', 'failed'),
+    'product': ('requested', 'scheduled', 'in-progress', 'complete', 'retry', 'failed'),
+}
+
 status_strings = ('remote',
                   'requested',
                   'initializing',  # this is only used at the job level

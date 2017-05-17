@@ -54,18 +54,21 @@ def submit_request (site, variable, spatial, temporal):
     return job.pk
 
 
-def processing_status(driver_name, spatial_spec, temporal_spec, products):
-    """Status of products matching the given criteria:
+def status_counts(driver_name, spatial_spec, temporal_spec, assets=None, products=None):
+    """Status of assets and/or products matching the given criteria:
 
     :driver_name:   eg 'landsat' or 'modis'; used to choose a Data class.
     :spatial_spec:  Dict; used for SpatialExtent.factory(..., **spatial_spec)
     :temporal_spec: Dict; used for TemporalExtent(**temporal_spec)
     :products:      List of requested product types, eg ['fsnow', ...]
 
-    The return value is a dict mapping status strings to counts of
-    products with that status.  For instance:
+    The return value is (asset_dict, product_dict), each mapping status
+    strings to counts of items with that status.  For instance:
     {'requested': 1, 'complete': 2, ...}.
+    Leave either kind of item as None to return a single dict instead of a tuple.
     """
+    if (assets, products) == (None, None):
+        raise ValueError("At least one of (assets, products) must be specified")
     orm.setup()
     dataclass = utils.import_data_class(driver_name)
     spatial = SpatialExtent.factory(dataclass, **spatial_spec)
@@ -76,48 +79,60 @@ def processing_status(driver_name, spatial_spec, temporal_spec, products):
     for se in spatial:
         tiles = tiles.union(se.tiles)
 
-    status = {s: 0 for s in dbinv.models.status_strings}
-    criteria = {
+    base_criteria = {
         'driver': driver_name,
         'tile__in': tiles,
         'date__gte': temporal.datebounds[0],
         'date__lte': temporal.datebounds[1],
-        'product__in': products,
     }
-    for p in dbinv.models.Product.objects.filter(**criteria):
-        # TODO: check for daybounds should be built in to query!
-        if (
-                p.date.timetuple().tm_yday >= temporal.daybounds[0]
-                and p.date.timetuple().tm_yday <= temporal.daybounds[1]
-        ):
-            status[p.status] += 1
-    return status
-    
+
+    # TODO: check for daybounds should be built in to query!
+    low_daybound, high_daybound = temporal.daybounds[0:2]
+
+    ret_val = ()
+
+    if assets is not None:
+        a_counts = {s: 0 for s in dbinv.models.status_values['asset']}
+        for a in dbinv.models.Asset.objects.filter(asset__in=assets, **base_criteria):
+            if low_daybound <= a.date.timetuple().tm_yday <= high_daybound:
+                a_counts[a.status] += 1
+        ret_val += (a_counts,)
+
+    if products is not None:
+        p_counts = {s: 0 for s in dbinv.models.status_values['product']}
+        for p in dbinv.models.Product.objects.filter(product__in=products, **base_criteria):
+            if low_daybound <= p.date.timetuple().tm_yday <= high_daybound:
+                p_counts[p.status] += 1
+        ret_val += (p_counts,)
+
+    return ret_val[0] if len(ret_val) == 1 else ret_val # return a tuple only if necessary
+
 
 def get_status(jobid):
+    """Return a status report for the given job.
+
+    Returns (job-status, asset-status, product-status).  Job status is a
+    short string or a prose error string.  Asset & product status are
+    both dicts.  The keys are all the possible values for status flags.
+    The values are the counts of the items in that state for the job.
+    """
     orm.setup()
     try:
         job = dbinv.models.Job.objects.get(pk=jobid)
     except dbinv.models.Job.DoesNotExist:
-        return "jobid does not exist", {}
+        return "jobid does not exist", {}, {}
 
     if job.status in('requested', 'initializing', 'scheduled'):
-        return job.status, {}
-    else:
-        product_status = processing_status(
-            job.variable.driver.encode('ascii', 'ignore'),
-            eval(job.spatial),
-            eval(job.temporal),
-            [job.variable.product.encode('ascii', 'ignore')]
-        )
-        # for now, get rid of the statuses not applicable to products
-        product_status.pop('remote', None)
-        product_status.pop('retry', None)
-        product_status.pop('post-processing', None)
-        product_status.pop('pp-scheduled', None)
-        product_status.pop('initializing', None)
+        return job.status, {}, {}
 
-        return job.status, product_status            
+    asset_status, product_status = status_counts(
+        job.variable.driver.encode('ascii', 'ignore'),
+        eval(job.spatial),
+        eval(job.temporal),
+        eval(job.variable.asset), # by convention a list
+        [job.variable.product.encode('ascii', 'ignore')]
+    )
+    return job.status, asset_status, product_status
     
 
 def get_results(job_id, filters=None):
