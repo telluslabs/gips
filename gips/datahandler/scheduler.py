@@ -223,11 +223,11 @@ def schedule_export_and_aggregate ():
         status='in-progress',
     )
     for job in jobs:
-        status = api.processing_status(
+        status = api.status_counts(
             job.variable.driver.encode('ascii', 'ignore'),
             eval(job.spatial),
             eval(job.temporal),
-            [job.variable.product.encode('ascii', 'ignore')],
+            products=[job.variable.product.encode('ascii', 'ignore')],
         )
         if (
                 status['requested'] == 0
