@@ -8,7 +8,7 @@ from glob import glob
 from commands import getstatusoutput
 
 
-GIPS_VERSION = "bs-deploy" # branch or tag to install from
+GIPS_VERSION = "bs-deploy-lxc-edit" # branch or tag to install from
 
 LSB_INFO = lsb.get_lsb_information()
 
@@ -86,7 +86,7 @@ def install_gips(gips_version=GIPS_VERSION, extras=()):
         base_url = gips_version
     else:
         base_url = (
-            'git+https://github.com/Applied-GeoSolutions/gips.git#egg={ver}'
+            'git+https://github.com/Applied-GeoSolutions/gips.git@{ver}#egg={ver}'
         ).format(ver=gips_version)
     url = base_url + '[{extras}]'.format(extras=','.join(extras))
     print url
