@@ -187,16 +187,36 @@ def get_setting(setting, default=None):
 
 
 def add_datahandler_settings(
-        task_queue, db_host, db_name, db_user, db_password, db_port,
-        dh_server='localhost', dh_port=9000, dh_log_port=9001,
+        fout, task_queue, db_host, db_name, db_user, db_password, db_port,
+        dh_server='localhost', dh_port=8001, dh_log_port=8002,
         dh_export_dir='/tmp/', update=False, **kwargs
 ):
-    # TODO: filter all *settings_template.py files in the datahandler area,
-    #       updating the args of this funciton appropriately, and append them
-    #       to the system environment settings.  Probably defer queue specific
-    #       handling to a function for each queue type based on the value of
-    #       'task_queue'.
-    raise NotImplemented('see todo in gips.utils.add_datahandler_settings')
+    from . import datahandler as gdh
+    gdh_path = gdh.__path__[0]
+    cfgfile = os.path.join(gdh_path, 'settings_template.py')
+    with open(cfgfile, 'r') as fin:
+        for line in fin:
+            fout.write(
+                line.replace(
+                    '$DH_SERVER', dh_server
+                ).replace(
+                    '$DH_PORT', str(dh_port)
+                ).replace(
+                    '$DH_LOG_PORT', str(dh_log_port)
+                ).replace(
+                    '$DH_EXPORT_DIR', dh_export_dir
+                ).replace(
+                    '$DB_NAME', db_name
+                ).replace(
+                    '$DB_USER', db_user
+                ).replace(
+                    '$DB_PASSWORD', db_password
+                ).replace(
+                    '$DB_HOST', db_host
+                ).replace(
+                    '$DB_PORT', str(db_port)
+                )
+            )
 
 
 def create_environment_settings(
@@ -251,7 +271,7 @@ def create_environment_settings(
                     for line in fin:
                         fout.write(line.replace('$TLD', repos_path))
             if 'task_queue' in kwargs:
-                add_datahandler_settings(**kwargs)
+                add_datahandler_settings(fout, **kwargs)
     return cfgfile
 
 

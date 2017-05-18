@@ -86,15 +86,24 @@ def install_gips(gips_version=GIPS_VERSION, extras=()):
         base_url = gips_version
     else:
         base_url = (
-            'https://github.com/Applied-GeoSolutions/gips/archive/'
-            '{ver}.tar.gz#egg=gips'
+            'git+https://github.com/Applied-GeoSolutions/gips.git#egg={ver}'
         ).format(ver=gips_version)
     url = base_url + '[{extras}]'.format(extras=','.join(extras))
+    print url
+    cmd = 'pip install --process-dependency-links {}'.format(url)
+    print('running: ' + cmd)
+    status, output = getstatusoutput(cmd)
+    if status != 0:
+        print output
+        sys.exit(-9999)
+
+    """
     pip_args = ['install', '--process-dependency-links', url]
     pip.main(args=pip_args)
+    """
 
 
-def setup_postgresql(db_host, db_name, db_user, db_password):
+def setup_postgresql(db_host, db_name, db_user, db_password, **kwargs):
     user_add = (
         'echo "CREATE USER {db_user} WITH PASSWORD '
         "'{db_password}' "
@@ -195,6 +204,7 @@ def main():
     install_gips(
         gips_version=GIPS_VERSION, extras=('dh-' + args['task_queue'],)
     )
+    setup_postgresql(**args)
 
     from gips.scripts.config import configure_environment
     configure_environment(**args)
