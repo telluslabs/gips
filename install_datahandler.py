@@ -117,7 +117,12 @@ def setup_postgresql(db_host, db_name, db_user, db_password, **kwargs):
     ).format(
         db_name=db_name, db_user=db_user
     )
-    for cmd in [user_add, db_create]:
+    grant_priv = (
+        'echo GRANT ALL PRIVILEGES ON DATABASE {db_name} to {db_user}'
+    ).format(
+        db_name=db_name, db_user=db_user
+    )
+    for cmd in [user_add, db_create, grant_priv]:
         print('running: ' + cmd)
         status, output = getstatusoutput(cmd)
         if status != 0:

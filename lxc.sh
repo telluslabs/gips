@@ -12,7 +12,7 @@
 # + restores the container to its `pipped` snapshot
 # +
 set -e
-CONT=c1
+CONT=dh
 {
     lxc info $CONT 2>&1>/dev/null || {
         time lxc launch ubuntu-daily:16.04 $CONT
@@ -24,10 +24,10 @@ CONT=c1
         lxc exec $CONT -- apt-get install -y gfortran libboost-all-dev libfreetype6-dev libgnutls-dev libatlas-base-dev libgdal-dev libgdal1-dev gdal-bin python-numpy python-scipy python-gdal swig2.0
         lxc exec $CONT -- pip install -U pip
     }
-    echo "1"
-    lxc info $CONT | grep Snapshots > /dev/null && echo "2" &&
-        { echo "3" ; lxc restore $CONT pipped ; echo "4" ; } ||
-            { echo "5" ; lxc snapshot $CONT pipped ; echo "6" ; }
+    #echo "1"
+    #lxc info $CONT | grep Snapshots > /dev/null && echo "2" &&
+    #    { echo "3" ; lxc restore $CONT pipped ; echo "4" ; } ||
+    #        { echo "5" ; lxc snapshot $CONT pipped ; echo "6" ; }
     if $(lxc list $CONT | grep STOPPED) ; then
         lxc start $CONT
         sleep 1
