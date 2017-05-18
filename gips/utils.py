@@ -189,7 +189,9 @@ def get_setting(setting, default=None):
 def add_datahandler_settings(
         fout, task_queue, db_host, db_name, db_user, db_password, db_port,
         dh_server='localhost', dh_port=8001, dh_log_port=8002,
-        dh_export_dir='/tmp/', update=False, **kwargs
+        dh_export_dir='/tmp/', queue_name='datahandler', queue_server='localhost',
+        remote_python='/usr/bin/env python',
+        update=False, **kwargs
 ):
     from . import datahandler as gdh
     gdh_path = gdh.__path__[0]
@@ -217,7 +219,18 @@ def add_datahandler_settings(
                     '$DB_PORT', str(db_port)
                 )
             )
-
+    qcfgfile = os.path.join(gdh_path, 'queue', task_queue+'_settings_template.py')
+    with open(qcfgfile, 'r') as fin:
+        for line in fin:
+            fout.write(
+                line.replace(
+                    '$QUEUE_NAME', queue_name
+                ).replace(
+                    '$QUEUE_SERVER', queue_server
+                ).replace(
+                    '$REMOTE_PYTHON', remote_python
+                )
+            )
 
 def create_environment_settings(
         repos_path, email, drivers, earthdata_user='', earthdata_password='',

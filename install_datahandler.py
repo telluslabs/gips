@@ -164,6 +164,10 @@ def main():
         help='Identifier of the queue to be used.'
     )
     p.add_argument(
+        '--queue-server', default='localhost',
+        help='Host running the task queue'
+    )
+    p.add_argument(
         '-G', '--gips-version', default=(GIPS_VERSION),
         help='Version (tag or branch) of GIPS to install.'
     )
