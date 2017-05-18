@@ -28,6 +28,7 @@ from osgeo import gdal, ogr
 from datetime import datetime
 import glob
 from itertools import groupby
+import itertools
 from shapely.wkt import loads
 import tarfile
 import zipfile
@@ -126,6 +127,30 @@ class Repository(object):
         """ Paths to repository: valid subdirs (tiles, composites, quarantine, stage) """
         return os.path.join(cls.get_setting('repository'), subdir)
 
+
+    @classmethod
+    def quarantine_file(cls, filename):
+        """Move file to the quarantine area of the repo.
+
+        If the filename exists in the quarantine, integer suffixes will
+        be tried, '-1', '-2', etc.  Returns the final absolute path &
+        filename.
+        """
+        afn = os.path.abspath(filename)
+        base_qfn = os.path.join(cls.path('quarantine'), os.path.basename(filename))
+        def quarantined_fn_gen(): # Generate sequence of candidate filenames
+            yield base_qfn
+            for n in itertools.count(start=1):
+                yield base_qfn + '-' + str(n)
+        for qfn in quarantined_fn_gen():
+            try:
+                os.link(afn, qfn) # os.rename silently clobbers, so do this instead
+            except OSError as o:
+                if o.errno != errno.EEXIST: # try again if file exists
+                    raise
+            else:
+                os.remove(afn) # hardlink to new name in place, safe to remove original
+                return qfn
 
     @classmethod
     def vector2tiles(cls, vector, pcov=0.0, ptile=0.0, tilelist=None):
@@ -438,9 +463,8 @@ class Asset(object):
         except Exception, e:
             # if problem with inspection, move to quarantine
             utils.report_error(e, 'File error, quarantining ' + filename)
-            qname = os.path.join(cls.Repository.path('quarantine'), bname)
-            if not os.path.exists(qname):
-                os.link(os.path.abspath(filename), qname)
+            qfn = cls.Repository.quarantine_file(filename)
+            utils.verbose_out("Asset file quarantined to " + qfn, 1, sys.stderr)
             return (None, 0)
 
         # make an array out of asset.date if it isn't already
@@ -452,47 +476,49 @@ class Asset(object):
         for d in dates:
             tpath = cls.Repository.data_path(asset.tile, d)
             newfilename = os.path.join(tpath, bname)
-            if not os.path.exists(newfilename):
-                # check if another asset exists
-                existing = cls.discover(asset.tile, d, asset.asset)
-                if len(existing) > 0 and (not update or not existing[0].updated(asset)):
-                    # gatekeeper case:  No action taken because existing assets are in the way
-                    VerboseOut('%s: other version(s) already exists:' % bname, 1)
-                    for ef in existing:
-                        VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
-                    otherversions = True
-                elif len(existing) > 0 and update:
-                    # update case:  Remove existing outdated assets and install the new one
-                    VerboseOut('%s: removing other version(s):' % bname, 1)
-                    for ef in existing:
-                        assert ef.updated(asset), 'Asset is not updated version'
-                        VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
-                        with utils.error_handler('Unable to remove old version ' + ef.filename):
-                            os.remove(ef.filename)
-                    files = glob.glob(os.path.join(tpath, '*'))
-                    for f in set(files).difference([ef.filename]):
-                        msg = 'Unable to remove product {} from {}'.format(f, tpath)
-                        with utils.error_handler(msg, continuable=True):
-                            os.remove(f)
-                    with utils.error_handler('Problem adding {} to archive'.format(filename)):
-                        os.link(os.path.abspath(filename), newfilename)
-                        asset.archived_filename = newfilename
-                        VerboseOut(bname + ' -> ' + newfilename, 2)
-                        numlinks = numlinks + 1
-
-                else:
-                    # 'normal' case:  Just add the asset to the archive; no other work needed
-                    if not os.path.exists(tpath):
-                        with utils.error_handler('Unable to make data directory ' + tpath):
-                            os.makedirs(tpath)
-                    with utils.error_handler('Problem adding {} to archive'.format(filename)):
-                        # needs full path
-                        os.link(os.path.abspath(filename), newfilename)
-                        asset.archived_filename = newfilename
-                        VerboseOut(bname + ' -> ' + newfilename, 2)
-                        numlinks = numlinks + 1
+            if os.path.exists(newfilename):
+                utils.verbose_out(
+                        "Unexpected asset file detected in archive, attempting to quarantine.",
+                        1, sys.stderr)
+                qfn = cls.Repository.quarantine_file(newfilename)
+                utils.verbose_out("Unexpected asset file quarantined to " + qfn, 1, sys.stderr)
+            # check if another asset exists
+            existing = cls.discover(asset.tile, d, asset.asset)
+            if len(existing) > 0 and (not update or not existing[0].updated(asset)):
+                # gatekeeper case:  No action taken because existing assets are in the way
+                VerboseOut('%s: other version(s) already exists:' % bname, 1)
+                for ef in existing:
+                    VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
+                otherversions = True
+            elif len(existing) > 0 and update:
+                # update case:  Remove existing outdated assets and install the new one
+                VerboseOut('%s: removing other version(s):' % bname, 1)
+                for ef in existing:
+                    assert ef.updated(asset), 'Asset is not updated version'
+                    VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
+                    with utils.error_handler('Unable to remove old version ' + ef.filename):
+                        os.remove(ef.filename)
+                files = glob.glob(os.path.join(tpath, '*'))
+                for f in set(files).difference([ef.filename]):
+                    msg = 'Unable to remove product {} from {}'.format(f, tpath)
+                    with utils.error_handler(msg, continuable=True):
+                        os.remove(f)
+                with utils.error_handler('Problem adding {} to archive'.format(filename)):
+                    os.link(os.path.abspath(filename), newfilename)
+                    asset.archived_filename = newfilename
+                    VerboseOut(bname + ' -> ' + newfilename, 2)
+                    numlinks = numlinks + 1
             else:
-                VerboseOut('%s already in archive' % filename, 2)
+                # 'normal' case:  Just add the asset to the archive; no other work needed
+                if not os.path.exists(tpath):
+                    with utils.error_handler('Unable to make data directory ' + tpath):
+                        os.makedirs(tpath)
+                with utils.error_handler('Problem adding {} to archive'.format(filename)):
+                    # needs full path
+                    os.link(os.path.abspath(filename), newfilename)
+                    asset.archived_filename = newfilename
+                    VerboseOut(bname + ' -> ' + newfilename, 2)
+                    numlinks = numlinks + 1
         if otherversions and numlinks == 0:
             return (asset, -1)
         else:
@@ -899,7 +925,7 @@ class Data(object):
                                     }
                                     # useful to datahandler to have this
                                     # grouped by (p,t,d) there is a fair bit of
-                                    # duplicated info this way, but oh well 
+                                    # duplicated info this way, but oh well
                                     if grouped:
                                         if (p,t,d) in response:
                                             response[(p,t,d)].append(rec)
