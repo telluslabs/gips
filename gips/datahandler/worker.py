@@ -30,21 +30,26 @@ def query (job_id):
         job.status = 'scheduled'
         job.save()
 
-    api.query_service(
-        job.variable.driver,
-        eval(job.spatial),
-        eval(job.temporal),
-        [job.variable.product])
+    try:
+        api.query_service(
+            job.variable.driver,
+            eval(job.spatial),
+            eval(job.temporal),
+            [job.variable.product])
+        job.refresh_from_db()
+        if job.status != 'scheduled':
+            # sanity check; have to keep going, but whine about it
+            Logger().log("Expected Job status to be 'initializing,' but got {}".format(job.status),
+                         level=1)
+        job.status = 'in-progress'
+        job.save()
+        return job
+    except Exception as e:
+        Logger().log('Error in query_service: ' + e.message, level=1)
+        job.status = 'failed'
+        job.save()
+        raise
 
-    job.refresh_from_db()
-    if job.status != 'scheduled':
-        # sanity check; have to keep going, but whine about it
-        err_msg = "Expected Job status to be 'initializing, but got {}"
-        utils.verbose_out(err_msg.format(job.status), 1)
-    job.status = 'in-progress'
-    job.save()
-
-    return job
 
 
 def fetch(asset_id):
