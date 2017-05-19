@@ -32,7 +32,7 @@ python install_datahandler.py --gips-version '.' --driver modis merra --earthdat
   * `--drivers modis merra`: enable the MODIS and MERRA data drivers
   * `--earthdata-user` and `--earthdata-password`: login credentials for EarthData
   * `--install-pg`: install the postgres database software -- not necessary if you plan on using an existing installation
-  * `--create-db`: create the postgres databse, user and grant privileges
+  * `--create-db`: create the postgres database, user and grant privileges
   * `--enable-cron`: installs the `scheduler` crontab entry into the current users crontab
   * `--enable-daemons`: create `systemd` service configurations for the `rq` task queues and `xmlrpc` API server
 
