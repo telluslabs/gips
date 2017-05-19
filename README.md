@@ -1,4 +1,12 @@
 
+## General
+
+Geokit Data Handler (GIPS) was developed by Applied Geosolutions, LLC (AGS) with support from a NASA
+Small Business Innovative Research grant (SBIR), in two grant Phases, beginning
+January 2014. For more information about the company please contact info@ags.io,
+for more information about Geokit open source development contact
+developers@ags.io
+
 ## Authors and Contributors
 The following have been authors or contributers to GIPS
 
