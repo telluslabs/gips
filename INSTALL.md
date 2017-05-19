@@ -21,7 +21,7 @@ virtualenv --system-site-packages dh_venv
 . dh_venv/bin/activate
 ```
 
-The GIPS datahandler is installed and configured using a convience script name `install_datahandler.py`. A typical installation would use options such as the following:
+The GIPS datahandler is installed and configured using a convenience script named `install_datahandler.py`. A typical installation would use options such as the following:
 
 ```
 python install_datahandler.py --gips-version '.' --driver modis merra --earthdata-user $USER --earthdata-password $PASSWORD --install-pg --create-db --enable-cron --enable-daemons
@@ -36,7 +36,7 @@ python install_datahandler.py --gips-version '.' --driver modis merra --earthdat
   * `--enable-cron`: installs the `scheduler` crontab entry into the current users crontab
   * `--enable-daemons`: create `systemd` service configurations for the `rq` task queues and `xmlrpc` API server
 
-There are a wide variety of additional optional arguments available, particularly database name, location and authentication, as well as hostname and ports for the associated daemon processes. See `python install_datahandler.py --help` for more details. The configuration options installed can be viewed using `gips_config print`
+There are a wide variety of additional optional arguments available, particularly database name, location and authentication, as well as hostname and ports for the associated daemon processes. See `python install_datahandler.py --help` for more details. The configuration options in use can be viewed using `gips_config print`
 
 Once this installation is complete, you can launch the two necessary daemons using the following commands:
 ```
@@ -45,4 +45,4 @@ sudo systemctl start gips_rqworker@{1..4}.service
 ```
 The above command will launch four `rq` workers.
 
-Unless specified otherwise, the xmlrpc API server will be listening on `localhost:8001` and logs written to `/var/log/gipd_dhd.log`. 
+Unless specified otherwise, the xmlrpc API server will be listening on `localhost:8001` and logs written to `/var/log/gipd_dhd.log` 
