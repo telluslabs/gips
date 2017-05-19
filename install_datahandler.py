@@ -224,9 +224,9 @@ def main():
     p = argparse.ArgumentParser(description='GIPS deployment script')
     h = ('Directory where all drivers will be initially configured to store '
          'files.')
-    p.add_argument('-r', '--repos-path', help=h, default='/var/gipsdata/')
+    p.add_argument('-r', '--repos', help=h, default='/var/gipsdata/')
     p.add_argument(
-        '-e', '--email', default='icooke@ags.io',
+        '-e', '--email', default='user@example.com',
         help='Set email address (used for anonymous FTP sources)',
     )
     p.add_argument(
@@ -273,16 +273,16 @@ def main():
         '--db-host', default='localhost', help='database server name/ip'
     ) 
     p.add_argument(
-        '--db-user', default='geokit', help='database user name'
+        '--db-user', default='datahandler', help='database user name'
     )
     p.add_argument(
-        '--db-password', default='geokitp4ss', help='database user password'
+        '--db-password', default='h4ndledata', help='database user password'
     )
     p.add_argument(
         '--db-port', default='5432', help='database server TCP port.'
     ) 
     p.add_argument(
-        '--db-name', default='gkdb', help='Name of database on DB server.'
+        '--db-name', default='dhdb', help='Name of database on DB server.'
     )
     p.add_argument(
 	'--create-db', default=False, action='store_true',
