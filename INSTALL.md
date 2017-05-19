@@ -11,7 +11,7 @@ Clone the GIPS datahandler repositiory from GitHub
 
 `git clone -b datahandler https://github.com/Applied-GeoSolutions/gips.git`
 
-# Create and activate a virtual environment
+Create and activate a virtual environment
 
 ```
 virtualenv --system-site-packages dh_venv
