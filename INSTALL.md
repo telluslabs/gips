@@ -12,7 +12,7 @@ sudo apt-get install -y python python-pip virtualenv
 
 Clone the GIPS datahandler repositiory from GitHub
 
-`git clone -b batch-scheduler https://github.com/Applied-GeoSolutions/gips.git`
+`git clone -b datahandler https://github.com/Applied-GeoSolutions/gips.git`
 
 # Create and activate a virtual environment
 
