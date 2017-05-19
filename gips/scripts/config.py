@@ -65,12 +65,12 @@ def create_data_variables():
         dv_model.save()
 
 
-def configure_environment(repos_path, email, drivers, earthdata_user,
+def configure_environment(repos, email, drivers, earthdata_user,
                           earthdata_password, update, **kwargs):
     try:
         # kwargs added for datahandler enabling
         cfgfile = create_environment_settings(
-            repos_path, email, drivers,
+            repos, email, drivers,
             earthdata_user, earthdata_password,
             update_config=update, **kwargs
         )
