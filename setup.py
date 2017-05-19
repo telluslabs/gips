@@ -45,28 +45,48 @@ for f in glob.glob('gips/scripts/*.py'):
     except:
         print traceback.format_exc()
 
+# GIPS requirements should be added at the level appropriate
+#  lib - required to install and import gips.core classes
+
+_lib_req = ['gippy>=0.3.8,<0.4.0']
+_base_req = [
+    'shapely',
+    'python-dateutil',
+]
+_full_req = _base_req + [
+    'landsat-util==0.8.0ircwaves0',
+    'Py6S>=1.5.0',
+    'requests',
+    'pydap<=3.2',
+]
+_orm_req = _full_req + [
+    'django==1.10',
+    'psycopg2<=2.6',
+]
+_dh_req = _orm_req + [
+    'rq',
+]
+
 setup(
     name='gips',
     version=__version__,
     description='Geospatial Image Processing System',
     author='Matthew Hanson',
     author_email='matt.a.hanson@gmail.com',
+    maintainer='Ian Cooke',
+    maintainer_email='icooke@ags.io',
     packages=find_packages(),
     package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf']},
-    install_requires=[
-        'Py6S>=1.5.0',
-        'shapely',
-        'gippy>=0.3.8',
-        'python-dateutil',
-        'pydap==3.2',
-        'pysolar==0.6',
-        'landsat-util==0.8.0ircwaves0',
-    ],
+    install_requires=_lib_req,
     extras_require={
-        'rq': ['rq'],
+        'base': _base_req,
+        'full': _full_req,
+        'orm': _orm_req,
+        'dh-rq': _dh_req,
     },
     dependency_links=[
-        'http://github.com/ircwaves/landsat-util/tarball/landsat_util#egg=landsat-util-0.8.0ircwaves0'
+        'http://github.com/ircwaves/landsat-util/tarball/landsat_util#egg=landsat-util-0.8.0ircwaves0',
+        'http://github.com/Applied-GeoSolutions/gippy/archive/v0.3.9.tar.gz#egg=gippy-0.3.9',
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
