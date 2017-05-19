@@ -194,9 +194,11 @@ def main():
         '--db-port', default='5432', help='database server TCP port.'
     ) 
     p.add_argument(
-
         '--db-name', default='gkdb', help='Name of database on DB server.'
     ) 
+    p.add_argument(
+        '--create-db', action='store_true', help='create postgres database'
+    )
     args = vars(p.parse_args())
     PKGS = GIPPY_PKGS
     if args['task_queue'] == 'rq':
@@ -213,7 +215,8 @@ def main():
     install_gips(
         gips_version=GIPS_VERSION, extras=('dh-' + args['task_queue'],)
     )
-    setup_postgresql(**args)
+    if args.get('create_db', False):
+        setup_postgresql(**args)
 
     from gips.scripts.config import configure_environment
     configure_environment(**args)
