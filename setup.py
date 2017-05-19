@@ -44,6 +44,10 @@ for f in glob.glob('gips/scripts/*.py'):
             console_scripts.append(script)
     except:
         print traceback.format_exc()
+console_scripts += [
+    'gips_scheduler = gips.datahandler.scheduler:main',
+    'gips_dhd       = gips.datahandler.dhd:main',
+]
 
 # GIPS requirements should be added at the level appropriate
 #  lib - required to install and import gips.core classes
@@ -68,6 +72,7 @@ _orm_requirements = _full_requirements + [
 ]
 _dh_requirements = _orm_requirements + [
     'rq',
+    'python-crontab',
 ]
 
 setup(

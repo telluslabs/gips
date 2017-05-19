@@ -2,8 +2,11 @@
 
 import sys
 import lsb_release as lsb
-import apt
+#import apt
+import getpass
+import os
 import pip
+import subprocess
 from glob import glob
 from commands import getstatusoutput
 
@@ -50,7 +53,7 @@ def install_system_requirements(PKGS):
     getting error that didn't occur in system call (see
     'this_worked_until_recently' below). 
     '''
-    cmd = 'apt-get install -y {}'.format(
+    cmd = 'sudo apt-get install -y {}'.format(
         ' '.join(PKGS)
     )
     print('running: ' + cmd)
@@ -131,6 +134,89 @@ def setup_postgresql(db_host, db_name, db_user, db_password, **kwargs):
         print('---')
 
 
+# TODO: remove this when issue #201 is sorted
+def create_netrc(earthdata_user, earthdata_password, **kwargs):
+    l = "machine urs.earthdata.nasa.gov login {user} password {password}".format(
+        user=earthdata_user,
+        password=earthdata_password
+    )
+    fname = os.path.join(os.getenv("HOME"), '.netrc')
+    if os.path.exists(fname):
+        with open(fname, 'r+') as netrc:
+            for line in netrc:
+                if line.strip() == l:
+                    # line alread exists
+                    return
+            netrc.seek(0, 2)
+            netrc.write(l + "\n")
+    else:
+        with open(fname, 'w') as netrc:
+            netrc.write(l + "\n")
+
+
+def enable_cron():
+    from crontab import CronTab
+    cron = CronTab(user=True)
+    # see if the job already exists
+    jobs = [j for j in cron.find_command('scheduler')]
+    if len(jobs) > 1:
+        raise RuntimeError("multiple scheduler jobs in cron")
+    from gips.datahandler import scheduler
+    schedpath = scheduler.__file__
+    # Turn pyc files into py files if we can
+    if schedpath.endswith('.pyc') and os.path.exists(schedpath[:-1]):
+        schedpath = schedpath[:-1]
+    command = sys.executable + " " + schedpath + " > /dev/null 2>&1"
+    if len(jobs) == 0:
+        job = cron.new(command=command)
+    else:
+        job = jobs[0]
+        job.set_command(command)
+    job.setall('* * * * *')
+    cron.write()
+
+
+def enable_daemons(task_queue, queue_name, rqexe=''):
+    from gips import datahandler 
+    gdh_path = os.path.realpath(datahandler.__path__[0])
+    dhdfile = os.path.join(gdh_path, 'gips_dhd.service.template')
+    dhdoutfile = '/etc/systemd/system/gips_dhd.service'
+    if os.path.exists(dhdoutfile):
+        subprocess.call('systemctl stop gips_dhd.service', shell=True)
+    dhdout = open(dhdoutfile, 'w')
+    with open(dhdfile, 'r') as fin:
+        for line in fin:
+            dhdout.write(
+                line.replace(
+                    '$AS_USER', getpass.getuser()
+                ).replace(
+                    '$PYTHON', sys.executable
+                ).replace(
+                    '$COMMAND', os.path.join(gdh_path, 'dhd.py')
+                )
+            )
+        dhdout.write("\n")
+    print "you can now start gip_dhd with 'sudo systemctl start gips_dhd.service'"
+
+    if task_queue == 'rq':
+        rqfile = os.path.join(gdh_path, 'gips_rqworker@.service.template')
+        rqoutfile = '/etc/systemd/system/gips_rqworker@.service'
+        rqout = open(rqoutfile, 'w')
+        with open(rqfile) as rqin:
+            for line in rqin:
+                rqout.write(
+                    line.replace(
+                        '$RQ_COMMAND', rqexe
+                    ).replace(
+                        '$QUEUE', queue_name
+                    ).replace(
+                        '$AS_USER', getpass.getuser()
+                    )
+                )
+            rqout.write("\n")
+        print "you can now start gips_rqworker with 'sudo systemctl start gips_rqworker@{1..4}.service'"
+                        
+
 def main():
     import argparse
     p = argparse.ArgumentParser(description='GIPS deployment script')
@@ -143,7 +229,7 @@ def main():
     )
     p.add_argument(
         '-d', '--drivers', nargs='*',
-        default=('modis', 'merra', 'landsat', 'aod'),
+        default=('modis', 'merra'),
         help='List of drivers to enable for this installation',
     )
     p.add_argument(
@@ -195,9 +281,12 @@ def main():
     ) 
     p.add_argument(
         '--db-name', default='gkdb', help='Name of database on DB server.'
-    ) 
+    )
     p.add_argument(
-        '--create-db', action='store_true', help='create postgres database'
+        '--enable-cron', action='store_true', help='Insert entry for schedulure into crontab'
+    )
+    p.add_argument(
+        '--enable-daemons', action='store_true', help='Setup and launch systemd controls for daemons'
     )
     args = vars(p.parse_args())
     PKGS = GIPPY_PKGS
@@ -208,20 +297,36 @@ def main():
     else:
         raise Exception('Unknown task-queue specified "{}"'.format(task_queue))
     
-    if 'install_pg' in args:
+    if args['install_pg']:
         PKGS += PG_PKGS
-
+        setup_postgresql(**args)
+        
     install_system_requirements(PKGS)
     install_gips(
-        gips_version=GIPS_VERSION, extras=('dh-' + args['task_queue'],)
+        gips_version=args['gips_version'], extras=('dh-' + args['task_queue'],)
     )
-    if args.get('create_db', False):
-        setup_postgresql(**args)
 
     from gips.scripts.config import configure_environment
     configure_environment(**args)
     # TODO: for driver in drivers: gips_inventory {driver} --rectify
-    print("Don't forget to add your ~/.netrc file (until issue #201 is sorted)")
+    # TODO: remove this after issue #201 is sorted
+    if args['earthdata_user'] and args['earthdata_password']:
+        create_netrc(**args)
+    #print("Don't forget to add your ~/.netrc file (until issue #201 is sorted)")
+    if args['enable_cron']:
+        enable_cron()
+    if args['enable_daemons']:
+        # clunky way to execute this using sudo without running whole script via sudo
+        import distutils
+        rqexe = distutils.spawn.find_executable('rq')
+        cmd = "sudo {} -c 'from install_datahandler import enable_daemons; enable_daemons(\"{}\",\"{}\",\"{}\")'".format(
+            sys.executable,
+            args['task_queue'],
+            args['queue_name'],
+            rqexe,
+        )
+        print cmd
+        subprocess.call(cmd, shell=True)
 
 
 if __name__ == '__main__':

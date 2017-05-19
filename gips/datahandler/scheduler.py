@@ -315,7 +315,7 @@ def print_outcomes(kind, outcomes):
 
 
 def main ():
-    lock = Lock('/tmp/geokitd.lock')
+    lock = Lock('/tmp/gips_scheduler.lock')
     try:
         lock.acquire()
     except IOError:
