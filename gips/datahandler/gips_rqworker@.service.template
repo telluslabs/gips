@@ -5,7 +5,7 @@ Description=GIPS datahandler RQ Worker %I
 
 # Uncomment the following two lines, making sure to change the absolute paths
 # to where you have installed GIPS on your system.
-ExecStart=/home/justin/sandbox/gips/venv/bin/rq worker datahandlerq > /dev/null 2>&1
+ExecStart=$RQ_COMMAND worker $QUEUE > /dev/null 2>&1
 PIDFile=/tmp/gips_rqworker.%I.pid
 Type=simple
 Restart=always
