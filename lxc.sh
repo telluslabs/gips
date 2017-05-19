@@ -37,4 +37,7 @@ lxc file push install_datahandler.py $CONT/root/
 lxc exec $CONT -- python /root/install_datahandler.py \
     --drivers modis merra \
     --earthdata-user $EDUSER \
-    --earthdata-password $EDPASS
+    --earthdata-password $EDPASS \
+    --enable-cron \
+    --install-pg \
+    --enable-daemons
