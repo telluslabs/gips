@@ -1,12 +1,9 @@
 # Set up system
 
-Run apt-get update
-
-`sudo apt-get update`
-
-Install python, python-pip, and virtualenv 
+Update `apt-get` and install python and virtualenv if not already available
 
 ```
+sudo apt-get update
 sudo apt-get install -y python python-pip virtualenv
 ```
 
@@ -21,7 +18,7 @@ virtualenv --system-site-packages dh_venv
 . dh_venv/bin/activate
 ```
 
-# Install and Configure GIPS datahandler 
+# Install and configure GIPS datahandler 
 
 The GIPS datahandler is installed and configured using a convenience script named `install_datahandler.py`. A typical installation would use options such as the following:
 
@@ -37,7 +34,7 @@ python install_datahandler.py --gips-version '.' --driver modis merra --earthdat
   * `--enable-cron`: installs the `scheduler` crontab entry into the current users crontab
   * `--enable-daemons`: create `systemd` service configurations for the `rq` task queues and `xmlrpc` API server
 
-There are a wide variety of additional optional arguments available, particularly database name, location and authentication, as well as hostname and ports for the associated daemon processes. See `python install_datahandler.py --help` for more details. The configuration options in use can be viewed using `gips_config print`
+There are a variety of additional optional arguments available, particularly database name, location and authentication, as well as hostname and ports for the associated daemon processes. See `python install_datahandler.py --help` for more details. The configuration options in use can be viewed using `gips_config print`
 
 Once this installation is complete, you can launch the two necessary daemons using the following commands:
 ```
