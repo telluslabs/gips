@@ -181,7 +181,7 @@ def _aggregate(job, outdir, nproc=1):
 
 
 def export_and_aggregate(job_id, start_ext, end_ext,
-                         nprocs=1, outdir=None, cleanup=False, **mosaic_kwargs):
+                         nprocs=1, outdir=None, cleanup=True, **mosaic_kwargs):
     """Does the same things as gips_project + zonal summary."""
     with transaction.atomic():
         job = dbinv.models.Job.objects.get(

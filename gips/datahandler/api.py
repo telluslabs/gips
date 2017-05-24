@@ -42,12 +42,12 @@ def submit_request (site, variable, spatial, temporal):
     Logger().log("submit_job: {} {} {} {}".format(site, variable,
                                                   spatial, temporal))
     orm.setup()
-    job = dbinv.models.Job.objects.create(
+    job, created = dbinv.models.Job.objects.get_or_create(
         site=site,
         variable=dbinv.models.DataVariable.objects.get(name=variable),
         spatial=repr(spatial),
         temporal=repr(temporal),
-        status='requested',
+        defaults={'status':'requested'},
     )
 
     Logger().log("submit_job: returned jobid {}".format(job.pk))
