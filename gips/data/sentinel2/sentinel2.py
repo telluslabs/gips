@@ -132,18 +132,30 @@ class sentinel2Asset(Asset):
 
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
+    _tile_re = '(?P<tile>\d\d[A-Z]{3})'
+    # example, note that leading tile code is spliced in by Asset.fetch:
+    # 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
+    _orig_name_re = (
+        '(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
+        '_\d{8}T\d{6}' # processing date (don't care)
+        '_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
+        # observation datetime:
+        '_V(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
+        'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
+        '_\d{8}T\d{6}.zip') # repeated observation datetime for no known reason
+
+    _2016_12_07_name_re = (
+        '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
+        '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
+        'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
+        '_N\d{4}_R\d\d\d_T' + _tile_re + '_\d{8}T\d{6}.zip$') # tile
+
     _asset_styles = {
         'original': {
-            'name-re': ( # pattern for the asset file name
-                # example, note that leading tile code is spliced in by Asset.fetch:
-                # 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
-                '^(?P<tile>\d\d[A-Z]{3})_(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # tile & sensor
-                '_\d{8}T\d{6}' # processing date (don't care)
-                '_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
-                # observation datetime:
-                '_V(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
-                'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
-                '_\d{8}T\d{6}.zip'), # repeated observation datetime; probably don't care
+            # original-style assets can't use the same name for downloading and archiving, because
+            # each downloaded file contains multiple tiles of data
+            'downloaded-name-re': _orig_name_re,
+            'archived-name-re': '^' + _tile_re + '_' + _orig_name_re,
             # raster file pattern
             'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B\d[\dA].jp2$',
             # TODO
@@ -155,11 +167,9 @@ class sentinel2Asset(Asset):
             #'inspire-md-re': '^.*/INSPIRE.xml$',
         },
         _2016_12_07: {
-            'name-re': ( # pattern for the asset file name
-                '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
-                '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
-                'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
-                '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$'), # tile
+            # post-2016 assets use their downloaded FN as their archived FN
+            'downloaded-name-re': _2016_12_07_name_re,
+            'archived-name-re': _2016_12_07_name_re,
             # raster file pattern
             'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B\d[\dA].jp2$',
             # internal metadata file patterns
@@ -185,7 +195,7 @@ class sentinel2Asset(Asset):
         base_filename = os.path.basename(filename)
 
         for style, style_dict in self._asset_styles.items():
-            match = re.match(style_dict['name-re'], base_filename)
+            match = re.match(style_dict['archived-name-re'], base_filename)
             if match is not None:
                 break
         if match is None:
@@ -295,23 +305,51 @@ class sentinel2Asset(Asset):
 
 
     @classmethod
-    def stage_asset(cls, style, asset_full_path, asset_base_name):
-        """Copy the given asset to the stage.
+    def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
+        if recursive:
+            raise ValueError('Recursive asset search not supported by Sentinel-2 driver.')
 
-        If the file is an old-style asset, it's exploded into many names,
-        one per tile, so that the archivation process will behave properly.
-        """
+        found_files = {
+            'original': [],
+            cls._2016_12_07: [],
+        }
+
+        for fn in glob.glob(os.path.join(path, cls._assets['L1C']['pattern'])):
+            with utils.error_handler('Error archiving asset', continuable=True):
+                bn = os.path.basename(fn)
+                for style, style_dict in cls._asset_styles.items():
+                    # TODO nothing seems to match here
+                    match = re.match(style_dict['downloaded-name-re'], bn)
+                    if match is not None:
+                        found_files[style].append(fn) # save the found path, not the basename
+                        break
+                if match is None:
+                    raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(bn))
+
+        assets = []
+        for fn in found_files[cls._2016_12_07]:
+            assets += super(sentinel2Asset, cls).archive(fn, False, keep, update)
+
+        for fn in found_files['original']:
+            tile_list = cls.tile_list(fn)
+            # use the stage dir since it's likely not to break anything (ie on same filesystem)
+            with utils.make_temp_dir(dir=cls.Repository.path('stage')) as tdname:
+                for tile in tile_list:
+                    tiled_fp = os.path.join(tdname, tile + '_' + os.path.basename(fn))
+                    os.link(fn, tiled_fp)
+                assets += super(sentinel2Asset, cls).archive(tdname, False, False, update)
+            if not keep:
+                utils.RemoveFiles([fn], ['.index', '.aux.xml'])
+
+        return assets
+
+
+    @classmethod
+    def stage_asset(cls, style, asset_full_path, asset_base_name):
+        """Copy the given asset to the stage."""
         stage_path = cls.Repository.path('stage')
-        if style == 'original':
-            # copy enough links into stage to do the thing successfully
-            # the way to do this is by extracting the tile list from the asset
-            tile_list = cls.tile_list(asset_full_path)
-            for tile in tile_list:
-                stage_fp = os.path.join(stage_path, tile + '_' + asset_base_name)
-                os.link(asset_full_path, stage_fp)
-        else:
-            stage_full_path = os.path.join(stage_path, asset_base_name)
-            os.rename(asset_full_path, stage_full_path) # on POSIX, if it works, it's atomic
+        stage_full_path = os.path.join(stage_path, asset_base_name)
+        os.rename(asset_full_path, stage_full_path) # on POSIX, if it works, it's atomic
 
 
     @classmethod
@@ -694,19 +732,6 @@ class sentinel2Data(Data):
             datafiles = [os.path.join('/vsizip/' + self.assets['L1C'].filename, f)
                     for f in self.metadata['filenames']]
         self.metadata['abs-filenames'] = datafiles
-
-        # TODO unused here down?
-        image = gippy.GeoImage(datafiles)
-        image.SetNoData(0) # inferred rather than taken from spec
-        sensor = self.assets['L1C'].sensor
-        colors = self.assets['L1C']._sensors[sensor]['colors']
-
-        # go through all the files/bands in the image object and set values for each one
-        for i, color in zip(range(1, len(colors) + 1), colors):
-            image.SetBandName(color, i)
-
-        return image
-
 
     def _time_report(self, msg, reset_clock=False, verbosity=None):
         """Provide the user with progress reports, including elapsed time.

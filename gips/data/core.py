@@ -394,11 +394,22 @@ class Asset(object):
 
     @classmethod
     def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
-        """ Move assets from directory to archive location """
+        """Move asset into the archive.
+
+        Pass in a path to a file or a directory.  If a directory, its
+        contents are scanned for assets and any found are archived; it
+        won't descend into subdirectories unless `recursive`.  Any found
+        assets are given hard links in the archive.  The original is
+        then removed, unless `keep`. If a found asset would replace an
+        extant archived asset, replacement is only performed if
+        `update`.  kwargs is unused and likely without purpose.
+        """
         start = datetime.now()
 
         fnames = []
-        if recursive:
+        if not os.path.isdir(path):
+            fnames.append(path)
+        elif recursive:
             for root, subdirs, files in os.walk(path):
                 for a in cls._assets.values():
                     fnames.extend(glob.glob(os.path.join(root, a['pattern'])))
