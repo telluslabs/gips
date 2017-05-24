@@ -360,16 +360,19 @@ def get_data_variables():
                 assets = repr(product_dict['assets'])
                 start_date = product_dict.get('startdate')
                 latency = product_dict.get('latency')
-                for band,bandname in enumerate(product_dict['bands']):
+                for band_num,band in enumerate(product_dict['bands']):
+                    band_name = band['name']
+                    units = band['units']
                     data_variable = {
                         'driver': driver,
                         'description': description,
                         'product': product,
-                        'name': "{}_{}_{}".format(driver, product, bandname),
+                        'name': "{}_{}_{}".format(driver, product, band_name),
                         'asset': assets,
-                        'band_number': band,
-                        'band': bandname,
+                        'band_number': band_num,
+                        'band': band_name,
                         'start_date': start_date,
+                        'units': units,
                         'latency': latency
                     }
 

@@ -84,72 +84,84 @@ class modisAsset(Asset):
         'MCD43A4': {
             'pattern': 'MCD43A4' + _asset_glob_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
+            'documentation': 'https://lpdaac.usgs.gov/dataset_discovery/modis/modis_products_table/mcd43a4_v006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MCD43A2': {
             'pattern': 'MCD43A2' + _asset_glob_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
+            'documentation': 'https://lpdaac.usgs.gov/dataset_discovery/modis/modis_products_table/mcd43a2_v006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -15
         },
         'MOD09Q1': {
             'pattern': 'MOD09Q1' + _asset_glob_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006/',
+            'documentation': 'https://lpdaac.usgs.gov/dataset_discovery/modis/modis_products_table/mod09q1_v006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': -7,
         },
         'MOD10A1': {
             'pattern': 'MOD10A1' + _asset_glob_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A1.005/',
+            'documentation': 'http://nsidc.org/data/MOD10A1',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A1': {
             'pattern': 'MYD10A1' + _asset_glob_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A1.005/',
+            'documentation': 'http://nsidc.org/data/myd10a2',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
         'MOD11A1': {
             'pattern': 'MOD11A1' + _asset_glob_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.006',
+            'documentation': 'https://lpdaac.usgs.gov/dataset_discovery/modis/modis_products_table/mod11a1_v006',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -1
         },
         'MYD11A1': {
             'pattern': 'MYD11A1' + _asset_glob_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.006',
+            'documentation': 'https://lpdaac.usgs.gov/dataset_discovery/modis/modis_products_table/myd11a1_v006',
             'startdate': datetime.date(2002, 7, 8),
             'latency': -1
         },
         'MOD11A2': {
             'pattern': 'MOD11A2' + _asset_glob_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.006',
+            'documentation': 'https://lpdaac.usgs.gov/dataset_discovery/modis/modis_products_table/mod11a2',
             'startdate': datetime.date(2000, 3, 5),
             'latency': -7
         },
         'MYD11A2': {
             'pattern': 'MYD11A2' + _asset_glob_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.006',
+            'documentation': 'https://lpdaac.usgs.gov/dataset_discovery/modis/modis_products_table/myd11a2_v006',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -7
         },
         'MOD10A2': {
             'pattern': 'MOD10A2' + _asset_glob_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A2.006/',
+            'documentation': 'https://nsidc.org/data/MOD10A2',
             'startdate': datetime.date(2000, 2, 24),
             'latency': -3
         },
         'MYD10A2': {
             'pattern': 'MYD10A2' + _asset_glob_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A2.006/',
+            'documentation': 'http://nsidc.org/data/MYD10A2',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
         'MCD12Q1': {
             'pattern': 'MCD12Q1' + _asset_glob_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
+            'documentation': 'https://lpdaac.usgs.gov/dataset_discovery/modis/modis_products_table/mcd12q1',
             'startdate': datetime.date(2002, 7, 4),
             'latency': -3
         },
@@ -307,21 +319,31 @@ class modisData(Data):
         'indices': {
             'description': 'Land indices',
             'assets': ['MCD43A4'],
-            'bands': ['ndvi', 'lswi', 'vari', 'brgt', 'satvi', 'evi'],
+            'bands': [
+                {'name': 'ndvi', 'units': 'dimensionless'},
+                {'name': 'lswi', 'units': 'dimensionless'},
+                {'name': 'vari', 'units': 'dimensionless'},
+                {'name': 'brgt', 'units': 'dimensionless'},
+                {'name': 'satvi', 'units': 'dimensionless'},
+                {'name': 'evi', 'units': 'dimensionless'}
+            ],
+            'category': 'Reflectance indices',
             'startdate': datetime.date(2000, 2, 18),
             'latency': 15
         },
         'quality': {
             'description': 'MCD Product Quality',
             'assets': ['MCD43A2'],
-            'bands': ['quality'],
+            'bands': [{'name': 'quality', 'units': 'none'}],
+            'category': 'Quality information',
             'startdate': datetime.date(2000, 2, 18),
             'latency': 15
         },
         'landcover': {
             'description': 'MCD Annual Land Cover',
             'assets': ['MCD12Q1'],
-            'bands': ['landcover'],
+            'bands': [{'name': 'landcover', 'units': 'none'}],
+            'category': '',
             'startdate': datetime.date(2002, 7, 4),
             'latency': 3
         },
@@ -329,14 +351,19 @@ class modisData(Data):
         'fsnow': {
             'description': 'Fractional snow cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
-            'bands': ['fractional-snow-cover'],
+            'bands': [{'name': 'fractional-snow-cover', 'units': 'fraction'}],
+            'category': 'Surface state',
             'startdate': datetime.date(2000, 2, 24),
             'latency': 3
         },
         'snow': {
             'description': 'Snow and ice cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
-            'bands': ['snow-cover', 'fractional-snow-cover'],
+            'bands': [
+                {'name': 'snow-cover', 'units': 'none'},
+                {'name': 'fractional-snow-cover', 'units': 'fraction'}
+            ],
+            'category': 'Surface state',
             'startdate': datetime.date(2000, 2, 24),
             'latency': 3
         },
@@ -344,12 +371,13 @@ class modisData(Data):
             'description': 'Surface temperature data',
             'assets': ['MOD11A1', 'MYD11A1'],
             'bands': [
-                'temperature-daytime-terra',
-                'temperature-nighttime-terra',
-                'temperature-daytime-aqua',
-                'temperature-nighttime-aqua',
-                'temperature-best-quality',
+                {'name': 'temperature-daytime-terra', 'units': 'degree Kelvin'},
+                {'name': 'temperature-nighttime-terra', 'units': 'degree Kelvin'},
+                {'name': 'temperature-daytime-aqua', 'units': 'degree Kelvin'},
+                {'name': 'temperature-nighttime-aqua', 'units': 'degree Kelvin'},
+                {'name': 'temperature-best-quality', 'units': 'degree Kelvin'}
             ],
+            'category': 'Surface characteristics',
             'startdate': datetime.date(2000, 3, 5),
             'latency': 1
         },
@@ -357,11 +385,12 @@ class modisData(Data):
             'description': 'MODIS Terra/Aqua overpass time',
             'assets': ['MOD11A1', 'MYD11A1'],
             'bands': [
-                'observation-time-daytime-terra',
-                'observation-time-nighttime-terra',
-                'observation-time-daytime-aqua',
-                'observation-time-nighttime-aqua'
+                {'name': 'observation-time-daytime-terra', 'units': 'hour'},
+                {'name': 'observation-time-nighttime-terra', 'units': 'hour'},
+                {'name': 'observation-time-daytime-aqua', 'units': 'hour'},
+                {'name': 'observation-time-nighttime-aqua', 'units': 'hour'}
             ],
+            'category': 'Observation characteristics',
             'startdate': datetime.date(2000, 3, 5),
             'latency': 1
         },
@@ -369,28 +398,35 @@ class modisData(Data):
         'ndvi8': {
             'description': 'Normalized Difference Vegetation Index: 250m',
             'assets': ['MOD09Q1'],
-            'bands': ['red', 'nir'],
+            'bands': [
+                {'name': 'red', 'units': 'dimensionless'},
+                {'name': 'nir', 'units': 'dimensionless'}
+            ],
+            'category': 'Reflectance indices',
             'startdate': datetime.date(2000, 2, 18),
             'latency': 7,
         },
         'temp8td': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
-            'bands': ['temp8td'],
+            'bands': [{'name': 'temp8td', 'units': 'degree Kelvin'}],
+            'category': 'Surface characteristics',
             'startdate': datetime.date(2000, 3, 5),
             'latency': 7
         },
         'temp8tn': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
-            'bands': ['temp8tn'],
+            'bands': [{'name': 'temp8tn', 'units': 'degree Kelvin'}],
+            'category': 'Surface characteristics',
             'startdate': datetime.date(2000, 3, 5),
             'latency': 7
         },
         'clouds': {
             'description': 'Cloud Mask',
             'assets': ['MOD10A1'],
-            'bands': ['cloud-cover'],
+            'bands': [{'name': 'cloud-cover', 'units': 'none'}],
+            'category': 'Atmosphere state',
             'startdate': datetime.date(2000, 2, 24),
             'latency': 3
         }
