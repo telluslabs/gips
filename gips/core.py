@@ -142,8 +142,11 @@ class SpatialExtent(object):
 
 
 class TemporalExtent(object):
-    """ Description of temporal extent """
+    """Two dates and a little method convenience, wrapped in a class.
 
+    The dates are represented internally by self.datebounds ==
+    (year1, year2) and self.daybounds == (day_of_year1, day_of_year2).
+    """
     def __init__(self, dates=None, days=None):
         """ Create temporal extent object from string input """
         if dates is None:
@@ -163,8 +166,6 @@ class TemporalExtent(object):
 
         self.datebounds = dates
         self.daybounds = days
-        self.datearray = []
-        #self.dates = [d for t in tiles for d in repo.find_dates(t) if datecheck(d) and daycheck(d)]
 
     def prune_dates(self, dates):
         """ Prune down given list of dates to those that meet temporal extent """
