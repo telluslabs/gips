@@ -1,5 +1,6 @@
 """GIPS scheduler API, for scheduling work and checking status of same."""
 
+import itertools
 from datetime import timedelta, datetime
 from pprint import pprint, pformat
 
@@ -165,6 +166,11 @@ def query_service(driver_name, spatial, temporal, products,
                (see gips.core.SpatialExtent.factory)
     temporal -- dictionary of TemporalExtent parameters ('dates', and 'days')
     products -- list of products which to query
+
+    Note that query_type and action may not be perfectly implemented,
+    and at present, are probably not called with anything other than the
+    defaults.
+
     query_type --
         + 'remote' get info for all remote items
         + 'missing' only get info for tile-dates that we don't have
@@ -273,24 +279,37 @@ def query_service(driver_name, spatial, temporal, products,
                         asset = dbinv.models.Asset(**params)
                         asset.save()
                 assets.append(asset)
-        if request_product:
-            params = {
-                'driver': driver_name, 'product': p,
-                'tile': t, 'date': d
-            }
-            with transaction.atomic():
-                try:
-                    product = dbinv.models.Product.objects.get(**params)
+
+    if request_product:
+        asset_status_picks = ('requested', 'scheduled', 'in-progress', 'retry', 'complete')
+        for (p, t) in itertools.product(products, tiles):
+            asset_types = datacls.products2assets([p])
+            all_dates = [datacls.Asset.dates(a, t, temporal_ext.datebounds, temporal_ext.daybounds)
+                            for a in asset_types]
+            # clunky syntax for set intersection of each item in all_dates
+            # Needed because products can only exist for dates on which all their asset
+            # dependencies also exist.
+            dates = set(all_dates[0]).intersection(*all_dates)
+            for d in dates:
+                with transaction.atomic():
+                    # first see if asset needs are satisfied/satisfyable
+                    relevant_assets = dbinv.models.Asset.objects.filter(
+                            asset__in=asset_types, driver=driver_name, tile=t, date=d)
+
+                    # only proceed if the prereqs are expected to be met
+                    if (len(asset_types)
+                            > relevant_assets.filter(status__in=asset_status_picks).count()):
+                        continue
+
+                    product, created = dbinv.models.Product.objects.get_or_create(
+                            driver=driver_name, product=p, tile=t, date=d)
                     if product.status not in ('scheduled', 'in-progress', 'complete'):
                         product.status = req_status
                         product.save()
-                except ObjectDoesNotExist:
-                    params['status'] = req_status
-                    product = dbinv.models.Product(**params)
-                    product.save()
-                    for asset in assets:
-                        dep = dbinv.models.AssetDependency(product=product, asset=asset)
-                        dep.save()
+                    if created: # new products need to have dependencies marked
+                        [dbinv.models.AssetDependency(product=product, asset=a).save()
+                            for a in relevant_assets]
+
     tstamps.append((time(), 'marked requested'))
     tprint(tstamps)
     return items
