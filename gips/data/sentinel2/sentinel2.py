@@ -222,7 +222,8 @@ class sentinel2Asset(Asset):
         # TODO when issue #131 comes around, this is the beginning of the 'query' step
         # search step:  locate the asset corresponding to (asset, tile, date)
         url_head = 'https://scihub.copernicus.eu/dhus/search?q='
-        url_tail = '&format=json'
+        #                vvvvvvvv--- sort by processing date so always get the newest one
+        url_tail = '&orderby=ingestiondate desc&format=json'
         if style == 'original':
             # compute the center coordinate of the tile
             tiles_shp_fn = cls.Repository.get_setting('tiles')
@@ -258,23 +259,23 @@ class sentinel2Asset(Asset):
             result_count = int(results['opensearch:totalResults'])
             if result_count == 0:
                 return # nothing found, a normal occurence for eg date range queries
-            if result_count > 1:
-                raise IOError(
-                        "Expected single result, but query returned {}.".format(result_count))
+            # unfortunately the data's structure varies with the result count
+            if result_count == 1:
+                entry = results['entry']
+            else: # result_count > 1
+                utils.verbose_out(
+                        "Query returned {} results; choosing the newest.".format(result_count))
+                entry = results['entry'][0]
 
-            entry = results['entry']
-            link = entry['link'][0]
-            if 'rel' in link: # sanity check - the right one doesn't have a 'rel' attrib
+            if 'rel' in entry['link'][0]: # sanity check - the right one doesn't have a 'rel' attrib
                 raise IOError("Unexpected 'rel' attribute in search link", link)
-            asset_url = link['href']
+            asset_url = entry['link'][0]['href']
             output_file_name = entry['title'] + '.zip'
 
         # old-style assets cover many tiles, so there may be duplication of effort; avoid that by
-        # aborting if the stage already contains content for the desired asset/tile/date:
-        ofn_glob = (tile.upper() + '_'
-                    + re.sub(r'_\w{4}_\d{8}T\d{6}_', r'_????_????????T??????_', output_file_name, 1))
-        stage_glob = os.path.join(cls.Repository.path('stage'), ofn_glob)
-        if len(glob.glob(stage_glob)) > 0:
+        # aborting if the stage already contains the desired asset
+        full_staged_path = os.path.join(cls.Repository.path('stage'), output_file_name)
+        if os.path.exists(full_staged_path):
             utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
                     output_file_name))
             return
@@ -299,13 +300,19 @@ class sentinel2Asset(Asset):
                 p.communicate()
                 if p.returncode != 0:
                     raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-                cls.stage_asset(style, output_full_path, output_file_name)
+                cls.stage_asset(output_full_path, output_file_name)
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
 
 
     @classmethod
     def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
+        """Archive original and new-style Sentinel-2 assets.
+
+        Original-style Sentinel-2 assets have special archiving needs
+        due to their multi-tile nature, so this method archives them
+        specially using hard links.
+        """
         if recursive:
             raise ValueError('Recursive asset search not supported by Sentinel-2 driver.')
 
@@ -318,7 +325,6 @@ class sentinel2Asset(Asset):
             with utils.error_handler('Error archiving asset', continuable=True):
                 bn = os.path.basename(fn)
                 for style, style_dict in cls._asset_styles.items():
-                    # TODO nothing seems to match here
                     match = re.match(style_dict['downloaded-name-re'], bn)
                     if match is not None:
                         found_files[style].append(fn) # save the found path, not the basename
@@ -345,7 +351,7 @@ class sentinel2Asset(Asset):
 
 
     @classmethod
-    def stage_asset(cls, style, asset_full_path, asset_base_name):
+    def stage_asset(cls, asset_full_path, asset_base_name):
         """Copy the given asset to the stage."""
         stage_path = cls.Repository.path('stage')
         stage_full_path = os.path.join(stage_path, asset_base_name)
