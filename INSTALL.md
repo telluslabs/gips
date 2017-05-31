@@ -23,7 +23,8 @@ virtualenv --system-site-packages dh_venv
 The GIPS datahandler is installed and configured using a convenience script named `install_datahandler.py`. A typical installation would use options such as the following:
 
 ```
-sudo python gips/install_datahandler.py --gips-version '.' --driver modis merra --earthdata-user $USER --earthdata-password $PASSWORD --install-pg --create-db --enable-cron --enable-daemons
+cd gips
+sudo ../dh_venv/bin/python install_datahandler.py --gips-version '.' --driver modis merra --earthdata-user $USER --earthdata-password $PASSWORD --install-pg --create-db --enable-cron --enable-daemons
 ```
 
   * `--gips-version '.'`: install the version currently in your cloned repository
