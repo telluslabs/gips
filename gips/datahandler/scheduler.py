@@ -175,7 +175,19 @@ def schedule_process ():
     prerequisite assets are in place.
     """
     orm.setup()
+    # fail any products with failed dependencies, otherwise they'd languish forever
+    with transaction.atomic():
+        # need distinct() because asset-product relation is many-to-many
+        doomed = dbinv.models.Product.objects.filter(
+                status='requested', assetdependency__asset__status='failed').distinct()
+        if doomed.exists():
+            Logger().log(
+                    "{} products failed due to failed asset dependencies".format(doomed.count()))
+            dbinv.models.update_status(doomed, 'failed')
+
     psfu = dbinv.models.Product.objects.select_for_update
+
+    # find products ready to run
     with transaction.atomic():
         products = psfu().filter(
             status='requested'
