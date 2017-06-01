@@ -11,7 +11,7 @@ from glob import glob
 from commands import getstatusoutput
 
 
-GIPS_VERSION = "bs-deploy-lxc-edit" # branch or tag to install from
+GIPS_VERSION = "291-missing-services" # branch or tag to install from
 
 LSB_INFO = lsb.get_lsb_information()
 
@@ -302,10 +302,10 @@ def main():
         PKGS += DH_TORQUE_PKGS
     else:
         raise Exception('Unknown task-queue specified "{}"'.format(task_queue))
-    
+
     if args['install_pg']:
         PKGS += PG_PKGS
-        
+
     install_system_requirements(PKGS)
 
     if args['create_db']:
