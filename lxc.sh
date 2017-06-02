@@ -11,6 +11,10 @@
 # endif
 # + restores the container to its `pipped` snapshot
 # +
+#
+# ARGUEMENTS
+# $1 -- a git branch or tag to install
+
 set -e
 CONT=dh
 SNAP=pipped
@@ -48,6 +52,10 @@ read -p "Enter your NASA EarthData password: " EDPASS
 echo ''
 create_or_reset_container
 lxc file push install_datahandler.py $CONT/root/
+EXTRA_ARGS=""
+if [ "${1}" ] ; then
+    EXTRA_ARGS="-G ${1} "
+fi
 lxc exec $CONT -- python /root/install_datahandler.py \
     --drivers modis merra \
     --earthdata-user $EDUSER \
@@ -55,4 +63,5 @@ lxc exec $CONT -- python /root/install_datahandler.py \
     --enable-cron \
     --install-pg \
     --create-db \
-    --enable-daemons
+    --enable-daemons \
+    ${EXTRA_ARGS}

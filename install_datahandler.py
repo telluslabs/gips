@@ -11,7 +11,7 @@ from glob import glob
 from commands import getstatusoutput
 
 
-GIPS_VERSION = "291-missing-services" # branch or tag to install from
+GIPS_VERSION = "datahandler" # branch or tag to install from
 
 LSB_INFO = lsb.get_lsb_information()
 
