@@ -85,8 +85,8 @@ setup(
     maintainer_email='icooke@ags.io',
     packages=find_packages(),
     package_data={
-        '': ['*.shp', '*.prj', '*.shx', '*.dbf']
-        'gips.datahandler': ['*.service.template',]
+        '': ['*.shp', '*.prj', '*.shx', '*.dbf'],
+        'gips.datahandler': ['*.service.template',],
     },
     install_requires=_lib_requirements,
     extras_require={
