@@ -84,18 +84,28 @@ def install_system_requirements(PKGS):
     '''
 
 
-def install_gips(gips_version=GIPS_VERSION, extras=()):
+def install_gips(gips_version=GIPS_VERSION, developer_install=False, extras=()):
+    repo_url = 'https://github.com/Applied-GeoSolutions/gips.git'
     if gips_version == '.':
-        base_url = gips_version
-        dev_opt = '-e'
+        url = gips_version
     else:
-        base_url = (
-            'git+https://github.com/Applied-GeoSolutions/gips.git@{ver}#egg={ver}'
-        ).format(ver=gips_version)
-        dev_opt = ''
-    url = base_url + '[{extras}]'.format(extras=','.join(extras))
+        url = (
+            'git+{repo}@{ver}#egg={ver}'
+        ).format(repo=repo_url, ver=gips_version)
+    cmd = ''
+    dev_opt = ''
+    if developer_install:
+        dev_opt = '-e'
+        if gips_version != '.':
+            cmd += (
+                'git clone {repo} ; '
+                'cd gips ; '
+                'git checkout {ver} ; '
+            ).format(repo=repo_url, ver=gips_version)
+            url = '.'
+    url += '[{extras}]'.format(extras=','.join(extras))
     print url
-    cmd = 'pip install --process-dependency-links {} {}'.format(dev_opt, url)
+    cmd += 'pip install --process-dependency-links {} {}'.format(dev_opt, url)
     print('running: ' + cmd)
     status, output = getstatusoutput(cmd)
     if status != 0:
@@ -283,19 +293,25 @@ def main():
     )
     p.add_argument(
         '--db-port', default='5432', help='database server TCP port.'
-    ) 
+    )
     p.add_argument(
         '--db-name', default='dhdb', help='Name of database on DB server.'
     )
     p.add_argument(
-	'--create-db', default=False, action='store_true',
-	help='Create a postgres database and configure user and privileges'
+        '--create-db', default=False, action='store_true',
+        help='Create a postgres database and configure user and privileges'
     )
     p.add_argument(
-        '--enable-cron', action='store_true', help='Insert entry for schedulure into crontab'
+        '--enable-cron', action='store_true',
+        help='Insert entry for schedulure into crontab'
     )
     p.add_argument(
-        '--enable-daemons', action='store_true', help='Setup and launch systemd controls for daemons'
+        '--enable-daemons', action='store_true',
+        help='Setup and launch systemd controls for daemons'
+    )
+    p.add_argument(
+        '--developer-install', action='store_true',
+        help='Install in develop mode',
     )
     args = vars(p.parse_args())
     PKGS = GIPPY_PKGS
