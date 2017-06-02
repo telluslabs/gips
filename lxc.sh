@@ -38,13 +38,13 @@ function create_or_reset_container() {
     fi
     if $(lxc list $CONT | grep STOPPED) ; then
         lxc start $CONT
-        sleep 1
+        sleep 5
     fi
 }
 
-read -sp "Enter your NASA EarthData username: " EDUSER
+read -p "Enter your NASA EarthData username: " EDUSER
 echo ''
-read -sp "Enter your NASA EarthData password: " EDPASS
+read -p "Enter your NASA EarthData password: " EDPASS
 echo ''
 create_or_reset_container
 lxc file push install_datahandler.py $CONT/root/
