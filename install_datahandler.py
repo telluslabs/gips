@@ -129,7 +129,10 @@ def setup_postgresql(db_host, db_name, db_user, db_password, **kwargs):
     )
     for cmd in [user_add, db_create, grant_priv]:
         print('running: ' + cmd)
+        prev_dir = os.path.abspath(os.curdir)
+        os.chdir('/')
         status, output = getstatusoutput(cmd)
+        os.chdir(prev_dir)
         if status != 0:
             raise Exception(output)
         print(output)
