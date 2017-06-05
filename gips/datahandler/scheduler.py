@@ -175,7 +175,20 @@ def schedule_process ():
     prerequisite assets are in place.
     """
     orm.setup()
+    # fail any products with failed dependencies; commented out while better solution is chosen
+    # details:  https://github.com/Applied-GeoSolutions/gips/pull/292
+    #with transaction.atomic():
+    #    # need distinct() because asset-product relation is many-to-many
+    #    doomed = dbinv.models.Product.objects.filter(
+    #            status='requested', assetdependency__asset__status='failed').distinct()
+    #    if doomed.exists():
+    #        Logger().log(
+    #                "{} products failed due to failed asset dependencies".format(doomed.count()))
+    #        dbinv.models.update_status(doomed, 'failed')
+
     psfu = dbinv.models.Product.objects.select_for_update
+
+    # find products ready to run
     with transaction.atomic():
         products = psfu().filter(
             status='requested'
@@ -216,6 +229,9 @@ def schedule_export_and_aggregate ():
     To be ready means that the task is unworked and its prerequisites
     are in place, in this case the products created by the processing
     step.
+
+    Also, because this is the best place to do it, fail jobs that have
+    any requisite assets or products failed.
     """
     orm.setup()
     # check if any in-progress jobs have finished fetch/process
@@ -223,18 +239,23 @@ def schedule_export_and_aggregate ():
         status='in-progress',
     )
     for job in jobs:
-        status = api.status_counts(
+        asset_status, product_status = api.status_counts(
             job.variable.driver.encode('ascii', 'ignore'),
             eval(job.spatial),
             eval(job.temporal),
+            assets=eval(job.variable.asset), # by convention a list
             products=[job.variable.product.encode('ascii', 'ignore')],
         )
-        if (
-                status['requested'] == 0
-                and status['scheduled'] == 0
-                and status['in-progress'] == 0
-                and status['retry'] == 0
-        ):
+        # Fail jobs if any of their assets or products have failed.
+        if (asset_status['failed'], product_status['failed']) != (0, 0):
+            job.status = 'failed'
+            job.save()
+            Logger().log('job {} failed due to {} failed assets and/or {} failed products'.format(
+                    job.pk, asset_status['failed'], product_status['failed']))
+            continue
+        # look for postprocessing-ready jobs, and if found, scehdule postprocessing
+        if [0, 0, 0, 0] == [product_status[k] for k in
+                ('requested', 'scheduled', 'in-progress', 'retry')]:
             Logger().log('job {} has finished fetch and process'.format(job.pk))
             # nothing being worked on. must be done pre-processing
             DataClass = utils.import_data_class(job.variable.driver.encode('ascii', 'ignore'))
