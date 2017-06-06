@@ -11,7 +11,7 @@ from glob import glob
 from commands import getstatusoutput
 
 
-GIPS_VERSION = "bs-deploy-lxc-edit" # branch or tag to install from
+GIPS_VERSION = "datahandler" # branch or tag to install from
 
 LSB_INFO = lsb.get_lsb_information()
 
@@ -129,7 +129,10 @@ def setup_postgresql(db_host, db_name, db_user, db_password, **kwargs):
     )
     for cmd in [user_add, db_create, grant_priv]:
         print('running: ' + cmd)
+        prev_dir = os.path.abspath(os.curdir)
+        os.chdir('/')
         status, output = getstatusoutput(cmd)
+        os.chdir(prev_dir)
         if status != 0:
             raise Exception(output)
         print(output)
@@ -302,10 +305,10 @@ def main():
         PKGS += DH_TORQUE_PKGS
     else:
         raise Exception('Unknown task-queue specified "{}"'.format(task_queue))
-    
+
     if args['install_pg']:
         PKGS += PG_PKGS
-        
+
     install_system_requirements(PKGS)
 
     if args['create_db']:
