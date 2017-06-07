@@ -93,7 +93,7 @@ setup(
         'full': _full_requirements,
         'orm': _orm_requirements,
         'dh-rq': _dh_requirements,
-        'th-torque': _orm_requirements,
+        'dh-torque': _orm_requirements,
     },
     dependency_links=[
         'http://github.com/ircwaves/landsat-util/tarball/landsat_util#egg=landsat-util-0.8.0ircwaves0',
