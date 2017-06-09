@@ -273,7 +273,7 @@ def import_data_class(clsname):
 ##############################################################################
 
 def open_vector(fname, key="", where=''):
-    """ Open vector or feature """
+    """Open vector or feature, returned as a gippy GeoVector or GeoFeature."""
     parts = fname.split(':')
     if len(parts) == 1:
         vector = GeoVector(fname)
@@ -289,11 +289,7 @@ def open_vector(fname, key="", where=''):
         vector.SetPrimaryKey(key)
     if where != '':
         # return array of features
-
-        # set_trace()
-
         return vector.where(where)
-        features = []
     else:
         return vector
 

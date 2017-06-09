@@ -62,6 +62,17 @@ class sentinel2Repository(Repository):
     # when looking at the tiles shapefile, what's the key to fetch a feature's tile ID?
     _tile_attribute = 'Name'
 
+    @classmethod
+    def tile_lat_lon(cls, tileid):
+        """Returns the coordinates of the given tile ID.
+
+        Uses the reference tile vectors provided with the driver.
+        Returns (x0, x1, y0, y1), which is
+        (west lon, east lon, south lat, north lat) in degrees.
+        """
+        e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[tileid].Extent()
+        return e.x0(), e.x1(), e.y0(), e.y1()
+
 
 class sentinel2Asset(Asset):
     Repository = sentinel2Repository
@@ -116,7 +127,6 @@ class sentinel2Asset(Asset):
         'L1C': {
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both original and shortened post-2016-12-07 assets.
-            # TODO test this line after assets are archived (ie during Asset.discover)
             'pattern': '*S2?_*MSIL1C_*????????T??????_*R???_*.zip',
             # TODO find real start date for S2 data:
             # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
@@ -157,14 +167,11 @@ class sentinel2Asset(Asset):
             'downloaded-name-re': _orig_name_re,
             'archived-name-re': '^' + _tile_re + '_' + _orig_name_re,
             # raster file pattern
+            # TODO '/.*/' can be misleading due to '/' satisfying '.', so rework into '/[^/]*/'
             'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B\d[\dA].jp2$',
-            # TODO
             ## internal metadata file patterns
-            #'datastrip-md-re': '^.*/DATASTRIP/.*/MTD_DS.xml$',
-            #'tile-md-re': '^.*/GRANULE/.*/MTD_TL.xml$',
-            ## Two files with asset-global metadata, this is one of them:
-            ## for INSPIRE.xml see http://inspire.ec.europa.eu/XML-Schemas/Data-Specifications/2892
-            #'inspire-md-re': '^.*/INSPIRE.xml$',
+            'datastrip-md-re': '^.*/DATASTRIP/.*/.*.xml$', # only XML file under DATASTRIP/
+            'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
         },
         _2016_12_07: {
             # post-2016 assets use their downloaded FN as their archived FN
@@ -201,12 +208,23 @@ class sentinel2Asset(Asset):
         if match is None:
             raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(base_filename))
         self.style = style
-        self.style_res = self._asset_styles[style]
         self.asset = 'L1C' # only supported asset type
         self.sensor = match.group('sensor')
         self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
         self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
+        self.set_style_res()
+
+
+    def set_style_res(self):
+        """Sets self.style_res dict."""
+        if self.style == self._2016_12_07:
+            self.style_res = self._asset_styles[self.style]
+            return
+        base_res = self._asset_styles[self.style]
+        self.style_res = base_res
+        self.style_res['tile-md-re'] = base_res['tile-md-re'].format(tileid=self.tile)
+        self.style_res['datastrip-md-re'] = base_res['datastrip-md-re'].format(tileid=self.tile)
 
 
     @classmethod
@@ -452,9 +470,10 @@ class sentinel2Asset(Asset):
     def tile_lat_lon(self):
         """Loads & returns boundaries for this asset's tile.
 
-        Taken from asset metadata; tuple is (w-lon, e-lon, s-lat, n-lat),
-        in degrees.  Structure for the lat/lons in INSPIRE.xml is, deep
-        in the file:
+        If the asset is old-style, it's taken from the tiles shapefile.
+        Otherwise, taken from asset metadata; tuple is (w-lon, e-lon,
+        s-lat, n-lat), in degrees.  Structure for the lat/lons in
+        INSPIRE.xml is, deep in the file:
             <gmd:EX_GeographicBoundingBox>
                 <gmd:westBoundLongitude>
                     <gco:Decimal>-71.46678204877877</gco:Decimal>
@@ -462,8 +481,8 @@ class sentinel2Asset(Asset):
                 . . . and so on for 3 more values . . .
             </gmd:EX_GeographicBoundingBox>
         """
-        # TODO this will have to be adapted for 'original' as the lat-lon can't be specific to a
-        # tile:
+        if self.style == 'original':
+            return self.Repository.tile_lat_lon(self.tile)
         gmd = '{http://www.isotc211.org/2005/gmd}' # xml namespace foolishness
         gco = '{http://www.isotc211.org/2005/gco}'
         gbb_elem = self.xml_subtree('inspire', gmd + 'EX_GeographicBoundingBox')
@@ -918,15 +937,15 @@ class sentinel2Data(Data):
 
         work = self.plan_work(products.requested.keys(), overwrite) # see if we can save any work
 
-        # TODO here down unsure if safe for 'original' style assets
-
         # only do the bits that need doing
         if 'ref-toa' in work:
             self.ref_toa_geoimage(sensor, data_spec)
         if 'rad-toa' in work:
             self.rad_toa_geoimage(asset_type, sensor)
+        # TODO waiting on aod
         if 'rad' in work:
             self.rad_geoimage()
+        # TODO waiting on aod
         if 'ref' in work:
             self.ref_geoimage(asset_type, sensor)
 
