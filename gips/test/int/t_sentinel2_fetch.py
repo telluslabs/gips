@@ -7,6 +7,8 @@ import subprocess
 
 import pytest
 
+from gips.inventory import dbinv
+from gips.inventory import orm
 from ...data.sentinel2 import sentinel2
 
 dt = datetime.datetime
@@ -229,23 +231,17 @@ def t_fetch_old_asset(fetch_mocks):
     Uses the test semi-real asset in data/ for this purpose.
     """
     # setup & mocks
-    expected_staged_bns = set([t + '_' + test_asset_bn for t in expected_tiles])
-    stage_path = sentinel2.sentinel2Repository.path('stage')
     # check for possible interference in the stage directory
-    obstacles = expected_staged_bns.intersection(set(os.listdir(stage_path)))
-    if len(obstacles) > 0:
-        raise IOError('Cannot run test:  {} items in the way: {}'.format(
-            len(obstacles), obstacles))
+    staged_fn = os.path.join(sentinel2.sentinel2Repository.path('stage'), test_asset_bn)
+    if os.path.lexists(staged_fn):
+        raise IOError('Cannot run test, item in the way: ' + staged_fn)
 
     # call, assertion, cleanup
     try:
         sentinel2.sentinel2Asset.fetch('L1C', '19TCH', dt(2016, 1, 19))
-        actual = set(os.listdir(stage_path))
-        assert expected_staged_bns.issubset(actual)
+        assert os.path.exists(staged_fn)
     finally:
-        for f in expected_staged_bns:
-            full_fn = os.path.join(stage_path, f)
-            os.path.exists(full_fn) and os.remove(full_fn)
+        os.path.exists(staged_fn) and os.remove(staged_fn)
 
 
 def t_fetch_old_asset_duplicate(fetch_mocks, mocker):
@@ -256,12 +252,10 @@ def t_fetch_old_asset_duplicate(fetch_mocks, mocker):
     purpose.
     """
     # setup & mocks
-    stage_path = sentinel2.sentinel2Repository.path('stage')
-    staged_bn = '19TCH_' + test_asset_bn
-    staged_fn = os.path.join(stage_path, staged_bn)
+    staged_fn = os.path.join(sentinel2.sentinel2Repository.path('stage'), test_asset_bn)
 
-    if os.path.exists(staged_fn):
-        raise IOError('Cannot run test:  item in the way: ' + staged_bn)
+    if os.path.lexists(staged_fn):
+        raise IOError('Cannot run test:  item in the way: ' + staged_fn)
     open(staged_fn, 'a').close() # python idiom for `touch`
 
     m_popen = fetch_mocks # for asserting 2nd call (download) was not made
@@ -292,52 +286,36 @@ def archive_setup(test_asset_fn):
     stage_path = sentinel2.sentinel2Repository.path('stage')
     tiles_path = sentinel2.sentinel2Repository.path('tiles')
 
-    staged_asset_bn = '19TCH_' + test_asset_bn
-
-    staged_asset_fn   = os.path.join(stage_path, staged_asset_bn)
-    archived_asset_fn = os.path.join(tiles_path, '19TCH', '2016019', staged_asset_bn)
+    staged_asset_fn   = os.path.join(stage_path, test_asset_bn)
+    archived_asset_fns = [
+            os.path.join(tiles_path, et, '2016019', et + '_' + test_asset_bn)
+            for et in expected_tiles]
 
     # do some pre-test checks
-    if os.path.exists(staged_asset_fn):
+    if os.path.lexists(staged_asset_fn):
         raise IOError('`{}` exists, aborting'.format(staged_asset_fn))
-    if os.path.exists(archived_asset_fn):
-        raise IOError('`{}` exists, aborting'.format(archived_asset_fn))
+    obstacles = [fn for fn in archived_asset_fns if os.path.lexists(fn)]
+    if len(obstacles) > 0:
+        raise IOError('{} files obstructing test, aborting'.format(len(obstacles)), obstacles)
 
     # finish setup by moving the asset into the stage
     shutil.copy(test_asset_fn, staged_asset_fn)
 
     # let the test run
     try:
-        yield (stage_path, staged_asset_fn, archived_asset_fn)
+        yield (stage_path, staged_asset_fn, archived_asset_fns)
     finally:
         # clean up by removing the asset from both the stage and the archive
         os.path.exists(staged_asset_fn) and os.remove(staged_asset_fn)
-        os.path.exists(archived_asset_fn) and os.remove(archived_asset_fn)
+        [os.path.exists(fn) and os.remove(fn) for fn in archived_asset_fns]
 
 
+@pytest.mark.django_db
 def t_archive_old_asset(archive_setup):
     """Confirm old-style assets archive properly."""
-    stage_path, staged_asset_fn, archived_asset_fn = archive_setup
+    stage_path, staged_asset_fn, archived_asset_fns = archive_setup
 
-    archived_assets = sentinel2.sentinel2Asset.archive(stage_path)
+    sentinel2.sentinel2Asset.archive(stage_path) # touches db if GIPS_ORM=true, hence django_db
 
-    assert os.path.exists(archived_asset_fn) and not os.path.exists(staged_asset_fn)
-
-
-def t_stage_asset_old_style(test_asset_fn):
-    """Confirm old-style assets are tile-exploded into stage/ properly."""
-    # setup
-    stage_path = sentinel2.sentinel2Repository.path('stage')
-    expected_files = [os.path.join(stage_path, t + '_' + test_asset_bn) for t in expected_tiles]
-    # safety check
-    extant_files = [ef for ef in expected_files if os.path.exists(ef)]
-    if len(extant_files) > 0:
-        raise IOError("Files exist, aborting: {}".format(extant_files))
-
-    try:
-        sentinel2.sentinel2Asset.stage_asset('original', test_asset_fn, test_asset_bn)
-        actual_files = [ef for ef in expected_files if os.path.exists(ef)]
-        assert expected_files == actual_files
-    finally:
-        # clean up in any case; this may break depending on what went wrong
-        [os.path.exists(ef) and os.remove(ef) for ef in expected_files]
+    assert (not os.path.exists(staged_asset_fn)
+            and all([os.path.exists(fn) for fn in archived_asset_fns]))
