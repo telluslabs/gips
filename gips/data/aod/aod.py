@@ -98,7 +98,7 @@ class aodAsset(Asset):
 
         bname = os.path.basename(filename)
         self.asset = bname[0:5]
-        self.tile = self._the_tile
+        self.tile = self.Repository._the_tile
         year = bname[10:14]
         doy = bname[14:17]
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
@@ -107,7 +107,9 @@ class aodAsset(Asset):
         # collection number is encoded in the filename as 005, 006, 051, or
         # 055.  So, we take it as a float, and then divide by the order of
         # magnitude to get the modis_collection number
-        self.modis_collection = collection_number / 10 ** numpy.floor(numpy.log10(cnum))
+        self.modis_collection = collection_number / 10 ** numpy.floor(
+            numpy.log10(collection_number)
+        )
         prefix = 'HDF4_EOS:EOS_GRID:"'
         sds = {
             5: 'Optical_Depth_Land_And_Ocean_Mean',
