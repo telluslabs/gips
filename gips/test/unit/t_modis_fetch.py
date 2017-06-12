@@ -178,7 +178,7 @@ def t_http_matching_listings(mocker, fetch_mocks, call, listing_url, listing_htm
     assert listing_url in get.call_args_list[0][0] and 2 == get.call_count
     listing.iter_lines.assert_called_once_with()
     # request assertions:  response = request.get(...) && response.iter_content()
-    get.assert_called_with(listing_url + '/' + asset_fn, auth=(user, passwd), timeout=30)
+    get.assert_called_with(listing_url + '/' + asset_fn, auth=(user, passwd), timeout=10)
     content.iter_content.assert_called_once_with()
     # file write assertions:  open(...) as fd && fd.write(...)
     assert open.call_args[0][0].endswith(asset_fn) # did we open the right filename?
@@ -189,7 +189,8 @@ def t_http_matching_listings(mocker, fetch_mocks, call, listing_url, listing_htm
 def t_auth_error(fetch_mocks, mocker, call, listing_url, listing_html, asset_fn):
     """Confirm auth failures are handled gracefully."""
     (get, listing, content, open, file) = fetch_mocks
-    print_mock = mocker.patch.object(modis, 'print') # to confirm user notification is produced
+    # to confirm user notification is produced
+    m_verbose_out = mocker.patch.object(modis.utils, 'verbose_out')
 
     listing.iter_lines.return_value = listing_html
 
@@ -201,7 +202,7 @@ def t_auth_error(fetch_mocks, mocker, call, listing_url, listing_html, asset_fn)
 
     assert all([
         not open.called, # Confirm short-circuiting by showing open was never called
-        print_mock.call_count == 1,
+        m_verbose_out.call_count == 1,
         # making sure the errors go to stderr important; precise wording probably isn't
-        print_mock.mock_calls[0][-1] == dict(file=sys.stderr),
+        m_verbose_out.call_args[0][-1] == sys.stderr,
     ])

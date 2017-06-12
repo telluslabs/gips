@@ -10,28 +10,31 @@ logger = logging.getLogger(__name__)
 pytestmark = sys  # skip everything unless --sys
 
 # changing this will require changes in expected/
-driver = 'merra'
+driver = 'aod'
 STD_TILE = 'h01v01'
-STD_DATES = '2015-135'
-STD_ARGS = (driver, '-s', NH_SHP_PATH, '-d', STD_DATES, '-v', '4')
+STD_DATES = '2017-004,2017-006'
+STD_ARGS = (driver, '-s', NE_SHP_PATH, '-d', STD_DATES, '-v', '4', '-p', 'aod' )
 
 
 @pytest.fixture
-def setup_merra_data(pytestconfig):
-    """Use gips_inventory to ensure presence of MERRA2 data in the data repo."""
+def setup_driver_data(pytestconfig):
+    """
+    Use gips_inventory to ensure presence of driver data in the data repo.
+    """
     if not pytestconfig.getoption('setup_repo'):
         logger.debug("Skipping repo setup per lack of option.")
         return
-    logger.info("Downloading MERRA data . . .")
+    logger.info("Downloading {} data . . .".format(driver.upper()))
     cmd_str = 'gips_inventory ' + ' '.join(STD_ARGS) + ' --fetch'
     outcome = envoy.run(cmd_str)
-    logger.info("MERRA data download complete.")
+    logger.info("{} data download complete.".format(driver.upper()))
     if outcome.status_code != 0:
-        raise RuntimeError("merra data setup via `gips_inventory` failed",
+        raise RuntimeError("{} data setup via `gips_inventory` failed"
+                           .format(driver),
                            outcome.std_out, outcome.std_err, outcome)
 
 
-setup_fixture = setup_merra_data
+setup_fixture = setup_driver_data
 
 # ###   SHOULD BE STANDARD BELOW HERE #####
 
@@ -48,8 +51,7 @@ def t_process(setup_fixture, repo_env, expected):
     """Test gips_process on {} data.""".format(driver)
     process_actual = repo_env.run('gips_process', *STD_ARGS)
     inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
-    assert expected == process_actual
-    assert inventory_actual.std_out == expected._inv_stdout
+    assert expected == process_actual and inventory_actual.std_out == expected._inv_stdout
 
 
 def t_info(repo_env, expected):
