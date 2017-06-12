@@ -42,8 +42,6 @@ from gips.data.core import Repository, Asset, Data
 from gips.utils import basename, open_vector
 from gips import utils
 
-from pdb import set_trace
-
 
 class Timeout():
     """Timeout class using ALARM signal."""
@@ -253,7 +251,7 @@ class merraAsset(Asset):
                     text = ''
                     if e.message.endswith('Unknown file format'):
                         token = 'Authorize NASA GESDISC DATA ARCHIVE'
-                        html = open(filename, 'r').read(100000)
+                        html = open(tmp_outpath, 'r').read(100000)
                         if token in html:
                             text = ('\n\nYou need to {t} \nfor your NASA '
                                     'EarthData login.\n').format(t=token)
@@ -500,8 +498,8 @@ class merraData(Data):
                 self.write_reduced(val[0], fun, fout, meta, units)
 
             elif val[0] == "prcp":
-                # TODO: check this units conversion from (kg m-2 s-1) to (mm d-1)
-                fun = lambda x: x.mean(axis=0)*36.*24.*1000.
+                # conversion from (kg m-2 s-1) to (mm d-1)
+                fun = lambda x: x.mean(axis=0)*36.*24.*100.
                 units = "mm d-1"
                 self.write_reduced(val[0], fun, fout, meta, units)
 
