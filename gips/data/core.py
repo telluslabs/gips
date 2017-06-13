@@ -27,6 +27,7 @@ import errno
 from osgeo import gdal, ogr
 from datetime import datetime
 import glob
+import re
 from itertools import groupby
 from shapely.wkt import loads
 import tarfile
@@ -184,10 +185,9 @@ class Asset(object):
         '': {'description': ''},
     }
     # dictionary of assets
-    # TODO - support regular expressions for patterns
     _assets = {
         '': {
-            'pattern': '*',
+            'pattern': r'.*',
         }
     }
 
@@ -309,7 +309,12 @@ class Asset(object):
             assets = cls._assets.keys()
         found = []
         for a in assets:
-            files = glob.glob(os.path.join(tpath, cls._assets[a]['pattern']))
+            if os.path.isdir(tpath):
+                pattern_re = re.compile(cls._assets[a]['pattern'])
+                print os.listdir(tpath)
+                files = [os.path.join(tpath, f) for f in os.listdir(tpath) if os.path.isfile(os.path.join(tpath, f)) and pattern_re.match(f)]
+            else:
+                files = []
             # more than 1 asset??
             if len(files) > 1:
                 VerboseOut(files, 2)
@@ -399,10 +404,14 @@ class Asset(object):
         if recursive:
             for root, subdirs, files in os.walk(path):
                 for a in cls._assets.values():
-                    fnames.extend(glob.glob(os.path.join(root, a['pattern'])))
+                    pattern_re = re.compile(a['pattern'])
+                    files = [os.path.join(path, f) for f in os.listdir(root) if os.path.isfile(os.path.join(path, f)) and pattern_re.match(f)]
+                    fnames.extend(files)
         else:
             for a in cls._assets.values():
-                fnames.extend(glob.glob(os.path.join(path, a['pattern'])))
+                pattern_re = re.compile(a['pattern'])
+                files = [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and pattern_re.match(f)]
+                fnames.extend(files)
         numlinks = 0
         numfiles = 0
         assets = []
