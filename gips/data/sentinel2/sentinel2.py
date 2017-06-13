@@ -32,6 +32,7 @@ import subprocess
 import json
 import tempfile
 import zipfile
+import copy
 from xml.etree import ElementTree, cElementTree
 
 import numpy
@@ -121,7 +122,8 @@ class sentinel2Asset(Asset):
             # landsat version: ['COASTAL', 'BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'CIRRUS'],
         },
     }
-    _sensors['S2B'] = {'description': 'Sentinel-2, Satellite B'}
+    _sensors['S2B'] = copy.deepcopy(_sensors['S2A'])
+    _sensors['S2B']['description'] = 'Sentinel-2, Satellite B'
 
     _assets = {
         'L1C': {
