@@ -228,8 +228,20 @@ class sentinel2Asset(Asset):
 
 
     @classmethod
-    def fetch(cls, asset, tile, date):
-        """Fetch the asset corresponding to the given asset type, tile, and date."""
+    def query_service(cls, asset, tile, date):
+        """Compatibility method; not used by fetch."""
+        bn, url = cls.query_provider(asset, tile, date)
+        return [{'basename': bn, 'url': url}]
+
+
+    @classmethod
+    def query_provider(cls, asset, tile, date):
+        """Search for a matching asset in the Sentinel-2 servers.
+
+        Uses the given (asset, tile, date) tuple as a search key, and
+        returns a tuple (base-filename-of-asset, url-for-fetching).  If
+        no assets were found, returns (None, None).
+        """
         # set up fetch params
         year, month, day = date.timetuple()[:3]
         username = cls.Repository.get_setting('username')
@@ -237,7 +249,6 @@ class sentinel2Asset(Asset):
 
         style = 'original' if date < cls._2016_12_07 else cls._2016_12_07
 
-        # TODO when issue #131 comes around, this is the beginning of the 'query' step
         # search step:  locate the asset corresponding to (asset, tile, date)
         url_head = 'https://scihub.copernicus.eu/dhus/search?q='
         #                vvvvvvvv--- sort by processing date so always get the newest one
@@ -276,7 +287,7 @@ class sentinel2Asset(Asset):
 
             result_count = int(results['opensearch:totalResults'])
             if result_count == 0:
-                return # nothing found, a normal occurence for eg date range queries
+                return None, None # nothing found, a normal occurence for eg date range queries
             # unfortunately the data's structure varies with the result count
             if result_count == 1:
                 entry = results['entry']
@@ -296,9 +307,18 @@ class sentinel2Asset(Asset):
         if os.path.exists(full_staged_path):
             utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
                     output_file_name))
-            return
+            return None, None
+        return output_file_name, asset_url
 
-        # TODO when issue #131 comes around, this is the beginning of the 'download' step
+
+    @classmethod
+    def fetch(cls, asset, tile, date):
+        """Fetch the asset corresponding to the given asset type, tile, and date."""
+        output_file_name, asset_url = cls.query_provider(asset, tile, date)
+        if (output_file_name, asset_url) == (None, None):
+            return # nothing found
+        username = cls.Repository.get_setting('username')
+        password = cls.Repository.get_setting('password')
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage
         # if the download is successful (this is necessary to avoid a race condition between
         # archive actions and fetch actions by concurrent processes)
