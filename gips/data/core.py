@@ -311,7 +311,10 @@ class Asset(object):
         for a in assets:
             if os.path.isdir(tpath):
                 pattern_re = re.compile(cls._assets[a]['pattern'])
-                files = [os.path.join(tpath, f) for f in os.listdir(tpath) if os.path.isfile(os.path.join(tpath, f)) and pattern_re.match(f)]
+                files = [os.path.join(tpath, f)
+                         for f in os.listdir(tpath)
+                         if os.path.isfile(os.path.join(tpath, f))
+                            and pattern_re.match(f)]
             else:
                 files = []
             # more than 1 asset??
