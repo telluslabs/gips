@@ -94,7 +94,10 @@ class sentinel2Asset(Asset):
             # 'pattern' is used for searching the repository of locally-managed assets
             #                      sense datetime              tile
             #                     (YYYYMMDDTHHMMSS)            (MGRS)
-            'pattern': 'S2?_MSIL1C_????????T??????_N????_R???_T?????_*.zip',
+            #'pattern': 'S2?_MSIL1C_????????T??????_N????_R???_T?????_*.zip',
+            'pattern': ('^(?P<sensor>S2[AB])_MSIL1C_' # sensor
+                        '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)T\d{6}' # year, month, day
+                        '_N\d{4}_R\d\d\d_T(?P<tile>\d\d[A-Z]{3})_\d{8}T\d{6}.zip$'),
             # used by fetch() to search for assets
             # TODO add filename pattern to end of this string?
             'url': 'https://scihub.copernicus.eu/dhus/search?q=filename:',
@@ -153,7 +156,7 @@ class sentinel2Asset(Asset):
             p = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             (stdout_data, stderr_data) = p.communicate()
             if p.returncode != 0:
-                verbose_out(stderr_data, stream=sys.stderr)
+                utils.verbose_out(stderr_data, stream=sys.stderr)
                 raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
             results = json.loads(stdout_data)['feed'] # always top-level key
 
