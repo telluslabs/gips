@@ -187,7 +187,7 @@ class Asset(object):
     # dictionary of assets
     _assets = {
         '': {
-            'pattern': r'.*',
+            'pattern': r'.+',
         }
     }
 
@@ -311,7 +311,6 @@ class Asset(object):
         for a in assets:
             if os.path.isdir(tpath):
                 pattern_re = re.compile(cls._assets[a]['pattern'])
-                print os.listdir(tpath)
                 files = [os.path.join(tpath, f) for f in os.listdir(tpath) if os.path.isfile(os.path.join(tpath, f)) and pattern_re.match(f)]
             else:
                 files = []

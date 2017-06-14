@@ -137,7 +137,7 @@ class merraAsset(Asset):
             'description': '2d, constants V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980',
             'pattern': r'MERRA2_\d\d\d\.const_2d_asm_Nx\.\d{4}\d{2}\d{2}\.nc4',
-            're_pattern': _asset_re_pattern.format(name='const_tavg1_2d_asm_Nx'),
+            're_pattern': _asset_re_pattern.format(name='const_2d_asm_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': None,
         }
