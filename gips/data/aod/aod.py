@@ -81,7 +81,7 @@ class aodAsset(Asset):
     }
     _assets = {
         'MOD08': {
-            'pattern': 'MOD08_D3*hdf',
+            'pattern': r'MOD08_D3.+?hdf',
             'startdate': datetime.date(2000, 2, 18),
             'url': 'ladsweb.nascom.nasa.gov/allData/6/MOD08_D3',
             'latency': -7,
