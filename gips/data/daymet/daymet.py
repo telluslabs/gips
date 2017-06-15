@@ -79,7 +79,7 @@ class daymetAsset(Asset):
     _assets = {
         'tmin': {
             'description': 'Daily minimum air temperature (C)',
-            'pattern': 'daymet_tmin_*_???????.tif',
+            'pattern': r'daymet_tmin_.+?_.{7}\.tif',
             'source': 'tmin.nc',
             'url': _url,
             'startdate': _startdate,
@@ -87,7 +87,7 @@ class daymetAsset(Asset):
         },
         'tmax': {
             'description': 'Daily maximum air temperature (C)',
-            'pattern': 'daymet_tmax_*_???????.tif',
+            'pattern': r'daymet_tmax_.+?_.{7}\.tif',
             'source': 'tmax.nc',
             'url': _url,
             'startdate': _startdate,
@@ -95,7 +95,7 @@ class daymetAsset(Asset):
         },
         'prcp': {
             'description': 'Daily precipitation (mm)',
-            'pattern': 'daymet_prcp_*_???????.tif',
+            'pattern': r'daymet_prcp_.+?_.{7}\.tif',
             'source': 'prcp.nc',
             'url': _url,
             'startdate': _startdate,
@@ -103,7 +103,7 @@ class daymetAsset(Asset):
         },
         'srad': {
             'description': 'Daily solar radiation (W m-2)',
-            'pattern': 'daymet_srad_*_???????.tif',
+            'pattern': r'daymet_srad_.+?_.{7}\.tif',
             'source': 'srad.nc',
             'url': _url,
             'startdate': _startdate,
@@ -111,7 +111,7 @@ class daymetAsset(Asset):
         },
         'vp': {
             'description': 'Daily vapor pressure (Pa)',
-            'pattern': 'daymet_vp_*_???????.tif',
+            'pattern': r'daymet_vp_.+?_.{7}\.tif',
             'source': 'vp.nc',
             'url': _url,
             'startdate': _startdate,
