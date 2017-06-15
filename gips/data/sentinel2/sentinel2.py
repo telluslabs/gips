@@ -214,18 +214,19 @@ class sentinel2Asset(Asset):
         self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
         self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
-        self.set_style_res()
+        self.set_style_regular_expressions()
 
 
-    def set_style_res(self):
-        """Sets self.style_res dict."""
-        if self.style == self._2016_12_07:
-            self.style_res = self._asset_styles[self.style]
-            return
-        base_res = self._asset_styles[self.style]
-        self.style_res = base_res
-        self.style_res['tile-md-re'] = base_res['tile-md-re'].format(tileid=self.tile)
-        self.style_res['datastrip-md-re'] = base_res['datastrip-md-re'].format(tileid=self.tile)
+    def set_style_regular_expressions(self):
+        """Sets self.style_res dict.
+
+        This lets the asset object locate internal metadata by setting
+        patterns appropriate for the asset's style.
+        """
+        sr = self.style_res = copy.deepcopy(self._asset_styles[self.style])
+        if self.style == 'original':
+            self.style_res['tile-md-re'] = sr['tile-md-re'].format(tileid=self.tile)
+            self.style_res['datastrip-md-re'] = sr['datastrip-md-re'].format(tileid=self.tile)
 
 
     @classmethod
