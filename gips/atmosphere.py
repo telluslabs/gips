@@ -51,17 +51,6 @@ from Py6S import SixS, Geometry, AeroProfile, Altitudes, Wavelength, \
     GroundReflectance, AtmosCorr, SixSHelpers
 
 
-def confirm_no_orm():
-    """Raise an exception if ORM-mode is selected during atmo correction.
-
-    This is needed because AOD is not compatible with ORM-mode.
-    """
-    if orm.use_orm():
-        msg = ("Inventory database does not support aod.  "
-               "Set GIPS_ORM=false to use the filesystem inventory instead.")
-        raise RuntimeError(msg)
-
-
 class AtmCorrException(Exception):
     """ Error thrown if failed atmospheric correction """
     pass
@@ -221,7 +210,6 @@ class SIXS():
 
     def __init__(self, bandnums, wavelengths, geometry, date_time, sensor=None):
         """ Run SixS atmospheric model using Py6S """
-        confirm_no_orm()
         start = datetime.datetime.now()
         VerboseOut('Running atmospheric model (6S)', 2)
 
@@ -296,7 +284,6 @@ class MODTRAN():
     _datadir = '/usr/local/modtran/DATA'
 
     def __init__(self, bandnum, wvlen1, wvlen2, dtime, lat, lon, profile=False):
-        confirm_no_orm()
         self.lat = lat
         self.lon = lon
         self.datetime = dtime
