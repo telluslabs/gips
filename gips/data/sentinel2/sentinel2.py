@@ -964,10 +964,8 @@ class sentinel2Data(Data):
             self.ref_toa_geoimage(sensor, data_spec)
         if 'rad-toa' in work:
             self.rad_toa_geoimage(asset_type, sensor)
-        # TODO waiting on aod
         if 'rad' in work:
             self.rad_geoimage()
-        # TODO waiting on aod
         if 'ref' in work:
             self.ref_geoimage(asset_type, sensor)
 
