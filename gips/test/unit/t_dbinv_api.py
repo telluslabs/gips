@@ -12,7 +12,7 @@ from gips.inventory.dbinv import (rectify_assets, rectify_products, list_tiles, 
 from gips.inventory import dbinv
 from gips.data.modis import modisAsset, modisData
 
-
+@pytest.mark.skip("needs to be rewritten post issue 297")
 @pytest.mark.django_db
 def t_rectify_assets(mocker):
     # construct plausible file listing & mock it into glob outcome
