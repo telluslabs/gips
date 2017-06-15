@@ -305,20 +305,15 @@ class Asset(object):
 
         # The rest of this fn uses the filesystem inventory
         tpath = cls.Repository.data_path(tile, date)
+        if not os.path.isdir(tpath):
+            return []
         if asset is not None:
             assets = [asset]
         else:
             assets = cls._assets.keys()
         found = []
         for a in assets:
-            if os.path.isdir(tpath):
-                pattern_re = re.compile(cls._assets[a]['pattern'])
-                files = [os.path.join(tpath, f)
-                         for f in os.listdir(tpath)
-                         if os.path.isfile(os.path.join(tpath, f))
-                            and pattern_re.match(f)]
-            else:
-                files = []
+            files = utils.find_files(cls._assets[a]['pattern'], tpath)
             # more than 1 asset??
             if len(files) > 1:
                 VerboseOut(files, 2)
@@ -419,13 +414,11 @@ class Asset(object):
         elif recursive:
             for root, subdirs, files in os.walk(path):
                 for a in cls._assets.values():
-                    pattern_re = re.compile(a['pattern'])
-                    files = [os.path.join(path, f) for f in os.listdir(root) if os.path.isfile(os.path.join(path, f)) and pattern_re.match(f)]
+                    files = utils.find_files(a['pattern'], path)
                     fnames.extend(files)
         else:
             for a in cls._assets.values():
-                pattern_re = re.compile(a['pattern'])
-                files = [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and pattern_re.match(f)]
+                files = utils.find_files(a['pattern'], path)
                 fnames.extend(files)
         numlinks = 0
         numfiles = 0

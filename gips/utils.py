@@ -25,6 +25,7 @@ from __future__ import print_function
 import imp
 import sys
 import os
+import re
 import errno
 from contextlib import contextmanager
 import tempfile
@@ -87,6 +88,7 @@ VerboseOut = verbose_out # VerboseOut name is deprecated
 ##############################################################################
 
 def File2List(filename):
+    """Return contents of file as a list of lines, sans newlines."""
     f = open(filename)
     txt = f.readlines()
     txt2 = []
@@ -96,6 +98,10 @@ def File2List(filename):
 
 
 def List2File(lst, filename):
+    """Overwrite the given file with the contents of the list.
+
+    Each item in the list is given a trailing newline.
+    """
     f = open(filename, 'w')
     f.write('\n'.join(lst) + '\n')
     f.close()
@@ -156,6 +162,17 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
         yield absolute_pathname
     finally:
         shutil.rmtree(absolute_pathname)
+
+
+def find_files(regex, path='.'):
+    """Find filenames in the given directory that match the regex.
+
+    Returns a list of matching filenames; each includes the given path.
+    Only regular files and symbolic links to regular files are returned.
+    """
+    compiled_re = re.compile(regex)
+    return [os.path.join(path, f) for f in os.listdir(path)
+            if os.path.isfile(os.path.join(path, f)) and compiled_re.match(f)]
 
 
 ##############################################################################

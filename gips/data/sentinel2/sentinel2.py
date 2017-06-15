@@ -27,7 +27,6 @@ import sys
 import datetime
 import shlex
 import re
-import glob
 import subprocess
 import json
 import tempfile
@@ -361,7 +360,7 @@ class sentinel2Asset(Asset):
             cls._2016_12_07: [],
         }
 
-        for fn in glob.glob(os.path.join(path, cls._assets['L1C']['pattern'])):
+        for fn in utils.find_files(cls._assets['L1C']['pattern'], path):
             with utils.error_handler('Error archiving asset', continuable=True):
                 bn = os.path.basename(fn)
                 for style, style_dict in cls._asset_styles.items():
