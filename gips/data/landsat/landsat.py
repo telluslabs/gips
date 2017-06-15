@@ -27,7 +27,6 @@ import re
 from datetime import datetime
 import shutil
 import glob
-from fnmatch import fnmatchcase
 import traceback
 from copy import deepcopy
 import commands
@@ -150,10 +149,10 @@ class landsatAsset(Asset):
     # TODO - consider assets and sensors relationship ?
     _assets = {
         'DN': {
-            'pattern': 'L' + (20 * '?') + '.tar.gz',
+            'pattern': r'L[A-Z]\d\d{3}\d{3}\d{4}\d{3}[A-Z]{3}\d{2}\.tar\.gz',
         },
         'SR': {
-            'pattern': 'L*-SC*.tar.gz',
+            'pattern': r'L.*?-SC.*?\.tar\.gz',
         }
     }
 
@@ -172,12 +171,15 @@ class landsatAsset(Asset):
         doy = fname[13:16]
         self.date = datetime.strptime(year + doy, "%Y%j")
 
-        if fnmatchcase(fname, self._assets['SR']['pattern']):
+        sr_pattern_re = re.compile(self._assets['SR']['pattern'])
+        dn_pattern_re = re.compile(self._assets['DN']['pattern'])
+
+        if sr_pattern_re.match(fname):
             VerboseOut('SR asset', 2)
             self.asset = 'SR'
             self.sensor = 'LC8SR'
             self.version = int(fname[20:22])
-        elif fnmatchcase(fname, self._assets['DN']['pattern']):
+        elif dn_pattern_re.match(fname):
             VerboseOut('DN asset', 2)
             self.asset = 'DN'
             self.sensor = fname[0:3]

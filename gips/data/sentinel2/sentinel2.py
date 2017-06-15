@@ -129,7 +129,7 @@ class sentinel2Asset(Asset):
         'L1C': {
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both original and shortened post-2016-12-07 assets.
-            'pattern': '*S2?_*MSIL1C_*????????T??????_*R???_*.zip',
+            'pattern': '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*\.zip',
             # TODO find real start date for S2 data:
             # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
             # (change to orderby=ingestiondate%20desc if needed)
@@ -283,7 +283,7 @@ class sentinel2Asset(Asset):
             p = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
             (stdout_data, stderr_data) = p.communicate()
             if p.returncode != 0:
-                verbose_out(stderr_data, stream=sys.stderr)
+                utils.verbose_out(stderr_data, stream=sys.stderr)
                 raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
             results = json.loads(stdout_data)['feed'] # always top-level key
 
