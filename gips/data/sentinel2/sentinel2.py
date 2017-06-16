@@ -128,7 +128,7 @@ class sentinel2Asset(Asset):
         'L1C': {
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both original and shortened post-2016-12-07 assets.
-            'pattern': '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*\.zip',
+            'pattern': '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*\.zip$',
             # TODO find real start date for S2 data:
             # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
             # (change to orderby=ingestiondate%20desc if needed)
@@ -199,7 +199,8 @@ class sentinel2Asset(Asset):
         https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
         """
         super(sentinel2Asset, self).__init__(filename)
-        zipfile.ZipFile(filename) # sanity check; exception if file isn't a valid zip
+        with utils.error_handler("Error opening asset '({})'".format(filename)):
+            zipfile.ZipFile(filename) # sanity check; exception if file isn't a valid zip
         base_filename = os.path.basename(filename)
 
         for style, style_dict in self._asset_styles.items():
@@ -884,6 +885,7 @@ class sentinel2Data(Data):
         if len(indices) == 0:
             return
 
+        import pdb; pdb.set_trace()
         self._time_report('Starting indices processing for: {}'.format(indices.keys()))
 
         metadata = self.meta_dict()
