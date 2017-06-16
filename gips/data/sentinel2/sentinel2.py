@@ -257,13 +257,8 @@ class sentinel2Asset(Asset):
         url_tail = '&orderby=ingestiondate desc&format=json'
         if style == 'original':
             # compute the center coordinate of the tile
-            tiles_shp_fn = cls.Repository.get_setting('tiles')
-            key = cls.Repository._tile_attribute
-            vector = utils.open_vector(tiles_shp_fn, key) # type is gippy GeoFeature
-            feature = vector[tile] # type is gippy GeoFeature
-            extent = feature.Extent()
-            lon = (extent.x0() + extent.x1())/2
-            lat = (extent.y0() + extent.y1())/2
+            x0, x1, y0, y1 = cls.Repository.tile_lat_lon(tile)
+            lat, lon = (y0 + y1)/2, (x0 + x1)/2
             #                                                  year mon  day
             url_search_string = ('filename:S2?_OPER_PRD_MSIL1C_*_{}{:02}{:02}T??????.SAFE'
                                  '%20AND%20footprint:%22Intersects({},%20{})%22') # <-- lat/lon
