@@ -549,7 +549,8 @@ class Data(object):
         """ Process composite products using provided inventory """
         pass
 
-    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False, overwrite=False, tree=False):
+    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False,
+             overwrite=False, tree=False):
         """ Copy products to new directory, warp to projection if given site.
 
         Arguments
@@ -755,9 +756,6 @@ class Data(object):
             dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
                                         tile=self.id, date=self.date, name=filename)
 
-
-
-
     def asset_filenames(self, product):
         assets = self._products[product]['assets']
         filenames = []
@@ -861,7 +859,8 @@ class Data(object):
         """ Return list of inventories (size 1 if not looping through geometries) """
         from gips.inventory import DataInventory
         from gips.core import SpatialExtent, TemporalExtent
-        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles, pcov=pcov, ptile=ptile)
+        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles,
+                                        pcov=pcov, ptile=ptile)
         temporal = TemporalExtent(dates, days)
         return DataInventory(cls, spatial[0], temporal, **kwargs)
 
@@ -944,3 +943,12 @@ class Data(object):
             print "  Optional qualifiers listed below each product."
             print "  Specify by appending '-option' to product (e.g., ref-toa)"
         sys.stdout.write(txt)
+
+    def make_temp_proc_dir(self):
+        """Make a temporary directory in which to perform gips processing.
+
+        Returns a context manager that governs the newly-made directory,
+        which is deleted on exiting the context. It is created in the
+        driver's stage directory, and has a random name.
+        """
+        return utils.make_temp_dir(prefix='proc', dir=self.Repository.path('stage'))
