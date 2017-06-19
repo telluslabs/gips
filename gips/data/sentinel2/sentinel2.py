@@ -885,7 +885,6 @@ class sentinel2Data(Data):
         if len(indices) == 0:
             return
 
-        import pdb; pdb.set_trace()
         self._time_report('Starting indices processing for: {}'.format(indices.keys()))
 
         metadata = self.meta_dict()
