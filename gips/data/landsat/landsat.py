@@ -149,11 +149,25 @@ class landsatAsset(Asset):
     # TODO - consider assets and sensors relationship ?
     _assets = {
         'DN': {
-            'pattern': r'L[A-Z]\d\d{3}\d{3}\d{4}\d{3}[A-Z]{3}\d{2}\.tar\.gz',
+            'pattern': (
+                r'L(?P<sensor>[A-Z])(?P<satellie>\d)'
+                r'(?P<path>\d{3})(?P<row>\d{3})'
+                r'(?P<acq_year>\d{4})(?P<acq_day>\d{3})'
+                r'(?P<gsi>[A-Z]{3})(?P<version>\d{2})\.tar\.gz'
+            ),
         },
         'SR': {
             'pattern': r'L.*?-SC.*?\.tar\.gz',
-        }
+        },
+        'C1': {
+            'pattern': (
+                r'L(?P<sensor>\w)(?P<satellite>\d{2})_'
+                r'(?P<correction_level>.{4})_(?P<path>\d{3})(?P<row>\d{3})_'
+                r'(?P<acq_year>\d{4})(?P<acq_month>\d{2})(?P<acq_day>\d{2})_'
+                r'(?P<proc_year>\d{4})(?P<proc_month>\d{2})(?P<proc_day>\d{2})_'
+                r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})\.tar\.gz'
+            ),
+        },
     }
 
     _defaultresolution = [30.0, 30.0]
@@ -166,25 +180,58 @@ class landsatAsset(Asset):
 
         VerboseOut(("fname", fname), 2)
 
-        self.tile = fname[3:9]
-        year = fname[9:13]
-        doy = fname[13:16]
-        self.date = datetime.strptime(year + doy, "%Y%j")
-
         sr_pattern_re = re.compile(self._assets['SR']['pattern'])
         dn_pattern_re = re.compile(self._assets['DN']['pattern'])
+        c1_pattern_re = re.compile(self._assets['C1']['pattern'])
 
-        if sr_pattern_re.match(fname):
+        sr_match = sr_pattern_re.match(fname)
+        dn_match = dn_pattern_re.match(fname)
+        c1_match = c1_pattern_re.match(fname)
+
+        if sr_match:
             VerboseOut('SR asset', 2)
             self.asset = 'SR'
             self.sensor = 'LC8SR'
             self.version = int(fname[20:22])
-        elif dn_pattern_re.match(fname):
+        elif dn_match:
             VerboseOut('DN asset', 2)
+
+            self.tile = fname[3:9]
+            year = fname[9:13]
+            doy = fname[13:16]
+            self.date = datetime.strptime(year + doy, "%Y%j")
+
             self.asset = 'DN'
             self.sensor = fname[0:3]
             self.version = int(fname[19:21])
             # Landsat DN specific additions
+            smeta = self._sensors[self.sensor]
+            self.meta = {}
+            for i, band in enumerate(smeta['colors']):
+                wvlen = smeta['bandlocs'][i]
+                self.meta[band] = {
+                    'bandnum': i + 1,
+                    'wvlen': wvlen,
+                    'wvlen1': wvlen - smeta['bandwidths'][i] / 2.0,
+                    'wvlen2': wvlen + smeta['bandwidths'][i] / 2.0,
+                    'E': smeta['E'][i],
+                    'K1': smeta['K1'][i],
+                    'K2': smeta['K2'][i],
+                }
+            self.visbands = [col for col in smeta['colors'] if col[0:4] != "LWIR"]
+            self.lwbands = [col for col in smeta['colors'] if col[0:4] == "LWIR"]
+        elif c1_match:
+            VerboseOut('C1 asset', 2)
+
+            self.tile = c1_match.group('path') + c1_match.group('row')
+            year = c1_match.group('acq_year')
+            month = c1_match.group('acq_month')
+            day = c1_match.group('acq_day')
+            self.date = datetime.strptime(year + month + day, "%Y%m%d")
+
+            self.asset = 'C1'
+            self.sensor = "L{}{}".format(c1_match.group('sensor'), int(c1_match.group('satellite')))
+
             smeta = self._sensors[self.sensor]
             self.meta = {}
             for i, band in enumerate(smeta['colors']):
@@ -276,22 +323,22 @@ class landsatData(Data):
     _products = {
         #'Standard':
         'rad': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Surface-leaving radiance',
             'arguments': [__toastring]
         },
         'ref': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Surface reflectance',
             'arguments': [__toastring]
         },
         'temp': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Brightness (apparent) temperature',
             'toa': True
         },
         'acca': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Automated Cloud Cover Assessment',
             'arguments': [
                 'X: erosion kernel diameter in pixels (default: 5)',
@@ -302,39 +349,39 @@ class landsatData(Data):
             'toa': True
         },
         'fmask': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Fmask cloud cover',
             'nargs': '*',
             'toa': True
         },
         'tcap': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Tassled cap transformation',
             'toa': True
         },
         'dn': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Raw digital numbers',
             'toa': True
         },
         'volref': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Volumetric water reflectance - valid for water only',
             'arguments': [__toastring]
         },
         'wtemp': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Water temperature (atmospherically correct) - valid for water only',
             # It's not really TOA, but the product code will take care of atm correction itself
             'toa': True
         },
         'bqa': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'LC8 band quality',
             'toa': True
         },
         'bqashadow': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'LC8 QA + Shadow Smear',
             'arguments': [
                 'X: erosion kernel diameter in pixels (default: 5)',
@@ -346,63 +393,63 @@ class landsatData(Data):
         },
         #'Indices': {
         'bi': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Brightness Index',
             'arguments': [__toastring]
         },
         'evi': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Enhanced Vegetation Index',
             'arguments': [__toastring]
         },
         'lswi': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Land Surface Water Index',
             'arguments': [__toastring]
         },
         'msavi2': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Modified Soil-Adjusted Vegetation Index (revised)',
             'arguments': [__toastring]
         },
         'ndsi': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Snow Index',
             'arguments': [__toastring]
         },
         'ndvi': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Vegetation Index',
             'arguments': [__toastring]
         },
         'ndwi': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Water Index',
             'arguments': [__toastring]
         },
         'satvi': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Soil-Adjusted Total Vegetation Index',
             'arguments': [__toastring]
         },
         #'Tillage Indices': {
         'ndti': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Tillage Index',
             'arguments': [__toastring]
         },
         'crc': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Crop Residue Cover',
             'arguments': [__toastring]
         },
         'sti': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Standard Tillage Index',
             'arguments': [__toastring]
         },
         'isti': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Inverse Standard Tillage Index',
             'arguments': [__toastring]
         },
@@ -1072,23 +1119,27 @@ class landsatData(Data):
         """ Read in Landsat MTL (metadata) file """
 
         # test if metadata already read in, if so, return
+        if 'C1' in self.assets.keys():
+            asset = 'C1'
+        elif 'DN' in self.assets.keys():
+            asset = 'DN'
 
-        datafiles = self.assets['DN'].datafiles()
+        datafiles = self.assets[asset].datafiles()
 
         # locate MTL file and save it to disk if it isn't saved already
         mtlfilename = [f for f in datafiles if 'MTL.txt' in f][0]
         if os.path.exists(mtlfilename) and os.stat(mtlfilename).st_size == 0:
             os.remove(mtlfilename)
         if not os.path.exists(mtlfilename):
-            mtlfilename = self.assets['DN'].extract([mtlfilename])[0]
+            mtlfilename = self.assets[asset].extract([mtlfilename])[0]
         # Read MTL file
         with utils.error_handler('Error reading metadata file ' + mtlfilename):
             text = open(mtlfilename, 'r').read()
         if len(text) < 10:
             raise Exception('MTL file is too short. {}'.format(mtlfilename))
 
-        sensor = self.assets['DN'].sensor
-        smeta = self.assets['DN']._sensors[sensor]
+        sensor = self.assets[asset].sensor
+        smeta = self.assets[asset]._sensors[sensor]
 
         # Process MTL text - replace old metadata tags with new
         # NOTE This is not comprehensive, there may be others
