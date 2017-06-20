@@ -48,7 +48,21 @@ def t_process(setup_fixture, repo_env, expected):
     """Test gips_process on {} data.""".format(driver)
     process_actual = repo_env.run('gips_process', *STD_ARGS)
     inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
-    assert expected == process_actual and inventory_actual.std_out == expected._inv_stdout
+
+    # TODO port this to all drivers that symlink products -- move to util, common call, yadda yadda
+    # Check symlinks specially:  Build list of expected paths to symlinks, and their
+    # expected targets, then compare with actual symlinks on the filesystem.
+    # have to build expectations about symlinks dynamically as they depend on a user setting.
+    # setting in question -----vvvvvvvvvvvvvv
+    tgt_prefix = '/vsizip//' + DATA_REPO_ROOT.strip('/')
+    expected_symlinks = {
+        os.path.join(DATA_REPO_ROOT, partial_ln): os.path.join(tgt_prefix, partial_tgt)
+        for partial_ln, partial_tgt in expected._symlinks.items()}
+    actual_symlinks = {ln: os.readlink(ln) if os.path.islink(ln) else 'Not-a-symlink'
+        for ln in expected_symlinks}
+
+    assert (expected == process_actual and inventory_actual.std_out == expected._inv_stdout
+        and expected_symlinks == actual_symlinks)
 
 
 # # TODO: determine why overwrite fails  (see comment in prism driver)
