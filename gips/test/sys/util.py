@@ -6,6 +6,7 @@ import pytest
 from scripttest import TestFileEnvironment, ProcResult, FoundFile, FoundDir
 import envoy
 
+from gips.inventory import orm # believed to be safe even though it's the code under test
 
 _log = logging.getLogger(__name__)
 
@@ -197,6 +198,8 @@ class GipsProcResult(object):
 
 def rectify(driver):
     """Ensure inv DB matches files on disk."""
+    if not orm.use_orm():
+        return
     rectify_cmd = 'gips_inventory {} --rectify'.format(driver)
     outcome = envoy.run(rectify_cmd)
     if outcome.status_code != 0:
@@ -207,7 +210,8 @@ def rectify(driver):
 @pytest.yield_fixture
 def repo_env(request):
     """Provide means to test files created by run & clean them up after."""
-    os.environ['GIPS_ORM'] = 'true'
+    if not orm.use_orm():
+        _log.warning("ORM is deactivated; check GIPS_ORM.")
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     yield gtfe
     # This step isn't effective if DATA_REPO_ROOT isn't right; in that case it
@@ -225,7 +229,8 @@ def clean_repo_env(request):
     This emulates tfe.run()'s checking the directory before and after a run,
     then working out how the directory has changed.  Unfortunately half the
     work is done in tfe, the other half in ProcResult."""
-    os.environ['GIPS_ORM'] = 'true'
+    if not orm.use_orm():
+        _log.warning("ORM is deactivated; check GIPS_ORM.")
     file_env = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     before = file_env._find_files()
     _log.debug("Generating file env: {}".format(file_env))

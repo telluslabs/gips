@@ -22,8 +22,8 @@ def setup_prism_data(pytestconfig):
     if not pytestconfig.getoption('setup_repo'):
         logger.debug("Skipping repo setup per lack of option.")
         return
-    logger.info("Downloading PRISM data . . .")
     cmd_str = 'gips_inventory ' + ' '.join(STD_ARGS) + ' --fetch'
+    logger.info("Downloading PRISM assets with " + cmd_str)
     outcome = envoy.run(cmd_str)
     logger.info("PRISM data download complete.")
     if outcome.status_code != 0:

@@ -66,19 +66,19 @@ class prismAsset(Asset):
     # 1 week for provisional
     _assets = {
         '_ppt': {
-            'pattern': r'PRISM_ppt_.+?\.zip',
+            'pattern': r'PRISM_ppt_.+?\.zip$',
             'url': 'ftp://prism.nacse.org/daily/ppt/',
             'startdate': _startdate,
             'latency': -7
         },
         '_tmin': {
-            'pattern': r'PRISM_tmin_.+?\.zip',
+            'pattern': r'PRISM_tmin_.+?\.zip$',
             'url': 'ftp://prism.nacse.org/daily/tmin/',
             'startdate': _startdate,
             'latency': -7
         },
         '_tmax': {
-            'pattern': r'PRISM_tmax_.+?\.zip',
+            'pattern': r'PRISM_tmax_.+?\.zip$',
             'url': 'ftp://prism.nacse.org/daily/tmax/',
             'startdate': _startdate,
             'latency': -7
@@ -213,10 +213,7 @@ class prismData(Data):
     }
 
     def process(self, *args, **kwargs):
-        """Make sure all products exist and return those that need processing.
-
-        (docstring cribbed from super.)
-        """
+        """Deduce which products need producing, then produce them."""
         products = super(prismData, self).process(*args, **kwargs)
         if len(products) == 0:
             return

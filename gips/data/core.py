@@ -316,8 +316,7 @@ class Asset(object):
             files = utils.find_files(cls._assets[a]['pattern'], tpath)
             # more than 1 asset??
             if len(files) > 1:
-                VerboseOut(files, 2)
-                raise Exception("Duplicate(?) assets found")
+                raise Exception("Duplicate(?) assets found: {}".format(files))
             if len(files) == 1:
                 found.append(cls(files[0]))
         return found
@@ -535,7 +534,8 @@ class Data(object):
         """ Make sure all products exist and return those that need processing """
         # TODO calling RequestedProducts twice is strange; rework into something clean
         products = self.RequestedProducts(products)
-        products = self.RequestedProducts([p for p in products.products if p not in self.products or overwrite])
+        products = self.RequestedProducts(
+                [p for p in products.products if p not in self.products or overwrite])
         # TODO - this doesnt know that some products aren't available for all dates
         return products
 
