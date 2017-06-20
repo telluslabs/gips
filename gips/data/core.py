@@ -642,11 +642,12 @@ class Data(object):
         """
         self.id = tile
         self.date = date
-        self.path = path
-        self.basename = ''              # product file name prefix, form is <tile>_<date>
-        self.assets = {}                # dict of <asset type string>: <Asset instance>
-        self.filenames = {}             # dict of (sensor, product): product filename
-        self.sensors = {}               # dict of asset/product: sensor
+        self.path = path      # /full/path/to/{driver}/tiles/{tile}/{date}; overwritten below
+        self.basename = ''    # product file name prefix, form is <tile>_<date>
+        self.assets = {}      # dict of <asset type string>: <Asset instance>
+        self.filenames = {}   # dict of (sensor, product): product filename
+        self.sensors = {}     # dict of asset/product: sensor
+        # self.basename       # self.path + part of a product filename; used as a prefix; set below
         if tile is not None and date is not None:
             self.path = self.Repository.data_path(tile, date)
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)

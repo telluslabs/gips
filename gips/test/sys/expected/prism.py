@@ -42,6 +42,7 @@ SENSORS\x1b[0m
 
 t_process = {
     'updated': {
+        'prism/stage': None,
         'prism/tiles/CONUS/19821201': None,
         'prism/tiles/CONUS/19821202': None,
         'prism/tiles/CONUS/19821203': None

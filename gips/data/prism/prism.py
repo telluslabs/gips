@@ -221,7 +221,6 @@ class prismData(Data):
         # utils.verbose_out('\n\noverwrite = {}\n'.format(overwrite), 2)
         # TODO: overwrite doesn't play well with pptsum -- wonder if it would
         #       if it was made into a composite product (which it is)
-        bname = os.path.join(self.path, self.basename)
         assert len(prismAsset._sensors) == 1  # sanity check to force this code to stay current
         sensor = prismAsset._sensors.keys()[0]
 
@@ -259,11 +258,13 @@ class prismData(Data):
                     5,
                 )
                 continue
-            fname = '{}_{}_{}.tif'.format(bname, 'prism', key)
+            prod_fn = '{}_{}_{}.tif'.format(self.basename, 'prism', key)
+            archived_fp = os.path.join(self.path, prod_fn) # final destination
             if val[0] in ['ppt', 'tmin', 'tmax']:
-                if os.path.lexists(fname):
-                    os.remove(fname)
-                os.symlink(vsinames[self._products[key]['assets'][0]], fname)
+                with self.make_temp_proc_dir() as tmp_dir:
+                    tmp_fp = os.path.join(tmp_dir, prod_fn)
+                    os.symlink(vsinames[self._products[key]['assets'][0]], tmp_fp)
+                    os.rename(tmp_fp, archived_fp)
             elif val[0] == 'pptsum':
                 try:
                     lag = int(val[1])
@@ -278,7 +279,8 @@ class prismData(Data):
                     # no argument provided, use
                     # default lag of 3 days SB configurable.
                     lag = 3
-                    fname = re.sub(r'\.tif$', '-{}.tif'.format(lag), fname)
+                    prod_fn = re.sub(r'\.tif$', '-{}.tif'.format(lag), prod_fn)
+                    archived_fp = os.path.join(self.path, prod_fn) # have to regenerate, sigh
                     utils.verbose_out('Using default lag of {} days.'
                                       .format(lag), 2)
 
@@ -304,17 +306,17 @@ class prismData(Data):
                     datobj = tileobj.tiles.values()[0]
                     imgs.append(GeoImage(get_bil_vsifile(datobj, '_ppt')))
 
-                if os.path.exists(fname):
-                    os.remove(fname)
-
-                oimg = GeoImage(fname, imgs[0])
-                for chunk in oimg.Chunks():
-                    oarr = oimg[0].Read(chunk) * 0.0
-                    for img in imgs:
-                        oarr += img[0].Read(chunk)
-                    oimg[0].Write(oarr, chunk)
-                oimg.Process()
+                with self.make_temp_proc_dir() as tmp_dir:
+                    tmp_fp = os.path.join(tmp_dir, prod_fn)
+                    oimg = GeoImage(tmp_fp, imgs[0])
+                    for chunk in oimg.Chunks():
+                        oarr = oimg[0].Read(chunk) * 0.0 # wat
+                        for img in imgs:
+                            oarr += img[0].Read(chunk)
+                        oimg[0].Write(oarr, chunk)
+                    oimg.Process()
+                    os.rename(tmp_fp, archived_fp)
                 oimg = None  # help swig+gdal with GC
                 products.requested.pop(key)
-            self.AddFile(sensor, key, fname)  # add product to inventory
+            self.AddFile(sensor, key, archived_fp)  # add product to inventory
         return products
