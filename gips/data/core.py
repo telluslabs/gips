@@ -953,3 +953,39 @@ class Data(object):
         driver's stage directory, and has a random name.
         """
         return utils.make_temp_dir(prefix='proc', dir=self.Repository.path('stage'))
+
+    @staticmethod
+    def proc_temp_dir_manager(wrapped_method):
+        """Decorator for self.process to use a tempdir consistently.
+
+        Decorate a method with it, and it'll create a temp
+        directory for the method's use, then destroy it afterwards.
+        """
+        def wrapper(self, *args, **kwargs):
+            assert not hasattr(self, '_temp_proc_dir')
+            with self.make_temp_proc_dir() as temp_dir:
+                self._temp_proc_dir = temp_dir
+                # keys are temp filenames, vals are tuples:  (sensor, prod-type, archive full path)
+                try:
+                    return wrapped_method(self, *args, **kwargs)
+                finally:
+                    del self._temp_proc_dir
+        return wrapper
+
+    def archive_temp_path(self, temp_fp):
+        """Move the product file from the managed temp dir to the archive.
+
+        The archival full path is returned; an appropriate spot in the
+        archive is chosen automatically.
+        """
+        archive_fp = os.path.join(self.path, os.path.basename(temp_fp))
+        os.rename(temp_fp, archive_fp)
+        return archive_fp
+
+    def generate_temp_path(self, filename):
+        """Return a full path to the filename within the managed temp dir.
+
+        The filename's basename is glued to the end of the temp dir.
+        This method should be called from within proc_temp_dir_manager.
+        """
+        return os.path.join(self._temp_proc_dir, os.path.basename(filename))

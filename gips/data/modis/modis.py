@@ -335,6 +335,7 @@ class modisData(Data):
         'fsnow': {
             'description': 'Fractional snow cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
+            'sensor': 'MCD',
             'bands': ['fractional-snow-cover'],
             'startdate': datetime.date(2000, 2, 24),
             'latency': 3
@@ -402,14 +403,22 @@ class modisData(Data):
         }
     }
 
+    def generate_temp_path(self, sensor, prod_type):
+        """Syntactic sugar to avoid generating filenames again and again."""
+        filename = '{}_{}_{}.tif'.format(self.basename, sensor, prod_type)
+        return super(modisData, self).generate_temp_path(filename)
+
+    @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
-        """ Process all products """
+        """Produce requested products."""
         products = super(modisData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
 
         bname = os.path.join(self.path, self.basename)
 
+        # example products.requested: {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
+        # Note that val[0] is the only usage of val in this method.
         for key, val in products.requested.items():
             start = datetime.datetime.now()
 
@@ -448,6 +457,13 @@ class modisData(Data):
 
             meta = self.meta_dict()
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
+
+            prod_type = val[0]
+            # sensor storage in the dict is the feature toggle for using tempdir
+            sensor = self._products[prod_type].get('sensor', None)
+            uses_tempdir = sensor is not None
+            if uses_tempdir:
+                fname = self.generate_temp_path(sensor, prod_type)
 
             if val[0] == "landcover":
                 sensor = 'MCD'
@@ -652,8 +668,6 @@ class modisData(Data):
             if val[0] == "fsnow":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
-                sensor = 'MCD'
-                fname = '%s_%s_%s' % (bname, sensor, key)
 
                 if not missingassets:
                     availbands = [0, 1]
@@ -772,8 +786,6 @@ class modisData(Data):
 
                 # imgout[0].Write(coverout)
                 imgout[0].Write(fracout)
-
-                VerboseOut('Completed writing %s' % fname)
 
             ###################################################################
             # SNOW/ICE COVER PRODUCT
@@ -1099,6 +1111,12 @@ class modisData(Data):
             imgout.SetMeta(meta)
 
             # add product to inventory
-            self.AddFile(sensor, key, imgout.Filename())
+            if uses_tempdir:
+                archive_fp = self.archive_temp_path(fname)
+                self.AddFile(sensor, key, archive_fp)
+                utils.verbose_out('Completed writing ' + archive_fp)
+            else:
+                self.AddFile(sensor, key, imgout.Filename())
             del imgout  # to cover for GDAL's internal problems
-            VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.datetime.now() - start), 1)
+            utils.verbose_out(' -> {}: processed in {}'.format(
+                os.path.basename(fname), datetime.datetime.now() - start), level=1)
