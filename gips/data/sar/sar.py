@@ -67,7 +67,7 @@ class sarAsset(Asset):
     }
     _assets = {
         '': {
-            'pattern': r'KC_.+?\.tar\.gz'
+            'pattern': r'^KC_.+?\.tar\.gz$'
         }
     }
 

@@ -66,19 +66,19 @@ class prismAsset(Asset):
     # 1 week for provisional
     _assets = {
         '_ppt': {
-            'pattern': r'PRISM_ppt_.+?\.zip',
+            'pattern': r'^PRISM_ppt_.+?\.zip$',
             'url': 'ftp://prism.nacse.org/daily/ppt/',
             'startdate': _startdate,
             'latency': -7
         },
         '_tmin': {
-            'pattern': r'PRISM_tmin_.+?\.zip',
+            'pattern': r'^PRISM_tmin_.+?\.zip$',
             'url': 'ftp://prism.nacse.org/daily/tmin/',
             'startdate': _startdate,
             'latency': -7
         },
         '_tmax': {
-            'pattern': r'PRISM_tmax_.+?\.zip',
+            'pattern': r'^PRISM_tmax_.+?\.zip$',
             'url': 'ftp://prism.nacse.org/daily/tmax/',
             'startdate': _startdate,
             'latency': -7

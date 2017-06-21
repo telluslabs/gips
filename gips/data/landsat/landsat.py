@@ -149,10 +149,10 @@ class landsatAsset(Asset):
     # TODO - consider assets and sensors relationship ?
     _assets = {
         'DN': {
-            'pattern': r'L[A-Z]\d\d{3}\d{3}\d{4}\d{3}[A-Z]{3}\d{2}\.tar\.gz',
+            'pattern': r'^L[A-Z]\d\d{3}\d{3}\d{4}\d{3}[A-Z]{3}\d{2}\.tar\.gz$',
         },
         'SR': {
-            'pattern': r'L.*?-SC.*?\.tar\.gz',
+            'pattern': r'^L.*?-SC.*?\.tar\.gz$',
         }
     }
 
