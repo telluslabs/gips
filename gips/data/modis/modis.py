@@ -181,6 +181,11 @@ class modisAsset(Asset):
 
     @classmethod
     def query_service(cls, asset, tile, date):
+        """Find out from the modis servers what assets are available.
+
+        Uses the given (asset, tile, date) tuple as a search key, and
+        returns a list of dicts:  {'basename': base-filename, 'url': url}
+        """
         year, month, day = date.timetuple()[:3]
 
         if asset == "MCD12Q1" and (month, day) != (1, 1):

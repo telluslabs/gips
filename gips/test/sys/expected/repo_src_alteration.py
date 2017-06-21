@@ -86,9 +86,9 @@ SENSORS\x1b[0m
 
 t_sentinel2_inv_fetch = {
     'created': {
-        'sentinel-2/tiles/19TCH': None,
-        'sentinel-2/tiles/19TCH/2017003': None,
-        'sentinel-2/tiles/19TCH/2017003/S2A_MSIL1C_20170103T154632_N0204_R011_T19TCH_20170103T154720.zip':
+        'sentinel2/tiles/19TCH': None,
+        'sentinel2/tiles/19TCH/2017003': None,
+        'sentinel2/tiles/19TCH/2017003/S2A_MSIL1C_20170103T154632_N0204_R011_T19TCH_20170103T154720.zip':
             -1786353244,
     },
     'ignored': [

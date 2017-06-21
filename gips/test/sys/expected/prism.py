@@ -42,6 +42,7 @@ SENSORS\x1b[0m
 
 t_process = {
     'updated': {
+        'prism/stage': None,
         'prism/tiles/CONUS/19821201': None,
         'prism/tiles/CONUS/19821202': None,
         'prism/tiles/CONUS/19821203': None
@@ -66,6 +67,12 @@ t_process = {
         'prism/tiles/CONUS/19821202/PRISM_ppt_stable_4kmD2_19821202_bil.zip.index': -1251812608,
         'prism/tiles/CONUS/19821201/PRISM_tmin_stable_4kmD1_19821201_bil.zip.index': -1015405459,
         'prism/tiles/CONUS/19821201/PRISM_ppt_stable_4kmD2_19821201_bil.zip.index': 1582653443,
+    },
+    '_symlinks': {
+        # TODO do the rest of the symlinks as time allows
+        'prism/tiles/CONUS/19821201/CONUS_19821201_prism_ppt.tif':
+            'prism/tiles/CONUS/19821201/PRISM_ppt_stable_4kmD2_19821201_bil.zip'
+            '/PRISM_ppt_stable_4kmD2_19821201_bil.bil',
     },
     'ignored': [
         'gips-inv-db.sqlite3',
