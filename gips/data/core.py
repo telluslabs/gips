@@ -316,8 +316,7 @@ class Asset(object):
             files = utils.find_files(cls._assets[a]['pattern'], tpath)
             # more than 1 asset??
             if len(files) > 1:
-                VerboseOut(files, 2)
-                raise Exception("Duplicate(?) assets found")
+                raise Exception("Duplicate(?) assets found: {}".format(files))
             if len(files) == 1:
                 found.append(cls(files[0]))
         return found
@@ -535,7 +534,8 @@ class Data(object):
         """ Make sure all products exist and return those that need processing """
         # TODO calling RequestedProducts twice is strange; rework into something clean
         products = self.RequestedProducts(products)
-        products = self.RequestedProducts([p for p in products.products if p not in self.products or overwrite])
+        products = self.RequestedProducts(
+                [p for p in products.products if p not in self.products or overwrite])
         # TODO - this doesnt know that some products aren't available for all dates
         return products
 
@@ -549,7 +549,8 @@ class Data(object):
         """ Process composite products using provided inventory """
         pass
 
-    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False, overwrite=False, tree=False):
+    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False,
+             overwrite=False, tree=False):
         """ Copy products to new directory, warp to projection if given site.
 
         Arguments
@@ -641,11 +642,12 @@ class Data(object):
         """
         self.id = tile
         self.date = date
-        self.path = path
-        self.basename = ''              # product file name prefix, form is <tile>_<date>
-        self.assets = {}                # dict of <asset type string>: <Asset instance>
-        self.filenames = {}             # dict of (sensor, product): product filename
-        self.sensors = {}               # dict of asset/product: sensor
+        self.path = path      # /full/path/to/{driver}/tiles/{tile}/{date}; overwritten below
+        self.basename = ''    # product file name prefix, form is <tile>_<date>
+        self.assets = {}      # dict of <asset type string>: <Asset instance>
+        self.filenames = {}   # dict of (sensor, product): product filename
+        self.sensors = {}     # dict of asset/product: sensor
+        # self.basename       # self.path + part of a product filename; used as a prefix; set below
         if tile is not None and date is not None:
             self.path = self.Repository.data_path(tile, date)
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)
@@ -755,9 +757,6 @@ class Data(object):
             dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
                                         tile=self.id, date=self.date, name=filename)
 
-
-
-
     def asset_filenames(self, product):
         assets = self._products[product]['assets']
         filenames = []
@@ -861,7 +860,8 @@ class Data(object):
         """ Return list of inventories (size 1 if not looping through geometries) """
         from gips.inventory import DataInventory
         from gips.core import SpatialExtent, TemporalExtent
-        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles, pcov=pcov, ptile=ptile)
+        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles,
+                                        pcov=pcov, ptile=ptile)
         temporal = TemporalExtent(dates, days)
         return DataInventory(cls, spatial[0], temporal, **kwargs)
 
@@ -944,3 +944,12 @@ class Data(object):
             print "  Optional qualifiers listed below each product."
             print "  Specify by appending '-option' to product (e.g., ref-toa)"
         sys.stdout.write(txt)
+
+    def make_temp_proc_dir(self):
+        """Make a temporary directory in which to perform gips processing.
+
+        Returns a context manager that governs the newly-made directory,
+        which is deleted on exiting the context. It is created in the
+        driver's stage directory, and has a random name.
+        """
+        return utils.make_temp_dir(prefix='proc', dir=self.Repository.path('stage'))
