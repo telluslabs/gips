@@ -45,6 +45,8 @@ def t_inventory(setup_modis_data, repo_env, expected):
 
 def t_process(setup_modis_data, repo_env, expected):
     """Test gips_process on modis data."""
+    # TODO add landcover test; relevant invocation:
+    # gips_process modis -t h12v04 -p landcover -d 2012-01-01 -v6 --fetch
     actual = repo_env.run('gips_process', *STD_ARGS)
     assert expected == actual
 

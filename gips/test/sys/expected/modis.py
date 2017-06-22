@@ -28,13 +28,14 @@ SENSORS\x1b[0m
 
 
 t_process = {
-    'updated': {'modis/tiles/h12v04/2012336': None,
-             'modis/tiles/h12v04/2012337': None,
-             'modis/tiles/h12v04/2012338': None},
+    'updated': {
+        'modis/stage': None,
+        'modis/tiles/h12v04/2012336': None,
+        'modis/tiles/h12v04/2012337': None,
+        'modis/tiles/h12v04/2012338': None,
+    },
     'created': {
-        # TODO Are these broken or what?  Each None is a broken symlink that seems to rely on weird
-        # gdal behavior (it uses the broken target of the symlink as a sort of data identifier?):
-        # See https://github.com/Applied-GeoSolutions/gips/issues/54
+        # Each None is a symlink; see prism for a way to test it more meaningfully.
         'modis/tiles/h12v04/2012336/h12v04_2012336_MCD_quality.tif': None,
         'modis/tiles/h12v04/2012337/h12v04_2012337_MCD_quality.tif': None,
         'modis/tiles/h12v04/2012337/h12v04_2012337_MOD_temp8td.tif': None,

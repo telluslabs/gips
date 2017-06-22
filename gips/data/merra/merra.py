@@ -469,15 +469,16 @@ class merraData(Data):
         imgout.SetAffine(np.array(self._geotransform))
 
 
+    @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
-        """ create products """
+        """Produce requested products."""
         products = super(merraData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
         bname = os.path.join(self.path, self.basename)
         sensor = "merra"
         for key, val in products.requested.items():
-            fout = "%s_%s_%s.tif" % (bname, sensor, key)
+            fout = self.temp_product_filename(sensor, key)
             meta = {}
             VERSION = "1.0"
             meta['VERSION'] = VERSION
@@ -634,4 +635,5 @@ class merraData(Data):
             """
 
             # add product to inventory
-            self.AddFile(sensor, key, fout)
+            archive_fp = self.archive_temp_path(fout)
+            self.AddFile(sensor, key, archive_fp)
