@@ -150,22 +150,22 @@ class landsatAsset(Asset):
     _assets = {
         'DN': {
             'pattern': (
-                r'L(?P<sensor>[A-Z])(?P<satellie>\d)'
+                r'^L(?P<sensor>[A-Z])(?P<satellie>\d)'
                 r'(?P<path>\d{3})(?P<row>\d{3})'
                 r'(?P<acq_year>\d{4})(?P<acq_day>\d{3})'
-                r'(?P<gsi>[A-Z]{3})(?P<version>\d{2})\.tar\.gz'
+                r'(?P<gsi>[A-Z]{3})(?P<version>\d{2})\.tar\.gz$'
             ),
         },
         'SR': {
-            'pattern': r'L.*?-SC.*?\.tar\.gz',
+            'pattern': r'^L.*?-SC.*?\.tar\.gz$',
         },
         'C1': {
             'pattern': (
-                r'L(?P<sensor>\w)(?P<satellite>\d{2})_'
+                r'^L(?P<sensor>\w)(?P<satellite>\d{2})_'
                 r'(?P<correction_level>.{4})_(?P<path>\d{3})(?P<row>\d{3})_'
                 r'(?P<acq_year>\d{4})(?P<acq_month>\d{2})(?P<acq_day>\d{2})_'
                 r'(?P<proc_year>\d{4})(?P<proc_month>\d{2})(?P<proc_day>\d{2})_'
-                r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})\.tar\.gz'
+                r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})\.tar\.gz$'
             ),
         },
     }
@@ -695,11 +695,14 @@ class landsatData(Data):
         for key, val in products.requested.items():
             assets.update(self._products[val[0]]['assets'])
 
-        if len(assets) != 1:
-            raise Exception('This driver does not support creation of products'
-                            ' from different Assets at the same time')
+        if assets == set(['C1', 'DN']):
+            asset = list(assets.intersection(self.assets.keys()))[0]
+        else:
+            if len(assets) != 1:
+                raise Exception('This driver does not support creation of products'
+                                ' from different Assets at the same time')
 
-        asset = list(assets)[0]
+            asset = list(assets)[0]
 
         # TODO: De-hack this
         # Better approach, but needs some thought, is to loop over assets
@@ -779,7 +782,7 @@ class landsatData(Data):
                     imgout[0].Write(cfmask)
 
 
-        elif asset == 'DN':
+        elif asset == 'DN' or asset == 'C1':
 
             # This block contains everything that existed in the first generation Landsat driver
 
@@ -787,12 +790,12 @@ class landsatData(Data):
             self.basename = self.basename + '_' + self.sensors[asset]
 
             # Read the assets
-            with utils.error_handler('Error reading ' + basename(self.assets['DN'].filename)):
+            with utils.error_handler('Error reading ' + basename(self.assets[asset].filename)):
                 img = self._readraw()
 
-            meta = self.assets['DN'].meta
-            visbands = self.assets['DN'].visbands
-            lwbands = self.assets['DN'].lwbands
+            meta = self.assets[asset].meta
+            visbands = self.assets[asset].visbands
+            lwbands = self.assets[asset].lwbands
             md = self.meta_dict()
 
             # running atmosphere if any products require it
@@ -819,15 +822,15 @@ class landsatData(Data):
             reflimg = gippy.GeoImage(img)
             theta = numpy.pi * self.metadata['geometry']['solarzenith'] / 180.0
             sundist = (1.0 - 0.016728 * numpy.cos(numpy.pi * 0.9856 * (float(self.day) - 4.0) / 180.0))
-            for col in self.assets['DN'].visbands:
+            for col in self.assets[asset].visbands:
                 reflimg[col] = img[col] * (1.0 /
                         ((meta[col]['E'] * numpy.cos(theta)) / (numpy.pi * sundist * sundist)))
-            for col in self.assets['DN'].lwbands:
+            for col in self.assets[asset].lwbands:
                 reflimg[col] = (((img[col].pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
                         ) * meta[col]['K2'] - 273.15
 
             # This is landsat, so always just one sensor for a given date
-            sensor = self.sensors['DN']
+            sensor = self.sensors[asset]
 
             # Process standard products
             for key, val in groups['Standard'].items():
@@ -837,7 +840,7 @@ class landsatData(Data):
                 # Create product
                 with utils.error_handler(
                         'Error creating product {} for {}'
-                        .format(key, basename(self.assets['DN'].filename)),
+                        .format(key, basename(self.assets[asset].filename)),
                         continuable=True):
                     fname = os.path.join(self.path, self.basename + '_' + key)
                     if val[0] == 'acca':
@@ -849,8 +852,8 @@ class landsatData(Data):
                         resset = set(
                             [(reflimg[band].Resolution().x(),
                               reflimg[band].Resolution().y())
-                             for band in (self.assets['DN'].visbands +
-                                          self.assets['DN'].lwbands)]
+                             for band in (self.assets[asset].visbands +
+                                          self.assets[asset].lwbands)]
                         )
                         if len(resset) > 1:
                             raise Exception(
@@ -1043,7 +1046,7 @@ class landsatData(Data):
             # cleanup directory
             try:
                 if settings().REPOS[self.Repository.name.lower()]['extract']:
-                    for bname in self.assets['DN'].datafiles():
+                    for bname in self.assets[asset].datafiles():
                         if bname[-7:] != 'MTL.txt':
                             files = glob.glob(os.path.join(self.path, bname) + '*')
                             RemoveFiles(files)
@@ -1064,7 +1067,7 @@ class landsatData(Data):
                         'Error creating ACOLITE products {} for {}'
                         .format(
                             groups['ACOLITE'].keys(),
-                            basename(self.assets['DN'].filename)
+                            basename(self.assets[asset].filename)
                         ),
                         continuable=True):
                     # amd is 'meta' (common to all products) and product info dicts
@@ -1081,7 +1084,7 @@ class landsatData(Data):
                         amd[p].pop('assets')
                     #set_trace()
                     prodout = self._process_acolite(
-                        asset=self.assets['DN'],
+                        asset=self.assets[asset],
                         aco_proc_dir=aco_proc_dir,
                         products=amd,
                     )
@@ -1229,15 +1232,17 @@ class landsatData(Data):
         return meta
 
     def _readqa(self):
+        asset = self.assets.keys()[0]
+
         # make sure metadata is loaded
         if not hasattr(self, 'metadata'):
             self.meta()
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract files
-            qadatafile = self.assets['DN'].extract([self.metadata['qafilename']])
+            qadatafile = self.assets[asset].extract([self.metadata['qafilename']])
         else:
             # Use tar.gz directly using GDAL's virtual filesystem
-            qadatafile = os.path.join('/vsitar/' + self.assets['DN'].filename, self.metadata['qafilename'])
+            qadatafile = os.path.join('/vsitar/' + self.assets[asset].filename, self.metadata['qafilename'])
         qaimg = gippy.GeoImage(qadatafile)
         return qaimg
 
@@ -1245,16 +1250,18 @@ class landsatData(Data):
     def _readraw(self):
         """ Read in Landsat bands using original tar.gz file """
         start = datetime.now()
+        asset = self.assets.keys()[0]
+
         # make sure metadata is loaded
         if not hasattr(self, 'metadata'):
             self.meta()
 
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract all files
-            datafiles = self.assets['DN'].extract(self.metadata['filenames'])
+            datafiles = self.assets[asset].extract(self.metadata['filenames'])
         else:
             # Use tar.gz directly using GDAL's virtual filesystem
-            datafiles = [os.path.join('/vsitar/' + self.assets['DN'].filename, f)
+            datafiles = [os.path.join('/vsitar/' + self.assets[asset].filename, f)
                     for f in self.metadata['filenames']]
 
         image = gippy.GeoImage(datafiles)
@@ -1267,8 +1274,8 @@ class landsatData(Data):
         # Geometry used for calculating incident irradiance
         # colors = self.assets['DN']._sensors[self.sensor_set[0]]['colors']
 
-        sensor = self.assets['DN'].sensor
-        colors = self.assets['DN']._sensors[sensor]['colors']
+        sensor = self.assets[asset].sensor
+        colors = self.assets[asset]._sensors[sensor]['colors']
 
         for bi in range(0, len(self.metadata['filenames'])):
             image.SetBandName(colors[bi], bi + 1)
