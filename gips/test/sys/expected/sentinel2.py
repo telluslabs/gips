@@ -56,6 +56,7 @@ _extraction_noise = [
 t_process = {
     'compare_stderr': False,
     'updated': {
+        'sentinel2/stage': None,
         'sentinel2/tiles/19TCH/2017010': None,
     },
     'created': {
