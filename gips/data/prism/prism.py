@@ -236,6 +236,7 @@ class prismData(Data):
             # check that we have required assets
             requiredassets = self.products2assets([val[0]])
             # val[0] s.b. key w/o product args
+            description = self._products['pptsum']['description']
             missingassets = []
             availassets = []
             vsinames = {}
@@ -309,6 +310,10 @@ class prismData(Data):
                 with self.make_temp_proc_dir() as tmp_dir:
                     tmp_fp = os.path.join(tmp_dir, prod_fn)
                     oimg = GeoImage(tmp_fp, imgs[0])
+                    oimg.SetNoData(-9999)
+                    oimg.SetBandName(
+                        description + '({} day window)'.format(lag), 1
+                    )
                     for chunk in oimg.Chunks():
                         oarr = oimg[0].Read(chunk) * 0.0 # wat
                         for img in imgs:
