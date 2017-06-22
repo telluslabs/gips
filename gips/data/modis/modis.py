@@ -313,6 +313,7 @@ class modisData(Data):
         'indices': {
             'description': 'Land indices',
             'assets': ['MCD43A4'],
+            'sensor': 'MCD',
             'bands': ['ndvi', 'lswi', 'vari', 'brgt', 'satvi', 'evi'],
             'startdate': datetime.date(2000, 2, 18),
             'latency': 15
@@ -320,6 +321,7 @@ class modisData(Data):
         'quality': {
             'description': 'MCD Product Quality',
             'assets': ['MCD43A2'],
+            'sensor': 'MCD',
             'bands': ['quality'],
             'startdate': datetime.date(2000, 2, 18),
             'latency': 15
@@ -327,6 +329,7 @@ class modisData(Data):
         'landcover': {
             'description': 'MCD Annual Land Cover',
             'assets': ['MCD12Q1'],
+            'sensor': 'MCD',
             'bands': ['landcover'],
             'startdate': datetime.date(2002, 7, 4),
             'latency': 3
@@ -343,6 +346,7 @@ class modisData(Data):
         'snow': {
             'description': 'Snow and ice cover data',
             'assets': ['MOD10A1', 'MYD10A1'],
+            'sensor': 'MCD',
             'bands': ['snow-cover', 'fractional-snow-cover'],
             'startdate': datetime.date(2000, 2, 24),
             'latency': 3
@@ -350,6 +354,7 @@ class modisData(Data):
         'temp': {
             'description': 'Surface temperature data',
             'assets': ['MOD11A1', 'MYD11A1'],
+            'sensor': 'MOD-MYD',
             'bands': [
                 'temperature-daytime-terra',
                 'temperature-nighttime-terra',
@@ -363,6 +368,7 @@ class modisData(Data):
         'obstime': {
             'description': 'MODIS Terra/Aqua overpass time',
             'assets': ['MOD11A1', 'MYD11A1'],
+            'sensor': 'MOD-MYD',
             'bands': [
                 'observation-time-daytime-terra',
                 'observation-time-nighttime-terra',
@@ -376,6 +382,7 @@ class modisData(Data):
         'ndvi8': {
             'description': 'Normalized Difference Vegetation Index: 250m',
             'assets': ['MOD09Q1'],
+            'sensor': 'MOD',
             'bands': ['red', 'nir'],
             'startdate': datetime.date(2000, 2, 18),
             'latency': 7,
@@ -383,6 +390,7 @@ class modisData(Data):
         'temp8td': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
+            'sensor': 'MOD',
             'bands': ['temp8td'],
             'startdate': datetime.date(2000, 3, 5),
             'latency': 7
@@ -390,6 +398,7 @@ class modisData(Data):
         'temp8tn': {
             'description': 'Surface temperature: 1km',
             'assets': ['MOD11A2'],
+            'sensor': 'MOD',
             'bands': ['temp8tn'],
             'startdate': datetime.date(2000, 3, 5),
             'latency': 7
@@ -397,6 +406,7 @@ class modisData(Data):
         'clouds': {
             'description': 'Cloud Mask',
             'assets': ['MOD10A1'],
+            'sensor': 'MOD',
             'bands': ['cloud-cover'],
             'startdate': datetime.date(2000, 2, 24),
             'latency': 3
@@ -428,10 +438,6 @@ class modisData(Data):
             availassets = []
             allsds = []
 
-            # no default sensor for products; we *want* it to NameError if not
-            # properly set
-            if 'sensor' in locals(): del sensor
-
             versions = {}
 
             for asset in assets:
@@ -459,18 +465,10 @@ class modisData(Data):
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
 
             prod_type = val[0]
-            # sensor storage in the dict is the feature toggle for using tempdir
-            sensor = self._products[prod_type].get('sensor', None)
-            uses_tempdir = sensor is not None
-            if uses_tempdir:
-                fname = self.generate_temp_path(sensor, prod_type)
+            sensor = self._products[prod_type]['sensor']
+            fname = self.generate_temp_path(sensor, prod_type) # moved to archive at bottom of loop
 
             if val[0] == "landcover":
-                sensor = 'MCD'
-                fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                if os.path.lexists(fname):
-                    os.remove(fname)
-
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
@@ -496,10 +494,6 @@ class modisData(Data):
             if val[0] == "quality":
                 if versions[asset] != 6:
                     raise Exception('product version not supported')
-                sensor = 'MCD'
-                fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                if os.path.lexists(fname):
-                    os.remove(fname)
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
@@ -508,8 +502,6 @@ class modisData(Data):
             if val[0] == "indices":
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
-                sensor = 'MCD'
-                fname = '%s_%s_%s' % (bname, sensor, key)
                 refl = gippy.GeoImage(allsds)
                 missing = 32767
 
@@ -634,8 +626,6 @@ class modisData(Data):
             if val[0] == "clouds":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
-                sensor = 'MOD'
-                fname = '%s_%s_%s' % (bname, sensor, key)
 
                 img = gippy.GeoImage(allsds)
 
@@ -792,8 +782,6 @@ class modisData(Data):
             if val[0] == "snow":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
-                sensor = 'MCD'
-                fname = '%s_%s_%s' % (bname, sensor, key)
 
                 if not missingassets:
                     availbands = [0, 1]
@@ -916,8 +904,6 @@ class modisData(Data):
             if val[0] == "temp":
                 VERSION = "1.1"
                 meta['VERSION'] = VERSION
-                sensor = 'MOD-MYD'
-                fname = '%s_%s_%s' % (bname, sensor, key)
 
                 if not missingassets:
                     availbands = [0, 1, 2, 3]
@@ -1028,8 +1014,6 @@ class modisData(Data):
             if val[0] == "obstime":
                 VERSION = "1"
                 meta['VERSION'] = VERSION
-                sensor = 'MOD-MYD'
-                fname = '%s_%s_%s' % (bname, sensor, key)
 
                 if not missingassets:
                     availbands = [0, 1, 2, 3]
@@ -1076,8 +1060,6 @@ class modisData(Data):
                 # NOTE this code is unreachable currently; see _products above.
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
-                sensor = 'MOD'
-                fname = '%s_%s_%s' % (bname, sensor, key)
 
                 refl = gippy.GeoImage(allsds)
                 refl.SetBandName("RED", 1)
@@ -1091,18 +1073,10 @@ class modisData(Data):
             # TEMPERATURE PRODUCT (8-day) - Terra only
 
             if val[0] == "temp8td":
-                sensor = 'MOD'
-                fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                if os.path.lexists(fname):
-                    os.remove(fname)
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
             if val[0] == "temp8tn":
-                sensor = 'MOD'
-                fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                if os.path.lexists(fname):
-                    os.remove(fname)
                 os.symlink(allsds[4], fname)
                 imgout = gippy.GeoImage(fname)
 
@@ -1111,12 +1085,9 @@ class modisData(Data):
             imgout.SetMeta(meta)
 
             # add product to inventory
-            if uses_tempdir:
-                archive_fp = self.archive_temp_path(fname)
-                self.AddFile(sensor, key, archive_fp)
-                utils.verbose_out('Completed writing ' + archive_fp)
-            else:
-                self.AddFile(sensor, key, imgout.Filename())
+            archive_fp = self.archive_temp_path(fname)
+            self.AddFile(sensor, key, archive_fp)
+            utils.verbose_out('Completed writing ' + archive_fp)
             del imgout  # to cover for GDAL's internal problems
             utils.verbose_out(' -> {}: processed in {}'.format(
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
