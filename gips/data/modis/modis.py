@@ -652,7 +652,6 @@ class modisData(Data):
                 imgout.SetGain(1.0)
                 imgout.SetBandName('Cloud Cover', 1)
                 imgout[0].Write(clouds)
-                VerboseOut('Completed writing %s' % fname)
 
             # SNOW/ICE COVER PRODUCT - FRACTIONAL masked with binary
             if val[0] == "fsnow":
@@ -897,8 +896,6 @@ class modisData(Data):
                 imgout[0].Write(coverout)
                 imgout[1].Write(fracout)
 
-                VerboseOut('Completed writing %s' % fname)
-
             ###################################################################
             # TEMPERATURE PRODUCT (DAILY)
             if val[0] == "temp":
@@ -1087,7 +1084,6 @@ class modisData(Data):
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
             self.AddFile(sensor, key, archive_fp)
-            utils.verbose_out('Completed writing ' + archive_fp)
             del imgout  # to cover for GDAL's internal problems
             utils.verbose_out(' -> {}: processed in {}'.format(
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
