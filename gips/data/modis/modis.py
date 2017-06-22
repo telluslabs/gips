@@ -413,11 +413,6 @@ class modisData(Data):
         }
     }
 
-    def generate_temp_path(self, sensor, prod_type):
-        """Syntactic sugar to avoid generating filenames again and again."""
-        filename = '{}_{}_{}.tif'.format(self.basename, sensor, prod_type)
-        return super(modisData, self).generate_temp_path(filename)
-
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
         """Produce requested products."""
@@ -466,7 +461,7 @@ class modisData(Data):
 
             prod_type = val[0]
             sensor = self._products[prod_type]['sensor']
-            fname = self.generate_temp_path(sensor, prod_type) # moved to archive at bottom of loop
+            fname = self.temp_product_filename(sensor, prod_type) # moved to archive at end of loop
 
             if val[0] == "landcover":
                 os.symlink(allsds[0], fname)

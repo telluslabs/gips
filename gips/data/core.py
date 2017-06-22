@@ -989,3 +989,11 @@ class Data(object):
         This method should be called from within proc_temp_dir_manager.
         """
         return os.path.join(self._temp_proc_dir, os.path.basename(filename))
+
+    def product_filename(self, sensor, prod_type):
+        """Returns a standardized product file name."""
+        return '{}_{}_{}.tif'.format(self.basename, sensor, prod_type)
+
+    def temp_product_filename(self, sensor, prod_type):
+        """Generates a product filename within the managed temp dir."""
+        return self.generate_temp_path(self.product_filename(sensor, prod_type))
