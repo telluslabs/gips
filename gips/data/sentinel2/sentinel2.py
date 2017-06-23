@@ -1004,7 +1004,6 @@ class sentinel2Data(Data):
         # process indices in two groups:  toa and surf
         indices = products.groups()['Index']
         toa_indices  = {k: v for (k, v) in indices.items() if 'toa' in v}
-        filename_prefix = os.path.join(self.path, self.basename + '_' + sensor + '_')
         self.process_indices('toa', sensor, toa_indices)
 
         surf_indices  = {k: v for (k, v) in indices.items() if 'toa' not in v}
