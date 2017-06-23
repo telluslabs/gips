@@ -31,6 +31,7 @@ from pydap.client import open_url
 import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, basename
+from gips import utils
 
 
 from pdb import set_trace
@@ -150,16 +151,22 @@ class daymetAsset(Asset):
         description = cls._assets[asset]['description']
         meta = {'ASSET': asset, 'TILE': tile, 'DATE': str(date.date()), 'DESCRIPTION': description}
         sday = str(day).zfill(3)
-        fout = os.path.join(cls.Repository.path('stage'), "daymet_%s_%s_%4d%s.tif" % (asset, tile, date.year, sday))
-        geo = [float(x0), cls._defaultresolution[0], 0.0, float(y0), 0.0, -cls._defaultresolution[1]]
+        geo = [float(x0), cls._defaultresolution[0], 0.0,
+               float(y0), 0.0, -cls._defaultresolution[1]]
         geo = np.array(geo).astype('double')
         dtype = create_datatype(data.dtype)
-        imgout = gippy.GeoImage(fout, xsz, ysz, 1, dtype)
-        imgout.SetBandName(asset, 1)
-        imgout.SetNoData(-9999.)
-        imgout.SetProjection(PROJ)
-        imgout.SetAffine(geo)
-        imgout[0].Write(data)    
+        filename = "daymet_%s_%s_%4d%s.tif" % (asset, tile, date.year, sday)
+        stage_dir = cls.Repository.path('stage')
+        with utils.make_temp_dir(prefix='fetch', dir=stage_dir) as temp_dir:
+            temp_fp = os.path.join(temp_dir, filename)
+            stage_fp = os.path.join(stage_dir, filename)
+            imgout = gippy.GeoImage(temp_fp, xsz, ysz, 1, dtype)
+            imgout.SetBandName(asset, 1)
+            imgout.SetNoData(-9999.)
+            imgout.SetProjection(PROJ)
+            imgout.SetAffine(geo)
+            imgout[0].Write(data)
+            os.rename(temp_fp, stage_fp)
 
 
 class daymetData(Data):
