@@ -635,7 +635,30 @@ class landsatData(Data):
             imgout.SetNoData(missing)
         return prodout
 
+    def _process_indices(self, image, metadata, sensor, indices):
+        """Process the given indices and add their files to the inventory.
 
+        Image is a GeoImage suitable for generating the indices.
+        Metadata is passed in to the gippy Indices() call.  Sensor is
+        used to generate index filenames and saving info about the
+        product to self. Indices is a dict of desired keys; keys and
+        values are the same as requested products in process().
+        """
+        gippy_input = {} # map prod types to temp output filenames for feeding to gippy
+        tempfps_to_ptypes = {} # map temp output filenames to prod types, for AddFile
+        for prod_type, pt_split in indices.items():
+            temp_fp = self.temp_product_filename(sensor, prod_type)
+            gippy_input[pt_split[0]] = temp_fp
+            tempfps_to_ptypes[temp_fp] = prod_type
+
+        prodout = Indices(image, gippy_input, metadata)
+
+        for temp_fp in prodout.values():
+            archived_fp = self.archive_temp_path(temp_fp)
+            self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
+
+
+    @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
         """ Make sure all products have been processed """
         products = super(landsatData, self).process(products, overwrite, **kwargs)
@@ -673,15 +696,12 @@ class landsatData(Data):
 
             # print imgpaths
 
-            bname = os.path.join(self.path, self.basename)
+            sensor = 'LC8SR'
 
             for key, val in products.requested.items():
+                fname = self.temp_product_filename(sensor, key)
 
                 if val[0] == "ndvi8sr":
-
-                    sensor = 'LC8SR'
-                    fname = '%s_%s_%s' % (bname, sensor, key)
-
                     img = gippy.GeoImage([imgpaths['sr_band4'], imgpaths['sr_band5']])
 
                     missing = float(img[0].NoDataValue())
@@ -712,10 +732,6 @@ class landsatData(Data):
                     imgout[0].Write(ndvi)
 
                 if val[0] == "landmask":
-
-                    sensor = 'LC8SR'
-                    fname = '%s_%s_%s' % (bname, sensor, key)
-
                     img = gippy.GeoImage([imgpaths['cfmask'], imgpaths['cfmask_conf']])
 
                     cfmask = img[0].Read()
@@ -730,6 +746,9 @@ class landsatData(Data):
                     imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
                     imgout.SetBandName('Land mask', 1)
                     imgout[0].Write(cfmask)
+
+                archive_fp = self.archive_temp_path(fname)
+                self.AddFile(sensor, key, archive_fp)
 
 
         elif asset == 'DN':
@@ -760,7 +779,8 @@ class landsatData(Data):
                 with utils.error_handler('Problem running 6S atmospheric model'):
                     wvlens = [(meta[b]['wvlen1'], meta[b]['wvlen2']) for b in visbands]
                     geo = self.metadata['geometry']
-                    atm6s = SIXS(visbands, wvlens, geo, self.metadata['datetime'], sensor=self.sensor_set[0])
+                    atm6s = SIXS(visbands, wvlens, geo, self.metadata['datetime'],
+                                 sensor=self.sensor_set[0])
                     md["AOD Source"] = str(atm6s.aod[0])
                     md["AOD Value"] = str(atm6s.aod[1])
 
@@ -782,7 +802,7 @@ class landsatData(Data):
             # This is landsat, so always just one sensor for a given date
             sensor = self.sensors['DN']
 
-            # Process standard products
+            # Process standard products (this is in the 'DN' block)
             for key, val in groups['Standard'].items():
                 start = datetime.now()
                 # TODO - update if no atmos desired for others
@@ -792,7 +812,7 @@ class landsatData(Data):
                         'Error creating product {} for {}'
                         .format(key, basename(self.assets['DN'].filename)),
                         continuable=True):
-                    fname = os.path.join(self.path, self.basename + '_' + key)
+                    fname = self.temp_product_filename(sensor, key)
                     if val[0] == 'acca':
                         s_azim = self.metadata['geometry']['solarazimuth']
                         s_elev = 90 - self.metadata['geometry']['solarzenith']
@@ -962,10 +982,13 @@ class landsatData(Data):
                     fname = imgout.Filename()
                     imgout.SetMeta(md)
                     imgout = None
-                    self.AddFile(sensor, key, fname)
-                    VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.now() - start), 1)
+                    archive_fp = self.archive_temp_path(fname)
+                    self.AddFile(sensor, key, archive_fp)
+                    product_finished_msg = ' -> {}: processed in {}'.format(
+                            os.path.basename(archive_fp), datetime.now() - start)
+                    utils.verbose_out(product_finished_msg, level=2)
 
-            # Process Indices
+            # Process Indices (this is in the 'DN' block)
             indices0 = dict(groups['Index'], **groups['Tillage'])
             if len(indices0) > 0:
                 start = datetime.now()
@@ -978,23 +1001,18 @@ class landsatData(Data):
                         indices[key] = val
                 # Run TOA
                 if len(indices_toa) > 0:
-                    fnames = [os.path.join(self.path, self.basename + '_' + key) for key in indices_toa]
-                    prodout = Indices(reflimg, dict(zip([p[0] for p in indices_toa.values()], fnames)), md)
-                    prodout = dict(zip(indices_toa.keys(), prodout.values()))
-                    [self.AddFile(sensor, key, fname) for key, fname in prodout.items()]
+                    self._process_indices(reflimg, md, sensor, indices_toa)
+
                 # Run atmospherically corrected
                 if len(indices) > 0:
-                    fnames = [os.path.join(self.path, self.basename + '_' + key) for key in indices]
                     for col in visbands:
                         img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
                                 ) * (1.0 / atm6s.results[col][2])
-                    prodout = Indices(img, dict(zip([p[0] for p in indices.values()], fnames)), md)
-                    prodout = dict(zip(indices.keys(), prodout.values()))
-                    [self.AddFile(sensor, key, fname) for key, fname in prodout.items()]
+                    self._process_indices(img, md, sensor, indices)
                 VerboseOut(' -> %s: processed %s in %s' % (
                         self.basename, indices0.keys(), datetime.now() - start), 1)
             img = None
-            # cleanup directory
+            # cleanup scene directory by removing (most) extracted files
             try:
                 if settings().REPOS[self.Repository.name.lower()]['extract']:
                     for bname in self.assets['DN'].datafiles():
@@ -1033,7 +1051,6 @@ class landsatData(Data):
                         }
                         amd[p].update(self._products[p])
                         amd[p].pop('assets')
-                    #set_trace()
                     prodout = self._process_acolite(
                         asset=self.assets['DN'],
                         aco_proc_dir=aco_proc_dir,

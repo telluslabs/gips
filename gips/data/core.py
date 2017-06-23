@@ -992,7 +992,9 @@ class Data(object):
 
     def product_filename(self, sensor, prod_type):
         """Returns a standardized product file name."""
-        return '{}_{}_{}.tif'.format(self.basename, sensor, prod_type)
+        date_string = self.date.strftime(self.Repository._datedir)
+        # reminder: self.id is the tile ID string, eg 'h12v04' or '19TCH'
+        return '{}_{}_{}_{}.tif'.format(self.id, date_string, sensor, prod_type)
 
     def temp_product_filename(self, sensor, prod_type):
         """Generates a product filename within the managed temp dir."""
