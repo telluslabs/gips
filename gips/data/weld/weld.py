@@ -21,14 +21,15 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
-import sys
 import os
+import sys
 import re
 import datetime
 import urllib
 import urllib2
 
 import numpy as np
+import requests
 
 import gippy
 # TODO: Use this:
@@ -99,29 +100,40 @@ class weldAsset(Asset):
     def fetch(cls, asset, tile, date):
         year, month, day = date.timetuple()[:3]
         mainurl = '%s/%s.%02d.%02d' % (cls._assets[asset]['url'], str(year), month, day)
+        utils.verbose_out("searching at " + mainurl, 4)
         with utils.error_handler('Unable to access {}'.format(mainurl)):
             listing = urllib.urlopen(mainurl).readlines()
         pattern = '(%s.week\d{2}.%s.%s.doy\d{3}to\d{3}.v1.5.hdf)' % (asset, str(year), tile)
         cpattern = re.compile(pattern)
         fetched = []
+        http_kw = {'timeout': 10,
+                   'auth': (cls.Repository.get_setting('username'),
+                            cls.Repository.get_setting('password'))}
         for item in listing:
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
                 name = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', name])
+                utils.verbose_out("found " + url)
                 outpath = os.path.join(cls.Repository.path('stage'), name)
                 if os.path.exists(outpath):
                     continue
                 err_msg = 'Unable to retrieve {} from {}'.format(name, url)
-                with utils.error_handler(err_msg, continuable=True), open(outpath, 'wb') as output:
-                    connection = urllib2.urlopen(url)
-                    output.write(connection.read())
+                with utils.error_handler(err_msg, continuable=True):
+                    response = requests.get(url, **http_kw)
+                    if response.status_code != requests.codes.ok:
+                        err_msg = 'Download failed({}): code={} reason="{}" url="{}"'.format(
+                                name, response.status_code, response.reason, url)
+                        utils.verbose_out(err_msg, 2, sys.stderr)
+                    with open(outpath, 'wb') as fd:
+                        for chunk in response.iter_content():
+                            fd.write(chunk)
                     utils.verbose_out('Retrieved {}'.format(name), 2)
                     fetched.append(outpath)
         if not fetched:
-             utils.verbose_out('Unable to find remote match for {} at {}'.format(pattern, mainurl),
-                    4, sys.stderr)
+            utils.verbose_out('Unable to find remote match for {} at {}'.format(pattern, mainurl),
+                              4, sys.stderr)
         return fetched
 
 
