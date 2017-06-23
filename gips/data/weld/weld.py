@@ -163,15 +163,17 @@ class weldData(Data):
         },
     }
 
+    @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
-        """ Process all products """
+        """Process requested products."""
         products = super(weldData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
-        bname = os.path.join(self.path, self.basename)
         for key, val in products.requested.items():
             start = datetime.datetime.now()
             sensor = 'WELD'
+            prod_type = val[0]
+            fname = self.temp_product_filename(sensor, prod_type) # moved to archive at end of loop
             # Check for asset availability
             assets = self._products[val[0]]['assets']
             missingassets = []
@@ -198,8 +200,6 @@ class weldData(Data):
             if val[0] == "ndsi":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
-                sensor = "WELD"
-                fname = "%s_%s_%s" % (bname, sensor, key)
                 refl = gippy.GeoImage(allsds)
                 # band 2
                 grnimg = refl[1].Read()
@@ -234,8 +234,6 @@ class weldData(Data):
             if val[0] == "snow":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
-                sensor = "WELD"
-                fname = "%s_%s_%s" % (bname, sensor, key)
                 refl = gippy.GeoImage(allsds)
                 # band 2
                 grnimg = refl[1].Read()
@@ -278,8 +276,6 @@ class weldData(Data):
             if val[0] == "ndvi":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
-                sensor = "WELD"
-                fname = "%s_%s_%s" % (bname, sensor, key)
                 refl = gippy.GeoImage(allsds)
                 # band 3
                 redimg = refl[2].Read()
@@ -311,8 +307,6 @@ class weldData(Data):
             if val[0] == "brgt":
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
-                sensor = "WELD"
-                fname = "%s_%s_%s" % (bname, sensor, key)
                 refl = gippy.GeoImage(allsds)
                 # band 2
                 grnimg = refl[1].Read()
@@ -347,5 +341,6 @@ class weldData(Data):
             imgout.SetMeta(meta)
 
             # add product to inventory
-            self.AddFile(sensor, key, imgout.Filename())
+            archive_fp = self.archive_temp_path(fname)
+            self.AddFile(sensor, key, archive_fp)
             VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.datetime.now() - start), 1)
