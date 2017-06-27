@@ -92,7 +92,7 @@ class prismAsset(Asset):
 
     @classmethod
     def fetch_ftp(cls, asset, tile, date):
-        """ Fetch via FTP """
+        """Fetch to the stage; returns the full path to the asset."""
         url = cls._assets[asset].get('url', '')
         if url == '':
             raise Exception("%s: URL not defined for asset %s" % (cls.__name__, asset))
@@ -101,7 +101,7 @@ class prismAsset(Asset):
             url = url[6:]  # drop ftp:// if given
         ftpurl = url.split('/')[0]
         ftpdir = url[len(ftpurl):]
-        try:
+        with utils.error_handler("Error downloading from " + ftpurl, continuable=True):
             ftp = ftplib.FTP(ftpurl)
             ftp.login('anonymous', settings().EMAIL)
             pth = os.path.join(ftpdir, date.strftime('%Y'))
@@ -117,33 +117,24 @@ class prismAsset(Asset):
             )
             if len(filenames) > 1:
                 filenames = sorted(filenames, key=lambda x: prismAsset(x).ver_stab, reverse=True)
-            filename = filenames[0]
-            stagedir = tempfile.mkdtemp(
-                prefix='prismDownloader',
-                dir=cls.Repository.path('stage')
-            )
-            ofilename = os.path.join(stagedir, filename)
-            utils.verbose_out("Downloading %s" % filename, 2)
-            with open(ofilename, "wb") as ofile:
-                ftp.retrbinary('RETR %s' % filename, ofile.write)
-            ftp.close()
-        except Exception, e:
-            # TODO error-handling-fix: with handler BUT mind the else
-            raise Exception("Error downloading: %s" % e)
-        else:
-            assets = cls.archive(stagedir)
-        try:
-            os.remove(ofilename)
-        except OSError as ose:
-            # TODO error-handling-fix: change to 'raise'
-            if ose.errno != 2:
-                raise ose
-        os.rmdir(stagedir)
+            asset_fn = filenames[0]
+            stage_dir_fp = cls.Repository.path('stage')
+            stage_fp = os.path.join(stage_dir_fp, asset_fn)
+            with utils.make_temp_dir(prefix='fetchtmp', dir=stage_dir_fp) as td_name:
+                temp_fp = os.path.join(td_name, asset_fn)
+                utils.verbose_out("Downloading " + asset_fn, 2)
+                with open(temp_fp, "wb") as temp_fo:
+                    ftp.retrbinary('RETR ' + asset_fn, temp_fo.write)
+                ftp.quit()
+                os.rename(temp_fp, stage_fp)
+            return stage_fp
+
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        """ Get this asset for this tile and date (via FTP) """
-        cls.fetch_ftp(asset, tile, date)
+        """Get this asset for this tile and date (via FTP)."""
+        fetched = cls.fetch_ftp(asset, tile, date)
+        return [] if fetched is None else [fetched]
 
     def __init__(self, filename):
         """ Inspect a PRISM file """
