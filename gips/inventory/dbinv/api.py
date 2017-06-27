@@ -3,6 +3,7 @@ import os, glob, sys, traceback, datetime, time, itertools, re
 import django.db.transaction
 
 from gips.utils import verbose_out, basename
+from gips import utils
 
 
 """API for the DB inventory for GIPS.
@@ -80,13 +81,10 @@ def rectify_assets(asset_class):
         # little optimization to make deleting stale records go faster:
         starting_keys = set(mao.filter(driver=driver, asset=ak).values_list('id', flat=True))
 
-        pattern_re = re.compile(av['pattern'])
-        all_tiles = glob.glob(path_glob)
-        tile_matches = []
-        for tile in all_tiles:
-            if pattern_re.match(os.path.basename(tile)):
-                tile_matches.append(tile)
-        _chunky_transaction(iter(tile_matches), rectify_asset)
+        # Use iterators to cut down on memory usage; some asset collections can be pretty big
+        imatches = itertools.chain.from_iterable(utils.find_files(av['pattern'], path)
+                                                 for path in glob.iglob(path_glob))
+        _chunky_transaction(imatches, rectify_asset)
 
         # Remove things from DB that are NOT in FS:
         print "Deleting stale asset records . . . "

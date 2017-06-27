@@ -42,7 +42,10 @@ SENSORS\x1b[0m
 
 
 t_process = {
-    'updated': {'merra/tiles/h01v01/2015135': None},
+    'updated': {
+        'merra/stage': None,
+        'merra/tiles/h01v01/2015135': None,
+    },
     'created': {
         'merra/tiles/h01v01/2015135/h01v01_2015135_merra_patm.tif': -832862627,
         'merra/tiles/h01v01/2015135/h01v01_2015135_merra_prcp.tif': -1814551991,

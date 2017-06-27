@@ -40,7 +40,8 @@ import commands
 import gippy
 from gippy.algorithms import CookieCutter
 from gips import __version__
-from gips.utils import settings, VerboseOut, RemoveFiles, File2List, List2File, Colors, basename, mkdir, open_vector
+from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File, Colors,
+        basename, mkdir, open_vector)
 from gips import utils
 from ..inventory import dbinv, orm
 
@@ -69,6 +70,7 @@ class Repository(object):
         """ Get tile designation from a geospatial feature (i.e. a row) """
         fldindex = feature.GetFieldIndex(cls._tile_attribute)
         return str(feature.GetField(fldindex))
+
 
     ##########################################################################
     # Override these functions if not using a tile/date directory structure
@@ -303,24 +305,18 @@ class Asset(object):
 
         # The rest of this fn uses the filesystem inventory
         tpath = cls.Repository.data_path(tile, date)
+        if not os.path.isdir(tpath):
+            return []
         if asset is not None:
             assets = [asset]
         else:
             assets = cls._assets.keys()
         found = []
         for a in assets:
-            if os.path.isdir(tpath):
-                pattern_re = re.compile(cls._assets[a]['pattern'])
-                files = [os.path.join(tpath, f)
-                         for f in os.listdir(tpath)
-                         if os.path.isfile(os.path.join(tpath, f))
-                            and pattern_re.match(f)]
-            else:
-                files = []
+            files = utils.find_files(cls._assets[a]['pattern'], tpath)
             # more than 1 asset??
             if len(files) > 1:
-                VerboseOut(files, 2)
-                raise Exception("Duplicate(?) assets found")
+                raise Exception("Duplicate(?) assets found: {}".format(files))
             if len(files) == 1:
                 found.append(cls(files[0]))
         return found
@@ -399,20 +395,29 @@ class Asset(object):
 
     @classmethod
     def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
-        """ Move assets from directory to archive location """
+        """Move asset into the archive.
+
+        Pass in a path to a file or a directory.  If a directory, its
+        contents are scanned for assets and any found are archived; it
+        won't descend into subdirectories unless `recursive`.  Any found
+        assets are given hard links in the archive.  The original is
+        then removed, unless `keep`. If a found asset would replace an
+        extant archived asset, replacement is only performed if
+        `update`.  kwargs is unused and likely without purpose.
+        """
         start = datetime.now()
 
         fnames = []
-        if recursive:
+        if not os.path.isdir(path):
+            fnames.append(path)
+        elif recursive:
             for root, subdirs, files in os.walk(path):
                 for a in cls._assets.values():
-                    pattern_re = re.compile(a['pattern'])
-                    files = [os.path.join(path, f) for f in os.listdir(root) if os.path.isfile(os.path.join(path, f)) and pattern_re.match(f)]
+                    files = utils.find_files(a['pattern'], path)
                     fnames.extend(files)
         else:
             for a in cls._assets.values():
-                pattern_re = re.compile(a['pattern'])
-                files = [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and pattern_re.match(f)]
+                files = utils.find_files(a['pattern'], path)
                 fnames.extend(files)
         numlinks = 0
         numfiles = 0
@@ -529,7 +534,8 @@ class Data(object):
         """ Make sure all products exist and return those that need processing """
         # TODO calling RequestedProducts twice is strange; rework into something clean
         products = self.RequestedProducts(products)
-        products = self.RequestedProducts([p for p in products.products if p not in self.products or overwrite])
+        products = self.RequestedProducts(
+                [p for p in products.products if p not in self.products or overwrite])
         # TODO - this doesnt know that some products aren't available for all dates
         return products
 
@@ -543,7 +549,8 @@ class Data(object):
         """ Process composite products using provided inventory """
         pass
 
-    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False, overwrite=False, tree=False):
+    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False,
+             overwrite=False, tree=False):
         """ Copy products to new directory, warp to projection if given site.
 
         Arguments
@@ -612,6 +619,19 @@ class Data(object):
         filenames[:] = [f for f in filenames if test(f)]
         return filenames
 
+
+    @classmethod
+    def normalize_tile_string(cls, tile_string):
+        """Override this method to provide custom processing of tile names.
+
+        This method should raise an exception if the tile string is
+        invalid, but should return a corrected string instead if
+        possible.  So for modis, 'H03V01' should return 'h03v01', while
+        'H03V' should raise an exception.
+        """
+        return tile_string
+
+
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
@@ -622,11 +642,12 @@ class Data(object):
         """
         self.id = tile
         self.date = date
-        self.path = path
-        self.basename = ''              # product file name prefix, form is <tile>_<date>
-        self.assets = {}                # dict of <asset type string>: <Asset instance>
-        self.filenames = {}             # dict of (sensor, product): product filename
-        self.sensors = {}               # dict of asset/product: sensor
+        self.path = path      # /full/path/to/{driver}/tiles/{tile}/{date}; overwritten below
+        self.basename = ''    # product file name prefix, form is <tile>_<date>
+        self.assets = {}      # dict of <asset type string>: <Asset instance>
+        self.filenames = {}   # dict of (sensor, product): product filename
+        self.sensors = {}     # dict of asset/product: sensor
+        # self.basename       # self.path + part of a product filename; used as a prefix; set below
         if tile is not None and date is not None:
             self.path = self.Repository.data_path(tile, date)
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)
@@ -736,9 +757,6 @@ class Data(object):
             dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
                                         tile=self.id, date=self.date, name=filename)
 
-
-
-
     def asset_filenames(self, product):
         assets = self._products[product]['assets']
         filenames = []
@@ -842,7 +860,8 @@ class Data(object):
         """ Return list of inventories (size 1 if not looping through geometries) """
         from gips.inventory import DataInventory
         from gips.core import SpatialExtent, TemporalExtent
-        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles, pcov=pcov, ptile=ptile)
+        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles,
+                                        pcov=pcov, ptile=ptile)
         temporal = TemporalExtent(dates, days)
         return DataInventory(cls, spatial[0], temporal, **kwargs)
 
@@ -925,3 +944,56 @@ class Data(object):
             print "  Optional qualifiers listed below each product."
             print "  Specify by appending '-option' to product (e.g., ref-toa)"
         sys.stdout.write(txt)
+
+    def make_temp_proc_dir(self):
+        """Make a temporary directory in which to perform gips processing.
+
+        Returns a context manager that governs the newly-made directory,
+        which is deleted on exiting the context. It is created in the
+        driver's stage directory, and has a random name.
+        """
+        return utils.make_temp_dir(prefix='proc', dir=self.Repository.path('stage'))
+
+    @staticmethod
+    def proc_temp_dir_manager(wrapped_method):
+        """Decorator for self.process to use a tempdir consistently.
+
+        Decorate a method with it, and it'll create a temp
+        directory for the method's use, then destroy it afterwards.
+        """
+        def wrapper(self, *args, **kwargs):
+            assert not hasattr(self, '_temp_proc_dir')
+            with self.make_temp_proc_dir() as temp_dir:
+                self._temp_proc_dir = temp_dir
+                # keys are temp filenames, vals are tuples:  (sensor, prod-type, archive full path)
+                try:
+                    return wrapped_method(self, *args, **kwargs)
+                finally:
+                    del self._temp_proc_dir
+        return wrapper
+
+    def archive_temp_path(self, temp_fp):
+        """Move the product file from the managed temp dir to the archive.
+
+        The archival full path is returned; an appropriate spot in the
+        archive is chosen automatically.
+        """
+        archive_fp = os.path.join(self.path, os.path.basename(temp_fp))
+        os.rename(temp_fp, archive_fp)
+        return archive_fp
+
+    def generate_temp_path(self, filename):
+        """Return a full path to the filename within the managed temp dir.
+
+        The filename's basename is glued to the end of the temp dir.
+        This method should be called from within proc_temp_dir_manager.
+        """
+        return os.path.join(self._temp_proc_dir, os.path.basename(filename))
+
+    def product_filename(self, sensor, prod_type):
+        """Returns a standardized product file name."""
+        return '{}_{}_{}.tif'.format(self.basename, sensor, prod_type)
+
+    def temp_product_filename(self, sensor, prod_type):
+        """Generates a product filename within the managed temp dir."""
+        return self.generate_temp_path(self.product_filename(sensor, prod_type))
