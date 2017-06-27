@@ -196,9 +196,12 @@ class landsatAsset(Asset):
         elif dn_match:
             VerboseOut('DN asset', 2)
 
-            self.tile = fname[3:9]
-            year = fname[9:13]
-            doy = fname[13:16]
+            #self.tile = fname[3:9]
+            #year = fname[9:13]
+            #doy = fname[13:16]
+            self.tile = dn_match.group('path') + dn_match.group('row')
+            year = dn_match.group('acq_year')
+            doy = dn_match.group('acq_day')
             self.date = datetime.strptime(year + doy, "%Y%j")
 
             self.asset = 'DN'
@@ -221,7 +224,7 @@ class landsatAsset(Asset):
             self.visbands = [col for col in smeta['colors'] if col[0:4] != "LWIR"]
             self.lwbands = [col for col in smeta['colors'] if col[0:4] == "LWIR"]
         elif c1_match:
-            VerboseOut('C1 asset', 2)
+            utils.verbose_out('C1 asset', 2)
 
             self.tile = c1_match.group('path') + c1_match.group('row')
             year = c1_match.group('acq_year')
