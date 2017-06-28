@@ -41,6 +41,9 @@ import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, basename
 from gips import utils
+import gips
+
+_daymet_driver_version = '0.1'
 
 requirements =['pydap']
 
@@ -159,6 +162,18 @@ class daymetAsset(Asset):
         # how daymet products load magically
         self.products[self.asset] = filename
 
+    @classmethod
+    def generate_metadata(cls, asset, tile, date, url):
+        """Returns a dict suitable to pass to GeoImage.SetMeta()."""
+        return {
+            'GIPS Version': gips.__version__,
+            'GIPS DAYMET Driver Version': _daymet_driver_version,
+            'ASSET': asset,
+            'TILE': tile,
+            'DATE': str(date.date()),
+            'DESCRIPTION': cls._assets[asset]['description'],
+            'URL': url,
+        }
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -175,8 +190,6 @@ class daymetAsset(Asset):
         var = dataset[asset]
         data = np.array(var.array[iday, :, :]).squeeze().astype('float32')
         ysz, xsz = data.shape
-        description = cls._assets[asset]['description']
-        meta = {'ASSET': asset, 'TILE': tile, 'DATE': str(date.date()), 'DESCRIPTION': description}
         sday = str(day).zfill(3)
         geo = [float(x0), cls._defaultresolution[0], 0.0,
                float(y0), 0.0, -cls._defaultresolution[1]]
@@ -194,6 +207,7 @@ class daymetAsset(Asset):
             imgout.SetProjection(PROJ)
             imgout.SetAffine(geo)
             imgout[0].Write(data)
+            imgout.SetMeta(cls.generate_metadata(asset, tile, date, loc))
             os.rename(temp_fp, stage_fp)
             return [stage_fp]
 
@@ -201,7 +215,7 @@ class daymetAsset(Asset):
 class daymetData(Data):
     """ A tile of data (all assets and products) """
     name = 'Daymet'
-    version = '0.1'
+    version = _daymet_driver_version
     Asset = daymetAsset
 
     _products = {
