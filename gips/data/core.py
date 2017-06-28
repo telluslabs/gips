@@ -27,7 +27,6 @@ import errno
 from osgeo import gdal, ogr
 from datetime import datetime
 import glob
-import re
 from itertools import groupby
 from shapely.wkt import loads
 import tarfile
@@ -647,7 +646,6 @@ class Data(object):
         self.assets = {}      # dict of <asset type string>: <Asset instance>
         self.filenames = {}   # dict of (sensor, product): product filename
         self.sensors = {}     # dict of asset/product: sensor
-        # self.basename       # self.path + part of a product filename; used as a prefix; set below
         if tile is not None and date is not None:
             self.path = self.Repository.data_path(tile, date)
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)
