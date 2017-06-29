@@ -197,7 +197,7 @@ class aodData(Data):
         if os.path.exists(lta_tif) and len(ltad_tifs) == 366:
             utils.verbose_out('lta composites already initialized', 2)
             return
-        a = inv[inv.dates[0]].tiles[cls._the_tile].open('aod')
+        a = inv[inv.dates[0]].tiles[cls.Asset.Repository._the_tile].open('aod')
         a[0] = a[0] * 0 + a[0].NoDataValue()
         a.Process(ltatif)
 
@@ -224,7 +224,7 @@ class aodData(Data):
                 # ):
                 for day in range(inventory.start_day, inventory.end_day + 1):
                     dates = [d for d in inventory.dates if int(d.strftime('%j')) == day]
-                    filenames = [inventory[d].tiles[cls._the_tile].filenames['MOD', 'aod'] for d in dates]
+                    filenames = [inventory[d].tiles[cls.Asset.Repository._the_tile].filenames['MOD', 'aod'] for d in dates]
                     fout = path + '%s.tif' % str(day).zfill(3)
                     cls.process_mean(filenames, fout)
             # Calculate single average per pixel (all days and years)
@@ -307,7 +307,7 @@ class aodData(Data):
         try:
             # this is just for fetching the data
             inv = cls.inventory(dates=date.strftime('%Y-%j'), fetch=fetch, products=['aod'])
-            img = inv[date].tiles[cls._the_tile].open('aod')
+            img = inv[date].tiles[cls.Asset.Repository._the_tile].open('aod')
             vals = img[0].Read(roi)
             # TODO - do this automagically in swig wrapper
             vals[numpy.where(vals == img[0].NoDataValue())] = numpy.nan

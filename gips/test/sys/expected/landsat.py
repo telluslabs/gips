@@ -28,6 +28,15 @@ Index Products
 LC8SR Products
 \x1b[0m   ndvi8sr     Normalized Difference Vegetation from LC8SR
 \x1b[1m
+ACOLITE Products
+\x1b[0m   acoflags    0 = water 1 = no data 2 = land          
+   fai         Floating Algae Index                    
+   oc2chl      Blue-Green Ratio Chlorophyll Algorithm using bands 483 & 561
+   oc3chl      Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561
+   rhow        Water-Leaving Radiance-Reflectance      
+   spm655      Suspended Sediment Concentration 655nm  
+   turbidity   Blended Turbidity                       
+\x1b[1m
 Tillage Products
 \x1b[0m   crc         Crop Residue Cover                      
                  toa: use top of the atmosphere reflectance
