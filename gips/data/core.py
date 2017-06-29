@@ -25,7 +25,7 @@ import os
 import sys
 import errno
 from osgeo import gdal, ogr
-from datetime import datetime
+from datetime import datetime, timedelta
 import glob
 import re
 from itertools import groupby
@@ -328,13 +328,17 @@ class Asset(object):
 
     @classmethod
     def end_date(cls, asset):
-        # TODO this method never seems to be called?
-        """ Get ending date for this asset """
-        edate = cls._assets[asset].get('enddate', None)
-        if edate is None:
-            latency = cls._assets[cls.asset].get('latency', None)
-            edate = datetime.now() - datetime.timedelta(latency)
-        return edate
+        """Get ending date for this asset.
+
+        One of 'enddate' or 'latency' must be present in
+        cls._assets[asset]. Returns either the enddate, or else a
+        computation of the most recently-available data, based on the
+        (today's date) - asset's known latency.
+        """
+        a_info = cls._assets[asset]
+        if 'enddate' in a_info:
+            return a_info['enddate']
+        return datetime.now() - timedelta(a_info['latency'])
 
     @classmethod
     def available(cls, asset, date):
@@ -343,7 +347,7 @@ class Asset(object):
         date1 = cls._assets[asset].get(['startdate'], None)
         date2 = cls._assets[asset].get(['enddate'], None)
         if date2 is None:
-            date2 = datetime.now() - datetime.timedelta(cls._asssets[asset]['latency'])
+            date2 = datetime.now() - timedelta(cls._asssets[asset]['latency'])
         if date1 is None or date2 is None:
             return False
         if date < date1 or date > date2:
@@ -360,12 +364,29 @@ class Asset(object):
         dates = [dt for dt in datearr if days[0] <= int(dt.strftime('%j')) <= days[1]]
         return dates
 
+    @classmethod
+    def query_provider(cls, asset, tile, date):
+        """Query the data provider for files matching the arguments.
+
+        Drivers must override this method or else query_service. Must
+        return (filename, url), or (None, None) if nothing found. This
+        method has a more convenient return value for drivers that never
+        find multiple files for the given (asset, tile, date), and don't
+        need to unpack a nested data structure in their fetch methods.
+        """
+        raise NotImplementedError('query_provider not supported for' + cls.__name__)
 
     @classmethod
     def query_service(cls, asset, tile, date):
-        """Wrap call to emulate existing convention."""
-        if not hasattr(cls, 'query_provider'):
-            raise NotImplementedError('Query/fetch bifurcation not supported for ' + cls.__name__)
+        """Query the data provider for files matching the arguments.
+
+        Drivers must override this method, or else query_provider, to
+        contact a data source regarding the given arguments, and report
+        on whether anything is available for fetching. Must return a
+        list of dicts containing available asset filenames and where to
+        find them:  [{'basename': bn, 'url': url}, ...]. When nothing is
+        avilable, must return [].
+        """
         bn, url = cls.query_provider(asset, tile, date)
         if (bn, url) == (None, None):
             return []
