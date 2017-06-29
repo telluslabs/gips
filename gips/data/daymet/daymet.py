@@ -31,6 +31,7 @@ from pydap.client import open_url
 import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, basename
+from gips import utils
 
 
 PROJ = ''.join([
@@ -85,7 +86,7 @@ class daymetAsset(Asset):
     _assets = {
         'tmin': {
             'description': 'Daily minimum air temperature (C)',
-            'pattern': 'daymet_tmin_*_???????.tif',
+            'pattern': r'^daymet_tmin_.+?_.{7}\.tif$',
             'source': 'tmin.nc',
             'url': _url,
             'startdate': _startdate,
@@ -93,7 +94,7 @@ class daymetAsset(Asset):
         },
         'tmax': {
             'description': 'Daily maximum air temperature (C)',
-            'pattern': 'daymet_tmax_*_???????.tif',
+            'pattern': r'^daymet_tmax_.+?_.{7}\.tif$',
             'source': 'tmax.nc',
             'url': _url,
             'startdate': _startdate,
@@ -101,7 +102,7 @@ class daymetAsset(Asset):
         },
         'prcp': {
             'description': 'Daily precipitation (mm)',
-            'pattern': 'daymet_prcp_*_???????.tif',
+            'pattern': r'^daymet_prcp_.+?_.{7}\.tif$',
             'source': 'prcp.nc',
             'url': _url,
             'startdate': _startdate,
@@ -109,7 +110,7 @@ class daymetAsset(Asset):
         },
         'srad': {
             'description': 'Daily solar radiation (W m-2)',
-            'pattern': 'daymet_srad_*_???????.tif',
+            'pattern': r'^daymet_srad_.+?_.{7}\.tif$',
             'source': 'srad.nc',
             'url': _url,
             'startdate': _startdate,
@@ -117,7 +118,7 @@ class daymetAsset(Asset):
         },
         'vp': {
             'description': 'Daily vapor pressure (Pa)',
-            'pattern': 'daymet_vp_*_???????.tif',
+            'pattern': r'^daymet_vp_.+?_.{7}\.tif$',
             'source': 'vp.nc',
             'url': _url,
             'startdate': _startdate,
@@ -166,17 +167,21 @@ class daymetAsset(Asset):
         ysz, xsz = data.shape
         description = cls._assets[asset]['description']
         meta = {'ASSET': asset, 'TILE': tile, 'DATE': str(date.date()), 'DESCRIPTION': description}
-        # save the asset in the stage
-        fout = os.path.join(cls.Repository.path('stage'), asset_bn)
-        geo = [float(x0), cls._defaultresolution[0], 0.0, float(y0), 0.0, -cls._defaultresolution[1]]
+        geo = [float(x0), cls._defaultresolution[0], 0.0,
+               float(y0), 0.0, -cls._defaultresolution[1]]
         geo = np.array(geo).astype('double')
         dtype = create_datatype(data.dtype)
-        imgout = gippy.GeoImage(fout, xsz, ysz, 1, dtype)
-        imgout.SetBandName(asset, 1)
-        imgout.SetNoData(-9999.)
-        imgout.SetProjection(PROJ)
-        imgout.SetAffine(geo)
-        imgout[0].Write(data)    
+        stage_dir = cls.Repository.path('stage')
+        with utils.make_temp_dir(prefix='fetch', dir=stage_dir) as temp_dir:
+            temp_fp = os.path.join(temp_dir, asset_bn)
+            stage_fp = os.path.join(stage_dir, asset_bn)
+            imgout = gippy.GeoImage(temp_fp, xsz, ysz, 1, dtype)
+            imgout.SetBandName(asset, 1)
+            imgout.SetNoData(-9999.)
+            imgout.SetProjection(PROJ)
+            imgout.SetAffine(geo)
+            imgout[0].Write(data)
+            os.rename(temp_fp, stage_fp)
 
 
 class daymetData(Data):

@@ -41,6 +41,7 @@ import numpy
 from gips.utils import List2File, VerboseOut
 from gips.data.merra import merraData
 from gips.data.aod import aodData
+from gips.inventory import orm
 
 # since Py6S pulls in matplotlib, we need to shut down all that gui business
 import matplotlib as mpl
@@ -257,7 +258,7 @@ class SIXS():
                     s.run()
                     outputs.append(s.outputs)
         except Exception, e:
-            # TODO error-handling-fix: add existing exception to the new one; see notes for technique AND TROLOLOLOLO
+            # TODO error-handling-fix: add existing exception to the new one
             sys.stdout = stdout
             raise AtmCorrException("Error running 6S: %s" % e)
 

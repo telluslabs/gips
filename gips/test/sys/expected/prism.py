@@ -42,6 +42,7 @@ SENSORS\x1b[0m
 
 t_process = {
     'updated': {
+        'prism/stage': None,
         'prism/tiles/CONUS/19821201': None,
         'prism/tiles/CONUS/19821202': None,
         'prism/tiles/CONUS/19821203': None
@@ -56,7 +57,7 @@ t_process = {
         'prism/tiles/CONUS/19821203/CONUS_19821203_prism_ppt.tif': None,
         'prism/tiles/CONUS/19821203/CONUS_19821203_prism_tmax.tif': None,
         'prism/tiles/CONUS/19821203/CONUS_19821203_prism_tmin.tif': None,
-        'prism/tiles/CONUS/19821203/CONUS_19821203_prism_pptsum-3.tif': -1313341182,
+        'prism/tiles/CONUS/19821203/CONUS_19821203_prism_pptsum-3.tif': 1770768528,
         'prism/tiles/CONUS/19821201/PRISM_tmax_stable_4kmD1_19821201_bil.zip.index': -74851230,
         'prism/tiles/CONUS/19821203/PRISM_ppt_stable_4kmD2_19821203_bil.zip.index': 1520480318,
         'prism/tiles/CONUS/19821203/PRISM_tmin_stable_4kmD1_19821203_bil.zip.index': -946867120,
@@ -66,6 +67,12 @@ t_process = {
         'prism/tiles/CONUS/19821202/PRISM_ppt_stable_4kmD2_19821202_bil.zip.index': -1251812608,
         'prism/tiles/CONUS/19821201/PRISM_tmin_stable_4kmD1_19821201_bil.zip.index': -1015405459,
         'prism/tiles/CONUS/19821201/PRISM_ppt_stable_4kmD2_19821201_bil.zip.index': 1582653443,
+    },
+    '_symlinks': {
+        # TODO do the rest of the symlinks as time allows
+        'prism/tiles/CONUS/19821201/CONUS_19821201_prism_ppt.tif':
+            'prism/tiles/CONUS/19821201/PRISM_ppt_stable_4kmD2_19821201_bil.zip'
+            '/PRISM_ppt_stable_4kmD2_19821201_bil.bil',
     },
     'ignored': [
         'gips-inv-db.sqlite3',
@@ -103,7 +110,7 @@ t_project = {
         '0/1982336_prism_tmax.tif': 858443300,
         '0/1982336_prism_tmin.tif': -1078834087,
         '0/1982337_prism_ppt.tif': 983840913,
-        '0/1982337_prism_pptsum.tif': 1470079626,
+        '0/1982337_prism_pptsum.tif': 366592820,
         '0/1982337_prism_tmax.tif': 1878755022,
         '0/1982337_prism_tmin.tif': -100140734,
 #        '0/1982335_prism_ppt.tif': -1525304978,
@@ -130,7 +137,7 @@ t_project_no_warp = {
         '0/1982337_prism_tmax.tif': -1029779846,
         '0/1982335_prism_tmin.tif': 976342700,
         '0/1982336_prism_tmin.tif': -165045365,
-        '0/1982337_prism_pptsum.tif': 868986376,
+        '0/1982337_prism_pptsum.tif': -1460879448,
 #        '0/1982335_prism_ppt.tif': -427336450,
 #        '0/1982335_prism_tmax.tif': 571279318,
 #        '0/1982335_prism_tmin.tif': 1498899978,
@@ -161,7 +168,7 @@ t_tiles_copy = {
         'CONUS/CONUS_1982337_prism_ppt.tif': 570845567,
         'CONUS/CONUS_1982337_prism_tmax.tif': 1289336243,
         'CONUS/CONUS_1982337_prism_tmin.tif': -818489243,
-        'CONUS/CONUS_1982337_prism_pptsum.tif': -928448216,
+        'CONUS/CONUS_1982337_prism_pptsum.tif': 272867928,
     }
 }
 
