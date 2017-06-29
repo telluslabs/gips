@@ -207,22 +207,6 @@ class landsatAsset(Asset):
             self.asset = 'DN'
             self.sensor = fname[0:3]
             self.version = int(fname[19:21])
-            # Landsat DN specific additions
-            smeta = self._sensors[self.sensor]
-            self.meta = {}
-            for i, band in enumerate(smeta['colors']):
-                wvlen = smeta['bandlocs'][i]
-                self.meta[band] = {
-                    'bandnum': i + 1,
-                    'wvlen': wvlen,
-                    'wvlen1': wvlen - smeta['bandwidths'][i] / 2.0,
-                    'wvlen2': wvlen + smeta['bandwidths'][i] / 2.0,
-                    'E': smeta['E'][i],
-                    'K1': smeta['K1'][i],
-                    'K2': smeta['K2'][i],
-                }
-            self.visbands = [col for col in smeta['colors'] if col[0:4] != "LWIR"]
-            self.lwbands = [col for col in smeta['colors'] if col[0:4] == "LWIR"]
         elif c1_match:
             utils.verbose_out('C1 asset', 2)
 
@@ -234,7 +218,16 @@ class landsatAsset(Asset):
 
             self.asset = 'C1'
             self.sensor = "L{}{}".format(c1_match.group('sensor'), int(c1_match.group('satellite')))
+            self.collection_number = c1_match.group('coll_num')
+            self.collection_category = c1_match.group('coll_cat')
+            self.version = 1e6 * int(self.collection_number) + \
+                    (self.date - datetime(2017, 1, 1)).days + \
+                    {'RT': 0, 'T2': 0.5, 'T1': 0.9}[self.collection_category]
+        else:
+            msg = "No matching landsat asset type for '{}'".format(fname)
+            raise RuntimeError(msg, filename)
 
+        if self.asset in ['DN', 'C1']:
             smeta = self._sensors[self.sensor]
             self.meta = {}
             for i, band in enumerate(smeta['colors']):
@@ -250,9 +243,6 @@ class landsatAsset(Asset):
                 }
             self.visbands = [col for col in smeta['colors'] if col[0:4] != "LWIR"]
             self.lwbands = [col for col in smeta['colors'] if col[0:4] == "LWIR"]
-        else:
-            msg = "No matching landsat asset type for '{}'".format(fname)
-            raise RuntimeError(msg, filename)
 
         if self.sensor not in self._sensors.keys():
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
