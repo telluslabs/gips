@@ -60,6 +60,7 @@ class prismAsset(Asset):
         'prism': {'description': 'Daily Gridded Climate Data'}
     }
     _startdate = date(1981, 1, 1)
+    _latency = -7
     # LATENCY (approximate)
     # 6 months for stable
     # 1 month for early
@@ -69,19 +70,19 @@ class prismAsset(Asset):
             'pattern': r'^PRISM_ppt_.+?\.zip$',
             'url': 'ftp://prism.nacse.org/daily/ppt/',
             'startdate': _startdate,
-            'latency': -7
+            'latency': _latency,
         },
         '_tmin': {
             'pattern': r'^PRISM_tmin_.+?\.zip$',
             'url': 'ftp://prism.nacse.org/daily/tmin/',
             'startdate': _startdate,
-            'latency': -7
+            'latency': _latency,
         },
         '_tmax': {
             'pattern': r'^PRISM_tmax_.+?\.zip$',
             'url': 'ftp://prism.nacse.org/daily/tmax/',
             'startdate': _startdate,
-            'latency': -7
+            'latency': _latency,
         },
     }
     _stab_score = {
@@ -181,25 +182,38 @@ class prismData(Data):
     name = 'PRISM'
     version = __version__
     Asset = prismAsset
+    # Prism official docs at http://www.prism.oregonstate.edu/FAQ/ say:
+    # "Dataset values are stored . . . precipitation as millimeters and
+    # temperature as degrees Celsius."
     _products = {
         'ppt': {
             'description': 'Precipitate',
             'assets': ['_ppt'],
+            'bands': [{'name': 'ppt', 'units': 'mm'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'pptsum': {
             'description': 'Cumulative Precipitate',
             'assets': ['_ppt'],
-            'arguments': [
-                'days: temporal window width (default: 3 days) .',
-            ]
+            'bands': [{'name': 'pptsum', 'units': 'mm'}],
+            'arguments': ['days: temporal window width (default: 3 days)'],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'tmin': {
             'description': 'Daily Minimum Temperature',
-            'assets': ['_tmin']
+            'assets': ['_tmin'],
+            'bands': [{'name': 'tmin', 'units': 'degree Celcius'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'tmax': {
             'description': 'Daily Maximum Temperature',
-            'assets': ['_tmax']
+            'assets': ['_tmax'],
+            'bands': [{'name': 'tmin', 'units': 'degree Celcius'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
     }
 
