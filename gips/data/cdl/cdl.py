@@ -65,7 +65,13 @@ class cdlData(Data):
     version = '0.9.0'
     Asset = cdlAsset
     _products = {
-        _cdl: {'description': 'Crop Data Layer'}
+        _cdl: {
+            'description': 'Crop Data Layer',
+            'assets': [_cdl],
+            'bands': [{'name': _cdl, 'units': 'none'}],
+            # presently 'startdate' & 'latency' are permitted to be unspecified
+            # by DH gips.utils.get_data_variables
+        }
     }
 
     _legend = None
