@@ -27,6 +27,7 @@ import errno
 from osgeo import gdal, ogr
 from datetime import datetime
 import glob
+import re
 from itertools import groupby
 from shapely.wkt import loads
 import tarfile
@@ -220,6 +221,19 @@ class Asset(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
+    def parse_asset_fp(self):
+        """Parse self.filename using the class's asset patterns.
+
+        On the first successful match, the re lib match object is
+        returned. Raises ValueError on failure to parse.
+        """
+        asset_bn = os.path.basename(self.filename)
+        for av in self._assets.values():
+            match = re.match(av['pattern'], asset_bn)
+            if match is not None:
+                return match
+        raise ValueError("Unparseable asset file name:  " + self.filename)
+
     def datafiles(self):
         """Get list of readable datafiles from asset.
 

@@ -138,20 +138,6 @@ class daymetAsset(Asset):
 
     _defaultresolution = (1000., 1000.,)
 
-    def parse_asset_fp(self):
-        """Parse self.filename using the class's asset patterns.
-
-        On the first successful match, the re lib match object is
-        returned. Raises ValueError on failure to parse.
-        """
-        # this method may be useful in core.Asset
-        asset_bn = os.path.basename(self.filename)
-        for av in self._assets.values():
-            match = re.match(av['pattern'], asset_bn)
-            if match is not None:
-                return match
-        raise ValueError("Unparseable asset file name:  " + self.filename)
-
     def __init__(self, filename):
         """Uses regexes above to parse filename & save metadata."""
         super(daymetAsset, self).__init__(filename)
