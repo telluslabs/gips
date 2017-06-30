@@ -207,22 +207,37 @@ class daymetData(Data):
     _products = {
         'tmin': {
             'description': 'Daily minimum air temperature (C)',
-            'assets': ['tmin']
+            'assets': ['tmin'],
+            'bands': [{'name': 'tmin', 'units': 'degree Celcius'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'tmax': {
             'description': 'Daily maximum air temperature (C)',
-            'assets': ['tmax']
+            'assets': ['tmax'],
+            'bands': [{'name': 'tmax', 'units': 'degree Celcius'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'prcp': {
             'description': 'Daily precipitation (mm)',
-            'assets': ['prcp']
+            'assets': ['prcp'],
+            'bands': [{'name': 'prcp', 'units': 'mm'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'srad': {
             'description': 'Daily solar radiation (W m-2)',
-            'assets': ['srad']
+            'assets': ['srad'],
+            'bands': [{'name': 'srad', 'units': 'W/m^2'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'vp': {
             'description': 'Daily vapor pressure (Pa)',
-            'assets': ['vp']
+            'assets': ['vp'],
+            'bands': [{'name': 'srad', 'units': 'Pa'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
     }
