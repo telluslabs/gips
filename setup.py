@@ -58,13 +58,10 @@ setup(
         'Py6S>=1.7.0',
         'shapely',
         'gippy>=0.3.8',
+        'homura==0.1.3',
         'python-dateutil',
         'pydap==3.2',
         'pysolar==0.6',
-        'landsat-util==0.8.0ircwaves0',
-    ],
-    dependency_links=[
-        'http://github.com/ircwaves/landsat-util/tarball/landsat_util#egg=landsat-util-0.8.0ircwaves0'
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,

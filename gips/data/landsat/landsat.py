@@ -40,10 +40,11 @@ from gips import __version__ as __gips_version__
 from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
 from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
-from gips.utils import VerboseOut, RemoveFiles, basename, settings
+from gips.utils import RemoveFiles, basename, settings, verbose_out
 from gips import utils
 
-from landsat_util import search, downloader
+from usgs import api
+from homura import download
 
 from pdb import set_trace
 
@@ -178,7 +179,7 @@ class landsatAsset(Asset):
 
         fname = os.path.basename(filename)
 
-        VerboseOut(("fname", fname), 2)
+        verbose_out(("fname", fname), 2)
 
         sr_pattern_re = re.compile(self._assets['SR']['pattern'])
         dn_pattern_re = re.compile(self._assets['DN']['pattern'])
@@ -189,17 +190,14 @@ class landsatAsset(Asset):
         c1_match = c1_pattern_re.match(fname)
 
         if sr_match:
-            VerboseOut('SR asset', 2)
+            verbose_out('SR asset', 2)
             self.asset = 'SR'
             self.sensor = 'LC8SR'
             self.version = int(fname[20:22])
         elif dn_match:
-            VerboseOut('DN asset', 2)
+            verbose_out('DN asset', 2)
 
-            #self.tile = fname[3:9]
-            #year = fname[9:13]
-            #doy = fname[13:16]
-            self.tile = dn_match.group('path') + dn_match.group('row')
+            self.title = dn_match.group('path') + dn_match.group('row')
             year = dn_match.group('acq_year')
             doy = dn_match.group('acq_day')
             self.date = datetime.strptime(year + doy, "%Y%j")
@@ -248,41 +246,61 @@ class landsatAsset(Asset):
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
 
     @classmethod
-    def fetch(cls, asset, tile, date):
+    def query_service(cls, asset, tile, date):
+        available = []
 
         # 'SR' not fetchable at the moment
         if asset == 'SR':
-            VerboseOut('SR assets are never fetchable', 4)
-            return
-        paths_rows = tile[:3] + "," + tile[3:]
+            verbose_out('SR assets are never fetchable', 4)
+            return available
+
+        # only fetching 'C1' assets from now on
+        if asset == 'DN':
+            verbose_out('DN assets are no longer fetchable', 4)
+            return available
+
+        path = tile[:3]
+        row = tile[3:]
         fdate = date.strftime('%Y-%m-%d')
 
-        s = search.Search()
-        response = s.search(paths_rows=paths_rows, start_date=fdate, end_date=fdate, cloud_max=90)
-        if response['status'] == 'SUCCESS' and response['total'] > 0:
-            VerboseOut('Fetching %s %s %s' % (asset, tile, fdate), 1)
-            if response['total_returned'] != 1:
+        username = settings().REPOS['landsat']['username']
+        password = settings().REPOS['landsat']['password']
+        api_key = api.login(username, password)['data']
+        response = api.search(
+            'LANDSAT_8_C1', 'EE',
+            start_date=fdate, end_date=fdate,
+            where={             # Field IDs retrieved with `dataset_fields()` call
+                '20514': path,  # Path
+                '20516': row,   # Row
+                #'20515': '90',  # Max cloud cover %, doesn't seem to work at the moment
+            },
+            api_key=api_key
+        )['data']
+
+        available = []
+        for result in response['results']:
+            available.append({'basename': result['displayId'] + '.tar.gz', 'sceneID': result['entityId']})
+
+        return available
+
+    @classmethod
+    def fetch(cls, asset, tile, date):
+        fdate = date.strftime('%Y-%m-%d')
+        response = cls.query_service(asset, tile, date)
+        if len(response) > 0:
+            verbose_out('Fetching %s %s %s' % (asset, tile, fdate), 1)
+            if len(response) != 1:
                 raise Exception('Single date, single location, returned more than one result')
-            result = response['results'][0]
-            cloudpct = result['cloud']
+            result = response[0]
             sceneID = result['sceneID']
             stage_dir = os.path.join(cls.Repository.path(), 'stage')
             sceneIDs = [str(sceneID)]
-            d = downloader.Downloader(download_dir=stage_dir)
-            d.download(sceneIDs)
-            # do the following because the downloaded .bz file has owner/group
-            # settings that cause the GDAL virtual filesystem access to fail
-            bz_path = glob.glob(os.path.join(stage_dir, sceneID + '*'))[0]
-            gz_path = os.path.splitext(bz_path)[0] + ".gz"
-            cmd = "tar xvfj %s -C %s |xargs tar cvfz %s -C %s" % (bz_path, stage_dir, gz_path, stage_dir)
-            VerboseOut("Reformatting bz->gz", 1)
-            result = commands.getstatusoutput(cmd)
-            VerboseOut("removing %s" % bz_path)
-            bands_path = glob.glob(os.path.join(stage_dir, sceneID + '_*.*'))
-            # clean up - the .tar.gz will get moved on archive
-            os.remove(bz_path)
-            for band_path in bands_path:
-                os.remove(band_path)
+
+            username = settings().REPOS['landsat']['username']
+            password = settings().REPOS['landsat']['password']
+            api_key = api.login(username, password)['data']
+            url = api.download('LANDSAT_8_C1', 'EE', sceneIDs, 'STANDARD', api_key)['data'][0]
+            download(url, stage_dir)
 
     def updated(self, newasset):
         '''
@@ -766,7 +784,7 @@ class landsatData(Data):
                     ndvi = missing + numpy.zeros_like(red)
                     ndvi[wvalid] = (nir[wvalid] - red[wvalid])/(nir[wvalid] + red[wvalid])
 
-                    VerboseOut("writing " + fname, 2)
+                    verbose_out("writing " + fname, 2)
                     imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
                     imgout.SetNoData(-9999.)
                     imgout.SetOffset(0.0)
@@ -785,7 +803,7 @@ class landsatData(Data):
                     cfmask[cfmask == 0] = 1
                     cfmask[cfmask == 2] = 0
 
-                    VerboseOut("writing " + fname, 2)
+                    verbose_out("writing " + fname, 2)
                     imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
                     imgout.SetBandName('Land mask', 1)
                     imgout[0].Write(cfmask)
@@ -1065,7 +1083,7 @@ class landsatData(Data):
                 shutil.rmtree(os.path.join(self.path, 'modtran'))
             except:
                 # TODO error-handling-fix: continuable handler
-                # VerboseOut(traceback.format_exc(), 4)
+                # verbose_out(traceback.format_exc(), 4)
                 pass
 
             if groups['ACOLITE']:
@@ -1102,7 +1120,7 @@ class landsatData(Data):
                     endtime = datetime.now()
                     for k, fn in prodout.items():
                         self.AddFile(sensor, k, fn)
-                    VerboseOut(
+                    verbose_out(
                         ' -> {}: processed {} in {}'
                         .format(self.basename, prodout.keys(), endtime - start),
                         1
@@ -1318,5 +1336,5 @@ class landsatData(Data):
             #     Out[20]: -64.927711800095906
 
 
-        VerboseOut('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
+        verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image
