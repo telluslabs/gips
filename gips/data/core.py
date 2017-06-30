@@ -522,6 +522,8 @@ class Data(object):
     version = '0.0.0'
     Asset = Asset
 
+    _unitless = 'unitless' # standard string for expressing that a product has no units
+
     _pattern = '*.tif'
     _products = {}
     _productgroups = {}

@@ -442,7 +442,10 @@ class sentinel2Asset(Asset):
         """Loads solar irradiances from asset metadata and returns them.
 
         The order of the list matches the band list above.  Irradiance
-        values are in watts/(m^2 * micrometers).
+        values are in watts/(m^2 * micrometers).  Wikipedia claims it is
+        really "spectral flux density" and measures the power flowing onto
+        a surface per unit wavelength:
+        https://en.wikipedia.org/wiki/Spectral_flux_density
         """
         sil_elem = self.xml_subtree('datastrip', 'Solar_Irradiance_List')
         values_tags = sil_elem.findall('SOLAR_IRRADIANCE')
@@ -593,79 +596,52 @@ class sentinel2Data(Data):
         'Index': ['ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari', 'brgt',
                   'ndti', 'crc', 'crcm', 'isti', 'sti'] # <-- tillage indices
     }
+
     _products = {
         # standard products
         'rad': {
             'description': 'Surface-leaving radiance',
-            'assets': ['L1C'],
+            'assets': [_asset_type],
+            'bands': [{'name': band_name, 'units': 'W/m^2/um'} # aka watts/(m^2 * micrometers)
+                      for band_name in Asset._sensors['S2A']['indices-colors']],
+            # 'startdate' and 'latency' are optional for DH
         },
         'ref': {
             'description': 'Surface reflectance',
-            'assets': ['L1C'],
-        },
-        # index products
-        'ndvi': {
-            'description': 'Normalized Difference Vegetation Index',
-            'assets': ['L1C'],
-        },
-        'evi': {
-            'description': 'Enhanced Vegetation Index',
-            'assets': ['L1C'],
-        },
-        'lswi': {
-            'description': 'Land Surface Water Index',
-            'assets': ['L1C'],
-        },
-        'ndsi': {
-            'description': 'Normalized Difference Snow Index',
-            'assets': ['L1C'],
-        },
-        'bi': {
-            'description': 'Brightness Index',
-            'assets': ['L1C'],
-        },
-        'satvi': {
-            'description': 'Soil-Adjusted Total Vegetation Index',
-            'assets': ['L1C'],
-        },
-        'msavi2': {
-            'description': 'Modified Soil-adjusted Vegetation Index',
-            'assets': ['L1C'],
-        },
-        'vari': {
-            'description': 'Visible Atmospherically Resistant Index',
-            'assets': ['L1C'],
-        },
-        # index products related to tillage
-        'brgt': {
-            'description': ('VIS and NIR reflectance, weighted by solar energy distribution.'),
-            # rbraswell's original description:
-            #'description': ('Brightness index:  Visible to near infrared reflectance weighted by'
-            #                ' approximate energy distribution of the solar spectrum. A proxy for'
-            #                ' broadband albedo.'),
-            'assets': ['L1C'],
-        },
-        'ndti': {
-            'description': 'Normalized Difference Tillage Index',
-            'assets': ['L1C'],
-        },
-        'crc': {
-            'description': 'Crop Residue Cover (uses BLUE)',
-            'assets': ['L1C'],
-        },
-        'crcm': {
-            'description': 'Crop Residue Cover, Modified (uses GREEN)',
-            'assets': ['L1C'],
-        },
-        'isti': {
-            'description': 'Inverse Standard Tillage Index',
-            'assets': ['L1C'],
-        },
-        'sti': {
-            'description': 'Standard Tillage Index',
-            'assets': ['L1C'],
+            'assets': [_asset_type],
+            'bands': [{'name': band_name, 'units': Data._unitless}
+                      for band_name in Asset._sensors['S2A']['indices-colors']],
         },
     }
+
+    # add index products to _products
+    _products.update(
+        (p, {'description': d,
+             'assets': ['L1C'],
+             'bands': [{'name': p, 'units': Data._unitless}]}
+        ) for p, d in [
+            ('ndvi',   'Normalized Difference Vegetation Index'),
+            ('evi',    'Enhanced Vegetation Index'),
+            ('lswi',   'Land Surface Water Index'),
+            ('ndsi',   'Normalized Difference Snow Index'),
+            ('bi',     'Brightness Index'),
+            ('satvi',  'Soil-Adjusted Total Vegetation Index'),
+            ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
+            ('vari',   'Visible Atmospherically Resistant Index'),
+            # index products related to tillage
+            # rbraswell's original description of brgt:  "Brightness index:
+            # Visible to near infrared reflectance weighted by" approximate
+            # energy distribution of the solar spectrum. A proxy for
+            # broadband albedo."
+            ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
+            ('ndti',   'Normalized Difference Tillage Index'),
+            ('crc',    'Crop Residue Cover (uses BLUE)'),
+            ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
+            ('isti',   'Inverse Standard Tillage Index'),
+            ('sti',    'Standard Tillage Index'),
+        ]
+    )
+
     _product_dependencies = {
         'indices':      'ref',
         'indices-toa':  'ref-toa',
@@ -825,6 +801,7 @@ class sentinel2Data(Data):
             upsampled_img = gippy.GeoImage(upsampled_filenames)
             upsampled_img.SetMeta(self.meta_dict())
             upsampled_img.SetNoData(0)
+            # eg:   3        '08'
             for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
                 band_index = data_spec['band-strings'].index(band_string) # starts at 0
                 color_name = data_spec['colors'][band_index]
