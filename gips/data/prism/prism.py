@@ -110,11 +110,11 @@ class prismAsset(Asset):
 
         Re-use the given ftp connection if possible; Returns (basename,
         None) on success; (None, None) otherwise."""
+        if asset not in cls._assets:
+            raise ValueError('{} has no defined asset for {}'.format(cls.Repository.name, asset))
         private_conn = conn is None # do we have a shared connection?
         if private_conn:
             conn = cls.ftp_connect(asset, date)
-        if asset not in cls._assets:
-            raise ValueError('{} has no defined asset for {}'.format(cls.Repository.name, asset))
         # get the list of filenames for the year, filter down to the specific date
         filenames = [fn for fn in conn.nlst() if date.strftime('%Y%m%d') in fn]
         if private_conn:
