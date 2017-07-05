@@ -189,16 +189,16 @@ class landsatAsset(Asset):
         c1_match = c1_pattern_re.match(fname)
 
         if sr_match:
-            VerboseOut('SR asset', 2)
+            utils.verbose_out('SR asset', 2)
             self.asset = 'SR'
             self.sensor = 'LC8SR'
             self.version = int(fname[20:22])
-        elif dn_match:
-            VerboseOut('DN asset', 2)
+            self.tile = fname[3:9]
+            self.date = datetime.strptime(fname[9:16], "%Y%j")
 
-            #self.tile = fname[3:9]
-            #year = fname[9:13]
-            #doy = fname[13:16]
+        elif dn_match:
+            utils.verbose_out('DN asset', 2)
+
             self.tile = dn_match.group('path') + dn_match.group('row')
             year = dn_match.group('acq_year')
             doy = dn_match.group('acq_day')
