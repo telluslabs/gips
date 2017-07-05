@@ -21,10 +21,19 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
+"""Daymet driver module; see https://daymet.ornl.gov/
+
+Daymet is an unusual GIPS driver in that its assets are also its
+products. During fetch, files are constructed out of data downloaded in
+non-file format (via opendap). These files are then available as both
+assets and products simultaneously.
+"""
+
 import os
 import datetime
 import time
 import numpy as np
+import re
 
 from pydap.client import open_url
 
@@ -32,9 +41,9 @@ import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, basename
 from gips import utils
+import gips
 
-
-from pdb import set_trace
+_daymet_driver_version = '0.1'
 
 requirements =['pydap']
 
@@ -73,14 +82,21 @@ class daymetAsset(Asset):
         }
     }
 
+    _sensor = 'daymet' # only one in the driver
+
     _latency = 0
     _startdate = datetime.date(1980, 1, 1)
     _url = "https://thredds.daac.ornl.gov/thredds/dodsC/ornldaac/1328/tiles/%d/%s_%d"
 
+    # daymet assets are named just like products: tile_date_sensor_asset/product.tif
+    _asset_template = '{}_{}_{}_{}.tif' # for generating filenames
+    # for validating and parsing filenames - doubling of {} is due to format() -----vv
+    _asset_re = r'^(?P<tile>\d{{5}})_(?P<date>\d{{7}})_' + _sensor + r'_(?P<ap_type>{})\.tif$'
+
     _assets = {
         'tmin': {
             'description': 'Daily minimum air temperature (C)',
-            'pattern': r'^daymet_tmin_.+?_.{7}\.tif$',
+            'pattern': _asset_re.format('tmin'),
             'source': 'tmin.nc',
             'url': _url,
             'startdate': _startdate,
@@ -88,7 +104,7 @@ class daymetAsset(Asset):
         },
         'tmax': {
             'description': 'Daily maximum air temperature (C)',
-            'pattern': r'^daymet_tmax_.+?_.{7}\.tif$',
+            'pattern': _asset_re.format('tmax'),
             'source': 'tmax.nc',
             'url': _url,
             'startdate': _startdate,
@@ -96,7 +112,7 @@ class daymetAsset(Asset):
         },
         'prcp': {
             'description': 'Daily precipitation (mm)',
-            'pattern': r'^daymet_prcp_.+?_.{7}\.tif$',
+            'pattern': _asset_re.format('prcp'),
             'source': 'prcp.nc',
             'url': _url,
             'startdate': _startdate,
@@ -104,7 +120,7 @@ class daymetAsset(Asset):
         },
         'srad': {
             'description': 'Daily solar radiation (W m-2)',
-            'pattern': r'^daymet_srad_.+?_.{7}\.tif$',
+            'pattern': _asset_re.format('srad'),
             'source': 'srad.nc',
             'url': _url,
             'startdate': _startdate,
@@ -112,7 +128,7 @@ class daymetAsset(Asset):
         },
         'vp': {
             'description': 'Daily vapor pressure (Pa)',
-            'pattern': r'^daymet_vp_.+?_.{7}\.tif$',
+            'pattern': _asset_re.format('vp'),
             'source': 'vp.nc',
             'url': _url,
             'startdate': _startdate,
@@ -123,15 +139,27 @@ class daymetAsset(Asset):
     _defaultresolution = (1000., 1000.,)
 
     def __init__(self, filename):
-        """ Inspect a single file and get some metadata """
+        """Uses regexes above to parse filename & save metadata."""
         super(daymetAsset, self).__init__(filename)
-        parts = basename(filename).split('_')
-        self.sensor = 'daymet'
-        self.asset = parts[1]
-        self.tile = parts[2]
-        self.date = datetime.datetime.strptime(parts[3], '%Y%j').date()
+        self.tile, date_str, self.asset = (
+            self.parse_asset_fp().group('tile', 'date', 'ap_type'))
+        self.date = datetime.datetime.strptime(date_str, '%Y%j').date()
+        self.sensor = self._sensor
+        # how daymet products load magically
         self.products[self.asset] = filename
 
+    @classmethod
+    def generate_metadata(cls, asset, tile, date, url):
+        """Returns a dict suitable to pass to GeoImage.SetMeta()."""
+        return {
+            'GIPS Version': gips.__version__,
+            'GIPS DAYMET Driver Version': _daymet_driver_version,
+            'ASSET': asset,
+            'TILE': tile,
+            'DATE': str(date.date()),
+            'DESCRIPTION': cls._assets[asset]['description'],
+            'URL': url,
+        }
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -139,7 +167,7 @@ class daymetAsset(Asset):
         url = cls._assets[asset].get('url', '') % (date.year, tile, date.year)
         source = cls._assets[asset]['source'] 
         loc = "%s/%s" % (url, source)
-        print loc
+        utils.verbose_out(loc)
         dataset = open_url(loc)
         x0 = dataset['x'].data[0] - 500.0
         y0 = dataset['y'].data[0] + 500.0
@@ -148,14 +176,13 @@ class daymetAsset(Asset):
         var = dataset[asset]
         data = np.array(var.array[iday, :, :]).squeeze().astype('float32')
         ysz, xsz = data.shape
-        description = cls._assets[asset]['description']
-        meta = {'ASSET': asset, 'TILE': tile, 'DATE': str(date.date()), 'DESCRIPTION': description}
         sday = str(day).zfill(3)
         geo = [float(x0), cls._defaultresolution[0], 0.0,
                float(y0), 0.0, -cls._defaultresolution[1]]
         geo = np.array(geo).astype('double')
         dtype = create_datatype(data.dtype)
-        filename = "daymet_%s_%s_%4d%s.tif" % (asset, tile, date.year, sday)
+        date_str = date.strftime(cls.Repository._datedir)
+        filename = cls._asset_template.format(tile, date_str, cls._sensor, asset)
         stage_dir = cls.Repository.path('stage')
         with utils.make_temp_dir(prefix='fetch', dir=stage_dir) as temp_dir:
             temp_fp = os.path.join(temp_dir, filename)
@@ -166,34 +193,51 @@ class daymetAsset(Asset):
             imgout.SetProjection(PROJ)
             imgout.SetAffine(geo)
             imgout[0].Write(data)
+            imgout.SetMeta(cls.generate_metadata(asset, tile, date, loc))
             os.rename(temp_fp, stage_fp)
+            return [stage_fp]
 
 
 class daymetData(Data):
     """ A tile of data (all assets and products) """
     name = 'Daymet'
-    version = '0.1'
+    version = _daymet_driver_version
     Asset = daymetAsset
 
     _products = {
         'tmin': {
             'description': 'Daily minimum air temperature (C)',
-            'assets': ['tmin']
+            'assets': ['tmin'],
+            'bands': [{'name': 'tmin', 'units': 'degree Celcius'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'tmax': {
             'description': 'Daily maximum air temperature (C)',
-            'assets': ['tmax']
+            'assets': ['tmax'],
+            'bands': [{'name': 'tmax', 'units': 'degree Celcius'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'prcp': {
             'description': 'Daily precipitation (mm)',
-            'assets': ['prcp']
+            'assets': ['prcp'],
+            'bands': [{'name': 'prcp', 'units': 'mm'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'srad': {
             'description': 'Daily solar radiation (W m-2)',
-            'assets': ['srad']
+            'assets': ['srad'],
+            'bands': [{'name': 'srad', 'units': 'W/m^2'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'vp': {
             'description': 'Daily vapor pressure (Pa)',
-            'assets': ['vp']
+            'assets': ['vp'],
+            'bands': [{'name': 'srad', 'units': 'Pa'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
     }
