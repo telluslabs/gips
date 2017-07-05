@@ -420,24 +420,18 @@ class Asset(object):
         VerboseOut('%s: fetch tile %s for %s' % (asset, tile, date), 3)
         ftpurl = url.split('/')[0]
         ftpdir = url[len(ftpurl):]
-        try:
+        with utils.error_handler("Error downloading from {}".format(ftpurl)):
             ftp = ftplib.FTP(ftpurl)
             ftp.login('anonymous', settings().EMAIL)
             pth = os.path.join(ftpdir, date.strftime('%Y'), date.strftime('%j'))
             ftp.set_pasv(True)
             ftp.cwd(pth)
 
-            filenames = []
-            ftp.retrlines('LIST', filenames.append)
-
             for f in ftp.nlst('*'):
                 VerboseOut("Downloading %s" % f, 2)
-                ftp.retrbinary('RETR %s' % f, open(os.path.join(cls.Repository.path('stage'), f), "wb").write)
+                ftp.retrbinary('RETR %s' % f,
+                               open(os.path.join(cls.Repository.path('stage'), f), "wb").write)
             ftp.close()
-        except Exception, e:
-            # TODO error-handling-fix: use with handler() instead
-            VerboseOut(traceback.format_exc(), 4)
-            raise Exception("Error downloading: %s" % e)
 
     @classmethod
     def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):

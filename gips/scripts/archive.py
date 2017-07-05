@@ -24,6 +24,7 @@
 from gips import __version__ as gipsversion
 from gips.parsers import GIPSParser
 from gips.utils import Colors, VerboseOut, import_data_class
+from gips import utils
 from gips.inventory import orm, dbinv
 
 
@@ -43,7 +44,9 @@ def main():
     )
     args = parser.parse_args()
 
-    try:
+    utils.gips_script_setup(None, args.stop_on_error)
+
+    with utils.error_handler('Data archive error'):
         print title
         cls = import_data_class(args.command)
         orm.setup() # set up DB orm in case it's needed for Asset.archive()
@@ -56,11 +59,7 @@ def main():
                 dbinv.update_or_add_asset(asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
                                           name=a.archived_filename, driver=cls.name.lower())
 
-    except Exception, e:
-        # TODO error-handling-fix: standard script-level handler
-        import traceback
-        VerboseOut(traceback.format_exc(), 4)
-        print 'Data archive error: %s' % e
+    utils.gips_exit()
 
 
 if __name__ == "__main__":

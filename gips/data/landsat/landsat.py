@@ -1056,17 +1056,16 @@ class landsatData(Data):
                         self.basename, indices0.keys(), datetime.now() - start), 1)
             img = None
             # cleanup scene directory by removing (most) extracted files
-            try:
+            with utils.error_handler('Error removing extracted files', continuable=True):
                 if settings().REPOS[self.Repository.name.lower()]['extract']:
                     for bname in self.assets[asset].datafiles():
                         if bname[-7:] != 'MTL.txt':
                             files = glob.glob(os.path.join(self.path, bname) + '*')
                             RemoveFiles(files)
-                shutil.rmtree(os.path.join(self.path, 'modtran'))
-            except:
-                # TODO error-handling-fix: continuable handler
-                # VerboseOut(traceback.format_exc(), 4)
-                pass
+                # TODO only wtemp uses MODTRAN; do the dir removal there?
+                modtran_path = os.path.join(self.path, 'modtran')
+                if os.path.exists(modtran_path):
+                    shutil.rmtree(modtran_path)
 
             if groups['ACOLITE']:
                 start = datetime.now()
@@ -1189,11 +1188,11 @@ class landsatData(Data):
         lat = (min(lats) + max(lats)) / 2.0
         lon = (min(lons) + max(lons)) / 2.0
         dt = datetime.strptime(mtl['DATE_ACQUIRED'] + ' ' + mtl['SCENE_CENTER_TIME'][:-2], '%Y-%m-%d %H:%M:%S.%f')
-        try:
+        clouds = 0.0
+        with utils.error_handler('Error reading CLOUD_COVER metadata', continuable=True):
+            # CLOUD_COVER isn't trusted for unknown reasons; previously errors were silenced, but
+            # now maybe explicit error reports will reveal something.
             clouds = float(mtl['CLOUD_COVER'])
-        except:
-            # TODO error-handling-fix: no try-except needed
-            clouds = 0
 
         filenames = []
         gain = []
@@ -1218,12 +1217,6 @@ class landsatData(Data):
             'lon': lon,
         }
 
-        try:
-            qafilename = [f for f in datafiles if '_BQA.TIF' in f][0]
-        except Exception:
-            # TODO error-handling-fix: no try-except needed
-            qafilename = None
-
         self.metadata = {
             'filenames': filenames,
             'gain': gain,
@@ -1232,7 +1225,7 @@ class landsatData(Data):
             'geometry': _geometry,
             'datetime': dt,
             'clouds': clouds,
-            'qafilename': qafilename
+            'qafilename': next((f for f in datafiles if '_BQA.TIF' in f), None) # defaults to None
         }
         #self.metadata.update(smeta)
 
