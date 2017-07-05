@@ -64,22 +64,23 @@ class prismAsset(Asset):
     # 6 months for stable
     # 1 month for early
     # 1 week for provisional
+    _host = 'prism.nacse.org'
     _assets = {
         '_ppt': {
             'pattern': r'^PRISM_ppt_.+?\.zip$',
-            'url': 'ftp://prism.nacse.org/daily/ppt/',
+            'path': '/daily/ppt',
             'startdate': _startdate,
             'latency': -7
         },
         '_tmin': {
             'pattern': r'^PRISM_tmin_.+?\.zip$',
-            'url': 'ftp://prism.nacse.org/daily/tmin/',
+            'path': '/daily/tmin',
             'startdate': _startdate,
             'latency': -7
         },
         '_tmax': {
             'pattern': r'^PRISM_tmax_.+?\.zip$',
-            'url': 'ftp://prism.nacse.org/daily/tmax/',
+            'path': '/daily/tmax',
             'startdate': _startdate,
             'latency': -7
         },
@@ -90,34 +91,50 @@ class prismAsset(Asset):
         'provisional': 1,
     }
 
-    @classmethod
-    def fetch_ftp(cls, asset, tile, date):
-        """Fetch to the stage; returns the full path to the asset."""
-        url = cls._assets[asset].get('url', '')
-        if url == '':
-            raise Exception("%s: URL not defined for asset %s" % (cls.__name__, asset))
-        utils.verbose_out('%s: fetch tile %s for %s' % (asset, tile, date), 3)
-        if url.startswith('ftp://'):
-            url = url[6:]  # drop ftp:// if given
-        ftpurl = url.split('/')[0]
-        ftpdir = url[len(ftpurl):]
-        with utils.error_handler("Error downloading from " + ftpurl, continuable=True):
-            ftp = ftplib.FTP(ftpurl)
-            ftp.login('anonymous', settings().EMAIL)
-            pth = os.path.join(ftpdir, date.strftime('%Y'))
-            ftp.set_pasv(True)
-            ftp.cwd(pth)
 
-            filenames = []
-            ftp.retrlines('LIST', filenames.append)
-            filenames = map(lambda x: x.split(' ')[-1], filenames)
-            filenames = filter(
-                lambda x: date.strftime('%Y%m%d') in x,
-                filenames
-            )
-            if len(filenames) > 1:
-                filenames = sorted(filenames, key=lambda x: prismAsset(x).ver_stab, reverse=True)
-            asset_fn = filenames[0]
+    @classmethod
+    def ftp_connect(cls, asset, date):
+        """Connect to the PRISM servers and chdir according to the args.
+
+        Returns the ftplib connection object."""
+        conn = ftplib.FTP(cls._host)
+        conn.login('anonymous', settings().EMAIL)
+        conn.set_pasv(True)
+        conn.cwd(os.path.join(cls._assets[asset]['path'], date.strftime('%Y')))
+        return conn
+
+
+    @classmethod
+    def query_provider(cls, asset, tile, date, conn=None):
+        """Determine availability of data for the given (asset, tile, date).
+
+        Re-use the given ftp connection if possible; Returns (basename,
+        None) on success; (None, None) otherwise."""
+        if asset not in cls._assets:
+            raise ValueError('{} has no defined asset for {}'.format(cls.Repository.name, asset))
+        private_conn = conn is None # do we have a shared connection?
+        if private_conn:
+            conn = cls.ftp_connect(asset, date)
+        # get the list of filenames for the year, filter down to the specific date
+        filenames = [fn for fn in conn.nlst() if date.strftime('%Y%m%d') in fn]
+        if private_conn:
+            conn.quit()
+        if 0 == len(filenames):
+            return None, None
+        # choose the one that has the most favorable stability & version values (usually only one)
+        return max(filenames, key=(lambda x: prismAsset(x).ver_stab)), None
+
+
+    @classmethod
+    def fetch(cls, asset, tile, date):
+        """Fetch to the stage.
+
+        Returns a list with one item, the full path to the staged asset.
+        """
+        utils.verbose_out('%s: fetch tile %s for %s' % (asset, tile, date), 3)
+        with utils.error_handler("Error downloading from " + cls._host, continuable=True):
+            ftp = cls.ftp_connect(asset, date) # starts chdir'd to the right directory
+            asset_fn, _ = cls.query_provider(asset, tile, date, ftp)
             stage_dir_fp = cls.Repository.path('stage')
             stage_fp = os.path.join(stage_dir_fp, asset_fn)
             with utils.make_temp_dir(prefix='fetchtmp', dir=stage_dir_fp) as td_name:
@@ -127,14 +144,8 @@ class prismAsset(Asset):
                     ftp.retrbinary('RETR ' + asset_fn, temp_fo.write)
                 ftp.quit()
                 os.rename(temp_fp, stage_fp)
-            return stage_fp
-
-
-    @classmethod
-    def fetch(cls, asset, tile, date):
-        """Get this asset for this tile and date (via FTP)."""
-        fetched = cls.fetch_ftp(asset, tile, date)
-        return [] if fetched is None else [fetched]
+            return [stage_fp]
+        return []
 
     def __init__(self, filename):
         """ Inspect a PRISM file """
