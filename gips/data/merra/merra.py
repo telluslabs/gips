@@ -212,7 +212,7 @@ class merraAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
-
+        """Standard Asset.fetch implementation for downloading assets."""
         if asset == "ASM" and date.date() != cls._assets[asset]['startdate']:
             #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
             utils.verbose_out('constants are available for %s only' % cls._assets[asset]['startdate'])
