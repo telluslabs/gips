@@ -130,11 +130,6 @@ def rectify_products(data_class):
     starting_keys = set(mpo.filter(driver=driver).values_list('id', flat=True))
 
     def rectify_product(full_fn):
-        # TODO if data_class.name == 'Daymet':
-        #   # Daymet assets & products are the same, so use Asset parsing to make Products
-        #   daymet_asset = data_class.Asset(full_fn)
-        #   # extract metadata here
-        #   # save deets as usual
         bfn_parts = basename(full_fn).split('_')
         if not len(bfn_parts) == 4:
             _match_failure_report(full_fn,

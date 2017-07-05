@@ -221,6 +221,19 @@ class Asset(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
+    def parse_asset_fp(self):
+        """Parse self.filename using the class's asset patterns.
+
+        On the first successful match, the re lib match object is
+        returned. Raises ValueError on failure to parse.
+        """
+        asset_bn = os.path.basename(self.filename)
+        for av in self._assets.values():
+            match = re.match(av['pattern'], asset_bn)
+            if match is not None:
+                return match
+        raise ValueError("Unparseable asset file name:  " + self.filename)
+
     def datafiles(self):
         """Get list of readable datafiles from asset.
 
@@ -555,6 +568,8 @@ class Data(object):
     version = '0.0.0'
     Asset = Asset
 
+    _unitless = 'unitless' # standard string for expressing that a product has no units
+
     _pattern = '*.tif'
     _products = {}
     _productgroups = {}
@@ -680,7 +695,6 @@ class Data(object):
         self.assets = {}      # dict of <asset type string>: <Asset instance>
         self.filenames = {}   # dict of (sensor, product): product filename
         self.sensors = {}     # dict of asset/product: sensor
-        # self.basename       # self.path + part of a product filename; used as a prefix; set below
         if tile is not None and date is not None:
             self.path = self.Repository.data_path(tile, date)
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)

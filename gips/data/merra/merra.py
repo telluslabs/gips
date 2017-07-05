@@ -89,8 +89,10 @@ class merraAsset(Asset):
     }
 
     _bandnames = ['%02d30GMT' % i for i in range(24)]
+    # used in _assets[asset_type]['pattern'], which is used by data/core.py to search the filesystem
     _asset_re_pattern = '^MERRA2_\d\d\d\.%s\.\d{4}\d{2}\d{2}\.nc4$'
-    _asset_re_format_pattern = "^MERRA2_\d\d\d\.{name}\.%04d%02d%02d\.nc4$"
+    # used in _assets[asset_type]['re_pattern'], which is used exclusively by query_service
+    _asset_re_format_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d\.nc4"
 
     _assets = {
         # MERRA2 SLV

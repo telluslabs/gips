@@ -115,10 +115,8 @@ class aodAsset(Asset):
             5: 'Optical_Depth_Land_And_Ocean_Mean',
             6: 'Aerosol_Optical_Depth_Land_Ocean_Mean',
         }
-        self.products = {
-            'aod': (prefix + filename +
-                    '":mod08:{}'.format(sds[int(self.modis_collection)]))
-        }
+        self.products['aod'] = (
+                prefix + filename + '":mod08:{}'.format(sds[int(self.modis_collection)]))
 
     def datafiles(self):
         indexfile = self.filename + '.index'
