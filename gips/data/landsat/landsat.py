@@ -92,6 +92,8 @@ class landsatAsset(Asset):
         #},
         'LT5': {
             'description': 'Landsat 5',
+            'startdate': datetime(1984, 3, 1),
+            'enddate': datetime(2013, 1, 1),
             'bands': ['1', '2', '3', '4', '5', '6', '7'],
             'oldbands': ['1', '2', '3', '4', '5', '6', '7'],
             'colors': ["BLUE", "GREEN", "RED", "NIR", "SWIR1", "LWIR", "SWIR2"],
@@ -105,6 +107,7 @@ class landsatAsset(Asset):
         },
         'LE7': {
             'description': 'Landsat 7',
+            'startdate': datetime(1999, 4, 15),
             #bands = ['1','2','3','4','5','6_VCID_1','6_VCID_2','7','8']
             'bands': ['1', '2', '3', '4', '5', '6_VCID_1', '7'],
             'oldbands': ['1', '2', '3', '4', '5', '61', '7'],
@@ -118,6 +121,7 @@ class landsatAsset(Asset):
         },
         'LC8': {
             'description': 'Landsat 8',
+            'startdate': datetime(2013, 4, 1),
             'bands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
             'oldbands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
             'colors': ["COASTAL", "BLUE", "GREEN", "RED", "NIR",
@@ -143,13 +147,15 @@ class landsatAsset(Asset):
         },
         'LC8SR': {
             'description': 'Landsat 8 Surface Reflectance',
+            'startdate': datetime(2013, 4, 1),
         }
 
     }
 
-    # TODO - consider assets and sensors relationship ?
     _assets = {
         'DN': {
+            'sensors': ['LT5', 'LE7', 'LC8'],
+            'enddate': datetime(2017, 4, 30),
             'pattern': (
                 r'^L(?P<sensor>[A-Z])(?P<satellie>\d)'
                 r'(?P<path>\d{3})(?P<row>\d{3})'
@@ -158,18 +164,29 @@ class landsatAsset(Asset):
             ),
         },
         'SR': {
+            'sensors': ['LC8SR'],
             'pattern': r'^L.*?-SC.*?\.tar\.gz$',
         },
         'C1': {
+            'sensors': ['LT5', 'LE7', 'LC8'],
             'pattern': (
                 r'^L(?P<sensor>\w)(?P<satellite>\d{2})_'
                 r'(?P<correction_level>.{4})_(?P<path>\d{3})(?P<row>\d{3})_'
+
                 r'(?P<acq_year>\d{4})(?P<acq_month>\d{2})(?P<acq_day>\d{2})_'
                 r'(?P<proc_year>\d{4})(?P<proc_month>\d{2})(?P<proc_day>\d{2})_'
                 r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})\.tar\.gz$'
             ),
+            'latency': 12,
         },
     }
+
+    # Set the startdate to the min date of the asset's sensors
+    for asset, asset_info in _assets.iteritems():
+        asset_info['startdate'] = min(
+            [_sensors[sensor]['startdate']
+                for sensor in asset_info['sensors']]
+        )
 
     _defaultresolution = [30.0, 30.0]
 
@@ -331,22 +348,26 @@ class landsatData(Data):
         ],
     }
     __toastring = 'toa: use top of the atmosphere reflectance'
+    __visible_bands_union = [color for color in Asset._sensors['LC8']['colors'] if 'LWIR' not in color]
     _products = {
         #'Standard':
         'rad': {
             'assets': ['DN', 'C1'],
             'description': 'Surface-leaving radiance',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': __visible_bands_union,
         },
         'ref': {
             'assets': ['DN', 'C1'],
             'description': 'Surface reflectance',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': __visible_bands_union,
         },
         'temp': {
             'assets': ['DN', 'C1'],
             'description': 'Brightness (apparent) temperature',
-            'toa': True
+            'toa': True,
+            'bands': ['LWIR', 'LWIR2'],
         },
         'acca': {
             'assets': ['DN', 'C1'],
@@ -357,39 +378,49 @@ class landsatData(Data):
                 'Z: cloud height in meters (default: 4000)'
             ],
             'nargs': '*',
-            'toa': True
+            'toa': True,
+            'bands': ['finalmask', 'cloudmask', 'ambclouds', 'pass1'],
         },
         'fmask': {
             'assets': ['DN', 'C1'],
             'description': 'Fmask cloud cover',
             'nargs': '*',
-            'toa': True
+            'toa': True,
+            'bands': ['finalmask', 'cloudmask', 'PCP', 'clearskywater', 'clearskyland'],
         },
         'tcap': {
             'assets': ['DN', 'C1'],
             'description': 'Tassled cap transformation',
-            'toa': True
+            'toa': True,
+            'bands': ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6'],
         },
         'dn': {
             'assets': ['DN', 'C1'],
             'description': 'Raw digital numbers',
-            'toa': True
+            'toa': True,
+            'bands': __visible_bands_union,
         },
         'volref': {
             'assets': ['DN', 'C1'],
             'description': 'Volumetric water reflectance - valid for water only',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': __visible_bands_union,
         },
         'wtemp': {
             'assets': ['DN', 'C1'],
             'description': 'Water temperature (atmospherically correct) - valid for water only',
             # It's not really TOA, but the product code will take care of atm correction itself
-            'toa': True
+            'toa': True,
+            'bands': ['LWIR', 'LWIR2'],
         },
         'bqa': {
             'assets': ['DN', 'C1'],
-            'description': 'LC8 band quality',
-            'toa': True
+            'description': ('The bit-packed information in the QA bands is translation of binary strings. '
+            'As a simple example, the integer value "1" translates to the binary value "0001." The binary value '
+            '"0001" has 4 bits, written right to left as bits 0 ("1"), 1 ("0"), 2 ("0"), and 3 ("0"). '
+            'Each of the bits 0-3 represents a yes/no indication of a physical value.'),
+            'toa': True,
+            'bands': ['qa bits'],
         },
         'bqashadow': {
             'assets': ['DN', 'C1'],
@@ -400,78 +431,93 @@ class landsatData(Data):
                 'Z: cloud height in meters (default: 4000)'
             ],
             'nargs': '*',
-            'toa': True
+            'toa': True,
+            'bands': ['+shadow_smear'],
         },
         #'Indices': {
         'bi': {
             'assets': ['DN', 'C1'],
             'description': 'Brightness Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['bi'],
         },
         'evi': {
             'assets': ['DN', 'C1'],
             'description': 'Enhanced Vegetation Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['evi'],
         },
         'lswi': {
             'assets': ['DN', 'C1'],
             'description': 'Land Surface Water Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['lswi'],
         },
         'msavi2': {
             'assets': ['DN', 'C1'],
             'description': 'Modified Soil-Adjusted Vegetation Index (revised)',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['msavi2'],
         },
         'ndsi': {
             'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Snow Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['ndsi'],
         },
         'ndvi': {
             'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Vegetation Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['ndvi'],
         },
         'ndwi': {
             'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Water Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['ndwi'],
         },
         'satvi': {
             'assets': ['DN', 'C1'],
             'description': 'Soil-Adjusted Total Vegetation Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['satvi'],
         },
         #'Tillage Indices': {
         'ndti': {
             'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Tillage Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['ndti'],
         },
         'crc': {
             'assets': ['DN', 'C1'],
             'description': 'Crop Residue Cover',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['crc'],
         },
         'sti': {
             'assets': ['DN', 'C1'],
             'description': 'Standard Tillage Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['sti'],
         },
         'isti': {
             'assets': ['DN', 'C1'],
             'description': 'Inverse Standard Tillage Index',
-            'arguments': [__toastring]
+            'arguments': [__toastring],
+            'bands': ['isti'],
         },
         # NEW!!!
         'ndvi8sr': {
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
+            'bands': ['NDVI'],
         },
         'landmask': {
             'assets': ['SR'],
             'description': 'Land mask from LC8SR',
+            'bands': ['Land mask'],
         },
         # ACOLITE products
         'rhow': {
@@ -483,6 +529,7 @@ class landsatData(Data):
             'offset': 0.,
             'dtype': 'int16',
             'toa': True,
+            'bands': [],
         },
         # Not sure what the issue is with this product, but it doesn't seem to
         # work as expected (multiband vis+nir product)
@@ -503,6 +550,7 @@ class landsatData(Data):
             'offset': 250.,
             'dtype': 'int16',
             'toa': True,
+            'bands': [],
         },
         'oc3chl': {
             'assets': ['DN'],
@@ -513,6 +561,7 @@ class landsatData(Data):
             'offset': 250.,
             'dtype': 'int16',
             'toa': True,
+            'bands': [],
         },
         'fai': {
             'assets': ['DN'],
@@ -521,6 +570,7 @@ class landsatData(Data):
             'acolite-key': 'FAI',
             'dtype': 'float32',
             'toa': True,
+            'bands': [],
         },
         'acoflags': {
             'assets': ['DN'],
@@ -529,6 +579,7 @@ class landsatData(Data):
             'acolite-key': 'FLAGS',
             'dtype': 'uint8',
             'toa': True,
+            'bands': [],
         },
         'spm655': {
             'assets': ['DN'],
@@ -539,6 +590,7 @@ class landsatData(Data):
             'gain': 0.005,
             'dtype': 'int16',
             'toa': True,
+            'bands': [],
         },
         'turbidity': {
             'assets': ['DN'],
@@ -549,8 +601,20 @@ class landsatData(Data):
             'gain': 0.005,
             'dtype': 'int16',
             'toa': True,
+            'bands': [],
         },
     }
+
+    for product, product_info in _products.iteritems():
+        product_info['startdate'] = min(
+            [landsatAsset._assets[asset]['startdate']
+                for asset in product_info['assets']]
+        )
+
+        if 'C1' in product_info['assets']:
+            product_info['latency'] = landsatAsset._assets['C1']['latency']
+        else:
+            product_info['latency'] = float("inf")
 
     def _process_acolite(self, asset, aco_proc_dir, products):
         '''
@@ -1070,7 +1134,7 @@ class landsatData(Data):
                         img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
                                 ) * (1.0 / atm6s.results[col][2])
                     self._process_indices(img, md, sensor, indices)
-                VerboseOut(' -> %s: processed %s in %s' % (
+                verbose_out(' -> %s: processed %s in %s' % (
                         self.basename, indices0.keys(), datetime.now() - start), 1)
             img = None
             # cleanup scene directory by removing (most) extracted files
