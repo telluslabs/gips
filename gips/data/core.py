@@ -25,7 +25,7 @@ import os
 import sys
 import errno
 from osgeo import gdal, ogr
-from datetime import datetime
+from datetime import datetime, timedelta
 import glob
 import re
 from itertools import groupby
@@ -221,6 +221,19 @@ class Asset(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
+    def parse_asset_fp(self):
+        """Parse self.filename using the class's asset patterns.
+
+        On the first successful match, the re lib match object is
+        returned. Raises ValueError on failure to parse.
+        """
+        asset_bn = os.path.basename(self.filename)
+        for av in self._assets.values():
+            match = re.match(av['pattern'], asset_bn)
+            if match is not None:
+                return match
+        raise ValueError("Unparseable asset file name:  " + self.filename)
+
     def datafiles(self):
         """Get list of readable datafiles from asset.
 
@@ -328,13 +341,17 @@ class Asset(object):
 
     @classmethod
     def end_date(cls, asset):
-        # TODO this method never seems to be called?
-        """ Get ending date for this asset """
-        edate = cls._assets[asset].get('enddate', None)
-        if edate is None:
-            latency = cls._assets[cls.asset].get('latency', None)
-            edate = datetime.now() - datetime.timedelta(latency)
-        return edate
+        """Get ending date for this asset.
+
+        One of 'enddate' or 'latency' must be present in
+        cls._assets[asset]. Returns either the enddate, or else a
+        computation of the most recently-available data, based on the
+        (today's date) - asset's known latency.
+        """
+        a_info = cls._assets[asset]
+        if 'enddate' in a_info:
+            return a_info['enddate']
+        return datetime.now() - timedelta(a_info['latency'])
 
     @classmethod
     def available(cls, asset, date):
@@ -343,7 +360,7 @@ class Asset(object):
         date1 = cls._assets[asset].get(['startdate'], None)
         date2 = cls._assets[asset].get(['enddate'], None)
         if date2 is None:
-            date2 = datetime.now() - datetime.timedelta(cls._asssets[asset]['latency'])
+            date2 = datetime.now() - timedelta(cls._asssets[asset]['latency'])
         if date1 is None or date2 is None:
             return False
         if date < date1 or date > date2:
@@ -359,6 +376,35 @@ class Asset(object):
         datearr = rrule(DAILY, dtstart=dates[0], until=dates[1])
         dates = [dt for dt in datearr if days[0] <= int(dt.strftime('%j')) <= days[1]]
         return dates
+
+    @classmethod
+    def query_provider(cls, asset, tile, date):
+        """Query the data provider for files matching the arguments.
+
+        Drivers must override this method or else query_service. Must
+        return (filename, url), or (None, None) if nothing found. This
+        method has a more convenient return value for drivers that never
+        find multiple files for the given (asset, tile, date), and don't
+        need to unpack a nested data structure in their fetch methods.
+        """
+        raise NotImplementedError('query_provider not supported for' + cls.__name__)
+
+    @classmethod
+    def query_service(cls, asset, tile, date):
+        """Query the data provider for files matching the arguments.
+
+        Drivers must override this method, or else query_provider, to
+        contact a data source regarding the given arguments, and report
+        on whether anything is available for fetching. Must return a
+        list of dicts containing available asset filenames and where to
+        find them:  [{'basename': bn, 'url': url}, ...]. When nothing is
+        avilable, must return [].
+        """
+        bn, url = cls.query_provider(asset, tile, date)
+        if (bn, url) == (None, None):
+            return []
+        return [{'basename': bn, 'url': url}]
+
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -522,6 +568,8 @@ class Data(object):
     version = '0.0.0'
     Asset = Asset
 
+    _unitless = 'unitless' # standard string for expressing that a product has no units
+
     _pattern = '*.tif'
     _products = {}
     _productgroups = {}
@@ -647,7 +695,6 @@ class Data(object):
         self.assets = {}      # dict of <asset type string>: <Asset instance>
         self.filenames = {}   # dict of (sensor, product): product filename
         self.sensors = {}     # dict of asset/product: sensor
-        # self.basename       # self.path + part of a product filename; used as a prefix; set below
         if tile is not None and date is not None:
             self.path = self.Repository.data_path(tile, date)
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)
