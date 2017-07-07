@@ -89,8 +89,10 @@ class merraAsset(Asset):
     }
 
     _bandnames = ['%02d30GMT' % i for i in range(24)]
-    _asset_re_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d.nc4"
-    _asset_pattern = "MERRA2_???.{name}.????????.nc4"
+    # used in _assets[asset_type]['pattern'], which is used by data/core.py to search the filesystem
+    _asset_re_pattern = '^MERRA2_\d\d\d\.%s\.\d{4}\d{2}\d{2}\.nc4$'
+    # used in _assets[asset_type]['re_pattern'], which is used exclusively by query_service
+    _asset_re_format_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d\.nc4"
 
     _assets = {
         # MERRA2 SLV
@@ -103,9 +105,9 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXSLV',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Single-Level Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4',
-            'documentary': 'https://disc.sci.gsfc.nasa.gov/uui/datasets/M2T1NXSLV_V5.12.4/summary',
-            'pattern': _asset_pattern.format(name='tavg1_2d_slv_Nx'),
-            're_pattern': _asset_re_pattern.format(name='tavg1_2d_slv_Nx'),
+            'documentation': 'https://disc.sci.gsfc.nasa.gov/uui/datasets/M2T1NXSLV_V5.12.4/summary',
+            'pattern': _asset_re_pattern % 'tavg1_2d_slv_Nx',
+            're_pattern': _asset_re_format_pattern.format(name='tavg1_2d_slv_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -117,8 +119,8 @@ class merraAsset(Asset):
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Surface Flux Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXFLX.5.12.4',
             'documentation': 'https://disc.sci.gsfc.nasa.gov/uui/datasets/M2T1NXFLX_V5.12.4/summary',
-            'pattern': _asset_pattern.format(name='tavg1_2d_flx_Nx'),
-            're_pattern': _asset_re_pattern.format(name='tavg1_2d_flx_Nx'),
+            'pattern': _asset_re_pattern % 'tavg1_2d_flx_Nx',
+            're_pattern': _asset_re_format_pattern.format(name='tavg1_2d_flx_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -129,8 +131,8 @@ class merraAsset(Asset):
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Radiation Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXRAD.5.12.4',
             'documentation': 'https://disc.sci.gsfc.nasa.gov/uui/datasets/M2T1NXRAD_V5.12.4/summary',
-            'pattern': _asset_pattern.format(name='tavg1_2d_rad_Nx'),
-            're_pattern': _asset_re_pattern.format(name='tavg1_2d_rad_Nx'),
+            'pattern': _asset_re_pattern % 'tavg1_2d_rad_Nx',
+            're_pattern': _asset_re_format_pattern.format(name='tavg1_2d_rad_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -141,8 +143,8 @@ class merraAsset(Asset):
             'description': '2d, constants V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980',
             'documentation': 'https://disc.sci.gsfc.nasa.gov/uui/datasets/M2C0NXASM_V5.12.4/summary',
-            'pattern': _asset_pattern.format(name='const_2d_asm_Nx'),
-            're_pattern': _asset_re_pattern.format(name='const_2d_asm_Nx'),
+            'pattern': _asset_re_pattern % 'const_2d_asm_Nx',
+            're_pattern': _asset_re_format_pattern.format(name='const_2d_asm_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': None,
         }
@@ -216,7 +218,7 @@ class merraAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
-
+        """Standard Asset.fetch implementation for downloading assets."""
         if asset == "ASM" and date.date() != cls._assets[asset]['startdate']:
             #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
             utils.verbose_out('constants are available for %s only' % cls._assets[asset]['startdate'])
@@ -555,15 +557,16 @@ class merraData(Data):
         imgout.SetAffine(np.array(self._geotransform))
 
 
+    @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
-        """ create products """
+        """Produce requested products."""
         products = super(merraData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
         bname = os.path.join(self.path, self.basename)
         sensor = "merra"
         for key, val in products.requested.items():
-            fout = "%s_%s_%s.tif" % (bname, sensor, key)
+            fout = self.temp_product_filename(sensor, key)
             meta = {}
             VERSION = "1.0"
             meta['VERSION'] = VERSION
@@ -720,4 +723,5 @@ class merraData(Data):
             """
 
             # add product to inventory
-            self.AddFile(sensor, key, fout)
+            archive_fp = self.archive_temp_path(fout)
+            self.AddFile(sensor, key, archive_fp)

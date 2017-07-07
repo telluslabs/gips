@@ -61,9 +61,10 @@ _lib_requirements = [
 ]
 _full_requirements = _lib_requirements + [
     'landsat-util==0.8.0ircwaves0',
-    'Py6S>=1.5.0',
+    'Py6S>=1.7.0',
+    'pysolar==0.6',
     'requests',
-    'pydap<=3.2',
+    'pydap==3.2',
     'netCDF4',
 ]
 _orm_requirements = _full_requirements + [

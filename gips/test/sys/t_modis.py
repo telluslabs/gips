@@ -28,15 +28,13 @@ def setup_modis_data(pytestconfig):
     outcome = envoy.run(cmd_str)
     logger.info("MODIS data download complete.")
     if outcome.status_code != 0:
-        msg = ("MODIS data setup via `gips_inventory` technically failed, but this may be due to false"
-               " positives in the driver; proceeding with tests")
-        logger.warning(msg)
-        logger.warning('=== standard out:  ' + outcome.std_out)
-        logger.warning('=== standard error:  ' + outcome.std_err)
-        # this is why we can't have nice things:  modis now uses a sensible nonzero exit status if
-        # one of its fetches fail, but it continues to attempt fetches that can't possibly succeed
-        # due to data unavailability.
-        # raise RuntimeError(msg, outcome.std_out, outcome.std_err, outcome)
+        #msg = ("MODIS data setup via `gips_inventory` technically failed, but this may be due to false"
+        #       " positives in the driver; proceeding with tests")
+        #logger.warning(msg)
+        #logger.warning('=== standard out:  ' + outcome.std_out)
+        #logger.warning('=== standard error:  ' + outcome.std_err)
+        raise RuntimeError("MODIS data setup via `gips_inventory` failed",
+                           outcome.std_out, outcome.std_err, outcome)
 
 
 def t_inventory(setup_modis_data, repo_env, expected):
@@ -47,6 +45,8 @@ def t_inventory(setup_modis_data, repo_env, expected):
 
 def t_process(setup_modis_data, repo_env, expected):
     """Test gips_process on modis data."""
+    # TODO add landcover test; relevant invocation:
+    # gips_process modis -t h12v04 -p landcover -d 2012-01-01 -v6 --fetch
     actual = repo_env.run('gips_process', *STD_ARGS)
     assert expected == actual
 

@@ -63,10 +63,10 @@ class sarannualAsset(Asset):
     }
     _assets = {
         'MOS': {
-            'pattern': '???????_??_MOS.tar.gz'
+            'pattern': r'^.{7}_.{2}_MOS\.tar\.gz$'
         },
         'FNF': {
-            'pattern': '???????_??_FNF.tar.gz'
+            'pattern': r'^.{7}_.{2}_FNF\.tar\.gz$'
         },
     }
 

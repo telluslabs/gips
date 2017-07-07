@@ -22,8 +22,8 @@ def setup_merra_data(pytestconfig):
     if not pytestconfig.getoption('setup_repo'):
         logger.debug("Skipping repo setup per lack of option.")
         return
-    logger.info("Downloading MERRA data . . .")
     cmd_str = 'gips_inventory ' + ' '.join(STD_ARGS) + ' --fetch'
+    logger.info("Downloading MERRA assets with " + cmd_str)
     outcome = envoy.run(cmd_str)
     logger.info("MERRA data download complete.")
     if outcome.status_code != 0:
