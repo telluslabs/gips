@@ -103,14 +103,18 @@ def parse_args():
 
 def submit(site_name, data_spec, site, dates):
     """Performs job submissions, returns the job id."""
-    job_id = rpc_conn().submit_job(site_name, data_spec,
-                                   {'site': site, 'key': 'shaid'}, {'dates': dates})
+    job_id = rpc_conn().submit_request(site_name, data_spec,
+                                       {'site': site, 'key': 'shaid'}, {'dates': dates})
     vprint(0, 'Job submitted; job ID:', job_id)
 
 
 def status(job_id):
     """Performs status check; returns current status."""
-    status, product_status = rpc_conn().job_status(job_id)
+    status, asset_status, product_status = rpc_conn().get_status(job_id)
+    if len(asset_status) != 0:
+        vprint(1, 'Asset Status:')
+        for state in 'requested', 'scheduled', 'in-progress', 'complete', 'retry', 'failed':
+            vprint(1, '  {:11} {:>4}'.format(state, asset_status.get(state, 0)))
     if len(product_status) != 0:
         vprint(1, 'Product Status:')
         for state in 'requested', 'scheduled', 'in-progress', 'complete', 'failed':
@@ -120,12 +124,12 @@ def status(job_id):
 
 def result(job_id, file_name):
     """Look up a job's results and print to CSV."""
-    status, _ = rpc_conn().job_status(job_id)
+    status, _, _ = rpc_conn().get_status(job_id)
     if status != 'complete':
-        vprint(1, "Can't continue, job status:", status)
+        vprint(1, "Can't print results, job status:", status)
         return
 
-    results = rpc_conn().stats_request_results({'job': job_id})
+    results = rpc_conn().get_results(job_id)
     with open(file_name, 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=result_field_names)
         writer.writeheader()

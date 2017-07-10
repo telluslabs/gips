@@ -139,7 +139,7 @@ class sentinel2Asset(Asset):
 
     }
 
-    _2016_12_07 = datetime.datetime(2016, 12, 7, 0, 0) # first day of new-style assets, UTC
+    _2016_12_07 = datetime.date(2016, 12, 7) # first day of new-style assets, UTC
 
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
@@ -199,8 +199,6 @@ class sentinel2Asset(Asset):
         https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
         """
         super(sentinel2Asset, self).__init__(filename)
-        with utils.error_handler("Error opening asset '({})'".format(filename)):
-            zipfile.ZipFile(filename) # sanity check; exception if file isn't a valid zip
         base_filename = os.path.basename(filename)
 
         for style, style_dict in self._asset_styles.items():
@@ -229,14 +227,6 @@ class sentinel2Asset(Asset):
             self.style_res['tile-md-re'] = sr['tile-md-re'].format(tileid=self.tile)
             self.style_res['datastrip-md-re'] = sr['datastrip-md-re'].format(tileid=self.tile)
 
-
-    @classmethod
-    def query_service(cls, asset, tile, date):
-        """Compatibility method; not used by fetch."""
-        bn, url = cls.query_provider(asset, tile, date)
-        return [{'basename': bn, 'url': url}]
-
-
     @classmethod
     def query_provider(cls, asset, tile, date):
         """Search for a matching asset in the Sentinel-2 servers.
@@ -250,7 +240,9 @@ class sentinel2Asset(Asset):
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
 
-        style = 'original' if date < cls._2016_12_07 else cls._2016_12_07
+        # date is a datetime() for vanilla gips, but a date() for datahandler,
+        # but only needs to be a date() for this code's needs.
+        style = 'original' if datetime.date(year, month, day) < cls._2016_12_07 else cls._2016_12_07
 
         # search step:  locate the asset corresponding to (asset, tile, date)
         url_head = 'https://scihub.copernicus.eu/dhus/search?q='

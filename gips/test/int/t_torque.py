@@ -10,7 +10,7 @@ from django.core.management import call_command
 import gippy
 from gips.inventory import dbinv, orm
 from gips.test.sys import util
-from gips.datahandler.torque import submit
+from gips.datahandler.queue.torque import submit
 
 @pytest.fixture
 def disable_db_blocker(django_db_blocker):

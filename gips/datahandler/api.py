@@ -137,10 +137,11 @@ def get_status(jobid):
     
 
 def get_results(job_id, filters=None):
-    """
-    Get all the results in the specified result set.
+    """Get all the results in the specified result set.
 
-    job_id -- Job primary key
+    job_id:  Job primary key
+    filters: dict to filter results; passed in via django ORM, ie:
+             Result.objects.filter(job=job_id, **filters)
     """
     orm.setup()
     qs = dbinv.models.Result.objects.filter(job=job_id)

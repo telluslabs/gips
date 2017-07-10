@@ -222,7 +222,11 @@ class Asset(object):
     _defaultresolution = [30.0, 30.0]
 
     def __init__(self, filename):
-        """ Inspect a single file and populate variables. Needs to be extended """
+        """Inspect given filename and populate self.
+
+        Don't assume the file is actually present, as the datahandler
+        instantiates for requested files.
+        """
         # full filename to asset
         self.filename = filename
         # the asset code

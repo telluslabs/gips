@@ -377,7 +377,7 @@ def get_data_variables():
                 description = product_dict['description']
                 assets = repr(product_dict['assets'])
                 start_date = product_dict.get('startdate')
-                latency = product_dict.get('latency')
+                latency = product_dict.get('latency', 0)
                 for band_num,band in enumerate(product_dict['bands']):
                     band_name = band['name']
                     units = band['units']

@@ -37,6 +37,7 @@ complete        Job         set by scheduler.schedule_export_and_aggregate when 
                 PPJ         same as Asset; set by worker.export_and_aggregate
 
 retry           Asset       set by worker.fetch when an asset fails to fetch
+                Product     apparently products can be set to this too?  see status_values below
 
 failed          Asset       set by scheduler when retry count exceeds hardcoded threshold (3)
                 PPJ         set by scheduler when it observes an E&A task is busted
