@@ -23,6 +23,7 @@ from __future__ import print_function
 import math
 import os
 import shutil
+import glob
 import sys
 import datetime
 import shlex
@@ -165,8 +166,7 @@ class sentinel2Asset(Asset):
         'original': {
             # original-style assets can't use the same name for downloading and archiving, because
             # each downloaded file contains multiple tiles of data
-            'downloaded-name-re': _orig_name_re,
-            'archived-name-re': '^' + _tile_re + '_' + _orig_name_re,
+            'name-re': '^' + _tile_re + '_' + _orig_name_re,
             # raster file pattern
             # TODO '/.*/' can be misleading due to '/' satisfying '.', so rework into '/[^/]*/'
             'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B\d[\dA].jp2$',
@@ -176,8 +176,7 @@ class sentinel2Asset(Asset):
         },
         _2016_12_07: {
             # post-2016 assets use their downloaded FN as their archived FN
-            'downloaded-name-re': _2016_12_07_name_re,
-            'archived-name-re': _2016_12_07_name_re,
+            'name-re': _2016_12_07_name_re,
             # raster file pattern
             'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B\d[\dA].jp2$',
             # internal metadata file patterns
@@ -202,7 +201,7 @@ class sentinel2Asset(Asset):
         base_filename = os.path.basename(filename)
 
         for style, style_dict in self._asset_styles.items():
-            match = re.match(style_dict['archived-name-re'], base_filename)
+            match = re.match(style_dict['name-re'], base_filename)
             if match is not None:
                 break
         if match is None:
@@ -289,16 +288,20 @@ class sentinel2Asset(Asset):
             if 'rel' in entry['link'][0]: # sanity check - the right one doesn't have a 'rel' attrib
                 raise IOError("Unexpected 'rel' attribute in search link", link)
             asset_url = entry['link'][0]['href']
-            output_file_name = entry['title'] + '.zip'
+            filename = entry['title'] + '.zip'
+
+        if style != 'original':
+            return filename, asset_url
 
         # old-style assets cover many tiles, so there may be duplication of effort; avoid that by
         # aborting if the stage already contains the desired asset
-        full_staged_path = os.path.join(cls.Repository.path('stage'), output_file_name)
-        if os.path.exists(full_staged_path):
-            utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
-                    output_file_name))
+        staged_fp_glob = os.path.join(cls.Repository.path('stage'), '?????_' + filename)
+        if len(glob.glob(staged_fp_glob)) > 0:
+            utils.verbose_out('Asset {} needed but matching asset(s)'
+                              ' already in stage/, skipping.'.format(filename))
             return None, None
-        return output_file_name, asset_url
+        tile_fn = tile + '_' + filename
+        return tile_fn, asset_url
 
 
     @classmethod
@@ -306,7 +309,7 @@ class sentinel2Asset(Asset):
         """Fetch the asset corresponding to the given asset type, tile, and date."""
         output_file_name, asset_url = cls.query_provider(asset, tile, date)
         if (output_file_name, asset_url) == (None, None):
-            return # nothing found
+            return [] # nothing found
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage
@@ -328,9 +331,10 @@ class sentinel2Asset(Asset):
                 p.communicate()
                 if p.returncode != 0:
                     raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-                cls.stage_asset(output_full_path, output_file_name)
+                stage_fp = cls.stage_asset(output_full_path, output_file_name)
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
+        return [stage_fp]
 
 
     @classmethod
@@ -353,7 +357,7 @@ class sentinel2Asset(Asset):
             with utils.error_handler('Error archiving asset', continuable=True):
                 bn = os.path.basename(fn)
                 for style, style_dict in cls._asset_styles.items():
-                    match = re.match(style_dict['downloaded-name-re'], bn)
+                    match = re.match(style_dict['name-re'], bn)
                     if match is not None:
                         found_files[style].append(fn) # save the found path, not the basename
                         break
@@ -366,10 +370,12 @@ class sentinel2Asset(Asset):
 
         for fn in found_files['original']:
             tile_list = cls.tile_list(fn)
+            # trim off the tile ID so it can be used as the basis for all its internal tile IDs
+            asset_bn = os.path.basename(fn)[6:]
             # use the stage dir since it's likely not to break anything (ie on same filesystem)
             with utils.make_temp_dir(dir=cls.Repository.path('stage')) as tdname:
                 for tile in tile_list:
-                    tiled_fp = os.path.join(tdname, tile + '_' + os.path.basename(fn))
+                    tiled_fp = os.path.join(tdname, tile + '_' + asset_bn)
                     os.link(fn, tiled_fp)
                 assets += super(sentinel2Asset, cls).archive(tdname, False, False, update)
             if not keep:
@@ -384,6 +390,7 @@ class sentinel2Asset(Asset):
         stage_path = cls.Repository.path('stage')
         stage_full_path = os.path.join(stage_path, asset_base_name)
         os.rename(asset_full_path, stage_full_path) # on POSIX, if it works, it's atomic
+        return stage_full_path
 
 
     @classmethod
