@@ -611,6 +611,13 @@ class sentinel2Data(Data):
             'bands': [{'name': band_name, 'units': Data._unitless}
                       for band_name in Asset._sensors['S2A']['indices-colors']],
         },
+        'reftoa': {
+            'description': "TOA reflectance; ugly hack due to datahandler's failure to support"
+                           " product arguments",
+            'assets': [_asset_type],
+            'bands': [{'name': band_name, 'units': Data._unitless}
+                      for band_name in Asset._sensors['S2A']['indices-colors']],
+        },
     }
 
     # add index products to _products
@@ -647,6 +654,7 @@ class sentinel2Data(Data):
         'ref':          'rad-toa',
         'rad':          'rad-toa',
         'rad-toa':      'ref-toa',
+        'reftoa':       'ref-toa', # hack hack
         'ref-toa':      None, # has no deps but the asset
     }
 
@@ -766,6 +774,17 @@ class sentinel2Data(Data):
             raise ValueError('Changing verbosity is only permitted when resetting the clock')
         utils.verbose_out('{}:  {}'.format(datetime.datetime.now() - start, msg),
                 self._time_report_verbosity)
+
+
+
+    def reftoa_dh_workaround_geoimage(self):
+        """Just a hack to work around DH's failure to support product arguments."""
+        self._time_report('Starting "reftoa" DH workaround hack product.')
+        real_ref_toa = self.load_image('ref-toa')
+        reftoa_image = gippy.GeoImage(real_ref_toa)
+        reftoa_image.SetNoData(0)
+        self._product_images['reftoa'] = reftoa_image
+
 
 
     def ref_toa_geoimage(self, sensor, data_spec):
@@ -940,6 +959,8 @@ class sentinel2Data(Data):
         # only do the bits that need doing
         if 'ref-toa' in work:
             self.ref_toa_geoimage(sensor, data_spec)
+        if 'reftoa' in work:
+            self.reftoa_dh_workaround_geoimage()
         if 'rad-toa' in work:
             self.rad_toa_geoimage(asset_type, sensor)
         if 'rad' in work:
