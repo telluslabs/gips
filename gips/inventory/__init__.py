@@ -240,7 +240,7 @@ class DataInventory(Inventory):
                 for a in archived_assets:
                     dbinv.update_or_add_asset(
                             asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-                            name=a.archived_filename, driver=driver, status='complete')
+                            name=a.archived_filename, driver=driver)
                     # if the new asset comes with any "free" products, save that info:
                     for (prod_type, fp) in a.products.items():
                         dbinv.update_or_add_product(

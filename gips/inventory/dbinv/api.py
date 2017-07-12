@@ -217,7 +217,7 @@ def add_product(**values):
     return p  # in case the user needs it
 
 
-def update_or_add_asset(driver, asset, tile, date, sensor, name, status='requested'):
+def update_or_add_asset(driver, asset, tile, date, sensor, name, status='complete'):
     """Update an existing model or create it if it's not found.
 
     Convenience method that wraps update_or_create.  The first four
@@ -239,7 +239,7 @@ def update_or_add_asset(driver, asset, tile, date, sensor, name, status='request
     return asset  # in case the user needs it
 
 
-def update_or_add_product(driver, product, tile, date, sensor, name, status):
+def update_or_add_product(driver, product, tile, date, sensor, name, status='complete'):
     """Update an existing model or create it if it's not found.
 
     Convenience method that wraps update_or_create.  The first four
