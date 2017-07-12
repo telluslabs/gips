@@ -103,8 +103,7 @@ def parse_args():
 
 def submit(site_name, data_spec, site, dates):
     """Performs job submissions, returns the job id."""
-    job_id = rpc_conn().submit_request(site_name, data_spec,
-                                       {'site': site, 'key': 'shaid'}, {'dates': dates})
+    job_id = rpc_conn().submit_request(site_name, data_spec, {'site': site}, {'dates': dates})
     vprint(0, 'Job submitted; job ID:', job_id)
 
 

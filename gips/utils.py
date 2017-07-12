@@ -34,6 +34,11 @@ import shutil
 import traceback
 import datetime
 import itertools
+import collections
+
+from shapely.wkt import loads as wktloads
+from osr import SpatialReference, CoordinateTransformation
+from ogr import CreateGeometryFromWkt
 
 import gippy
 from gippy import GeoVector
@@ -419,31 +424,23 @@ def import_data_class(clsname):
 # Geospatial functions
 ##############################################################################
 
-def open_vector(fname, key="", where=''):
+def open_vector(fname, key='', where=''):
     """Open vector or feature, returned as a gippy GeoVector or GeoFeature."""
-    parts = fname.split(':')
-    if len(parts) == 1:
-        vector = GeoVector(fname)
-        vector.SetPrimaryKey(key)
+    # gippy can't handle unicode:
+    afname, akey, awhere = [s.encode('ascii', 'ignore') for s in (fname, key, where)]
+    if not ':' in afname:
+        vector = GeoVector(afname)
     else:
         # or it is a database
-        if parts[0] not in settings().DATABASES.keys():
-            raise Exception("%s is not a valid database" % parts[0])
-        db = settings().DATABASES[parts[0]]
-        filename = ("PG:dbname=%s host=%s port=%s user=%s password=%s" %
-                    (db['NAME'], db['HOST'], db['PORT'], db['USER'], db['PASSWORD']))
-        vector = GeoVector(filename, parts[1])
-        vector.SetPrimaryKey(key)
-    if where != '':
-        # return array of features
-        return vector.where(where)
-    else:
-        return vector
+        db_name, gv_arg = afname.split(':')
+        conn_params = settings().DATABASES[db_name]
+        conn_template = "PG:dbname={NAME} host={HOST} port={PORT} user={USER} password={PASSWORD}"
+        vector = GeoVector(conn_template.format(**conn_params), gv_arg)
 
-from shapely.wkt import loads as wktloads
-from osr import SpatialReference, CoordinateTransformation
-from ogr import CreateGeometryFromWkt
-
+    vector.SetPrimaryKey(akey)
+    if awhere != '':
+        return vector.where(awhere) # return array of features
+    return vector
 
 def transform_shape(shape, ssrs, tsrs):
     """ Transform shape from ssrs to tsrs (all wkt) and return as wkt """
@@ -560,6 +557,25 @@ def grouper(iterable, n, fillvalue=None):
     https://docs.python.org/2/library/itertools.html"""
     args = [iter(iterable)] * n
     return itertools.izip_longest(fillvalue=fillvalue, *args)
+
+def gippy_geoimage(*args):
+    """returns gippy.GeoImage(*args), but filters out unicode."""
+    if not args:
+        return gippy.GeoImage()
+
+    first, rest = args[0], args[1:]
+
+    # all the cases that start with a string:
+    if isinstance(first, unicode):
+        return gippy.GeoImage(first.encode('ascii', 'ignore'), *rest)
+    if isinstance(first, str) or isinstance(first, gippy.GeoImage):
+        return gippy.GeoImage(first, *rest)
+
+    # special case of a pile of strings; type()() preserves the type of the argument
+    if isinstance(first, collections.Sequence):
+        return gippy.GeoImage(type(first)(i.encode('ascii', 'ignore') for i in first))
+    raise ValueError("Unknown combination of arguments: " + repr(args), args)
+
 
 ##############################################################################
 # Error handling and script setup & teardown

@@ -71,7 +71,8 @@ class sentinel2Repository(Repository):
         Returns (x0, x1, y0, y1), which is
         (west lon, east lon, south lat, north lat) in degrees.
         """
-        e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[tileid].Extent()
+        atileid = tileid.encode('ascii', 'ignore')
+        e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[atileid].Extent()
         return e.x0(), e.x1(), e.y0(), e.y1()
 
 
@@ -601,6 +602,7 @@ class sentinel2Data(Data):
         'rad': {
             'description': 'Surface-leaving radiance',
             'assets': [_asset_type],
+            'arguments': ['toa: use top of atmosphere values'],
             'bands': [{'name': band_name, 'units': 'W/m^2/um'} # aka watts/(m^2 * micrometers)
                       for band_name in Asset._sensors['S2A']['indices-colors']],
             # 'startdate' and 'latency' are optional for DH
@@ -608,6 +610,7 @@ class sentinel2Data(Data):
         'ref': {
             'description': 'Surface reflectance',
             'assets': [_asset_type],
+            'arguments': ['toa: use top of atmosphere values'],
             'bands': [{'name': band_name, 'units': Data._unitless}
                       for band_name in Asset._sensors['S2A']['indices-colors']],
         },
@@ -624,6 +627,7 @@ class sentinel2Data(Data):
     _products.update(
         (p, {'description': d,
              'assets': ['L1C'],
+             'arguments': ['toa: use top of atmosphere values'],
              'bands': [{'name': p, 'units': Data._unitless}]}
         ) for p, d in [
             ('ndvi',   'Normalized Difference Vegetation Index'),
@@ -634,12 +638,12 @@ class sentinel2Data(Data):
             ('satvi',  'Soil-Adjusted Total Vegetation Index'),
             ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
             ('vari',   'Visible Atmospherically Resistant Index'),
-            # index products related to tillage
             # rbraswell's original description of brgt:  "Brightness index:
             # Visible to near infrared reflectance weighted by" approximate
             # energy distribution of the solar spectrum. A proxy for
             # broadband albedo."
             ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
+            # index products related to tillage
             ('ndti',   'Normalized Difference Tillage Index'),
             ('crc',    'Crop Residue Cover (uses BLUE)'),
             ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
@@ -702,7 +706,7 @@ class sentinel2Data(Data):
         """
         if product in self._product_images:
             return self._product_images[product]
-        image = gippy.GeoImage(self.filenames[(self.current_sensor(), product)])
+        image = utils.gippy_geoimage(self.filenames[(self.current_sensor(), product)])
         self._product_images[product] = image
         return image
 
@@ -781,7 +785,7 @@ class sentinel2Data(Data):
         """Just a hack to work around DH's failure to support product arguments."""
         self._time_report('Starting "reftoa" DH workaround hack product.')
         real_ref_toa = self.load_image('ref-toa')
-        reftoa_image = gippy.GeoImage(real_ref_toa)
+        reftoa_image = utils.gippy_geoimage(real_ref_toa)
         reftoa_image.SetNoData(0)
         self._product_images['reftoa'] = reftoa_image
 
@@ -816,7 +820,7 @@ class sentinel2Data(Data):
                 if p.returncode != 0:
                     raise IOError("Expected gdalwarp exit status 0, got {}".format(
                             p.returncode))
-            upsampled_img = gippy.GeoImage(upsampled_filenames)
+            upsampled_img = utils.gippy_geoimage(upsampled_filenames)
             upsampled_img.SetMeta(self.meta_dict())
             upsampled_img.SetNoData(0)
             # eg:   3        '08'
@@ -841,7 +845,7 @@ class sentinel2Data(Data):
 
         radiance_factors = asset_instance.radiance_factors()
 
-        rad_image = gippy.GeoImage(upsampled_img)
+        rad_image = utils.gippy_geoimage(upsampled_img)
 
         for i in range(len(rad_image)):
             color = rad_image[i].Description()
@@ -860,7 +864,7 @@ class sentinel2Data(Data):
         ca = self.current_asset()
         atm6s = ca.generate_atmo_corrector()
 
-        rad_image = gippy.GeoImage(rad_toa_img)
+        rad_image = utils.gippy_geoimage(rad_toa_img)
         # set meta to pass along to indices
         rad_image._aod_source = str(atm6s.aod[0])
         rad_image._aod_value  = str(atm6s.aod[1])
@@ -918,7 +922,7 @@ class sentinel2Data(Data):
         atm6s = self.assets[asset_type].generate_atmo_corrector()
         scaling_factor = 0.001 # to prevent chunky small ints
         rad_rev_img = self.load_image('rad-toa')
-        sr_image = gippy.GeoImage(rad_rev_img)
+        sr_image = utils.gippy_geoimage(rad_rev_img)
         # set meta to pass along to indices
         sr_image._aod_source = str(atm6s.aod[0])
         sr_image._aod_value  = str(atm6s.aod[1])
@@ -980,7 +984,7 @@ class sentinel2Data(Data):
                 # have to reproduce the whole object because gippy refuses to write metadata when
                 # you do image.Process(filename).
                 source_image = self._product_images[prod_type]
-                output_image = gippy.GeoImage(temp_fp, source_image)
+                output_image = utils.gippy_geoimage(temp_fp, source_image)
                 output_image.SetNoData(0)
                 output_image.SetMeta(self.meta_dict()) # add standard metadata
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
