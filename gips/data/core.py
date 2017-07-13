@@ -283,9 +283,8 @@ class Asset(object):
         for f in filenames:
             fname = os.path.join(path, f)
             if not os.path.exists(fname):
-                VerboseOut("Extracting %s" % f, 3)
+                utils.verbose_out("Extracting " + f, 3)
                 open_file.extract(f, path)
-            with utils.error_handler('Error processing ' + fname, continuable=True):
                 # this ensures we have permissions on extracted files
                 if not os.path.isdir(fname):
                     os.chmod(fname, 0664)
