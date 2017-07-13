@@ -38,7 +38,7 @@ pip install 'https://github.com/Applied-GeoSolutions/gippy/tarball/v0.3.x#egg=gi
 
 echo === install GIPS itself ===
 # TODO --process-dependency-links is deprecated
-pip install --process-dependency-links -e .
+pip install -e .
 
 # help user with configuration
 echo "Install complete.  GIPS configuration:"
