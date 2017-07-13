@@ -412,6 +412,17 @@ class Asset(object):
         raise NotImplementedError("Fetch not supported for this data source")
 
     @classmethod
+    def ftp_connect(cls, working_directory):
+        """Connect to an FTP server and chdir according to the args.
+
+        Returns the ftplib connection object."""
+        conn = ftplib.FTP(cls._host)
+        conn.login('anonymous', settings().EMAIL)
+        conn.set_pasv(True)
+        conn.cwd(working_directory)
+        return conn
+
+    @classmethod
     def fetch_ftp(cls, asset, tile, date):
         """ Fetch via FTP """
         url = cls._assets[asset].get('url', '')

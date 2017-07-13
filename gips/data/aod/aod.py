@@ -23,10 +23,12 @@
 
 import os
 import datetime
-import gdal
-import numpy
 import glob
 import traceback
+import re
+
+import gdal
+import numpy
 
 import gippy
 from gips.data.core import Repository, Asset, Data
@@ -79,11 +81,12 @@ class aodAsset(Asset):
         'MOD': {'description': 'MODIS Terra'},
         #'MYD': {'description': 'MODIS Aqua'},
     }
+    _host = 'ladsweb.nascom.nasa.gov'
     _assets = {
         'MOD08': {
             'pattern': r'^MOD08_D3.+?hdf$',
             'startdate': datetime.date(2000, 2, 18),
-            'url': 'ladsweb.nascom.nasa.gov/allData/6/MOD08_D3',
+            'path': '/allData/6/MOD08_D3',
             'latency': -7,
         },
         #'MYD08': {
@@ -131,9 +134,41 @@ class aodAsset(Asset):
         return datafiles
 
     @classmethod
+    def ftp_connect(cls, asset, date):
+        """As super, but make the working dir out of (asset, date)."""
+        wd = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%j'))
+        return super(aodAsset, cls).ftp_connect(wd)
+
+    @classmethod
+    def query_provider(cls, asset, tile, date):
+        """Query the data provider for files matching the arguments.
+
+        Returns (filename, url), or (None, None) if nothing found.
+        """
+        utils.verbose_out('{}: query tile {} for {}'.format(asset, tile, date), 3)
+        if asset not in cls._assets:
+            raise ValueError('{} has no defined asset for {}'.format(cls.Repository.name, asset))
+        with utils.error_handler("Error querying " + cls._host, continuable=True):
+            ftp = cls.ftp_connect(asset, date)
+            filenames = [fn for fn in ftp.nlst('*')
+                         if re.match(cls._assets[asset]['pattern'], fn)]
+            ftp.quit()
+            if len(filenames) > 1: # 0 assets happens all the time
+                raise ValueError("Expected one asset, found {}".format(len(filenames)))
+            return filenames[0], None # urls are not relevant for ftp
+        return None, None
+
+    @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
-        cls.fetch_ftp(asset, tile, date)
+        fname, _ = cls.query_provider(asset, tile, date)
+        if fname is None:
+            return []
+        stage_fp = os.path.join(cls.Repository.path('stage'), fname)
+        ftp = cls.ftp_connect(asset, date)
+        ftp.retrbinary('RETR ' + fname, open(stage_fp, "wb").write)
+        ftp.quit()
+        return [stage_fp]
 
     #@classmethod
     #def archive(cls, path='.', recursive=False, keep=False):
