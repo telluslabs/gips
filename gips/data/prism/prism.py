@@ -92,18 +92,11 @@ class prismAsset(Asset):
         'provisional': 1,
     }
 
-
     @classmethod
     def ftp_connect(cls, asset, date):
-        """Connect to the PRISM servers and chdir according to the args.
-
-        Returns the ftplib connection object."""
-        conn = ftplib.FTP(cls._host)
-        conn.login('anonymous', settings().EMAIL)
-        conn.set_pasv(True)
-        conn.cwd(os.path.join(cls._assets[asset]['path'], date.strftime('%Y')))
-        return conn
-
+        """As super, but make the working dir out of (asset, date)."""
+        wd = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'))
+        return super(prismAsset, cls).ftp_connect(wd)
 
     @classmethod
     def query_provider(cls, asset, tile, date, conn=None):
