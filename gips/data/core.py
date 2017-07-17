@@ -128,6 +128,14 @@ class Repository(object):
 
     @classmethod
     def managed_request(cls, url, debug=False):
+        """Visit the given http URL and return the response.
+
+        Attempt to log in using the user's username and password for the
+        current driver, also attempt to follow redirects.  Uses
+        urllib2.urlopen, returning its return value, or if it raises an
+        HTTPError, returns that instead (it can be used like a response
+        object, see urllib2 docs).
+        """
         username = cls.get_setting('username')
         password = cls.get_setting('password')
         manager_url = cls._manager_url
@@ -142,13 +150,20 @@ class Repository(object):
             urllib2.HTTPCookieProcessor(cookie_jar))
         urllib2.install_opener(opener)
         request = urllib2.Request(url)
-        response = urllib2.urlopen(request)
+        try:
+            response = urllib2.urlopen(request)
+        except urllib2.HTTPError as he:
+            return he
         redirect_url = response.geturl()
         # some data centers do it differently
-        if "redirect" in redirect_url:
+        if "redirect" in redirect_url: # TODO is this the right way to detect redirects?
+            utils.verbose_out('Redirected to ' + redirect_url, 3)
             redirect_url += "&app_type=401"
             request = urllib2.Request(redirect_url)
-            response = urllib2.urlopen(request)
+            try:
+                response = urllib2.urlopen(request)
+            except urllib2.HTTPError as he:
+                return he
         return response
 
     @classmethod

@@ -195,19 +195,23 @@ class modisAsset(Asset):
             return []
 
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
-        pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
+        pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (
+                        asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
         cpattern = re.compile(pattern)
 
         if datetime.datetime.today().date().weekday() == 2:
-            err_msg = "Error downloading on a Wednesday; possible planned MODIS provider downtime: " + mainurl
+            err_msg = ("Error downloading on a Wednesday;"
+                       " possible planned MODIS provider downtime: " + mainurl)
         else:
             err_msg = "Error downloading: " + mainurl
 
         with utils.error_handler(err_msg):
             response = cls.Repository.managed_request(mainurl)
-            if response.msg != "OK":
-                raise Exception, "Response code: {}".format(
-                    response.code)
+            if response.code != 200:
+                # don't raise here because asset-not-found is pretty common
+                err_msg = '{} gave bad response: {} {}'.format(mainurl, response.code, response.msg)
+                utils.verbose_out(err_msg, 1)
+                return []
 
         listing = response.readlines()
 
@@ -224,12 +228,8 @@ class modisAsset(Asset):
                 available.append({'basename': basename, 'url': url})
 
         if len(available) == 0:
-            utils.verbose_out(
-                'Unable to find remote match for {} at {}'
-                .format(pattern, mainurl),
-                4,
-                sys.stderr
-            )
+            err_msg = 'Unable to find remote match for {} at {}'.format(pattern, mainurl)
+            utils.verbose_out(err_msg, 4)
         return available
 
 
