@@ -237,6 +237,7 @@ class modisAsset(Asset):
     def fetch(cls, asset, tile, date):
         available_assets = cls.query_service(asset, tile, date)
         retrieved_filenames = []
+        # TODO does modis ever have more than one asset per (a,t,d)?  If not, unloop this method.
         for asset_info in available_assets:
             basename = asset_info['basename']
             url = asset_info['url']
@@ -253,15 +254,13 @@ class modisAsset(Asset):
 
                 else:  # http(s)
                     response = cls.Repository.managed_request(url)
-                    if response.msg != "OK":
+                    if response.code != 200:
                         utils.verbose_out(
                             'Download failed({}): code={} url="{}"'
                             .format(basename, response.code, url),
                             2,
                             sys.stderr
                         )
-                        # TODO: is this correct?
-                        # stop because the other will also fail
                         return retrieved_filenames
 
                     with open(outpath, 'wb') as fd:
