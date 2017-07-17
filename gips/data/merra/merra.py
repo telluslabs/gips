@@ -196,7 +196,12 @@ class merraAsset(Asset):
         err_msg = "Error downloading"
         with utils.error_handler(err_msg):
             # obtain the list of files
-            listing = cls.Repository.managed_request(mainurl).readlines()
+            response = cls.Repository.managed_request(mainurl)
+            if response.code != 200:
+                err_msg = '{} gave bad response: {} {}'.format(mainurl, response.code, response.msg)
+                utils.verbose_out(err_msg, 2, sys.stderr)
+                return []
+            listing = response.readlines()
         available = []
         for item in listing:
             # inspect the page and extract the full name of the needed file
@@ -231,9 +236,10 @@ class merraAsset(Asset):
             with utils.error_handler("Asset fetch error", continuable=True):
                 # obtain the data
                 response = cls.Repository.managed_request(url)
-                if response.msg != "OK":
-                    print('Download of', basename, 'failed:', response.code,
-                          '\nFull URL:', url, file=sys.stderr)
+                if response.code != 200:
+                    err_msg = 'Download failed({}): code={} url="{}"'.format(
+                            basename, response.code, url)
+                    utils.verbose_out(err_msg, 1, sys.stderr)
                     return
                 tmp_outpath = tempfile.mkstemp(
                     suffix='.nc4', prefix='downloading',

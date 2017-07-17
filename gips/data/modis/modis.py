@@ -210,7 +210,7 @@ class modisAsset(Asset):
             if response.code != 200:
                 # don't raise here because asset-not-found is pretty common
                 err_msg = '{} gave bad response: {} {}'.format(mainurl, response.code, response.msg)
-                utils.verbose_out(err_msg, 1)
+                utils.verbose_out(err_msg, 2, sys.stderr)
                 return []
 
         listing = response.readlines()
@@ -258,7 +258,7 @@ class modisAsset(Asset):
                         utils.verbose_out(
                             'Download failed({}): code={} url="{}"'
                             .format(basename, response.code, url),
-                            2,
+                            1,
                             sys.stderr
                         )
                         return retrieved_filenames
