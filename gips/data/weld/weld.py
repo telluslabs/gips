@@ -29,7 +29,6 @@ import urllib
 import urllib2
 
 import numpy as np
-import requests
 
 import gippy
 # TODO: Use this:
@@ -52,6 +51,8 @@ def binmask(arr, bit):
 class weldRepository(Repository):
     name = 'WELD'
     description = 'WELD Landsat'
+
+    _manager_url = "https://urs.earthdata.nasa.gov"
 
     @classmethod
     def feature2tile(cls, feature):
@@ -102,14 +103,16 @@ class weldAsset(Asset):
         mainurl = '%s/%s.%02d.%02d' % (cls._assets[asset]['url'], str(year), month, day)
         utils.verbose_out("searching at " + mainurl, 4)
         with utils.error_handler('Unable to access {}'.format(mainurl)):
-            listing = urllib.urlopen(mainurl).readlines()
+            response = cls.Repository.managed_request(mainurl)
+            if response is None:
+                return []
         pattern = '(%s.week\d{2}.%s.%s.doy\d{3}to\d{3}.v1.5.hdf)' % (asset, str(year), tile)
         cpattern = re.compile(pattern)
         fetched = []
         http_kw = {'timeout': 10,
                    'auth': (cls.Repository.get_setting('username'),
                             cls.Repository.get_setting('password'))}
-        for item in listing:
+        for item in response.readlines():
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
@@ -119,16 +122,14 @@ class weldAsset(Asset):
                 outpath = os.path.join(cls.Repository.path('stage'), name)
                 if os.path.exists(outpath):
                     continue
+                # match found, perform the download
                 err_msg = 'Unable to retrieve {} from {}'.format(name, url)
                 with utils.error_handler(err_msg, continuable=True):
-                    response = requests.get(url, **http_kw)
-                    if response.status_code != requests.codes.ok:
-                        err_msg = 'Download failed({}): code={} reason="{}" url="{}"'.format(
-                                name, response.status_code, response.reason, url)
-                        utils.verbose_out(err_msg, 2, sys.stderr)
+                    response = cls.Repository.managed_request(url)
+                    if response is None:
+                        return fetched # might as well give up now since the rest probably fail too
                     with open(outpath, 'wb') as fd:
-                        for chunk in response.iter_content():
-                            fd.write(chunk)
+                        fd.write(response.read())
                     utils.verbose_out('Retrieved {}'.format(name), 2)
                     fetched.append(outpath)
         if not fetched:
