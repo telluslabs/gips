@@ -204,19 +204,13 @@ class modisAsset(Asset):
                        " possible planned MODIS provider downtime: " + mainurl)
         else:
             err_msg = "Error downloading: " + mainurl
-
         with utils.error_handler(err_msg):
-            response = cls.Repository.managed_request(mainurl)
-            if response.code != 200:
-                # don't raise here because asset-not-found is pretty common
-                err_msg = '{} gave bad response: {} {}'.format(mainurl, response.code, response.msg)
-                utils.verbose_out(err_msg, 2, sys.stderr)
+            response = cls.Repository.managed_request(mainurl, verbosity=2)
+            if response is None:
                 return []
 
-        listing = response.readlines()
-
         available = []
-        for item in listing:
+        for item in response.readlines():
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
             # effectively random).
@@ -244,27 +238,12 @@ class modisAsset(Asset):
             outpath = os.path.join(cls.Repository.path('stage'), basename)
 
             with utils.error_handler(
-                "Asset fetch error ({})".format(asset_info),
-                continuable=True):
-
-                if url.startswith('ftp'):
-                    connection = urllib2.urlopen(url)
-                    with open(outpath, 'wb') as fd:
-                        fd.write(connection.read())
-
-                else:  # http(s)
-                    response = cls.Repository.managed_request(url)
-                    if response.code != 200:
-                        utils.verbose_out(
-                            'Download failed({}): code={} url="{}"'
-                            .format(basename, response.code, url),
-                            1,
-                            sys.stderr
-                        )
-                        return retrieved_filenames
-
-                    with open(outpath, 'wb') as fd:
-                        fd.write(response.read())
+                    "Asset fetch error ({})".format(asset_info), continuable=True):
+                response = cls.Repository.managed_request(url)
+                if response is None:
+                    return retrieved_filenames # give up now as the rest
+                with open(outpath, 'wb') as fd:
+                    fd.write(response.read())
 
                 utils.verbose_out('Retrieved %s' % basename, 2)
                 retrieved_filenames.append(outpath)

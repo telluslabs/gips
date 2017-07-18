@@ -127,14 +127,14 @@ class Repository(object):
             return r[key]
 
     @classmethod
-    def managed_request(cls, url, debug=False):
+    def managed_request(cls, url, verbosity=1, debuglevel=0):
         """Visit the given http URL and return the response.
 
-        Attempt to log in using the user's username and password for the
-        current driver, also attempt to follow redirects.  Uses
-        urllib2.urlopen, returning its return value, or if it raises an
-        HTTPError, returns that instead (it can be used like a response
-        object, see urllib2 docs).
+        Uses auth settings and cls._manager_url, and also follows custom
+        weird redirects (specific to Earthdata servers seemingly).
+        Returns urllib2.urlopen(...), or None if errors are encountered.
+        debuglevel is ultimately passed in to httplib; if >0, http info,
+        such as headers, will be printed on standard out.
         """
         username = cls.get_setting('username')
         password = cls.get_setting('password')
@@ -145,26 +145,29 @@ class Repository(object):
         cookie_jar = CookieJar()
         opener = urllib2.build_opener(
             urllib2.HTTPBasicAuthHandler(password_manager),
-            urllib2.HTTPHandler(debuglevel=debug),
-            urllib2.HTTPSHandler(debuglevel=debug),
+            urllib2.HTTPHandler(debuglevel=debuglevel),
+            urllib2.HTTPSHandler(debuglevel=debuglevel),
             urllib2.HTTPCookieProcessor(cookie_jar))
         urllib2.install_opener(opener)
-        request = urllib2.Request(url)
-        try:
+        try: # try instead of error handler because the exceptions have funny values to unpack
+            request = urllib2.Request(url)
             response = urllib2.urlopen(request)
-        except urllib2.HTTPError as he:
-            return he
-        redirect_url = response.geturl()
-        # some data centers do it differently
-        if "redirect" in redirect_url: # TODO is this the right way to detect redirects?
-            utils.verbose_out('Redirected to ' + redirect_url, 3)
-            redirect_url += "&app_type=401"
-            request = urllib2.Request(redirect_url)
-            try:
+            redirect_url = response.geturl()
+            # some data centers do it differently
+            if "redirect" in redirect_url: # TODO is this the right way to detect redirects?
+                utils.verbose_out('Redirected to ' + redirect_url, 3)
+                redirect_url += "&app_type=401"
+                request = urllib2.Request(redirect_url)
                 response = urllib2.urlopen(request)
-            except urllib2.HTTPError as he:
-                return he
-        return response
+            return response
+        except urllib2.URLError as e:
+            utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
+                              verbosity, sys.stderr)
+            return None
+        except urllib2.HTTPError as e:
+            utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
+                              verbosity, sys.stderr)
+            return None
 
     @classmethod
     def path(cls, subdir=''):

@@ -193,17 +193,13 @@ class merraAsset(Asset):
             mainurl = cls._assets[asset]['url']
             pattern = cls._assets[asset]['re_pattern'] % (0, 0, 0)
         cpattern = re.compile(pattern)
-        err_msg = "Error downloading"
-        with utils.error_handler(err_msg):
+        with utils.error_handler("Error downloading"):
             # obtain the list of files
-            response = cls.Repository.managed_request(mainurl)
-            if response.code != 200:
-                err_msg = '{} gave bad response: {} {}'.format(mainurl, response.code, response.msg)
-                utils.verbose_out(err_msg, 2, sys.stderr)
+            response = cls.Repository.managed_request(mainurl, verbosity=2)
+            if response is None:
                 return []
-            listing = response.readlines()
         available = []
-        for item in listing:
+        for item in response.readlines():
             # inspect the page and extract the full name of the needed file
             if cpattern.search(item):
                 if 'xml' in item:
@@ -236,11 +232,8 @@ class merraAsset(Asset):
             with utils.error_handler("Asset fetch error", continuable=True):
                 # obtain the data
                 response = cls.Repository.managed_request(url)
-                if response.code != 200:
-                    err_msg = 'Download failed({}): code={} url="{}"'.format(
-                            basename, response.code, url)
-                    utils.verbose_out(err_msg, 1, sys.stderr)
-                    return
+                if response is None:
+                    continue
                 tmp_outpath = tempfile.mkstemp(
                     suffix='.nc4', prefix='downloading',
                     dir=cls.Repository.path('stage')
