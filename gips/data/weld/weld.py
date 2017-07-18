@@ -22,19 +22,21 @@
 ################################################################################
 
 import os
+import sys
 import re
 import datetime
 import urllib
 import urllib2
 
-import math
 import numpy as np
+import requests
 
 import gippy
 # TODO: Use this:
 # from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut
+from gips import utils
 
 
 PROJ = """PROJCS["WELD_CONUS",GEOGCS["GCS_WGS_1984",DATUM["WGS_1984",SPHEROID["WGS_84",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Albers_Conic_Equal_Area"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["longitude_of_center",-96.0],PARAMETER["Standard_Parallel_1",29.5],PARAMETER["Standard_Parallel_2",45.5],PARAMETER["latitude_of_center",23.0],UNIT["Meter",1.0]]"""
@@ -98,42 +100,41 @@ class weldAsset(Asset):
     def fetch(cls, asset, tile, date):
         year, month, day = date.timetuple()[:3]
         mainurl = '%s/%s.%02d.%02d' % (cls._assets[asset]['url'], str(year), month, day)
-        try:
+        utils.verbose_out("searching at " + mainurl, 4)
+        with utils.error_handler('Unable to access {}'.format(mainurl)):
             listing = urllib.urlopen(mainurl).readlines()
-        except Exception:
-            # TODO error-handling-fix: standard handle
-            raise Exception("Unable to access %s" % mainurl)
         pattern = '(%s.week\d{2}.%s.%s.doy\d{3}to\d{3}.v1.5.hdf)' % (asset, str(year), tile)
         cpattern = re.compile(pattern)
-        success = False
+        fetched = []
+        http_kw = {'timeout': 10,
+                   'auth': (cls.Repository.get_setting('username'),
+                            cls.Repository.get_setting('password'))}
         for item in listing:
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
                 name = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', name])
+                utils.verbose_out("found " + url)
                 outpath = os.path.join(cls.Repository.path('stage'), name)
                 if os.path.exists(outpath):
                     continue
-                try:
-                    connection = urllib2.urlopen(url)
-                    output = open(outpath, 'wb')
-                    output.write(connection.read())
-                    output.close()
-                except Exception:
-                    # TODO error-handling-fix: continuable handler but mind the else
-                    # TODO - implement pre-check to only attempt on valid dates
-                    # then uncomment this
-                    #raise Exception('Unable to retrieve %s from %s' % (name, url))
-                    pass
-                else:
-                    VerboseOut('Retrieved %s' % name, 2)
-                    success = True
-        if not success:
-            # TODO - implement pre-check to only attempt on valid dates then uncomment below
-            #raise Exception('Unable to find remote match for %s at %s' % (pattern, mainurl))
-            # VerboseOut('Unable to find remote match for %s at %s' % (pattern, mainurl), 4)
-            pass
+                err_msg = 'Unable to retrieve {} from {}'.format(name, url)
+                with utils.error_handler(err_msg, continuable=True):
+                    response = requests.get(url, **http_kw)
+                    if response.status_code != requests.codes.ok:
+                        err_msg = 'Download failed({}): code={} reason="{}" url="{}"'.format(
+                                name, response.status_code, response.reason, url)
+                        utils.verbose_out(err_msg, 2, sys.stderr)
+                    with open(outpath, 'wb') as fd:
+                        for chunk in response.iter_content():
+                            fd.write(chunk)
+                    utils.verbose_out('Retrieved {}'.format(name), 2)
+                    fetched.append(outpath)
+        if not fetched:
+            utils.verbose_out('Unable to find remote match for {} at {}'.format(pattern, mainurl),
+                              4, sys.stderr)
+        return fetched
 
 
 class weldData(Data):
