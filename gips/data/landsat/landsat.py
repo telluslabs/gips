@@ -390,6 +390,12 @@ class landsatData(Data):
             'toa': True,
             'bands': ['finalmask', 'cloudmask', 'PCP', 'clearskywater', 'clearskyland'],
         },
+        'cloudmask': {
+            'assets': ['C1'],
+            'description': 'Cloud mask product based on cloud bits of the quality band',
+            'toa': True,
+            'bands': ['cloudmask'],
+        },
         'tcap': {
             'assets': ['DN', 'C1'],
             'description': 'Tassled cap transformation',
@@ -417,12 +423,14 @@ class landsatData(Data):
         },
         'bqa': {
             'assets': ['DN', 'C1'],
-            'description': ('The bit-packed information in the QA bands is translation of binary strings. '
-            'As a simple example, the integer value "1" translates to the binary value "0001." The binary value '
-            '"0001" has 4 bits, written right to left as bits 0 ("1"), 1 ("0"), 2 ("0"), and 3 ("0"). '
-            'Each of the bits 0-3 represents a yes/no indication of a physical value.'),
+            # TODO prior description was too long; is this a good-enough short replacement?
+            'description': 'The quality band extracted into separate layers.',
+            # 'description': ('The bit-packed information in the QA bands is translation of binary strings. '
+            # 'As a simple example, the integer value "1" translates to the binary value "0001." The binary value '
+            # '"0001" has 4 bits, written right to left as bits 0 ("1"), 1 ("0"), 2 ("0"), and 3 ("0"). '
+            # 'Each of the bits 0-3 represents a yes/no indication of a physical value.'),
             'toa': True,
-            'bands': ['qa bits'],
+            'bands': ['qa bits'], # TODO aren't there 7 bands?
         },
         'bqashadow': {
             'assets': ['DN', 'C1'],
@@ -963,6 +971,23 @@ class landsatData(Data):
                         if len(val) >= 3:
                             tolerance, dilation = [int(v) for v in val[1:3]]
                         imgout = Fmask(reflimg, fname, tolerance, dilation)
+
+                    elif val[0] == 'cloudmask':
+                        qaimg = self._readqa()
+                        npqa = qaimg.Read() # transmogrify into numpy array
+                        # https://landsat.usgs.gov/collectionqualityband
+                        # cloudmaskmask = (cloud and (cc_med or cc_high)) or csc_med or csc_high
+                        # cloud iff bit 4
+                        # (cc_med or cc_high) iff bit 6
+                        # (csc_med or csc_high) iff bit 8
+                        def get_bit(np_array, i):
+                            """Return an array with the ith bit extracted from each cell."""
+                            return (np_array >> i) & 0b1
+                        np_cloudmask = get_bit(npqa, 4) & get_bit(npqa, 6) | get_bit(npqa, 8)
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1) # only one layer
+                        verbose_out("writing " + fname, 2)
+                        imgout.SetBandName('Cloud Mask', 1)
+                        imgout[0].Write(np_cloudmask)
                     elif val[0] == 'rad':
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
                         for i in range(0, imgout.NumBands()):
