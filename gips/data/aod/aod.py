@@ -30,13 +30,18 @@ import traceback
 
 import gippy
 from gips.data.core import Repository, Asset, Data
-from gips.utils import File2List, List2File, VerboseOut
-
+from gips.utils import File2List, List2File
+from gips import utils
 
 class aodRepository(Repository):
     name = 'AOD'
     description = 'Aerosol Optical Depth from MODIS (MOD08)'
     _datedir = '%Y%j'
+    _subdirs = [
+        'tiles', 'stage', 'quarantine', 'composites',
+        'composites/ltad'
+    ]
+    _the_tile = 'h01v01'
 
     @classmethod
     def data_path(cls, tile='', date=''):
@@ -47,7 +52,7 @@ class aodRepository(Repository):
 
     @classmethod
     def find_tiles(cls):
-        return ['']
+        return [cls._the_tile]
 
     @classmethod
     def find_dates(cls, tile=''):
@@ -63,22 +68,23 @@ class aodRepository(Repository):
 
     @classmethod
     def vector2tiles(cls, *args, **kwargs):
-        """ There are no tiles """
-        return {'': (1, 1)}
+        """ There are no tiles -- so use the "one tile" style """
+        return {cls._the_tile: (1, 1)}
 
 
 class aodAsset(Asset):
     Repository = aodRepository
 
-    # ???? Not specific to MODIS
     _sensors = {
         'MOD': {'description': 'MODIS Terra'},
         #'MYD': {'description': 'MODIS Aqua'},
     }
     _assets = {
         'MOD08': {
-            'pattern': 'MOD08_D3*hdf',
-            'url': 'ladsweb.nascom.nasa.gov/allData/51/MOD08_D3'
+            'pattern': r'^MOD08_D3.+?hdf$',
+            'startdate': datetime.date(2000, 2, 18),
+            'url': 'ladsweb.nascom.nasa.gov/allData/6/MOD08_D3',
+            'latency': -7,
         },
         #'MYD08': {
         #    'pattern': 'MYD08_D3*hdf',
@@ -92,14 +98,25 @@ class aodAsset(Asset):
 
         bname = os.path.basename(filename)
         self.asset = bname[0:5]
-        self.tile = ''
+        self.tile = self.Repository._the_tile
         year = bname[10:14]
         doy = bname[14:17]
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
         self.sensor = bname[:3]
-        #datafiles = self.datafiles()
+        collection_number = float(bname[18:21])
+        # collection number is encoded in the filename as 005, 006, 051, or
+        # 055.  So, we take it as a float, and then divide by the order of
+        # magnitude to get the modis_collection number
+        self.modis_collection = collection_number / 10 ** numpy.floor(
+            numpy.log10(collection_number)
+        )
         prefix = 'HDF4_EOS:EOS_GRID:"'
-        self.products = {'aod': prefix + filename + '":mod08:Optical_Depth_Land_And_Ocean_Mean'}
+        sds = {
+            5: 'Optical_Depth_Land_And_Ocean_Mean',
+            6: 'Aerosol_Optical_Depth_Land_Ocean_Mean',
+        }
+        self.products['aod'] = (
+                prefix + filename + '":mod08:{}'.format(sds[int(self.modis_collection)]))
 
     def datafiles(self):
         indexfile = self.filename + '.index'
@@ -128,8 +145,8 @@ class aodAsset(Asset):
 
 
 class aodData(Data):
-    name = 'MODAOD'
-    version = '0.9.0'
+    name = 'AOD'
+    version = '0.9.1'
     Asset = aodAsset
 
     _products = {
@@ -151,24 +168,61 @@ class aodData(Data):
         }
     }
 
+
     #def process(self, products):
     #    start = datetime.datetime.now()
         #bname = os.path.basename(self.assets[''].filename)
     #    for product in products:
             #if product == 'aerolta':
             #    self.process_aerolta()
-    #        VerboseOut(' -> %s: processed %s in %s' % (fout, product, datetime.datetime.now()-start))
+    #        utils.verbose_out(' -> %s: processed %s in %s' % (fout, product, datetime.datetime.now()-start))
+
+    @classmethod
+    def initialize_composites(cls):
+        '''
+        This method is incomplete, but will ensure that the composites
+        directory is boostrapped for running process composites.
+
+        INCOMPLETE at this time.
+        '''
+        lta_tif = os.path.join(cls.Asset.Repository.path('composites'), 'lta.tif')
+        ltadpat = os.path.join(
+            cls.Asset.Repository.path('composites'),
+            'ltad',
+            'ltad???.tif'
+        )
+        ltad_tifs = glob.glob(ltadpat)
+        if os.path.exists(lta_tif) and len(ltad_tifs) == 366:
+            utils.verbose_out('lta composites already initialized', 2)
+            return
+        a = inv[inv.dates[0]].tiles[cls.Asset.Repository._the_tile].open('aod')
+        a[0] = a[0] * 0 + a[0].NoDataValue()
+        a.Process(ltatif)
+
 
     @classmethod
     def process_composites(cls, inventory, products, **kwargs):
+        '''
+        Currently inoperative do to absence of 'start_day' and 'end_day' from
+        DataInventory class.
+        '''
+        # since it is broken
+        raise NotImplementedError('Composite processing is currently broken')
+        cls.initialize_composites()
         for product in products:
             cpath = os.path.join(cls.Asset.Repository.path('composites'), 'ltad')
             path = os.path.join(cpath, 'ltad')
             # Calculate AOT long-term multi-year averages (lta) for given day
             if product == 'ltad':
+                # tried this as a replacement for the 'for' below, but this
+                # doesn't make it work either.
+                # for day in range(
+                #         inventory.temporal.daybounds[0],
+                #         inventory.temporal.daybounds[1] + 1
+                # ):
                 for day in range(inventory.start_day, inventory.end_day + 1):
                     dates = [d for d in inventory.dates if int(d.strftime('%j')) == day]
-                    filenames = [inventory[d].tiles[''].products['aod'] for d in dates]
+                    filenames = [inventory[d].tiles[cls.Asset.Repository._the_tile].filenames['MOD', 'aod'] for d in dates]
                     fout = path + '%s.tif' % str(day).zfill(3)
                     cls.process_mean(filenames, fout)
             # Calculate single average per pixel (all days and years)
@@ -206,7 +260,12 @@ class aodData(Data):
             totalvar[inds] = numpy.divide(totalvar[inds], counts[inds])
             imgout[1].Write(totalvar)
             t = datetime.datetime.now() - start
-            VerboseOut('%s: mean/var for %s files processed in %s' % (os.path.basename(fout), len(filenames), t))
+            utils.verbose_out(
+                '%s: mean/var for %s files processed in %s' %
+                (os.path.basename(fout), len(filenames), t)
+            )
+        else:
+            raise Exception('No filenames provided')
         return imgout
 
     @classmethod
@@ -234,7 +293,7 @@ class aodData(Data):
             return (val, var)
         except:
             # TODO error-handling-fix: read through for refactor, otherwise standard handler
-            VerboseOut(traceback.format_exc(), 4)
+            utils.verbose_out(traceback.format_exc(), 4)
             return (numpy.nan, numpy.nan)
 
     @classmethod
@@ -246,7 +305,7 @@ class aodData(Data):
         try:
             # this is just for fetching the data
             inv = cls.inventory(dates=date.strftime('%Y-%j'), fetch=fetch, products=['aod'])
-            img = inv[date].tiles[''].open('aod')
+            img = inv[date].tiles[cls.Asset.Repository._the_tile].open('aod')
             vals = img[0].Read(roi)
             # TODO - do this automagically in swig wrapper
             vals[numpy.where(vals == img[0].NoDataValue())] = numpy.nan
@@ -259,7 +318,7 @@ class aodData(Data):
                 source = 'MODIS (MOD08_D3) spatial average'
         except Exception:
             # TODO error-handling-fix: std handler but mind `aod`
-            VerboseOut(traceback.format_exc(), 4)
+            utils.verbose_out(traceback.format_exc(), 4)
             aod = numpy.nan
 
         var = 0
@@ -285,7 +344,7 @@ class aodData(Data):
                 totalvar = var
                 norm = 1.0 / var
                 cnt = cnt + 1
-                VerboseOut('AOD: LTA-Daily = %s, %s' % (val, var), 3)
+                utils.verbose_out('AOD: LTA-Daily = %s, %s' % (val, var), 3)
 
             # LTA
             val, var = cls._read_point(os.path.join(cpath, 'lta.tif'), roi, nodata)
@@ -295,7 +354,7 @@ class aodData(Data):
                 totalvar = totalvar + var
                 norm = norm + 1.0 / var
                 cnt = cnt + 1
-                VerboseOut('AOD: LTA = %s, %s' % (val, var), 3)
+                utils.verbose_out('AOD: LTA = %s, %s' % (val, var), 3)
 
             # TODO - adjacent days
 
@@ -306,5 +365,5 @@ class aodData(Data):
         if numpy.isnan(aod):
             raise Exception("Could not retrieve AOD")
 
-        VerboseOut('AOD: Source = %s Value = %s' % (source, aod), 2)
+        utils.verbose_out('AOD: Source = %s Value = %s' % (source, aod), 2)
         return (source, aod)

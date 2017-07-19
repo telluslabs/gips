@@ -23,6 +23,8 @@
 
 import datetime
 import calendar
+import sys
+
 from gips import utils
 from gips.utils import Colors, open_vector
 
@@ -83,6 +85,8 @@ class SpatialExtent(object):
     @classmethod
     def factory(cls, dataclass, site=None, key='', where='', tiles=None, pcov=0.0, ptile=0.0):
         """ Create array of SpatialExtent instances """
+        if tiles is not None:
+            tiles = [dataclass.normalize_tile_string(t) for t in tiles]
         if site is None and tiles is None:
             # raise Exception('Site geometry and/or tile ids required')
             # TODO: make this better. It only returns the tiles you have without telling

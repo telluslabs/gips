@@ -6,17 +6,19 @@ import pytest
 from scripttest import TestFileEnvironment, ProcResult, FoundFile, FoundDir
 import envoy
 
+from gips.inventory import orm # believed to be safe even though it's the code under test
 
 _log = logging.getLogger(__name__)
 
 
 def set_constants(config):
     """Use pytest config API to set globals pointing at needed file paths."""
-    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH, DURHAM_SHP_PATH
+    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH, DURHAM_SHP_PATH, NE_SHP_PATH
     TEST_DATA_DIR  = str(config.rootdir.join('gips/test'))
     DATA_REPO_ROOT = config.getini('data-repo')
     OUTPUT_DIR     = config.getini('output-dir')
     NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
+    NE_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NE.shp')
     DURHAM_SHP_PATH = os.path.join(TEST_DATA_DIR, 'durham.shp')
 
 slow = pytest.mark.skipif('not config.getoption("slow")',
@@ -196,6 +198,8 @@ class GipsProcResult(object):
 
 def rectify(driver):
     """Ensure inv DB matches files on disk."""
+    if not orm.use_orm():
+        return
     rectify_cmd = 'gips_inventory {} --rectify'.format(driver)
     outcome = envoy.run(rectify_cmd)
     if outcome.status_code != 0:
@@ -206,7 +210,8 @@ def rectify(driver):
 @pytest.yield_fixture
 def repo_env(request):
     """Provide means to test files created by run & clean them up after."""
-    os.environ['GIPS_ORM'] = 'true'
+    if not orm.use_orm():
+        _log.warning("ORM is deactivated; check GIPS_ORM.")
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     yield gtfe
     # This step isn't effective if DATA_REPO_ROOT isn't right; in that case it
@@ -224,7 +229,8 @@ def clean_repo_env(request):
     This emulates tfe.run()'s checking the directory before and after a run,
     then working out how the directory has changed.  Unfortunately half the
     work is done in tfe, the other half in ProcResult."""
-    os.environ['GIPS_ORM'] = 'true'
+    if not orm.use_orm():
+        _log.warning("ORM is deactivated; check GIPS_ORM.")
     file_env = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     before = file_env._find_files()
     _log.debug("Generating file env: {}".format(file_env))

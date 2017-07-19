@@ -22,11 +22,13 @@
 ################################################################################
 
 import os
-from datetime import datetime
+import datetime
 from csv import DictReader
 
 from gips.data.core import Repository, Asset, Data
 
+# make the compiler spell-check the one sensor, product, and asset type in the driver
+_cdl = 'cdl'
 
 class cdlRepository(Repository):
     name = 'CDL'
@@ -35,32 +37,26 @@ class cdlRepository(Repository):
     _defaultresolution = [30.0, 30.0]
     _tile_attribute = 'STATE_ABBR'
 
+
 class cdlAsset(Asset):
     Repository = cdlRepository
-    _sensors = {
-        'cdl': {'description': 'Crop Data Layer'}
-    }
+
+    _sensors = {_cdl: {'description': 'Crop Data Layer'}}
     _assets = {
-        '': {
-            'pattern': 'CDL_*.tif'
+        _cdl: {
+            # CDL assets are named just like products: tile_date_sensor_asset-product.tif
+            'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdl + '\.tif$'
         }
     }
 
     def __init__(self, filename):
-        """ Inspect a CDL file """
+        """Use the given filename to set metadata."""
         super(cdlAsset, self).__init__(filename)
-        # TODO - get tile (state) so we can archive
-        bname = os.path.basename(filename)
-        try:
-            self.date = datetime.strptime(bname[4:8], self.Repository._datedir)
-        except:
-            self.date = datetime.strptime(bname[13:17], self.Repository._datedir)
-        self.products['cdl'] = filename
-        self.sensor = 'cdl'
-
-    @classmethod
-    def archive(cls, path=''):
-        raise Exception('Archive not supported')
+        self.tile, date_str = self.parse_asset_fp().group('tile', 'date')
+        self.date = datetime.datetime.strptime(date_str, self.Repository._datedir).date()
+        self.asset = _cdl
+        self.sensor = _cdl
+        self.products[_cdl] = filename # magically it is also a product
 
 
 class cdlData(Data):
@@ -69,18 +65,31 @@ class cdlData(Data):
     version = '0.9.0'
     Asset = cdlAsset
     _products = {
-        'cdl': {'description': 'Crop Data Layer'}
+        _cdl: {
+            'description': 'Crop Data Layer',
+            'assets': [_cdl],
+            'bands': [{'name': _cdl, 'units': 'none'}],
+            # presently 'startdate' & 'latency' are permitted to be unspecified
+            # by DH gips.utils.get_data_variables
+        }
     }
 
-    _legend_file = os.path.join(cdlRepository.get_setting('repository'), 'CDL_Legend.csv')
-    _legend = [row['ClassName'].lower() for row in DictReader(open(_legend_file))]
+    _legend = None
+
+    @classmethod
+    def legend(cls):
+        """Open the legend file, keeping it memoized for future calls."""
+        if cls._legend is None:
+            legend_fp = os.path.join(cdlRepository.get_setting('repository'), 'CDL_Legend.csv')
+            cls._legend = [row['ClassName'].lower() for row in DictReader(open(legend_fp))]
+        return cls._legend
 
     @classmethod
     def get_code(cls, cropname):
-        ''' Retrieve CDL code for the given crop name (lower case) '''
-        return cls._legend.index(cropname)
+        """Retrieve CDL code for the given crop name (lower case)."""
+        return cls.legend().index(cropname)
 
     @classmethod
     def get_cropname(cls, code):
-        '''Retrieve name associated with given crop code'''
-        return cls._legend[code]
+        """Retrieve name associated with given crop code."""
+        return cls.legend()[code]

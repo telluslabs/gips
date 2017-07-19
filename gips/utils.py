@@ -25,12 +25,14 @@ from __future__ import print_function
 import imp
 import sys
 import os
+import re
 import errno
 from contextlib import contextmanager
 import tempfile
 import commands
 import shutil
 import traceback
+import datetime
 import itertools
 
 import gippy
@@ -87,6 +89,7 @@ VerboseOut = verbose_out # VerboseOut name is deprecated
 ##############################################################################
 
 def File2List(filename):
+    """Return contents of file as a list of lines, sans newlines."""
     f = open(filename)
     txt = f.readlines()
     txt2 = []
@@ -96,6 +99,10 @@ def File2List(filename):
 
 
 def List2File(lst, filename):
+    """Overwrite the given file with the contents of the list.
+
+    Each item in the list is given a trailing newline.
+    """
     f = open(filename, 'w')
     f.write('\n'.join(lst) + '\n')
     f.close()
@@ -156,6 +163,17 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
         yield absolute_pathname
     finally:
         shutil.rmtree(absolute_pathname)
+
+
+def find_files(regex, path='.'):
+    """Find filenames in the given directory that match the regex.
+
+    Returns a list of matching filenames; each includes the given path.
+    Only regular files and symbolic links to regular files are returned.
+    """
+    compiled_re = re.compile(regex)
+    return [os.path.join(path, f) for f in os.listdir(path)
+            if os.path.isfile(os.path.join(path, f)) and compiled_re.match(f)]
 
 
 ##############################################################################
@@ -402,7 +420,7 @@ def import_data_class(clsname):
 ##############################################################################
 
 def open_vector(fname, key="", where=''):
-    """ Open vector or feature """
+    """Open vector or feature, returned as a gippy GeoVector or GeoFeature."""
     parts = fname.split(':')
     if len(parts) == 1:
         vector = GeoVector(fname)
@@ -418,11 +436,7 @@ def open_vector(fname, key="", where=''):
         vector.SetPrimaryKey(key)
     if where != '':
         # return array of features
-
-        # set_trace()
-
         return vector.where(where)
-        features = []
     else:
         return vector
 
@@ -517,6 +531,26 @@ def mosaic(images, outfile, vector, product_res=None):
     imgout.CopyColorTable(images[0])
     return crop2vector(imgout, vector)
 
+def julian_date(date_and_time, variant=None):
+    """Returns the julian date for the given datetime object.
+
+    If no variant is chosen, the original julian date is given (days
+    since noon, Jan 1, 4713 BC, fractions included).  If a variant is
+    chosen, that julian date is returned instead.  Supported variants:
+    'modified' (JD - 2400000.5) and 'cnes' (JD - 2433282.5).  See
+    https://en.wikipedia.org/wiki/Julian_day for more details.
+    """
+    mjd_td = date_and_time - datetime.datetime(1858, 11, 17)
+    # note day-length isn't constant under UTC due to leap seconds; hopefully this is close enough
+    mjd = mjd_td.days + mjd_td.seconds / 86400.0
+
+    offsets = {
+        None:       2400000.5,
+        'modified': 0.0,
+        'cnes':     -33282.0,
+    }
+
+    return mjd + offsets[variant]
 
 def grouper(iterable, n, fillvalue=None):
     """Collect data into fixed-length chunks or blocks.
@@ -527,6 +561,9 @@ def grouper(iterable, n, fillvalue=None):
     args = [iter(iterable)] * n
     return itertools.izip_longest(fillvalue=fillvalue, *args)
 
+##############################################################################
+# Error handling and script setup & teardown
+##############################################################################
 
 _traceback_verbosity = 4    # only print a traceback if the user selects this verbosity or higher
 _accumulated_errors = []    # used for tracking success/failure & doing final error reporting when
@@ -602,7 +639,8 @@ def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
     set_error_handler(cli_error_handler)
     from gips.inventory import orm # avoids a circular import
     with error_handler():
+        # must run before orm.setup
+        data_class = None if driver_string is None else import_data_class(driver_string)
         if setup_orm:
             orm.setup()
-        if driver_string is not None:
-            return import_data_class(driver_string)
+        return data_class

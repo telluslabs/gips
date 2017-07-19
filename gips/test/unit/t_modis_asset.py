@@ -1,5 +1,6 @@
 import datetime
 import fnmatch
+import os
 
 import pytest
 
@@ -52,8 +53,13 @@ def t_discover_filename_globs(mocker, asset_type, bad_filename_tail):
         else:
             fake_dir_listing.append(repo_prefix + at + '.' + tail)
 
-    glob = mocker.patch.object(core.glob, 'glob')
-    glob.side_effect = lambda path: [fn for fn in fake_dir_listing if fnmatch.fnmatchcase(fn, path)]
+    isdir = mocker.patch.object(core.os.path, 'isdir')
+    isdir.return_value = True
+    isfile = mocker.patch.object(core.os.path, 'isfile')
+    isfile.return_value = True
+
+    listdir = mocker.patch.object(core.os, 'listdir')
+    listdir.side_effect = lambda path: [os.path.basename(fn) for fn in fake_dir_listing]
 
     # run the test
     found = modisAsset.discover('hi mom!', datetime.date(9999, 9, 9))
