@@ -45,7 +45,9 @@ from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File,
 from gips import utils
 from ..inventory import dbinv, orm
 
-from pdb import set_trace
+from cookielib import CookieJar
+from urllib import urlencode
+import urllib2
 
 
 """
@@ -123,6 +125,49 @@ class Repository(object):
                 raise Exception('%s is not a valid setting!' % key)
         else:
             return r[key]
+
+    @classmethod
+    def managed_request(cls, url, verbosity=1, debuglevel=0):
+        """Visit the given http URL and return the response.
+
+        Uses auth settings and cls._manager_url, and also follows custom
+        weird redirects (specific to Earthdata servers seemingly).
+        Returns urllib2.urlopen(...), or None if errors are encountered.
+        debuglevel is ultimately passed in to httplib; if >0, http info,
+        such as headers, will be printed on standard out.
+        """
+        username = cls.get_setting('username')
+        password = cls.get_setting('password')
+        manager_url = cls._manager_url
+        password_manager = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        password_manager.add_password(
+            None, manager_url, username, password)
+        cookie_jar = CookieJar()
+        opener = urllib2.build_opener(
+            urllib2.HTTPBasicAuthHandler(password_manager),
+            urllib2.HTTPHandler(debuglevel=debuglevel),
+            urllib2.HTTPSHandler(debuglevel=debuglevel),
+            urllib2.HTTPCookieProcessor(cookie_jar))
+        urllib2.install_opener(opener)
+        try: # try instead of error handler because the exceptions have funny values to unpack
+            request = urllib2.Request(url)
+            response = urllib2.urlopen(request)
+            redirect_url = response.geturl()
+            # some data centers do it differently
+            if "redirect" in redirect_url: # TODO is this the right way to detect redirects?
+                utils.verbose_out('Redirected to ' + redirect_url, 3)
+                redirect_url += "&app_type=401"
+                request = urllib2.Request(redirect_url)
+                response = urllib2.urlopen(request)
+            return response
+        except urllib2.URLError as e:
+            utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
+                              verbosity, sys.stderr)
+            return None
+        except urllib2.HTTPError as e:
+            utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
+                              verbosity, sys.stderr)
+            return None
 
     @classmethod
     def path(cls, subdir=''):

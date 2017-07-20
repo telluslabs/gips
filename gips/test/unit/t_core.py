@@ -148,8 +148,10 @@ def t_data_fetch_base_case(df_mocks):
 
     It should return data about the fetch on success, and shouldn't
     raise an exception."""
-    expected = [('DN', '012030', datetime(2012, 12, 1, 0, 0)),
-                ('C1', '012030', datetime(2012, 12, 1, 0, 0))]
+    expected = [
+        ('DN', '012030', datetime(2012, 12, 1, 0, 0)),
+        ('C1', '012030', datetime(2012, 12, 1, 0, 0)),
+    ]
     assert expected == landsatData.fetch(*df_args)
 
 
