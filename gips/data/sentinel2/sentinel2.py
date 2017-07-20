@@ -71,6 +71,7 @@ class sentinel2Repository(Repository):
         Returns (x0, x1, y0, y1), which is
         (west lon, east lon, south lat, north lat) in degrees.
         """
+        # ascii encoding to protect gippy from django/etc's unicode
         atileid = tileid.encode('ascii', 'ignore')
         e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[atileid].Extent()
         return e.x0(), e.x1(), e.y0(), e.y1()
