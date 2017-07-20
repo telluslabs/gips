@@ -61,8 +61,7 @@ class chirpsAsset(Asset):
 
     def __init__(self, filename):
         """Inspect a single filename and set some metadata."""
-        # TODO not working for some reason super(chirpsAsset, self).__init__(filename)
-        self.filename = filename
+        super(chirpsAsset, self).__init__(filename)
         base_filename = os.path.basename(filename)
 
         match = re.match(self._assets[_asset_type]['pattern'], base_filename)
@@ -121,3 +120,19 @@ class chirpsAsset(Asset):
             os.rename(temp_fp, stage_fp)
             return [stage_fp]
         return []
+
+
+class chirpsData(Data):
+    name = chirpsRepository.name
+    version = '0.1.0'
+    Asset = chirpsAsset
+
+    _products = {
+        # standard products
+        'rainfall': {
+            'description': 'Total rainfall for a period given by the asset',
+            'assets': [_asset_type],
+            'bands': [{'name': 'rainfall', 'units': 'buckets'}],
+        },
+    }
+

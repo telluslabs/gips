@@ -50,7 +50,6 @@ class prismRepository(Repository):
     name = 'PRISM'
     description = 'PRISM Gridded Climate Data'
     _datedir = '%Y%m%d'
-    _defaultresolution = [4000.0, 4000.0]
     _tile_attribute = 'id'
 
 
