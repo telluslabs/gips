@@ -62,6 +62,7 @@ setup(
         'python-dateutil',
         'pydap==3.2',
         'pysolar==0.6',
+        'dbfread==2.0.7',
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
