@@ -308,7 +308,7 @@ class aodData(Data):
         """ Read single point from mean/var file and return if valid, or mean/var of 3x3 neighborhood """
         if not os.path.exists(filename):
             return (numpy.nan, numpy.nan)
-        try:
+        with utils.error_handler('Unable to read point from {}'.format(filename), continuable=True):
             img = gippy.GeoImage(filename)
             vals = img[0].Read(roi).squeeze()
             variances = img[1].Read(roi)
@@ -326,18 +326,22 @@ class aodData(Data):
                 var = numpy.mean(variances[~numpy.isnan(variances)])
             img = None
             return (val, var)
-        except:
-            # TODO error-handling-fix: read through for refactor, otherwise standard handler
-            utils.verbose_out(traceback.format_exc(), 4)
-            return (numpy.nan, numpy.nan)
+        return (numpy.nan, numpy.nan)
 
     @classmethod
     def get_aod(cls, lat, lon, date, fetch=True):
+        """Returns an aod value for the given lat/lon.
+
+        If the pixel has a no-data value, nearby values are averaged.  If
+        no nearby values are available, it makes an estimate using
+        long-term averages.
+        """
         pixx = int(numpy.round(float(lon) + 179.5))
         pixy = int(numpy.round(89.5 - float(lat)))
         roi = gippy.Recti(pixx - 1, pixy - 1, 3, 3)
         # try reading actual data file first
-        try:
+        aod = numpy.nan
+        with utils.error_handler('Unable to load aod values', continuable=True):
             # this is just for fetching the data
             inv = cls.inventory(dates=date.strftime('%Y-%j'), fetch=fetch, products=['aod'])
             img = inv[date].tiles[cls.Asset.Repository._the_tile].open('aod')
@@ -351,10 +355,6 @@ class aodData(Data):
             if numpy.isnan(aod) and numpy.any(~numpy.isnan(vals)):
                 aod = numpy.mean(vals[~numpy.isnan(vals)])
                 source = 'MODIS (MOD08_D3) spatial average'
-        except Exception:
-            # TODO error-handling-fix: std handler but mind `aod`
-            utils.verbose_out(traceback.format_exc(), 4)
-            aod = numpy.nan
 
         var = 0
         totalvar = 0
@@ -395,7 +395,6 @@ class aodData(Data):
 
             # Final AOD estimate
             aod = aod / norm
-            totalvar = totalvar / cnt
 
         if numpy.isnan(aod):
             raise Exception("Could not retrieve AOD")
