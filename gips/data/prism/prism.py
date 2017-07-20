@@ -276,23 +276,14 @@ class prismData(Data):
                     os.symlink(vsinames[self._products[key]['assets'][0]], tmp_fp)
                     os.rename(tmp_fp, archived_fp)
             elif val[0] == 'pptsum':
-                try:
-                    lag = int(val[1])
-                except ValueError, TypeError:
-                    # TODO error-handling-fix:
-                    #   refactor IndexError to be a conditional
-                    #   use with handler for other types
-                    raise Exception(
-                        'pptsum argument format error (given: {}).'
-                    )
-                except IndexError:
-                    # no argument provided, use
-                    # default lag of 3 days SB configurable.
-                    lag = 3
+                if len(val) < 2:
+                    lag = 3 # no argument provided, use default lag of 3 days SB configurable.
                     prod_fn = re.sub(r'\.tif$', '-{}.tif'.format(lag), prod_fn)
                     archived_fp = os.path.join(self.path, prod_fn) # have to regenerate, sigh
-                    utils.verbose_out('Using default lag of {} days.'
-                                      .format(lag), 2)
+                    utils.verbose_out('Using default lag of {} days.'.format(lag), 2)
+                else:
+                    with utils.error_handler("Error for pptsum lag value '{}').".format(val[1])):
+                        lag = int(val[1])
 
                 date_spec = '{},{}'.format(
                     datetime.strftime(

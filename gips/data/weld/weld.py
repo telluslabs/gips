@@ -29,6 +29,7 @@ import urllib
 import urllib2
 
 import numpy as np
+import requests
 
 import gippy
 # TODO: Use this:
@@ -113,6 +114,7 @@ class weldAsset(Asset):
                    'auth': (cls.Repository.get_setting('username'),
                             cls.Repository.get_setting('password'))}
         for item in response.readlines():
+
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
@@ -171,32 +173,27 @@ class weldData(Data):
         products = super(weldData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
+        sensor = 'WELD'
         for key, val in products.requested.items():
             start = datetime.datetime.now()
-            sensor = 'WELD'
             prod_type = val[0]
             fname = self.temp_product_filename(sensor, prod_type) # moved to archive at end of loop
-            # Check for asset availability
-            assets = self._products[val[0]]['assets']
-            missingassets = []
-            availassets = []
-            allsds = []
-            for asset in assets:
-                try:
-                    sds = self.assets[asset].datafiles()
-                except Exception:
-                    # TODO error-handling-fix: continuable handler but mind the else
-                    missingassets.append(asset)
-                else:
-                    availassets.append(asset)
-                    allsds.extend(sds)
-            if not availassets:
-                # some products aren't available for every day but this is trying every day
-                VerboseOut('There are no available assets (%s) on %s for tile %s'
-                           % (str(missingassets), str(self.date), str(self.id), ), 5)
-                continue
+
             meta = self.meta_dict()
-            meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
+            meta['AVAILABLE_ASSETS'] = ''
+
+            # Check for asset availability
+            needed_assets = self._products[val[0]]['assets']
+            allsds = []
+            for a in needed_assets:
+                if a in self.assets:
+                    with utils.error_handler('Error reading datafiles for ' + a, continuable=True):
+                        allsds.extend(self.assets[a].datafiles())
+                        meta['AVAILABLE_ASSETS'] += ' ' + a
+            if meta['AVAILABLE_ASSETS'] == '':
+                utils.verbose_out('There are no available assets (%s) on %s for tile %s'
+                           % (str(needed_assets), str(self.date), str(self.id), ), 5)
+                continue
 
             # SNOW ICE INDEX PRODUCT
             if val[0] == "ndsi":

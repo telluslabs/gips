@@ -39,6 +39,7 @@ import shutil
 import numpy
 
 from gips.utils import List2File, VerboseOut
+from gips import utils
 from gips.data.merra import merraData
 from gips.data.aod import aodData
 from gips.inventory import orm
@@ -49,11 +50,6 @@ mpl.use('Agg')
 
 from Py6S import SixS, Geometry, AeroProfile, Altitudes, Wavelength, \
     GroundReflectance, AtmosCorr, SixSHelpers
-
-
-class AtmCorrException(Exception):
-    """ Error thrown if failed atmospheric correction """
-    pass
 
 
 def atmospheric_model(doy, lat):
@@ -238,29 +234,26 @@ class SIXS():
         s.atmos_corr = AtmosCorr.AtmosCorrLambertianFromRadiance(1.0)
 
         # Used for testing
-        try:
-            stdout = sys.stdout
-            funcs = {
-                'LT5': SixSHelpers.Wavelengths.run_landsat_tm,
-                'LT7': SixSHelpers.Wavelengths.run_landsat_etm,
-                # LC8 doesn't seem to work
-                #'LC8': SixSHelpers.Wavelengths.run_landsat_oli
-            }
-            if sensor in funcs.keys():
+        funcs = {
+            'LT5': SixSHelpers.Wavelengths.run_landsat_tm,
+            'LT7': SixSHelpers.Wavelengths.run_landsat_etm,
+            # LC8 doesn't seem to work
+            #'LC8': SixSHelpers.Wavelengths.run_landsat_oli
+        }
+        if sensor in funcs.keys():
+            saved_stdout = sys.stdout
+            try:
                 sys.stdout = open(os.devnull, 'w')
                 wvlens, outputs = funcs[sensor](s)
-                sys.stdout = stdout
-            else:
-                # Use wavelengths
-                outputs = []
-                for wv in wavelengths:
-                    s.wavelength = Wavelength(wv[0], wv[1])
-                    s.run()
-                    outputs.append(s.outputs)
-        except Exception, e:
-            # TODO error-handling-fix: add existing exception to the new one
-            sys.stdout = stdout
-            raise AtmCorrException("Error running 6S: %s" % e)
+            finally:
+                sys.stdout = saved_stdout
+        else:
+            # Use wavelengths
+            outputs = []
+            for wv in wavelengths:
+                s.wavelength = Wavelength(wv[0], wv[1])
+                s.run()
+                outputs.append(s.outputs)
 
         self.results = {}
         VerboseOut("{:>6} {:>8}{:>8}{:>8}".format('Band', 'T', 'Lu', 'Ld'), 4)
@@ -331,9 +324,8 @@ class MODTRAN():
             self.output = self.readoutput(bandnum)
             VerboseOut('MODTRAN Output: %s' % ' '.join([str(s) for s in self.output]), 4)
         except:
-            # TODO error-handling-fix: add existing exception to the new one; see notes for technique
-            VerboseOut(modout, 4)
-            raise AtmCorrException("Error running MODTRAN")
+            utils.verbose_out(modout, 4)
+            raise
 
         # Change back to original directory
         os.chdir(pwd)
@@ -343,32 +335,23 @@ class MODTRAN():
         shutil.rmtree(tmpdir)
 
     def readoutput(self, bandnum):
-        # TODO error-handling-fix: this is used once (in this file) sort out what for & refactor as needed (blech)
-        try:
-            f = open('band' + str(bandnum) + '.chn')
+        with open('band' + str(bandnum) + '.chn') as f:
             lines = f.readlines()
-            f.close()
-            data = lines[4 + bandnum]
-            # Get nominal band width in microns
-            bandwidth = float(data[85:94]) / 1000
-            # Convert from W/sr-cm2 to W/sr-m2-um
-            Lu = (float(data[59:72]) * 10000) / bandwidth
-            trans = float(data[239:248])
-            try:
-                f = open('band' + str(bandnum) + 'Ld.chn')
+        data = lines[4 + bandnum]
+        # Get nominal band width in microns
+        bandwidth = float(data[85:94]) / 1000
+        # Convert from W/sr-cm2 to W/sr-m2-um
+        Lu = (float(data[59:72]) * 10000) / bandwidth
+        trans = float(data[239:248])
+        Ld = 0.0
+        with utils.error_handler('Error calculating Ld, falling back to default (0.0)',
+                                 continuable=True):
+            with open('band' + str(bandnum) + 'Ld.chn') as f:
                 lines = f.readlines()
-                f.close()
-                data = lines[4 + bandnum]
-                # Convert channel radiance to spectral radiance
-                Ld = (float(data[59:72]) * 10000) / bandwidth
-            except Exception:
-                # TODO error-handling-fix: confirm this is correct behavior
-                #print 'No downwelled radiance run'
-                Ld = 0.0
-            return [trans, Lu, Ld]
-        except Exception:
-            #print 'No MODTRAN data for band ',bandnum
-            return
+            data = lines[4 + bandnum]
+            # Convert channel radiance to spectral radiance
+            Ld = (float(data[59:72]) * 10000) / bandwidth
+        return [trans, Lu, Ld]
 
     def addband(self, bandnum, wvlen1, wvlen2):
         rootname1 = 'band' + str(bandnum)
