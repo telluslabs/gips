@@ -137,10 +137,11 @@ def get_status(jobid):
     
 
 def get_results(job_id, filters=None):
-    """
-    Get all the results in the specified result set.
+    """Get all the results in the specified result set.
 
-    job_id -- Job primary key
+    job_id:  Job primary key
+    filters: dict to filter results; passed in via django ORM, ie:
+             Result.objects.filter(job=job_id, **filters)
     """
     orm.setup()
     qs = dbinv.models.Result.objects.filter(job=job_id)
@@ -175,7 +176,7 @@ def query_service(driver_name, spatial, temporal, products,
         + 'remote' get info for all remote items
         + 'missing' only get info for tile-dates that we don't have
         + 'update' get info for missing or updated items
-    action --
+    action -- is always 'request-product'; this function is never called any other way.
         + 'request-asset' to set status 'requested' if status not 'in-progress' or 'complete'.
         + 'force-request-asset' to set status 'requested' no matter what current status is.
         + 'request-product' set status 'requested' for product (and implies 'request-asset')
@@ -280,7 +281,7 @@ def query_service(driver_name, spatial, temporal, products,
                         asset.save()
                 assets.append(asset)
 
-    if request_product:
+    if request_product: # always true because nobody calls this function any other way
         asset_status_picks = ('requested', 'scheduled', 'in-progress', 'retry', 'complete')
         for (p, t) in itertools.product(products, tiles):
             asset_types = datacls.products2assets([p])

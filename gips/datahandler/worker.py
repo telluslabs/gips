@@ -109,9 +109,15 @@ def process(product_id):
         product.status = 'in-progress'
         product.save()
 
-    DataClass = utils.import_data_class(_de_u(product.driver))
-    data = DataClass(_de_u(product.tile), product.date) # should autopopulate with the right assets
-    data.process([_de_u(product.product)])
+    try:
+        DataClass = utils.import_data_class(_de_u(product.driver))
+        data = DataClass(_de_u(product.tile), product.date) # should autopopulate with the right assets
+        data.process([_de_u(product.product)])
+    except Exception as e:
+        Logger().log('Error in process: ' + e.message, level=1)
+        product.status = 'failed'
+        product.save()
+        raise
 
     # sanity check
     product.refresh_from_db()
