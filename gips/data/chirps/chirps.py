@@ -22,6 +22,7 @@ import os
 import re
 import sys
 import datetime
+import gzip
 
 from gips.data.core import Repository, Asset, Data
 from gips import utils
@@ -35,10 +36,10 @@ class chirpsRepository(Repository):
 _tile_id = 'africa'
 _sensor = 'chirps'
 _asset_type = 'africa-daily'
-_product_type = 'rainfall'
+_product_type = 'precip'
 
 class chirpsAsset(Asset):
-    """Asset class for CHIRPS, currently only supports africa daily rainfall."""
+    """Asset class for CHIRPS, currently only supports africa daily precipitation."""
     Repository = chirpsRepository
 
     _sensors = {
@@ -128,11 +129,37 @@ class chirpsData(Data):
     Asset = chirpsAsset
 
     _products = {
-        # standard products
-        'rainfall': {
+        _product_type: {
             'description': 'Total rainfall for a period given by the asset',
             'assets': [_asset_type],
-            'bands': [{'name': 'rainfall', 'units': 'buckets'}],
+            'bands': [{'name': _product_type, 'units': 'mm'}],
         },
     }
 
+    @Data.proc_temp_dir_manager
+    def process(self, products=None, overwrite=False, **kwargs):
+        """Produce data products and save them to files.
+
+        Only one product; it's processed in the usual way, but for this
+        driver, it's extracted from the gzip file and saved (not
+        symlink/vsi).  Method signature is largely for campatibilty with
+        the rest of gips, eg kwargs is unused.
+        """
+        needed_products = self.needed_products(products, overwrite)
+        if len(needed_products) == 0:
+            utils.verbose_out('No new processing required.')
+            return
+
+        # sanity check that requested product & asset look ok
+        assert (needed_products.requested == {_product_type: [_product_type]}
+                and _asset_type in self.assets)
+
+        asset = self.assets[_asset_type]
+        err_msg = 'Error creating product {} from {}'.format(
+            _product_type, os.path.basename(asset.filename))
+        with utils.error_handler(err_msg, continuable=True):
+            temp_fp = self.temp_product_filename(_sensor, _product_type)
+            with gzip.GzipFile(asset.filename) as asset_gzfo, open(temp_fp, 'wb') as temp_fo:
+                temp_fo.write(asset_gzfo.read()) # chunk writes?  output approx 9M
+            archive_fp = self.archive_temp_path(temp_fp)
+            self.AddFile(_sensor, _product_type, archive_fp)
