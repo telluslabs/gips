@@ -50,7 +50,6 @@ class prismRepository(Repository):
     name = 'PRISM'
     description = 'PRISM Gridded Climate Data'
     _datedir = '%Y%m%d'
-    _defaultresolution = [4000.0, 4000.0]
     _tile_attribute = 'id'
 
 
@@ -59,6 +58,7 @@ class prismAsset(Asset):
     _sensors = {
         'prism': {'description': 'Daily Gridded Climate Data'}
     }
+    _defaultresolution = [4000.0, 4000.0]
     _startdate = date(1981, 1, 1)
     _latency = -7
     # LATENCY (approximate)
