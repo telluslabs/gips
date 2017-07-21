@@ -58,6 +58,7 @@ class prismAsset(Asset):
     _sensors = {
         'prism': {'description': 'Daily Gridded Climate Data'}
     }
+    _defaultresolution = [4000.0, 4000.0]
     _startdate = date(1981, 1, 1)
     _latency = -7
     # LATENCY (approximate)

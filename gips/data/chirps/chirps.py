@@ -22,7 +22,6 @@ import os
 import re
 import sys
 import datetime
-import gzip
 
 from gips.data.core import Repository, Asset, Data
 from gips import utils
@@ -156,10 +155,11 @@ class chirpsData(Data):
 
         asset = self.assets[_asset_type]
         err_msg = 'Error creating product {} from {}'.format(
-            _product_type, os.path.basename(asset.filename))
+                        _product_type, os.path.basename(asset.filename))
         with utils.error_handler(err_msg, continuable=True):
             temp_fp = self.temp_product_filename(_sensor, _product_type)
-            with gzip.GzipFile(asset.filename) as asset_gzfo, open(temp_fp, 'wb') as temp_fo:
-                temp_fo.write(asset_gzfo.read()) # chunk writes?  output approx 9M
+            # make gdal/gippy-readable path to the inner file
+            vsi_inner_path = '/vsigzip/' + asset.filename
+            os.symlink(vsi_inner_path, temp_fp)
             archive_fp = self.archive_temp_path(temp_fp)
             self.AddFile(_sensor, _product_type, archive_fp)
