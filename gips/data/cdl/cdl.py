@@ -31,6 +31,9 @@ from dbfread import DBF
 
 from gips.data.core import Repository, Asset, Data
 from gippy import GeoImage
+from osgeo import gdal
+
+import imghdr
 
 # make the compiler spell-check the one sensor, product, and asset type in the driver
 _cdl = 'cdl'
@@ -54,7 +57,7 @@ class cdlAsset(Asset):
             'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdl + '\.tif$'
         },
         _cdlmkii: {
-            'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdlmkii + '_' + _cdl + '\.zip$',
+            'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdlmkii + '\.zip$',
             'description': '',
         },
     }
@@ -87,32 +90,44 @@ class cdlData(Data):
         }
     }
 
+    @Data.proc_temp_dir_manager
     def process(self, products, overwrite=False, **kwargs):
         for asset_type, asset in self.assets.iteritems():
-            if asset_type == _cdlmkii:  # with older cdl products, the asset is the product
-                product_files = []
+            if asset_type != _cdlmkii:  # with older cdl products, the asset is the product
+                continue
 
-                with ZipFile(asset.filename, 'r') as zipfile:
-                    for member in zipfile.infolist():
-                        product_files.append(zipfile.extract(member.filename))
+            fname = self.temp_product_filename(_cdl, _cdlmkii)
+            fname_without_ext, _ = os.path.splitext(fname)
 
-                asset_name, _ = os.path.basename(asset.filename).split('.', 1)
+            with ZipFile(asset.filename, 'r') as zipfile:
+                for member in zipfile.infolist():
+                    member_ext = member.filename.split('.', 1)[1]
+                    extracted = zipfile.extract(member, fname_without_ext)
+                    os.rename(extracted, fname_without_ext + '.' + member_ext)
 
-                for f in product_files:
-                    _, ext = os.path.basename(f).split('.', 1)
-                    os.rename(f, os.path.dirname(f) + '/' + asset_name + '.' + ext)
 
-                image = GeoImage(os.path.dirname(asset.filename) + '/' + asset_name + '.tif', True)
-                image[0].SetNoData(0)
-                image = None
+            image = GeoImage(fname, True)
+            image[0].SetNoData(0)
+            image = None
+
+            image = gdal.Open(fname, gdal.GA_Update)
+            dbf = DBF(fname + '.vat.dbf')
+            for i, record in enumerate(dbf):
+                image.SetMetadataItem(str("CLASS_NAME_%s" % record['CLASS_NAME']), str(i))
+            image = None
+
+            archive_fp = self.archive_temp_path(fname)
+            self.AddFile(_cdl, _cdl, archive_fp)
 
     def legend(self):
         """Open the legend file, keeping it memoized for future calls."""
-        if not hasattr(self, "_legend") or self._legend is None:
+        if getattr(self, "_legend", None) is None:
             if self.assets.keys()[0] == _cdlmkii:
-                legend_filename = os.path.splitext(self.assets[_cdlmkii].filename)[0] + '.tif.vat.dbf'
-                dbf = DBF(legend_filename)
-                self._legend = [record['CLASS_NAME'].lower() for record in dbf]
+                self._legend = [''] * 256
+                im = gdal.Open(os.path.splitext(self.assets[_cdlmkii].filename)[0] + '.tif')
+                for key, val in im.GetMetadata().iteritems():
+                    if key[0:10] == 'CLASS_NAME':
+                        self._legend[int(val)] = key[11:]
             else:
                 legend_fp = os.path.join(cdlRepository.get_setting('repository'), 'CDL_Legend.csv')
                 self._legend = [row['ClassName'].lower() for row in DictReader(open(legend_fp))]
