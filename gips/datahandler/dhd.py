@@ -94,19 +94,21 @@ class LogRecordSocketReceiver (SocketServer.ThreadingTCPServer):
 
 
 def serve_log (host, port):
-    # TODO 3rd party libs log too, and don't pass in `extras`, so KeyError.  Fix by using one
-    # formatter for most logs, and a special one that shows jobid for worker logging.  Note also
-    # funcName:  datahandler.Logger.log() calls logging.log, so funcName is often just 'log', which
-    # isn't helpful.
+    """Configure and run the logging server portion of dhd.
+
+    Part of the contract for passing log records to this server is to
+    provide a 'dh_id' attrib in LogRecords passed in, which must be
+    usefully convertible to a string.  It should identify the running
+    code that emitted the LogRecord, such as a job ID, process ID, or
+    similar.
+    """
     logging.basicConfig(format = (
-        #'---- %(asctime)s %(jobid)s %(caller)s -----\n'
-        '---- %(asctime)s ---------- %(funcName)s ------\n'
+        '%(levelname)s %(asctime)s --- %(dh_id)s:%(filename)s:%(funcName)s\n'
         '%(message)s\n'
         '--------------------------------------------------------'
     ))
     tcpserver = LogRecordSocketReceiver(host, port)
     tcpserver.serve_until_stopped()
-
 
 def serve_xmlrpc (host, port):
     #server = SimpleXMLRPCServer(

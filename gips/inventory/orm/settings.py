@@ -116,6 +116,7 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 
+LOGGING_CONFIG = None # handle logging config outside the ORM (in case GIPS_ORM=false)
 
 # load user-specified GIPS settings into Django
 import gips.utils

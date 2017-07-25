@@ -2,7 +2,9 @@
 
 These functions are called inside worker processes.
 """
+import time
 import os, shutil
+import logging
 
 from django.db import transaction, IntegrityError
 
@@ -237,3 +239,10 @@ def export_and_aggregate(job_id, start_ext, end_ext,
 
     if cleanup:
         shutil.rmtree(outdir)
+
+def look_busy(duration=5):
+    """Do-nothing job for testing/diagnostic purposes."""
+    logger = logging.getLogger(__name__)
+    logger.debug("Whew, hard work!  I need a little rest.")
+    time.sleep(duration)
+    logger.debug("I was just resting my eyes!")

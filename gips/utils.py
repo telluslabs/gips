@@ -27,6 +27,7 @@ import sys
 import os
 import re
 import errno
+import logging
 from contextlib import contextmanager
 import tempfile
 import commands
@@ -660,3 +661,15 @@ def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
         if setup_orm:
             orm.setup()
         return data_class
+
+_logging_configured = False
+
+def configure_logging():
+    """Read the setting LOGGING, then pass it in to python's logging."""
+    global _logging_configured
+    if _logging_configured:
+        return
+    logging_config = get_setting('LOGGING', None)
+    if logging_config is not None:
+        logging.config.dictConfig(logging_config)
+    _logging_configured = True
