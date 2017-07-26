@@ -3,6 +3,7 @@
 import argparse
 import logging
 import logging.handlers
+import logging.config
 from multiprocessing import Process
 import os
 import pickle
@@ -92,6 +93,24 @@ class LogRecordSocketReceiver (SocketServer.ThreadingTCPServer):
                 self.handle_request()
             abort = self.abort
 
+_default_server_logging = {
+    'version': 1,
+    'formatters': {
+        'dhdformatter': {
+            'format': '%(levelname)s %(asctime)s --- %(dh_id)s:%(filename)s:%(funcName)s\n'
+                      '%(message)s\n'
+                      '--------------------------------------------------------',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO',
+            'formatter': 'dhdformatter',
+        },
+    },
+    'root': {'handlers': ['console']},
+}
 
 def serve_log (host, port):
     """Configure and run the logging server portion of dhd.
@@ -102,11 +121,9 @@ def serve_log (host, port):
     code that emitted the LogRecord, such as a job ID, process ID, or
     similar.
     """
-    logging.basicConfig(format = (
-        '%(levelname)s %(asctime)s --- %(dh_id)s:%(filename)s:%(funcName)s\n'
-        '%(message)s\n'
-        '--------------------------------------------------------'
-    ))
+    # not using basicConfig because setting the log level mysteriously didn't work
+    logging_config = utils.get_setting('SERVER_LOGGING', _default_server_logging)
+    logging.config.dictConfig(logging_config)
     tcpserver = LogRecordSocketReceiver(host, port)
     tcpserver.serve_until_stopped()
 

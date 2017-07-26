@@ -246,3 +246,11 @@ def look_busy(duration=5):
     logger.debug("Whew, hard work!  I need a little rest.")
     time.sleep(duration)
     logger.debug("I was just resting my eyes!")
+
+def blow_up():
+    """Another do-nothing job for testing/diagnostic purposes."""
+    logger = logging.getLogger(__name__)
+    logger.debug("The DEBUGger says things may explode . . . ")
+    logger.info("For your INFOrmation, things may be blow up . . . ")
+    logger.warning("I should WARN you, explosion imminent!")
+    raise Exception("KABOOM!")
