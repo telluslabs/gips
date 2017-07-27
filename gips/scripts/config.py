@@ -31,6 +31,7 @@ from gips import __version__ as version
 from gips.parsers import GIPSParser
 from gips.utils import (VerboseOut, create_environment_settings,
     create_user_settings, create_repos, get_data_variables)
+from gips import utils
 from gips.inventory import orm
 
 
@@ -88,7 +89,6 @@ def configure_environment(repos, email, drivers, earthdata_user,
 
 
 def main():
-    import gips
     title = 'GIPS Configuration Utility (v%s)' % (version)
 
     parser = GIPSParser(description=title, datasources=False)
@@ -130,6 +130,8 @@ def main():
     #p.add_argument('-f', '--full', help=h, default=False, action='store_true')
     args = parser.parse_args()
     print title
+
+    utils.gips_script_setup(setup_orm=False)
 
     if args.command == 'print':
         try:

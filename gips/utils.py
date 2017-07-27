@@ -28,6 +28,7 @@ import os
 import re
 import errno
 import logging
+import logging.config
 from contextlib import contextmanager
 import tempfile
 import commands
@@ -71,22 +72,50 @@ class Colors():
     _CYAN   = _c + '46m'
     _WHITE  = _c + '47m'
 
+def v_to_ll(v):
+    """Converts verbosity values (`-v 3`) to python log levels.
+
+    verbosity levels don't map to match log levels.  Log levels describe
+    severity, but verbosity describes level of detail or noisiness on
+    the console.  Most of gips CLI output is probably INFO or DEBUG,
+    whereas the WARNING, ERROR, and CRITICAL stuff is all (or had better
+    be) at -v1, and will be in the context of error handling anyway.
+    """
+    # gips.parsers says verbosity 0 means "quiet" mode, and the gips defaul for -v is 1.
+    if v < 1:
+        return logging.WARNING
+    if v == 1:
+        return logging.INFO
+    if v > 1:
+        return logging.DEBUG
+
+_named_logger = 'gips'
 
 def verbose_out(obj, level=1, stream=sys.stdout):
-    """print(obj) but only if the user's chosen verbosity level warrants it.
+    """print() or log() the object, conditional on _lib_mode.
 
-    Print to stdout by default, but select any stream the user wishes.  Finally
-    if the obj is a list or tuple, print each contained object consecutively on
-    separate lines.
+    If _lib_mode, python's logging is used and `stream` is ignored.
+    Otherwise, print the object to the stream, but only if the user's
+    chosen verbosity level warrants it. Finally if the obj is a list or
+    tuple, print each contained object consecutively on separate lines.
     """
     #TODO: Add real documentation of rules regarding levels used within
     #      GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
     #      "let me see everything" level.
-    if gippy.Options.Verbose() >= level:
-        if not isinstance(obj, (list, tuple)):
-            obj = [obj]
-        for o in obj:
-            print(o, file=stream)
+    listish = isinstance(obj, (list, tuple))
+    if _lib_mode:
+        l = logging.getLogger(_named_logger)
+        # consider passing in stream as another clue about log level to use
+        ll = v_to_ll(level)
+        if listish:
+            [l.log(ll, o) for o in obj]
+        else:
+            l.log(ll, obj)
+    elif gippy.Options.Verbose() >= level:
+        if listish:
+            [print(o, file=stream) for o in obj]
+        else:
+            print(obj, file=stream)
 
 VerboseOut = verbose_out # VerboseOut name is deprecated
 
@@ -594,12 +623,12 @@ def set_error_handler(handler):
     error_handler = handler
 
 
-def report_error(error, msg_prefix, show_tb=True):
+def report_error(error, msg_prefix):
     """Print an error report on stderr, possibly including a traceback.
 
-    Caller can suppress the traceback with show_tb.  The user can suppress
-    it via the GIPS global verbosity setting."""
-    if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
+    The user can suppress the traceback via the GIPS global verbosity setting.
+    """
+    if gippy.Options.Verbose() >= _traceback_verbosity:
         verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
         traceback.print_exc()
     else:
@@ -612,11 +641,9 @@ def lib_error_handler(msg_prefix='Error', continuable=False):
     try:
         yield
     except Exception as e:
-        if continuable and not _stop_on_error:
-            report_error(e, msg_prefix)
-        else:
-            report_error(e, msg_prefix, show_tb=False)
-            raise
+        logging.getLogger(_named_logger).exception(msg_prefix) # automatically gets exc_info
+        if _stop_on_error or not continuable:
+            raise # thus may end up logging an exception twice
 
 
 error_handler = lib_error_handler # set this so gips code can use the right error handler
@@ -648,11 +675,22 @@ def cli_error_handler(msg_prefix='Error', continuable=False):
         else:
             gips_exit()
 
+# consider using _lib_mode to control error handling instead of set_error_handler
+_lib_mode = True
 
 def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
-    """Run this at the beginning of a GIPS CLI program to do setup."""
+    """Run this at the beginning of a GIPS CLI program to do setup.
+
+    Returns the data class corresponding `driver_string`, or else None.
+    `stop_on_error` causes the error handler to ignore continuable flags
+    and stop on the first uncaught exception.  If `setup_orm`, configure
+    the ORM & its inventory database. Also sets error handling to CLI
+    mode and sets gips generally to non-lib-mode.
+    """
     global _stop_on_error
     _stop_on_error = stop_on_error
+    global _lib_mode
+    _lib_mode = False
     set_error_handler(cli_error_handler)
     from gips.inventory import orm # avoids a circular import
     with error_handler():
