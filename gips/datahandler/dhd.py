@@ -128,6 +128,7 @@ def serve_log (host, port):
     tcpserver.serve_until_stopped()
 
 def serve_xmlrpc (host, port):
+    utils.configure_logging()
     #server = SimpleXMLRPCServer(
     server = ThreadedRPC(
         (host, port),
