@@ -26,7 +26,7 @@ from gips.inventory import dbinv, orm
 from gips.datahandler import api
 from gips.datahandler import queue
 
-logger = logging.getLogger(__name__)
+log = lambda: logging.getLogger(__name__)
 
 class Lock:
     def __init__(self, filename):
@@ -67,12 +67,12 @@ def schedule_query ():
         call_signatures = [[pk] for pk in job_pks]
         outcomes = queue.submit('query', call_signatures, 1)
     except Exception as e:
-        logger.exception("Error submitting query for jobs, IDs {}".format(job_pks))
+        log().exception("Error submitting query for jobs, IDs {}".format(job_pks))
         # possibly better to go to 'failed' instead?
         jfilter(pk__in=job_pks, status='initializing').update(status='requested')
         raise
     ids = [{'torque_id': o[0], 'db_id': o[1][0][0]} for o in outcomes]
-    logger.info("Submitted query for job(s):\n{}".format(pformat(ids)))
+    log().info("Submitted query for job(s):\n{}".format(pformat(ids)))
 
 
 def schedule_fetch (driver):
@@ -90,7 +90,7 @@ def schedule_fetch (driver):
         active_jobs = active.order_by('sched_id').distinct('sched_id')
         for j in active_jobs:
             if j.sched_id and queue.is_job_alive(j.sched_id):
-                logger.debug('Previous {} fetch job still running; returning.'.format(driver))
+                log().debug('Previous {} fetch job still running; returning.'.format(driver))
                 return
 
         # if anything leftover, clean it up
@@ -101,19 +101,19 @@ def schedule_fetch (driver):
         )
         if needs_cleanup.exists():
             # something went wrong. not 'complete', but no running/scheduled job
-            logger.info('Attempting to reschedule incomplete tasks')
+            log().info('Attempting to reschedule incomplete tasks')
 
             for a in needs_cleanup:
                 asest_string = "{} {} {} {} {}".format(f.id, f.driver, f.asset, f.tile, f.date)
                 if a.num_retries >= 3:
                     # if it has been retried 3 times, give up
                     a.status = 'failed'
-                    logger.error(
+                    log().error(
                         "Fetch failed {} times, giving up: {}".format(a.num_retries, asset_string))
                 else:
                     a.status = 'requested'
                     a.sched_id = ''
-                    logger.info(
+                    log().info(
                         "Fetch failed, retrying (try {}): {}".format(a.num_retries, asset_string))
                 a.save()
 
@@ -139,7 +139,7 @@ def schedule_fetch (driver):
         outcomes = queue.submit('fetch', call_signatures, per_job, chain=True)
         print outcomes
     except Exception as e:
-        logger.exception("fetch job submission failure, IDs: {}".format(asset_pks))
+        log().exception("fetch job submission failure, IDs: {}".format(asset_pks))
         # possibly better to go to 'failed' instead?
         with transaction.atomic():
             assets = asfu().filter(pk__in=asset_pks, status='scheduled')
@@ -153,8 +153,8 @@ def schedule_fetch (driver):
         for i in ids:
             asfu().filter(id__in=i['assets']).update(sched_id=i['job_id'])
     if ids:
-        logger.info('scheduled {} fetch jobs'.format(len(ids)))
-    logger.debug('scheduled fetch jobs, details: {}'.format(pformat(ids)))
+        log().info('scheduled {} fetch jobs'.format(len(ids)))
+    log().debug('scheduled fetch jobs, details: {}'.format(pformat(ids)))
 
 
 def schedule_process ():
@@ -195,7 +195,7 @@ def schedule_process ():
         outcomes = queue.submit('process', call_signatures, 5)
         print outcomes
     except Exception as e:
-        logger.exception("Error submitting products for processing, IDs {}".format(product_pks))
+        log().exception("Error submitting products for processing, IDs {}".format(product_pks))
         # possibly better to go to 'failed' instead?
         with transaction.atomic():
             products = psfu().filter(pk__in=product_pks, status='scheduled')
@@ -209,10 +209,10 @@ def schedule_process ():
         for i in ids:
             products = dbinv.models.Product.objects.filter(id__in=i['products'])
             products.update(sched_id=i['torque_id'])
-    logger.info('scheduled process job(s):\n{}'.format(pformat(ids)))
+    log().info('scheduled process job(s):\n{}'.format(pformat(ids)))
     if ids:
-        logger.info('scheduled {} process jobs'.format(len(ids)))
-    logger.debug('scheduled process jobs, details: {}'.format(pformat(ids)))
+        log().info('scheduled {} process jobs'.format(len(ids)))
+    log().debug('scheduled process jobs, details: {}'.format(pformat(ids)))
 
 def schedule_export_and_aggregate ():
     """Find ready post-processing tasks and submit them to a work queue.
@@ -241,13 +241,13 @@ def schedule_export_and_aggregate ():
         if (asset_status['failed'], product_status['failed']) != (0, 0):
             job.status = 'failed'
             job.save()
-            logger.error('job {} failed due to {} failed assets and/or {} failed products'.format(
+            log().error('job {} failed due to {} failed assets and/or {} failed products'.format(
                     job.pk, asset_status['failed'], product_status['failed']))
             continue
         # look for postprocessing-ready jobs, and if found, scehdule postprocessing
         if [0, 0, 0, 0] == [product_status[k] for k in
                 ('requested', 'scheduled', 'in-progress', 'retry')]:
-            logger.info('job {} has finished fetch and process'.format(job.pk))
+            log().info('job {} has finished fetch and process'.format(job.pk))
             # nothing being worked on. must be done pre-processing
             DataClass = utils.import_data_class(job.variable.driver.encode('ascii', 'ignore'))
             spatial_spec = eval(job.spatial)
@@ -285,9 +285,9 @@ def schedule_export_and_aggregate ():
                 job.refresh_from_db()
                 job.status = 'post-processing'
                 job.save()
-                if ids:
-                    logger.info('scheduled {} post-process jobs'.format(len(outcomes)))
-                logger.debug('scheduled post-process jobs, details: {}'.format(pformat(outcomes)))
+                if outcomes:
+                    log().info('scheduled {} post-process jobs'.format(len(outcomes)))
+                log().debug('scheduled post-process jobs, details: {}'.format(pformat(outcomes)))
 
     # check whether any post-processing jobs have finished
     with transaction.atomic():
@@ -304,7 +304,7 @@ def schedule_export_and_aggregate ():
                 if task.status in ('scheduled', 'in-progress'):
                     # make sure jobs are still queued / running
                     if not queue.is_job_alive(task.sched_id):
-                        logger.error("task {} for job {} failed to complete"
+                        log().error("task {} for job {} failed to complete"
                                      .format(task.sched_id, job.pk))
                         task.status = 'failed'
                         task.save()
@@ -333,7 +333,7 @@ def main ():
     try:
         lock.acquire()
     except IOError:
-        logger.info("previous scheduler process still running")
+        log().info("previous scheduler process still running")
         exit(1)
     
     outcomes = schedule_query()

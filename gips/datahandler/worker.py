@@ -16,12 +16,10 @@ from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import dbinv, orm
 from gips.scripts.spatial_wrapper import aggregate
 
-# Normally one avoids running code at import time but this appears to be safe
-logger = logging.getLogger(__name__)
+log = lambda: logging.getLogger(__name__)
 
 def _de_u(u):
     return u.encode('ascii', 'ignore')
-
 
 def query (job_id):
     """Determine which assets to fetch and products to process"""
@@ -43,12 +41,12 @@ def query (job_id):
         job.refresh_from_db()
         if job.status != 'scheduled':
             # sanity check; have to keep going, but whine about it
-            logger.warning("Expected Job status to be 'initializing,' but got {}".format(job.status))
+            log().warning("Expected Job status to be 'initializing,' but got {}".format(job.status))
         job.status = 'in-progress'
         job.save()
         return job
     except Exception as e:
-        logger.exception('Error in query_service')
+        log().exception('Error in query_service')
         job.status = 'failed'
         job.save()
         raise
@@ -69,7 +67,7 @@ def fetch(asset_id):
         asset.save()
 
     fetch_msg = "fetching {} {} {} {}".format(asset.driver, asset.asset, asset.tile, asset.date)
-    logger.info("started " + fetch_msg)
+    log().info("started " + fetch_msg)
     # locate the correct fetch function & execute it, then archive the file and update the DB
     DataClass  = utils.import_data_class(asset.driver)
     AssetClass = DataClass.Asset
@@ -82,7 +80,7 @@ def fetch(asset_id):
 
     a_obj = AssetClass._archivefile(filenames[0])[0] # for now neglect the 'update' case
 
-    logger.info("finished " + fetch_msg)
+    log().info("finished " + fetch_msg)
     # update DB now that the work is done; no need for an atomic transaction
     # because the only critical action is Model.save(), which is already atomic
     asset.refresh_from_db()
@@ -116,7 +114,7 @@ def process(product_id):
         data = DataClass(_de_u(product.tile), product.date) # should autopopulate with the right assets
         data.process([_de_u(product.product)])
     except Exception as e:
-        logger.exception('Error in process')
+        log().exception('Error in process')
         product.status = 'failed'
         product.save()
         raise
@@ -242,13 +240,14 @@ def export_and_aggregate(job_id, start_ext, end_ext,
 
 def look_busy(duration=5):
     """Do-nothing job for testing/diagnostic purposes."""
-    logger.debug("Whew, hard work!  I need a little rest.")
+    log().debug("Whew, hard work!  I need a little rest.")
     time.sleep(duration)
-    logger.debug("I was just resting my eyes!")
+    log().debug("I was just resting my eyes!")
 
 def blow_up():
     """Another do-nothing job for testing/diagnostic purposes."""
-    logger.debug("The DEBUGger says things may explode . . . ")
-    logger.info("For your INFOrmation, things may be blow up . . . ")
-    logger.warning("I should WARN you, explosion imminent!")
+    l = log()
+    l.debug("The DEBUGger says things may explode . . . ")
+    l.info("For your INFOrmation, things may be blow up . . . ")
+    l.warning("I should WARN you, explosion imminent!")
     raise Exception("KABOOM!")
