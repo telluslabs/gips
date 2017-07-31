@@ -153,6 +153,7 @@ def main ():
                         default=utils.settings().GEOKIT_SERVER)
     parser.add_argument('--logport', help='port for log server',
                         default=utils.settings().LOG_PORT)
+    # TODO logfile arg is ignored?
     parser.add_argument('-l', '--logfile', help='logfile',
                         default='geokitd.log')
     parser.add_argument('--xmlrpcport', help='port for xmlrpc server',
