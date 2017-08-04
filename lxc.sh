@@ -64,4 +64,5 @@ lxc exec $CONT -- python /root/install_datahandler.py \
     --install-pg \
     --create-db \
     --enable-daemons \
+    --developer-install \
     ${EXTRA_ARGS}
