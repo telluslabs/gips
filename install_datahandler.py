@@ -120,7 +120,7 @@ def install_gips(gips_version=GIPS_VERSION, developer_install=False, extras=()):
             sys.executable + " -c 'import gips, os ; "
             "print(os.path.dirname(os.path.dirname(gips.__file__)))'"
         )
-	if os.path.isdir(output) and output not in sys.path:
+        if os.path.isdir(output) and output not in sys.path:
             sys.path.append(output)
     """
     pip_args = ['install', '--process-dependency-links', url]
