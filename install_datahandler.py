@@ -105,13 +105,23 @@ def install_gips(gips_version=GIPS_VERSION, developer_install=False, extras=()):
             url = '.'
     url += '[{extras}]'.format(extras=','.join(extras))
     print url
-    cmd += 'pip install --process-dependency-links {} {}'.format(dev_opt, url)
+    cmd += (sys.executable +
+            ' -mpip install --process-dependency-links {} {}'
+            .format(dev_opt, url))
     print('running: ' + cmd)
     status, output = getstatusoutput(cmd)
     if status != 0:
         print output
         sys.exit(-9999)
 
+    # hacking to get gips install location into this python interpreter's path
+    if dev_opt == '-e':
+        status, output = getstatusoutput(
+            sys.executable + " -c 'import gips, os ; "
+            "print(os.path.dirname(os.path.dirname(gips.__file__)))'"
+        )
+	if os.path.isdir(output) and output not in sys.path:
+            sys.path.append(output)
     """
     pip_args = ['install', '--process-dependency-links', url]
     pip.main(args=pip_args)
