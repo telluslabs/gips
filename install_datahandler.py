@@ -331,7 +331,9 @@ def main():
         setup_postgresql(**args)
 
     install_gips(
-        gips_version=args['gips_version'], extras=('dh-' + args['task_queue'],)
+        gips_version=args['gips_version'],
+        developer_install=args['developer_install'],
+        extras=('dh-' + args['task_queue'],)
     )
 
     from gips.scripts.config import configure_environment
