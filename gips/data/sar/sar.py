@@ -22,6 +22,7 @@
 ################################################################################
 
 import os
+import re
 import datetime
 import tarfile
 import copy
@@ -59,6 +60,8 @@ class sarAsset(Asset):
     """ Single original file """
     Repository = sarRepository
 
+    _launchdate = {'A': datetime.date(2006, 1, 24), 'J': datetime.date(1992, 2, 11)}
+
     _sensors = {
         'AFBS': {'description': 'PALSAR FineBeam Single Polarization'},
         'AFBD': {'description': 'PALSAR FineBeam Dual Polarization'},
@@ -66,63 +69,81 @@ class sarAsset(Asset):
         'JFBS': {'description': 'JERS-1 FineBeam Single Polarization'}
     }
     _assets = {
-        '': {
-            'pattern': r'^KC_.+?\.tar\.gz$'
+        'alos1': {
+            # KC_017-C27N00E100WB1ORSA1.tar.gz     # old
+            'pattern': (
+                r'^KC_(?P<userid>[0-9]{3})-'
+                r'(?P<year_or_cycle>[CY])'
+                r'(?P<cyid>[0-9]+)'
+                r'(?P<tile>[NS][0-9]{2}[EW][0-9]{3})'
+                r'(?P<mode>[FWP][LB][1DSR])'
+                r'(?P<pathtype>OR[SM])'
+                r'(?P<satellite>[AJ])1'
+                r'\.tar\.gz$'
+            ),
+            'cycledates': {
+                7: '20-Oct-06', 8: '05-Dec-06', 9: '20-Jan-07',
+                10: '07-Mar-07', 11: '22-Apr-07', 12: '07-Jun-07',
+                13: '23-Jul-07', 14: '07-Sep-07', 15: '23-Oct-07',
+                16: '08-Dec-07', 17: '23-Jan-08', 18: '09-Mar-08',
+                19: '24-Apr-08', 20: '09-Jun-08', 21: '25-Jul-08',
+                22: '09-Sep-08', 23: '25-Oct-08', 24: '10-Dec-08',
+                25: '25-Jan-09', 26: '12-Mar-09', 27: '27-Apr-09',
+                28: '12-Jun-09', 29: '28-Jul-09', 30: '12-Sep-09',
+                31: '28-Oct-09', 32: '13-Dec-09', 33: '28-Jan-10',
+                34: '15-Mar-10', 35: '30-Apr-10', 36: '15-Jun-10',
+                37: '31-Jul-10', 38: '15-Sep-10', 39: '31-Oct-10',
+                40: '16-Dec-10', 41: '31-Jan-11', 42: '18-Mar-11',
+                43: '03-May-11'  
+            },
+        },
+        'alos2': {
+            # KC_999-C045DRN00E115WBDORSA1.tar.gz  # new
+            'pattern': (
+                r'^KC_(?P<userid>[0-9]{3})-'
+                r'(?P<year_or_cycle>C)'
+                r'(?P<cyid>[0-9]+)'
+                r'(?P<format>[AD])'
+                r'(?P<lookdir>[LR])'
+                r'(?P<tile>(?P<lat>[NS][0-9]{2})(?P<lon>[EW][0-9]{3}))'
+                r'(?P<mode>WBD)'
+                r'ORS'
+                r'(?P<satellite>[AJ])'
+                r'(?P<serialno>[0-9])'
+                r'\.tar\.gz$'
+            )
         }
     }
 
     _defaultresolution = [0.000834028356964, 0.000834028356964]
 
     # launch dates for PALSAR (A) and JERS-1 (J)
-    _launchdate = {'A': datetime.date(2006, 1, 24), 'J': datetime.date(1992, 2, 11)}
-
-    _cycledates = {
-        7: '20-Oct-06',
-        8: '05-Dec-06',
-        9: '20-Jan-07',
-        10: '07-Mar-07',
-        11: '22-Apr-07',
-        12: '07-Jun-07',
-        13: '23-Jul-07',
-        14: '07-Sep-07',
-        15: '23-Oct-07',
-        16: '08-Dec-07',
-        17: '23-Jan-08',
-        18: '09-Mar-08',
-        19: '24-Apr-08',
-        20: '09-Jun-08',
-        21: '25-Jul-08',
-        22: '09-Sep-08',
-        23: '25-Oct-08',
-        24: '10-Dec-08',
-        25: '25-Jan-09',
-        26: '12-Mar-09',
-        27: '27-Apr-09',
-        28: '12-Jun-09',
-        29: '28-Jul-09',
-        30: '12-Sep-09',
-        31: '28-Oct-09',
-        32: '13-Dec-09',
-        33: '28-Jan-10',
-        34: '15-Mar-10',
-        35: '30-Apr-10',
-        36: '15-Jun-10',
-        37: '31-Jul-10',
-        38: '15-Sep-10',
-        39: '31-Oct-10',
-        40: '16-Dec-10',
-        41: '31-Jan-11',
-        42: '18-Mar-11',
-        43: '03-May-11'
-    }
 
     def __init__(self, filename):
         """ Inspect a single file and get some basic info """
         super(sarAsset, self).__init__(filename)
 
         bname = os.path.basename(filename)
-        self.tile = bname[10:17]
-        self.sensor = bname[-9:-8] + bname[-15:-12]
+        mats = {}
+        for a in self._assets:
+            m = re.match(self._assets[a]['pattern'], bname)
+            if m:
+                mats[a] = m
+
+
+        if not mats:
+            raise Exception(
+                "{} doesn't match asset naming convention".format(bname)
+            )
+        elif len(mats) > 1:
+            raise Exception('{} matches pattern for: ' + ','.join(mats))
+
+
+        self.asset, m = mats.items()[0]
+        from pprint import pprint
+        pprint(m.groupdict())
+        self.tile = m.group('tile')
+        self.sensor = m.group('satellite') + m.group('mode')
 
         datafiles = self.datafiles()
         for f in datafiles:
@@ -131,9 +152,6 @@ class sarAsset(Asset):
             if f[-4:] == 'date':
                 datefile = f
                 rootname = f[:-5]
-
-        # unique to sarData (TODO - is this still used later?)
-        self.hdrfile = hdrfile
 
         # Check if inspecting a file in the repository
         path = os.path.dirname(filename)
@@ -170,8 +188,8 @@ class sarAsset(Asset):
             #    if date.year != ydate.year:
             #        raise Exception('%s: Date %s outside of expected year (%s)' % (fname, str(date),str(ydate)))
             # If widebeam check cycle dates
-            if bname[7] == 'C':
-                cdate = datetime.datetime.strptime(self._cycledates[int(bname[8:10])], '%d-%b-%y').date()
+            if m.group('year_or_cycle') == 'C':
+                cdate = datetime.datetime.strptime(self._cycledates[int(m.group('cyid'))], '%d-%b-%y').date()
                 if not (cdate <= date <= (cdate + datetime.timedelta(days=45))):
                     raise Exception('%s: Date %s outside of cycle range (%s)' % (bname, str(date), str(cdate)))
             #VerboseOut('%s: inspect %s' % (fname,datetime.datetime.now()-start), 4)

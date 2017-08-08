@@ -268,14 +268,8 @@ class landsatAsset(Asset):
     def query_service(cls, asset, tile, date):
         available = []
 
-        # 'SR' not fetchable at the moment
-        if asset == 'SR':
-            verbose_out('SR assets are never fetchable', 4)
-            return available
-
-        # only fetching 'C1' assets from now on
-        if asset == 'DN':
-            verbose_out('DN assets are no longer fetchable', 4)
+        if asset in ['DN', 'SR']:
+            verbose_out('Landsat "{}" assets are no longer fetchable'.format(asset), 4)
             return available
 
         path = tile[:3]
