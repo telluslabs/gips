@@ -30,6 +30,7 @@ from gips import utils
 class chirpsRepository(Repository):
     name = 'CHIRPS'
     description = 'Climate Hazards Group InfraRed Precipitation with Station data'
+    _tile_attribute = 'tileid'
 
 # sort of a singleton driver:  one asset, one sensor, one product, set them here
 _tile_id = 'africa'
