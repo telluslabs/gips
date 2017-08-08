@@ -735,7 +735,8 @@ class Data(object):
     def __init__(self, tile=None, date=None, path='', search=True):
         """ Find all data and assets for this tile and date.
 
-        search=False will prevent searching for assets via Asset.discover().
+        Note date should be a datetime.date object. search=False will
+        prevent searching for assets via Asset.discover().
         """
         self.id = tile
         self.date = date
