@@ -340,7 +340,8 @@ class landsatData(Data):
 
     # Group products belong to ('Standard' if not specified)
     _productgroups = {
-        'Index': ['bi', 'evi', 'lswi', 'msavi2', 'ndsi', 'ndvi', 'ndwi', 'satvi'],
+        'Index': ['bi', 'evi', 'lswi', 'msavi2', 'ndsi', 'ndvi', 'ndwi',
+                  'satvi', 'vari'],
         'Tillage': ['ndti', 'crc', 'sti', 'isti'],
         'LC8SR': ['ndvi8sr'],
         'ACOLITE': [
@@ -492,6 +493,12 @@ class landsatData(Data):
             'description': 'Soil-Adjusted Total Vegetation Index',
             'arguments': [__toastring],
             'bands': ['satvi'],
+        },
+        'vari': {
+            'assets': ['DN', 'C1'],
+            'description': 'Visible Atmospherically Resistant Index',
+            'arguments': [__toastring],
+            'bands': ['vari'],
         },
         #'Tillage Indices': {
         'ndti': {
