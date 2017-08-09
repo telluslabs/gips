@@ -54,11 +54,12 @@ Standard Products
                  X: erosion kernel diameter in pixels (default: 5)
                  Y: dilation kernel diameter in pixels (default: 10)
                  Z: cloud height in meters (default: 4000)
-   bqa         LC8 band quality                        
+   bqa         The quality band extracted into separate layers.
    bqashadow   LC8 QA + Shadow Smear                   
                  X: erosion kernel diameter in pixels (default: 5)
                  Y: dilation kernel diameter in pixels (default: 10)
                  Z: cloud height in meters (default: 4000)
+   cloudmask   Cloud mask product based on cloud bits of the quality band
    dn          Raw digital numbers                     
    fmask       Fmask cloud cover                       
    landmask    Land mask from LC8SR                    
