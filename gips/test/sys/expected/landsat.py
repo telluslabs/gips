@@ -24,6 +24,8 @@ Index Products
                  toa: use top of the atmosphere reflectance
    satvi       Soil-Adjusted Total Vegetation Index    
                  toa: use top of the atmosphere reflectance
+   vari        Visible Atmospherically Resistant Index 
+                 toa: use top of the atmosphere reflectance
 \x1b[1m
 LC8SR Products
 \x1b[0m   ndvi8sr     Normalized Difference Vegetation from LC8SR
