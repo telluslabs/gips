@@ -56,11 +56,13 @@ def fetch_mocks(mocker):
     return (managed_request, listing, content, open, file)
 
 @pytest.mark.parametrize("call, expected", http_404_params)
-def t_no_http_matching_listings(fetch_mocks, call, expected):
-    """Unit test for modisAsset.fetch for assets that 404."""
+def t_managed_request_returns_none(fetch_mocks, call, expected):
+    """Unit test for handling cases when managed_request returns None.
+
+    This happens for any 4xx error, 5xx error, and similar."""
     # setup & mocks
     (managed_request, listing, content, open, file) = fetch_mocks
-    listing.code = 404
+    managed_request.side_effect = [None, None]
 
     # call
     modis.modisAsset.fetch(*call)
@@ -168,7 +170,7 @@ def t_http_matching_listings(mocker, fetch_mocks, call, listing_url, listing_htm
     modis.modisAsset.fetch(*call)
 
     # assertions
-    assert mocker.call(listing_url) == managed_request.call_args_list[0]
+    assert mocker.call(listing_url, verbosity=2) == managed_request.call_args_list[0]
     listing.readlines.assert_called_once_with()
     # request assertions:  response = request.get(...) && response.iter_content()
     managed_request.assert_called_with(listing_url + '/' + asset_fn)
@@ -176,22 +178,3 @@ def t_http_matching_listings(mocker, fetch_mocks, call, listing_url, listing_htm
     # file write assertions:  open(...) as fd && fd.write(...)
     assert open.call_args[0][0].endswith(asset_fn) # did we open the right filename?
     file.write.assert_called_once_with(content_data)
-
-@pytest.mark.parametrize("call, listing_url, listing_html, asset_fn", http_200_params)
-def t_auth_error(fetch_mocks, mocker, call, listing_url, listing_html, asset_fn):
-    """Confirm auth failures are handled gracefully."""
-    (managed_request, listing, content, open, file) = fetch_mocks
-    # to confirm user notification is produced
-    m_verbose_out = mocker.patch.object(modis.utils, 'verbose_out')
-
-    listing.readlines.return_value = listing_html
-
-    content.code = 401 # rig to fail for content fetch
-    content.msg = 'Unauthorized'
-    # TODO not sure how this is represented in urllib2
-    # content.text = 'HTTP Basic: Access denied.\n'
-
-    modis.modisAsset.fetch(*call)
-
-    # Confirm there was no attempt to save content
-    assert not open.called and not file.write.called
