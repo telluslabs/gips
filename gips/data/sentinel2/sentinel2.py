@@ -616,7 +616,7 @@ class sentinel2Data(Data):
         'cfmask': {
             'description': 'Cloud mask',
             'assets': [_asset_type],
-            'bands': [],
+            'bands': ['cloudmask'],
         }
     }
 
