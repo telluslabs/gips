@@ -170,7 +170,7 @@ class sentinel2Asset(Asset):
             'archived-name-re': '^' + _tile_re + '_' + _orig_name_re,
             # raster file pattern
             # TODO '/.*/' can be misleading due to '/' satisfying '.', so rework into '/[^/]*/'
-            'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B\d[\dA].jp2$',
+            'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B(?P<band>\d[\dA]).jp2$',
             ## internal metadata file patterns
             'datastrip-md-re': '^.*/DATASTRIP/.*/.*.xml$', # only XML file under DATASTRIP/
             'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
@@ -180,7 +180,7 @@ class sentinel2Asset(Asset):
             'downloaded-name-re': _2016_12_07_name_re,
             'archived-name-re': _2016_12_07_name_re,
             # raster file pattern
-            'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B\d[\dA].jp2$',
+            'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B(?P<band>\d[\dA]).jp2$',
             # internal metadata file patterns
             'datastrip-md-re': '^.*/DATASTRIP/.*/MTD_DS.xml$',
             'tile-md-re': '^.*/GRANULE/.*/MTD_TL.xml$',
@@ -918,17 +918,42 @@ class sentinel2Data(Data):
         self._product_images['ref'] = sr_image
 
 
+    def _band_filename(self, band, zipfile, asset_style):
+        for name in zipfile.namelist():
+            match = re.match(self.Asset._asset_styles[asset_style]['raster-re'], name)
+            if match and match.group('band') == band:
+                return name
+        raise IOError("{} does not contain raster band {}".format(
+                zipfile.filename, band))
+
+
     def fmask_geoimage(self, asset_type):
+        """Generate cloud mask.
+
+        Uses python implementation of cfmask. Builds a VRT of all the necessary
+        bands in the proper order, an angles image is created using the supplied
+        metadata, and then the two are put through the fmask algorithm.
+        """
         self._time_report('Generating cloud mask')
 
-        zipfile.ZipFile(self.assets[asset_type].filename, 'r').extractall(self._temp_proc_dir)
+        safe_zip = zipfile.ZipFile(self.assets[asset_type].filename, 'r')
+        safe_zip.extractall(self._temp_proc_dir)
+
+        asset_style = self.assets[asset_type].style
         bands = []
         for i in range(1, 9):
-            bands.append(glob.glob("%s/*.SAFE/GRANULE/*/IMG_DATA/*_B0%d.jp2" % (self._temp_proc_dir, i))[0])
-        bands.append(glob.glob("%s/*.SAFE/GRANULE/*/IMG_DATA/*_B8A.jp2" % self._temp_proc_dir)[0])
-        bands.append(glob.glob("%s/*.SAFE/GRANULE/*/IMG_DATA/*_B09.jp2" % self._temp_proc_dir)[0])
+            band = self._band_filename('0' + str(i), safe_zip, asset_style)
+            bands.append("{}/{}".format(self._temp_proc_dir, band))
+
+        band = self._band_filename('8A', safe_zip, asset_style)
+        bands.append("{}/{}".format(self._temp_proc_dir, band))
+
+        band = self._band_filename('09', safe_zip, asset_style)
+        bands.append("{}/{}".format(self._temp_proc_dir, band))
+
         for i in range(3):
-            bands.append(glob.glob("%s/*.SAFE/GRANULE/*/IMG_DATA/*_B1%d.jp2" % (self._temp_proc_dir, i))[0])
+            band = self._band_filename('1' + str(i), safe_zip, asset_style)
+            bands.append("{}/{}".format(self._temp_proc_dir, band))
 
         gdalbuildvrt_args = [
             "gdalbuildvrt",
@@ -941,7 +966,12 @@ class sentinel2Data(Data):
         if rc != 0:
             raise IOError("Expected gdalbuildvrt exit status 0, got {}".format(rc))
 
-        metadata_xml = glob.glob("%s/*.SAFE/GRANULE/*/*.xml" % self._temp_proc_dir)[0]
+        metadata_xml = None
+        for name in safe_zip.namelist():
+            if re.match(self.Asset._asset_styles[asset_style]['tile-md-re'], name):
+                metadata_xml = "{}/{}".format(self._temp_proc_dir, name)
+        if not metadata_xml:
+            raise IOError("{} does not contain expected metadatafile.".format(safe_zip.filename))
         rc = subprocess.call(
             [
                 "fmask_sentinel2makeAnglesImage.py",
@@ -957,14 +987,15 @@ class sentinel2Data(Data):
                 "fmask_sentinel2Stacked.py",
                 "-a", "%s/allbands.vrt" % self._temp_proc_dir,
                 "-z", "%s/angles.img" % self._temp_proc_dir,
-                "-o", "%s/cloudmask.img" % self._temp_proc_dir,
+                "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
                 "-v",
             ]
         )
         if rc != 0:
             raise IOError("Expected fmask_sentinel2Stacked.py exit status 0, got {}".formt(rc))
 
-        fmask_image = gippy.GeoImage("%s/cloudmask.img" % self._temp_proc_dir)
+        safe_zip.close()
+        fmask_image = gippy.GeoImage("%s/cloudmask.tif" % self._temp_proc_dir)
         self._product_images['cfmask'] = fmask_image
 
 
@@ -1026,6 +1057,13 @@ class sentinel2Data(Data):
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)
+                if prod_type == 'cfmask':
+                    output_image.SetMeta('FMASK_0', 'nodata')
+                    output_image.SetMeta('FMASK_1', 'valid')
+                    output_image.SetMeta('FMASK_2', 'cloud')
+                    output_image.SetMeta('FMASK_3', 'cloud shadow')
+                    output_image.SetMeta('FMASK_4', 'snow')
+                    output_image.SetMeta('FMASK_5', 'water')
                 for b_num, b_name in enumerate(source_image.BandNames(), 1):
                     output_image.SetBandName(b_name, b_num)
                 # process bandwise because gippy had an error doing it all at once
