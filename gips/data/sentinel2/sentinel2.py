@@ -32,6 +32,7 @@ import json
 import tempfile
 import zipfile
 import copy
+import glob
 from xml.etree import ElementTree, cElementTree
 
 import numpy
@@ -612,6 +613,11 @@ class sentinel2Data(Data):
             'bands': [{'name': band_name, 'units': Data._unitless}
                       for band_name in Asset._sensors['S2A']['indices-colors']],
         },
+        'cfmask': {
+            'description': 'Cloud mask',
+            'assets': [_asset_type],
+            'bands': [],
+        }
     }
 
     # add index products to _products
@@ -649,6 +655,7 @@ class sentinel2Data(Data):
         'rad':          'rad-toa',
         'rad-toa':      'ref-toa',
         'ref-toa':      None, # has no deps but the asset
+        'cfmask':       None,
     }
 
     def plan_work(self, requested_products, overwrite):
@@ -910,6 +917,57 @@ class sentinel2Data(Data):
             sr_image[c] = (rad_rev_img[c] - Lu) / TLdS
         self._product_images['ref'] = sr_image
 
+
+    def fmask_geoimage(self, asset_type):
+        self._time_report('Generating cloud mask')
+
+        zipfile.ZipFile(self.assets[asset_type].filename, 'r').extractall(self._temp_proc_dir)
+        bands = []
+        for i in range(1, 9):
+            bands.append(glob.glob("%s/*.SAFE/GRANULE/*/IMG_DATA/*_B0%d.jp2" % (self._temp_proc_dir, i))[0])
+        bands.append(glob.glob("%s/*.SAFE/GRANULE/*/IMG_DATA/*_B8A.jp2" % self._temp_proc_dir)[0])
+        bands.append(glob.glob("%s/*.SAFE/GRANULE/*/IMG_DATA/*_B09.jp2" % self._temp_proc_dir)[0])
+        for i in range(3):
+            bands.append(glob.glob("%s/*.SAFE/GRANULE/*/IMG_DATA/*_B1%d.jp2" % (self._temp_proc_dir, i))[0])
+
+        gdalbuildvrt_args = [
+            "gdalbuildvrt",
+            "-resolution", "user",
+            "-tr", "20", "20",
+            "-separate",
+            "%s/allbands.vrt" % self._temp_proc_dir,
+        ] + bands
+        rc = subprocess.call(gdalbuildvrt_args)
+        if rc != 0:
+            raise IOError("Expected gdalbuildvrt exit status 0, got {}".format(rc))
+
+        metadata_xml = glob.glob("%s/*.SAFE/GRANULE/*/*.xml" % self._temp_proc_dir)[0]
+        rc = subprocess.call(
+            [
+                "fmask_sentinel2makeAnglesImage.py",
+                "-i", metadata_xml,
+                "-o", "%s/angles.img" % self._temp_proc_dir,
+            ]
+        )
+        if rc != 0:
+            raise IOError("Expected fmask_sentinel2makeAnglesImage.py exit status 0, got {}".format(rc))
+
+        rc = subprocess.call(
+            [
+                "fmask_sentinel2Stacked.py",
+                "-a", "%s/allbands.vrt" % self._temp_proc_dir,
+                "-z", "%s/angles.img" % self._temp_proc_dir,
+                "-o", "%s/cloudmask.img" % self._temp_proc_dir,
+                "-v",
+            ]
+        )
+        if rc != 0:
+            raise IOError("Expected fmask_sentinel2Stacked.py exit status 0, got {}".formt(rc))
+
+        fmask_image = gippy.GeoImage("%s/cloudmask.img" % self._temp_proc_dir)
+        self._product_images['cfmask'] = fmask_image
+
+
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
         """Produce data products and save them to files.
@@ -947,6 +1005,8 @@ class sentinel2Data(Data):
             self.rad_geoimage()
         if 'ref' in work:
             self.ref_geoimage(asset_type, sensor)
+        if 'cfmask' in work:
+            self.fmask_geoimage(asset_type)
 
         self._time_report('Starting on standard product processing')
 
