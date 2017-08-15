@@ -212,6 +212,7 @@ class sarAsset(Asset):
         self.is_cycle = m.group('year_or_cycle') == 'C'
         self.is_year = not self.is_cycle
         self.cyid = int(m.group('cyid'))
+        self.bname = bname
 
         # Check if inspecting a file in the repository
         path = os.path.dirname(filename)
@@ -294,7 +295,7 @@ class sarAsset(Asset):
             for d in datevals if d != 0
         ]
         if not dates:
-            raise Exception('%s: no valid dates' % bname)
+            raise Exception('%s: no valid dates' % self.bname)
         date = min(dates)
         self._meta_dict['min_date'] = date
         #VerboseOut('Date from image: %s' % str(date),3)
@@ -312,10 +313,10 @@ class sarAsset(Asset):
             delta = (date - cdate).days
             utils.verbose_out(
                 '{}: {} days different between datearray and cycledate'
-                .format(bname, delta)
+                .format(self.bname, delta)
             )
             if not (0 <= delta <= 45):
-                raise Exception('%s: Date %s outside of cycle range (%s)' % (bname, str(date), str(cdate)))
+                raise Exception('%s: Date %s outside of cycle range (%s)' % (self.bname, str(date), str(cdate)))
         #VerboseOut('%s: inspect %s' % (fname,datetime.datetime.now()-start), 4)
 
 
