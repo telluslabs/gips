@@ -132,7 +132,10 @@ class sentinel2Asset(Asset):
             # TODO find real start date for S2 data:
             # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
             # (change to orderby=ingestiondate%20desc if needed)
-            'startdate': datetime.date(2015, 1, 1), # used to prevent impossible searches
+            'startdate': datetime.date(2015, 1, 1), # used to prevent
+            # impossible searches
+            # TODO: (may need to change -- nigeria work shows no
+            # imagery before August 2015)
             'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
                           # only needed by Asset.end_date and Asset.available, but those are never called?
         },
