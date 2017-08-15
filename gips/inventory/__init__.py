@@ -39,7 +39,7 @@ from . import dbinv, orm
 
 class Inventory(object):
     """ Base class for inventories """
-    _colors = [Colors.PURPLE, Colors.RED, Colors.GREEN, Colors.BLUE]
+    _colors = [Colors.PURPLE, Colors.RED, Colors.GREEN, Colors.BLUE, Colors.YELLOW]
 
     def __init__(self):
         pass
@@ -296,7 +296,7 @@ class DataInventory(Inventory):
                     tiles_obj.tiles[tile] = data_obj
             return
 
-        # Perform filesystem search since user wants that.  Data object instantiation results
+        # Perofrm filesystem search since user wants that.  Data object instantiation results
         # in filesystem search (thanks to search=True).
         self.data = {} # clear out data dict in case it has partial results
         for date in dates:
