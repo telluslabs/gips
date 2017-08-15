@@ -181,6 +181,22 @@ class landsatAsset(Asset):
         },
     }
 
+    # Field ids are retrieved with `api.dataset_fields()` call
+    _ee_datasets = {
+        'LANDSAT_8_C1': {
+            'path_field': '20514',
+            'row_field': '20516',
+        },
+        'LANDSAT_ETM_C1': {
+            'path_field': '19884',
+            'row_field': '19887',
+        },
+        'LANDSAT_TM_C1': {
+            'path_field': '19873',
+            'row_field': '19879',
+        },
+    }
+
     # Set the startdate to the min date of the asset's sensors
     for asset, asset_info in _assets.iteritems():
         asset_info['startdate'] = min(
@@ -285,20 +301,24 @@ class landsatAsset(Asset):
         username = settings().REPOS['landsat']['username']
         password = settings().REPOS['landsat']['password']
         api_key = api.login(username, password)['data']
-        response = api.search(
-            'LANDSAT_8_C1', 'EE',
-            start_date=fdate, end_date=fdate,
-            where={             # Field IDs retrieved with `dataset_fields()` call
-                '20514': path,  # Path
-                '20516': row,   # Row
-                #'20515': '90',  # Max cloud cover %, doesn't seem to work at the moment
-            },
-            api_key=api_key
-        )['data']
-
         available = []
-        for result in response['results']:
-            available.append({'basename': result['displayId'] + '.tar.gz', 'sceneID': result['entityId']})
+        for dataset in cls._ee_datasets.keys():
+            response = api.search(
+                dataset, 'EE',
+                start_date=fdate, end_date=fdate,
+                where={
+                    cls._ee_datasets[dataset]['path_field']: path,
+                    cls._ee_datasets[dataset]['row_field']: row,
+                },
+                api_key=api_key
+            )['data']
+
+            for result in response['results']:
+                available.append({
+                    'basename': result['displayId'] + '.tar.gz',
+                    'sceneID': result['entityId'],
+                    'dataset': dataset,
+                })
 
         return available
 
@@ -318,7 +338,7 @@ class landsatAsset(Asset):
             username = settings().REPOS['landsat']['username']
             password = settings().REPOS['landsat']['password']
             api_key = api.login(username, password)['data']
-            url = api.download('LANDSAT_8_C1', 'EE', sceneIDs, 'STANDARD', api_key)['data'][0]
+            url = api.download(result['dataset'], 'EE', sceneIDs, 'STANDARD', api_key)['data'][0]
             download(url, stage_dir)
 
     def updated(self, newasset):

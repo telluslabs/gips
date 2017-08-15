@@ -77,8 +77,8 @@ Standard Products
 t_inventory = { 'stdout': u"""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
 Retrieving inventory for site NHseacoast-0
 fname
-LC80120302015352LGN00.tar.gz
-DN asset
+LC08_L1GT_012030_20151218_20170224_01_T2.tar.gz
+C1 asset
 
 \x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
 \x1b[1m
@@ -87,9 +87,9 @@ Tile Coverage
   012030      100.0%        6.7%
   013030        2.4%        0.2%
 
-\x1b[1m\x1b[4m    DATE        DN        SR     Product  \x1b[0m
+\x1b[1m\x1b[4m    DATE        C1        DN        SR     Product  \x1b[0m
 \x1b[1m2015        
-\x1b[0m    352       100.0%             
+\x1b[0m    352       100.0%                       
 
 
 1 files on 1 dates
