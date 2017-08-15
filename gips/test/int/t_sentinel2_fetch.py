@@ -188,9 +188,12 @@ expected_tiles = [
 
 test_asset_bn = 'S2A_OPER_PRD_MSIL1C_PDMC_20160119T230435_R011_V20160119T155447_20160119T155447.zip'
 
+def build_asset_fp(fn):
+    return os.path.join(os.path.dirname(__file__), 'data', fn)
+
 @pytest.fixture
 def test_asset_fn():
-    return os.path.join(os.path.dirname(__file__), 'data', test_asset_bn)
+    return build_asset_fp(test_asset_bn)
 
 @pytest.fixture
 def fetch_mocks(mocker, test_asset_fn):
@@ -268,12 +271,17 @@ def t_fetch_old_asset_duplicate(fetch_mocks, mocker):
     finally:
         os.path.exists(staged_fn) and os.remove(staged_fn)
 
+# found in the field; dunno why, but it's fetchable even though it only contains one granule:
+strange_asset_bn = 'S2A_OPER_PRD_MSIL1C_PDMC_20161030T191653_R079_V20161030T095132_20161030T095132.zip'
 
-def t_tile_list(test_asset_fn):
+@pytest.mark.parametrize('asset_fp, expected_tiles', (
+    (build_asset_fp(test_asset_bn), expected_tiles),
+    (build_asset_fp(strange_asset_bn), ['31PHN']),
+))
+def t_tile_list(asset_fp, expected_tiles):
     """Use the test asset file to confirm tile_list()."""
-    tiles = sentinel2.sentinel2Asset.tile_list(test_asset_fn)
-    assert expected_tiles == tiles
-
+    actual_tiles = sentinel2.sentinel2Asset.tile_list(asset_fp)
+    assert expected_tiles == actual_tiles
 
 @pytest.fixture
 def archive_setup(test_asset_fn):
