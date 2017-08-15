@@ -397,18 +397,22 @@ class sentinel2Asset(Asset):
     @classmethod
     def tile_list(cls, file_name):
         """Extract a list of tiles from the given old-style asset."""
-        # "the only XML file one directory down from DATASTRIP/"
-        file_pattern = '^.*/DATASTRIP/[^/]+/[^/]+\.xml$'
-        subtree_tag = 'Tile_List'
+        # find an xml file with a very long name in the top-level .SAFE/ directory
+        # eg S2A_OPER_MTD_SAFL1C_PDMC_20161030T191653_R079_V20161030T095132_20161030T095132.xml
+        file_pattern = r'^[^/]+\.SAFE/[^/]{78}\.xml$'
+        subtree_tag = 'Granules'
+        tile_re = '_T' + cls._tile_re + '_' # group 'tile' is handy
         with zipfile.ZipFile(file_name) as asset_zf:
             metadata_fn = next(fn for fn in asset_zf.namelist() if re.match(file_pattern, fn))
             with asset_zf.open(metadata_fn) as metadata_zf:
                 tree = cElementTree.parse(metadata_zf)
-                tl_elem = next(tree.iter(subtree_tag))
-                tiles_tags = tl_elem.findall('Tile')
-                # from this:  S2A_OPER_MSI_L1C_TL_EPA__20170221T200353_A002192_T35UNQ_N02.04
-                # want this:  35UNQ
-                return [tt.attrib['tileId'].split('_')[-2][1:] for tt in tiles_tags]
+                tiles = []
+                for elem in tree.iter(subtree_tag):
+                    attrib = elem.attrib['granuleIdentifier']
+                    # from this:  S2A_OPER_MSI_L1C_TL_EPA__20170221T200353_A002192_T35UNQ_N02.04
+                    # want this:  35UNQ
+                    tiles.append(re.search(tile_re, attrib).group('tile'))
+                return tiles
 
 
     def updated(self, newasset):
