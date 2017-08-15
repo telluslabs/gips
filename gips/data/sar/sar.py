@@ -346,7 +346,6 @@ class sarData(Data):
     version = '0.9.0'
     Asset = sarAsset
 
-    _pattern = '*'
     _products = {
         'sign': {
             'description': 'Sigma nought (radar backscatter coefficient)',
