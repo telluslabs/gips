@@ -918,15 +918,6 @@ class sentinel2Data(Data):
         self._product_images['ref'] = sr_image
 
 
-    def _band_filename(self, band, zipfile, asset_style):
-        for name in zipfile.namelist():
-            match = re.match(self.Asset._asset_styles[asset_style]['raster-re'], name)
-            if match and match.group('band') == band:
-                return name
-        raise IOError("{} does not contain raster band {}".format(
-                zipfile.filename, band))
-
-
     def fmask_geoimage(self, asset_type):
         """Generate cloud mask.
 
@@ -936,24 +927,9 @@ class sentinel2Data(Data):
         """
         self._time_report('Generating cloud mask')
 
-        safe_zip = zipfile.ZipFile(self.assets[asset_type].filename, 'r')
-        safe_zip.extractall(self._temp_proc_dir)
-
         asset_style = self.assets[asset_type].style
-        bands = []
-        for i in range(1, 9):
-            band = self._band_filename('0' + str(i), safe_zip, asset_style)
-            bands.append("{}/{}".format(self._temp_proc_dir, band))
 
-        band = self._band_filename('8A', safe_zip, asset_style)
-        bands.append("{}/{}".format(self._temp_proc_dir, band))
-
-        band = self._band_filename('09', safe_zip, asset_style)
-        bands.append("{}/{}".format(self._temp_proc_dir, band))
-
-        for i in range(3):
-            band = self._band_filename('1' + str(i), safe_zip, asset_style)
-            bands.append("{}/{}".format(self._temp_proc_dir, band))
+        DEVNULL = open(os.devnull, 'w')
 
         gdalbuildvrt_args = [
             "gdalbuildvrt",
@@ -961,40 +937,39 @@ class sentinel2Data(Data):
             "-tr", "20", "20",
             "-separate",
             "%s/allbands.vrt" % self._temp_proc_dir,
-        ] + bands
-        rc = subprocess.call(gdalbuildvrt_args)
-        if rc != 0:
-            raise IOError("Expected gdalbuildvrt exit status 0, got {}".format(rc))
+        ] + self.metadata['abs-filenames']
+        subprocess.check_call(gdalbuildvrt_args, stderr=DEVNULL)
 
+        safe_zip = zipfile.ZipFile(self.assets[asset_type].filename, 'r')
         metadata_xml = None
         for name in safe_zip.namelist():
             if re.match(self.Asset._asset_styles[asset_style]['tile-md-re'], name):
+                safe_zip.extract(name, self._temp_proc_dir)
                 metadata_xml = "{}/{}".format(self._temp_proc_dir, name)
         if not metadata_xml:
             raise IOError("{} does not contain expected metadatafile.".format(safe_zip.filename))
-        rc = subprocess.call(
+        subprocess.check_call(
             [
                 "fmask_sentinel2makeAnglesImage.py",
                 "-i", metadata_xml,
                 "-o", "%s/angles.img" % self._temp_proc_dir,
             ]
+            #stderr=DEVNULL
         )
-        if rc != 0:
-            raise IOError("Expected fmask_sentinel2makeAnglesImage.py exit status 0, got {}".format(rc))
+        safe_zip.close()
 
-        rc = subprocess.call(
+        subprocess.check_call(
             [
                 "fmask_sentinel2Stacked.py",
                 "-a", "%s/allbands.vrt" % self._temp_proc_dir,
                 "-z", "%s/angles.img" % self._temp_proc_dir,
                 "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
                 "-v",
-            ]
+            ],
+            stderr=DEVNULL
         )
-        if rc != 0:
-            raise IOError("Expected fmask_sentinel2Stacked.py exit status 0, got {}".formt(rc))
 
-        safe_zip.close()
+        DEVNULL.close()
         fmask_image = gippy.GeoImage("%s/cloudmask.tif" % self._temp_proc_dir)
         self._product_images['cfmask'] = fmask_image
 
