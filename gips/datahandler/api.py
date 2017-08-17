@@ -3,6 +3,7 @@
 import itertools
 from datetime import timedelta, datetime
 from pprint import pprint, pformat
+import logging
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
@@ -13,9 +14,8 @@ from gips import utils
 from gips.core import SpatialExtent, TemporalExtent
 
 from gips.inventory import dbinv, orm
-from gips.datahandler.logger import Logger
-#from pdb import set_trace
 
+log = lambda: logging.getLogger(__name__)
 
 def get_catalog ():
     """Return list of installed DataVariables as dicts"""
@@ -40,8 +40,7 @@ def submit_request (site, variable, spatial, temporal):
                     (see gips.core.SpatialExtent.factory)
     temporal:       dictionary of TemporalExtent parameters ('dates' and 'days')
     """
-    Logger().log("submit_job: {} {} {} {}".format(site, variable,
-                                                  spatial, temporal))
+    log().info("submit_request: {} {} {} {}".format(site, variable, spatial, temporal))
     orm.setup()
     job, created = dbinv.models.Job.objects.get_or_create(
         site=site,
@@ -51,7 +50,7 @@ def submit_request (site, variable, spatial, temporal):
         defaults={'status':'requested'},
     )
 
-    Logger().log("submit_job: returned jobid {}".format(job.pk))
+    log().info("submit_job: returned jobid {}".format(job.pk))
     return job.pk
 
 
@@ -184,9 +183,7 @@ def query_service(driver_name, spatial, temporal, products,
         + 'get-info' - do nothing but return that which would have been requested.
     '''
     from time import time
-    log = Logger().log
-
-    log("query_service starting; args: " + repr((
+    log().info("query_service starting; args: " + repr((
         driver_name, spatial, temporal, products, query_type, action)))
     def tprint(tslist):
         last = tslist[0]

@@ -7,7 +7,6 @@ import os
 from subprocess import check_output, Popen, PIPE, CalledProcessError
 
 from gips import utils
-from gips.datahandler.logger import Logger
 from .. import queue
 
 pbs_directives = [
@@ -25,11 +24,13 @@ import_block = """
 import os
 import datetime
 import gippy
+from gips import utils
 from gips.inventory import dbinv, orm
 from gips.datahandler import worker
 """
 
 setup_block = """
+utils.configure_logging()
 os.environ['GIPS_ORM'] = 'true'
 gippy.Options.SetVerbose(4) # substantial verbosity for testing purposes
 orm.setup()

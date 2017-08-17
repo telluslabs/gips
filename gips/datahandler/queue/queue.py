@@ -43,10 +43,10 @@ def get_queue_module():
     raise RuntimeError("Unreachable line reached; valid_tq_settings need updating?")
 
 
-def get_job_name(*args, **kwargs):
+def get_job_name():
     """Return the job's name as given by its queueing system."""
     # need to return an ascii string because, way down the line, gippy can't handle unicode
-    return get_queue_module().get_job_name(*args, **kwargs).encode('ascii')
+    return get_queue_module().get_job_name().encode('ascii')
 
 def is_job_alive(*args, **kwargs):
     """Returns True only if the job exists and is not yet completed.

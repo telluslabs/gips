@@ -53,6 +53,7 @@ def work(operation, *args):
     """Set up a good environment, then call worker.operation(*args).
 
     Meant to be executed in an RQ worker process."""
+    utils.configure_logging()
     os.environ['GIPS_ORM'] = 'true'
     gippy.Options.SetVerbose(4) # substantial verbosity for testing purposes
     orm.setup()

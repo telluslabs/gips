@@ -3,6 +3,7 @@
 import argparse
 import logging
 import logging.handlers
+import logging.config
 from multiprocessing import Process
 import os
 import pickle
@@ -92,23 +93,42 @@ class LogRecordSocketReceiver (SocketServer.ThreadingTCPServer):
                 self.handle_request()
             abort = self.abort
 
+_default_server_logging = {
+    'version': 1,
+    'formatters': {
+        'dhdformatter': {
+            'format': '%(levelname)s %(asctime)s --- %(dh_id)s:%(filename)s:%(funcName)s\n'
+                      '%(message)s\n'
+                      '--------------------------------------------------------',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO',
+            'formatter': 'dhdformatter',
+        },
+    },
+    'root': {'handlers': ['console']},
+}
 
 def serve_log (host, port):
-    # TODO 3rd party libs log too, and don't pass in `extras`, so KeyError.  Fix by using one
-    # formatter for most logs, and a special one that shows jobid for worker logging.  Note also
-    # funcName:  datahandler.Logger.log() calls logging.log, so funcName is often just 'log', which
-    # isn't helpful.
-    logging.basicConfig(format = (
-        #'---- %(asctime)s %(jobid)s %(caller)s -----\n'
-        '---- %(asctime)s ---------- %(funcName)s ------\n'
-        '%(message)s\n'
-        '--------------------------------------------------------'
-    ))
+    """Configure and run the logging server portion of dhd.
+
+    Part of the contract for passing log records to this server is to
+    provide a 'dh_id' attrib in LogRecords passed in, which must be
+    usefully convertible to a string.  It should identify the running
+    code that emitted the LogRecord, such as a job ID, process ID, or
+    similar.
+    """
+    # not using basicConfig because setting the log level mysteriously didn't work
+    logging_config = utils.get_setting('SERVER_LOGGING', _default_server_logging)
+    logging.config.dictConfig(logging_config)
     tcpserver = LogRecordSocketReceiver(host, port)
     tcpserver.serve_until_stopped()
 
-
 def serve_xmlrpc (host, port):
+    utils.configure_logging()
     #server = SimpleXMLRPCServer(
     server = ThreadedRPC(
         (host, port),
@@ -133,6 +153,7 @@ def main ():
                         default=utils.settings().GEOKIT_SERVER)
     parser.add_argument('--logport', help='port for log server',
                         default=utils.settings().LOG_PORT)
+    # TODO logfile arg is ignored?
     parser.add_argument('-l', '--logfile', help='logfile',
                         default='geokitd.log')
     parser.add_argument('--xmlrpcport', help='port for xmlrpc server',
