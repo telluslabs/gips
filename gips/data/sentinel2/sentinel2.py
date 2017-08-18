@@ -614,9 +614,9 @@ class sentinel2Data(Data):
                       for band_name in Asset._sensors['S2A']['indices-colors']],
         },
         'cfmask': {
-            'description': 'Cloud mask',
+            'description': 'Cloud, cloud shadow, and water classification',
             'assets': [_asset_type],
-            'bands': ['cloudmask'],
+            'bands': {'name': 'cfmask', 'units': Data._unitless},
         }
     }
 
