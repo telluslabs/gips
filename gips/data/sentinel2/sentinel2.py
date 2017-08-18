@@ -148,7 +148,8 @@ class sentinel2Asset(Asset):
     # 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
     _orig_name_re = (
         '(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
-        '_\d{8}T\d{6}' # processing date (don't care)
+        '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # year, month, day
+        'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # hour, minute, second
         '_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
         # observation datetime:
         '_V(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
@@ -398,21 +399,22 @@ class sentinel2Asset(Asset):
     def tile_list(cls, file_name):
         """Extract a list of tiles from the given old-style asset."""
         # find an xml file with a very long name in the top-level .SAFE/ directory
-        # eg S2A_OPER_MTD_SAFL1C_PDMC_20161030T191653_R079_V20161030T095132_20161030T095132.xml
-        file_pattern = r'^[^/]+\.SAFE/[^/]{78}\.xml$'
-        subtree_tag = 'Granules'
-        tile_re = '_T' + cls._tile_re + '_' # group 'tile' is handy
+        # eg
+        # S2A_OPER_MTD_SAFL1C_PDMC_20161030T191653_R079_V20161030T095132_20161030T095132.xml
+        tiles = set()
+        file_pattern = cls._asset_styles['original']['raster-re'].format(tileid=cls._tile_re)
+        p = re.compile(file_pattern)
         with zipfile.ZipFile(file_name) as asset_zf:
-            metadata_fn = next(fn for fn in asset_zf.namelist() if re.match(file_pattern, fn))
-            with asset_zf.open(metadata_fn) as metadata_zf:
-                tree = cElementTree.parse(metadata_zf)
-                tiles = []
-                for elem in tree.iter(subtree_tag):
-                    attrib = elem.attrib['granuleIdentifier']
-                    # from this:  S2A_OPER_MSI_L1C_TL_EPA__20170221T200353_A002192_T35UNQ_N02.04
-                    # want this:  35UNQ
-                    tiles.append(re.search(tile_re, attrib).group('tile'))
-                return tiles
+            for f in asset_zf.namelist():
+                m = p.match(f)
+                if m:
+                    tiles.add(m.group('tile'))
+        if not tiles:
+            raise Exception(
+                'Datastrip asset contains no tiles???? ({})'
+                .format(file_name)
+            )
+        return list(tiles)
 
 
     def updated(self, newasset):
