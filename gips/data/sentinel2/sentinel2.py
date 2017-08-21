@@ -149,8 +149,8 @@ class sentinel2Asset(Asset):
     # 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
     _orig_name_re = (
         '(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
-        '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # year, month, day
-        'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # hour, minute, second
+        '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
+        'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
         '_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
         # observation datetime:
         '_V(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
@@ -161,7 +161,11 @@ class sentinel2Asset(Asset):
         '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
         '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
         'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
-        '_N\d{4}_R\d\d\d_T' + _tile_re + '_\d{8}T\d{6}.zip$') # tile
+        '_N\d{4}_R\d\d\d_T' + _tile_re +  # tile
+        '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
+        'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
+        '.zip$'
+    )
 
     _asset_styles = {
         'original': {
