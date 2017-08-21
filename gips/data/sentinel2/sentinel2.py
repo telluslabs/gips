@@ -947,7 +947,7 @@ class sentinel2Data(Data):
         safe_zip = zipfile.ZipFile(self.assets[asset_type].filename, 'r')
         metadata_xml = None
         for name in safe_zip.namelist():
-            if re.match(self.Asset._asset_styles[asset_style]['tile-md-re'], name):
+            if re.match(self.Asset._asset_styles[asset_style]['tile-md-re'].format(tileid=self.assets[asset_type].tile), name):
                 safe_zip.extract(name, self._temp_proc_dir)
                 metadata_xml = "{}/{}".format(self._temp_proc_dir, name)
         if not metadata_xml:
