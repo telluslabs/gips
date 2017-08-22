@@ -200,18 +200,13 @@ def create_environment_settings(repos_path, email=''):
     cfgfile = os.path.join(cfgpath, 'settings.py')
     if src[-1] == 'c':
         src = src[:-1]
-    try:
-        if not os.path.exists(cfgfile):
-            with open(cfgfile, 'w') as fout:
-                with open(src, 'r') as fin:
-                    for line in fin:
-                        fout.write(line.replace('$TLD', repos_path).replace('$EMAIL', email))
+    if os.path.exists(cfgfile):
         return cfgfile
-    except OSError:
-        # no permissions, so no environment level config installed
-        #print traceback.format_exck()
-        # TODO error-handling-fix: report on specifics of error then continue; no error handler here
-        return None
+    with open(cfgfile, 'w') as fout:
+        with open(src, 'r') as fin:
+            for line in fin:
+                fout.write(line.replace('$TLD', repos_path).replace('$EMAIL', email))
+    return cfgfile
 
 
 def create_user_settings(email=''):

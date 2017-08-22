@@ -32,6 +32,7 @@ import json
 import tempfile
 import zipfile
 import copy
+import glob
 from xml.etree import ElementTree, cElementTree
 
 import numpy
@@ -169,7 +170,7 @@ class sentinel2Asset(Asset):
             'archived-name-re': '^' + _tile_re + '_' + _orig_name_re,
             # raster file pattern
             # TODO '/.*/' can be misleading due to '/' satisfying '.', so rework into '/[^/]*/'
-            'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B\d[\dA].jp2$',
+            'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B(?P<band>\d[\dA]).jp2$',
             ## internal metadata file patterns
             'datastrip-md-re': '^.*/DATASTRIP/.*/.*.xml$', # only XML file under DATASTRIP/
             'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
@@ -179,7 +180,7 @@ class sentinel2Asset(Asset):
             'downloaded-name-re': _2016_12_07_name_re,
             'archived-name-re': _2016_12_07_name_re,
             # raster file pattern
-            'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B\d[\dA].jp2$',
+            'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B(?P<band>\d[\dA]).jp2$',
             # internal metadata file patterns
             'datastrip-md-re': '^.*/DATASTRIP/.*/MTD_DS.xml$',
             'tile-md-re': '^.*/GRANULE/.*/MTD_TL.xml$',
@@ -397,18 +398,22 @@ class sentinel2Asset(Asset):
     @classmethod
     def tile_list(cls, file_name):
         """Extract a list of tiles from the given old-style asset."""
-        # "the only XML file one directory down from DATASTRIP/"
-        file_pattern = '^.*/DATASTRIP/[^/]+/[^/]+\.xml$'
-        subtree_tag = 'Tile_List'
+        # find an xml file with a very long name in the top-level .SAFE/ directory
+        # eg S2A_OPER_MTD_SAFL1C_PDMC_20161030T191653_R079_V20161030T095132_20161030T095132.xml
+        file_pattern = r'^[^/]+\.SAFE/[^/]{78}\.xml$'
+        subtree_tag = 'Granules'
+        tile_re = '_T' + cls._tile_re + '_' # group 'tile' is handy
         with zipfile.ZipFile(file_name) as asset_zf:
             metadata_fn = next(fn for fn in asset_zf.namelist() if re.match(file_pattern, fn))
             with asset_zf.open(metadata_fn) as metadata_zf:
                 tree = cElementTree.parse(metadata_zf)
-                tl_elem = next(tree.iter(subtree_tag))
-                tiles_tags = tl_elem.findall('Tile')
-                # from this:  S2A_OPER_MSI_L1C_TL_EPA__20170221T200353_A002192_T35UNQ_N02.04
-                # want this:  35UNQ
-                return [tt.attrib['tileId'].split('_')[-2][1:] for tt in tiles_tags]
+                tiles = []
+                for elem in tree.iter(subtree_tag):
+                    attrib = elem.attrib['granuleIdentifier']
+                    # from this:  S2A_OPER_MSI_L1C_TL_EPA__20170221T200353_A002192_T35UNQ_N02.04
+                    # want this:  35UNQ
+                    tiles.append(re.search(tile_re, attrib).group('tile'))
+                return tiles
 
 
     def updated(self, newasset):
@@ -612,6 +617,11 @@ class sentinel2Data(Data):
             'bands': [{'name': band_name, 'units': Data._unitless}
                       for band_name in Asset._sensors['S2A']['indices-colors']],
         },
+        'cfmask': {
+            'description': 'Cloud, cloud shadow, and water classification',
+            'assets': [_asset_type],
+            'bands': {'name': 'cfmask', 'units': Data._unitless},
+        }
     }
 
     # add index products to _products
@@ -649,6 +659,7 @@ class sentinel2Data(Data):
         'rad':          'rad-toa',
         'rad-toa':      'ref-toa',
         'ref-toa':      None, # has no deps but the asset
+        'cfmask':       None,
     }
 
     def plan_work(self, requested_products, overwrite):
@@ -910,6 +921,63 @@ class sentinel2Data(Data):
             sr_image[c] = (rad_rev_img[c] - Lu) / TLdS
         self._product_images['ref'] = sr_image
 
+
+    def fmask_geoimage(self, asset_type):
+        """Generate cloud mask.
+
+        Uses python implementation of cfmask. Builds a VRT of all the necessary
+        bands in the proper order, an angles image is created using the supplied
+        metadata, and then the two are put through the fmask algorithm.
+        """
+        self._time_report('Generating cloud mask')
+
+        asset_style = self.assets[asset_type].style
+
+        DEVNULL = open(os.devnull, 'w')
+
+        gdalbuildvrt_args = [
+            "gdalbuildvrt",
+            "-resolution", "user",
+            "-tr", "20", "20",
+            "-separate",
+            "%s/allbands.vrt" % self._temp_proc_dir,
+        ] + self.metadata['abs-filenames']
+        subprocess.check_call(gdalbuildvrt_args, stderr=DEVNULL)
+
+        safe_zip = zipfile.ZipFile(self.assets[asset_type].filename, 'r')
+        metadata_xml = None
+        for name in safe_zip.namelist():
+            if re.match(self.Asset._asset_styles[asset_style]['tile-md-re'], name):
+                safe_zip.extract(name, self._temp_proc_dir)
+                metadata_xml = "{}/{}".format(self._temp_proc_dir, name)
+        if not metadata_xml:
+            raise IOError("{} does not contain expected metadatafile.".format(safe_zip.filename))
+        subprocess.check_call(
+            [
+                "fmask_sentinel2makeAnglesImage.py",
+                "-i", metadata_xml,
+                "-o", "%s/angles.img" % self._temp_proc_dir,
+            ]
+            #stderr=DEVNULL
+        )
+        safe_zip.close()
+
+        subprocess.check_call(
+            [
+                "fmask_sentinel2Stacked.py",
+                "-a", "%s/allbands.vrt" % self._temp_proc_dir,
+                "-z", "%s/angles.img" % self._temp_proc_dir,
+                "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
+                "-v",
+            ],
+            stderr=DEVNULL
+        )
+
+        DEVNULL.close()
+        fmask_image = gippy.GeoImage("%s/cloudmask.tif" % self._temp_proc_dir)
+        self._product_images['cfmask'] = fmask_image
+
+
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
         """Produce data products and save them to files.
@@ -947,6 +1015,8 @@ class sentinel2Data(Data):
             self.rad_geoimage()
         if 'ref' in work:
             self.ref_geoimage(asset_type, sensor)
+        if 'cfmask' in work:
+            self.fmask_geoimage(asset_type)
 
         self._time_report('Starting on standard product processing')
 
@@ -966,6 +1036,13 @@ class sentinel2Data(Data):
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)
+                if prod_type == 'cfmask':
+                    output_image.SetMeta('FMASK_0', 'nodata')
+                    output_image.SetMeta('FMASK_1', 'valid')
+                    output_image.SetMeta('FMASK_2', 'cloud')
+                    output_image.SetMeta('FMASK_3', 'cloud shadow')
+                    output_image.SetMeta('FMASK_4', 'snow')
+                    output_image.SetMeta('FMASK_5', 'water')
                 for b_num, b_name in enumerate(source_image.BandNames(), 1):
                     output_image.SetBandName(b_name, b_num)
                 # process bandwise because gippy had an error doing it all at once
