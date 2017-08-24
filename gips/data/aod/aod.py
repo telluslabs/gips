@@ -20,7 +20,6 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
-
 import os
 import datetime
 import glob
@@ -34,6 +33,7 @@ import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import File2List, List2File
 from gips import utils
+
 
 class aodRepository(Repository):
     name = 'AOD'
@@ -364,32 +364,44 @@ class aodData(Data):
         repo = cls.Asset.Repository
         cpath = repo.path('composites')
         if numpy.isnan(aod):
-            aod = 0.0
-            norm = 0.0
-            cnt = 0
             nodata = -32768
 
             source = 'Weighted estimate using MODIS LTA values'
+
+            def _calculate_esitmate(filename):
+                val, var = cls._read_point(filename, roi, nodata)
+                aod = 0.0
+                norm = 0.0
+
+                # Negative values don't make sense
+                if val < 0:
+                    val = 0
+
+                if var == 0:
+                    # There is only one observation, so make up
+                    # the variance.
+                    if val == 0:
+                        var = 0.15
+                    else:
+                        var = val / 2
+
+                if not numpy.isnan(val) and not numpy.isnan(var):
+                    aod = val / var
+                    norm = 1.0 / var
+                    utils.verbose_out('AOD: LTA-Daily = %s, %s' % (val, var), 3)
+
+                return val, var, aod, norm
+
             # LTA-Daily
             filename = os.path.join(cpath, 'ltad', 'ltad%s.tif' % str(day).zfill(3))
-            val, var = cls._read_point(filename, roi, nodata)
-            var = var if var != 0.0 else val
-            if not numpy.isnan(val) and not numpy.isnan(var):
-                aod = val / var
-                totalvar = var
-                norm = 1.0 / var
-                cnt = cnt + 1
-                utils.verbose_out('AOD: LTA-Daily = %s, %s' % (val, var), 3)
+            daily_val, daily_var, daily_aod, daily_norm = _calculate_estimate(filename)
 
             # LTA
-            val, var = cls._read_point(os.path.join(cpath, 'lta.tif'), roi, nodata)
-            var = var if var != 0.0 else val
-            if not numpy.isnan(val) and not numpy.isnan(var):
-                aod = aod + val / var
-                totalvar = totalvar + var
-                norm = norm + 1.0 / var
-                cnt = cnt + 1
-                utils.verbose_out('AOD: LTA = %s, %s' % (val, var), 3)
+            val, var, aod, norm = _calculate_estimate(os.path.join(cpath, 'lta.tif'))
+
+            aod = aod + daily_aod
+            totalvar = var + daily_var
+            norm = norm + daily_norm
 
             # TODO - adjacent days
 
