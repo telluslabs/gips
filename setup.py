@@ -64,6 +64,7 @@ setup(
         'pysolar==0.6',
         'rios==1.4.3',
         'python-fmask==0.4.5',
+        'usgs', # 0.2.1 known to work
     ],
     dependency_links=[
         'https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3',
