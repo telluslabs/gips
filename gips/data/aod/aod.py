@@ -368,7 +368,7 @@ class aodData(Data):
 
             source = 'Weighted estimate using MODIS LTA values'
 
-            def _calculate_esitmate(filename):
+            def _calculate_estimate(filename):
                 val, var = cls._read_point(filename, roi, nodata)
                 aod = 0.0
                 norm = 0.0
@@ -393,7 +393,7 @@ class aodData(Data):
                 return val, var, aod, norm
 
             # LTA-Daily
-            filename = os.path.join(cpath, 'ltad', 'ltad%s.tif' % str(day).zfill(3))
+            filename = os.path.join(cpath, 'ltad', 'ltad%s.tif' % str(day).zfill(4))
             daily_val, daily_var, daily_aod, daily_norm = _calculate_estimate(filename)
 
             # LTA
@@ -406,7 +406,11 @@ class aodData(Data):
             # TODO - adjacent days
 
             # Final AOD estimate
-            aod = aod / norm
+            if aod == 0:
+                # aod value doesn't exist for LTA-Daily or LTA
+                aod = numpy.nan
+            else:
+                aod = aod / norm
 
         if numpy.isnan(aod):
             raise Exception("Could not retrieve AOD")
