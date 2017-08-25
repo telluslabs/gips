@@ -356,22 +356,19 @@ class aodData(Data):
                 aod = numpy.mean(vals[~numpy.isnan(vals)])
                 source = 'MODIS (MOD08_D3) spatial average'
 
-        var = 0
-        totalvar = 0
-
-        day = date.strftime('%j')
         # Calculate best estimate from multiple sources
-        repo = cls.Asset.Repository
-        cpath = repo.path('composites')
         if numpy.isnan(aod):
+            day = date.strftime('%j')
+            repo = cls.Asset.Repository
+            cpath = repo.path('composites')
             nodata = -32768
 
             source = 'Weighted estimate using MODIS LTA values'
 
             def _calculate_estimate(filename):
                 val, var = cls._read_point(filename, roi, nodata)
-                aod = 0.0
-                norm = 0.0
+                aod = numpy.nan
+                norm = numpy.nan
 
                 # Negative values don't make sense
                 if val < 0:
@@ -390,30 +387,28 @@ class aodData(Data):
                     norm = 1.0 / var
                     utils.verbose_out('AOD: LTA-Daily = %s, %s' % (val, var), 3)
 
-                return val, var, aod, norm
+                return aod, norm
 
             # LTA-Daily
             filename = os.path.join(cpath, 'ltad', 'ltad%s.tif' % str(day).zfill(4))
-            daily_val, daily_var, daily_aod, daily_norm = _calculate_estimate(filename)
+            daily_aod, daily_norm = _calculate_estimate(filename)
 
             # LTA
-            val, var, aod, norm = _calculate_estimate(os.path.join(cpath, 'lta.tif'))
+            lta_aod, lta_norm = _calculate_estimate(os.path.join(cpath, 'lta.tif'))
 
-            aod = aod + daily_aod
-            totalvar = var + daily_var
-            norm = norm + daily_norm
+            if numpy.isnan(lta_aod):
+                raise Exception("Could not retrieve AOD")
+
+            aod = lta_aod
+            norm = lta_norm
+            if not numpy.isnan(daily_aod):
+                aod = aod + daily_aod
+                norm = norm + daily_norm
 
             # TODO - adjacent days
 
             # Final AOD estimate
-            if aod == 0:
-                # aod value doesn't exist for LTA-Daily or LTA
-                aod = numpy.nan
-            else:
-                aod = aod / norm
-
-        if numpy.isnan(aod):
-            raise Exception("Could not retrieve AOD")
+            aod = aod / norm
 
         utils.verbose_out('AOD: Source = %s Value = %s' % (source, aod), 2)
         return (source, aod)
