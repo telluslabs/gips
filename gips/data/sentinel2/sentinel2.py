@@ -964,26 +964,40 @@ class sentinel2Data(Data):
                 metadata_xml = "{}/{}".format(self._temp_proc_dir, name)
         if not metadata_xml:
             raise IOError("{} does not contain expected metadatafile.".format(safe_zip.filename))
-        subprocess.check_call(
-            [
-                "fmask_sentinel2makeAnglesImage.py",
-                "-i", metadata_xml,
-                "-o", "%s/angles.img" % self._temp_proc_dir,
-            ]
-            #stderr=DEVNULL
-        )
         safe_zip.close()
 
-        subprocess.check_call(
-            [
-                "fmask_sentinel2Stacked.py",
-                "-a", "%s/allbands.vrt" % self._temp_proc_dir,
-                "-z", "%s/angles.img" % self._temp_proc_dir,
-                "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
-                "-v",
-            ],
-            stderr=DEVNULL
-        )
+        angles_cmd_list = [
+            "fmask_sentinel2makeAnglesImage.py",
+            "-i", metadata_xml,
+            "-o", "%s/angles.img" % self._temp_proc_dir,
+        ]
+        fmask_cmd_list = [
+            "fmask_sentinel2Stacked.py",
+            "-a", "%s/allbands.vrt" % self._temp_proc_dir,
+            "-z", "%s/angles.img" % self._temp_proc_dir,
+            "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
+            "-v",
+        ]
+        # Temp dir for intermediaries that pyfmask generates in the current
+        # working directory.  N.B.: the mask is output to self._temp_proc_dir.
+        with utils.make_temp_dir(prefix='gips-py-fmask', dir='/tmp') as tdir:
+            prev_wd = os.getcwd()
+            os.chdir(tdir)
+            try:
+                utils.verbose_out('running: ' + ' '.join(angles_cmd_list), 3)
+                subprocess.check_call(
+                    angles_cmd_list,
+                    #stderr=DEVNULL
+                )
+                utils.verbose_out('running: ' + ' '.join(fmask_cmd_list), 3)
+                subprocess.check_call(
+                    fmask_cmd_list,
+                    stderr=DEVNULL
+                )
+            except:
+                raise
+            finally:
+                os.chdir(prev_wd)
 
         DEVNULL.close()
         fmask_image = gippy.GeoImage("%s/cloudmask.tif" % self._temp_proc_dir)

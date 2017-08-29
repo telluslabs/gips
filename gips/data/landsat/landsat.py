@@ -329,17 +329,32 @@ class landsatAsset(Asset):
         if len(response) > 0:
             verbose_out('Fetching %s %s %s' % (asset, tile, fdate), 1)
             if len(response) != 1:
-                raise Exception('Single date, single location, returned more than one result')
+                raise Exception('Single date, single location, '
+                                'returned more than one result')
             result = response[0]
+            utils.verbose_out(str(response), 4)
             sceneID = result['sceneID']
-            stage_dir = os.path.join(cls.Repository.path(), 'stage')
+            stage_dir = cls.Repository.path('stage')
             sceneIDs = [str(sceneID)]
 
             username = settings().REPOS['landsat']['username']
             password = settings().REPOS['landsat']['password']
             api_key = api.login(username, password)['data']
-            url = api.download(result['dataset'], 'EE', sceneIDs, 'STANDARD', api_key)['data'][0]
-            download(url, stage_dir)
+            url = api.download(
+                result['dataset'], 'EE', sceneIDs, 'STANDARD', api_key
+            )['data'][0]
+            with utils.make_temp_dir(prefix='dwnld', dir=stage_dir) as dldir:
+                download(url, dldir)
+                granules = os.listdir(dldir)
+                if len(granules) == 0:
+                    raise Exception(
+                        'Download appears to have not produced a file: {}'
+                        .format(str(granules))
+                    )
+                os.rename(
+                    os.path.join(dldir, granules[0]),
+                    os.path.join(stage_dir, granules[0]),
+                )
 
     def updated(self, newasset):
         '''
@@ -354,7 +369,7 @@ class landsatAsset(Asset):
 
 class landsatData(Data):
     name = 'Landsat'
-    version = '0.9.0'
+    version = '1.0.0'
 
     Asset = landsatAsset
 
@@ -413,7 +428,7 @@ class landsatData(Data):
         },
         'cloudmask': {
             'assets': ['C1'],
-            'description': 'Cloud mask product based on cloud bits of the quality band',
+            'description': 'Cloud (and shadow) mask product based on cloud bits of the quality band',
             'toa': True,
             'bands': ['cloudmask'],
         },
@@ -1001,20 +1016,43 @@ class landsatData(Data):
 
                     elif val[0] == 'cloudmask':
                         qaimg = self._readqa()
-                        npqa = qaimg.Read() # transmogrify into numpy array
+                        npqa = qaimg.Read()  # read image file into numpy array
                         # https://landsat.usgs.gov/collectionqualityband
                         # cloudmaskmask = (cloud and (cc_med or cc_high)) or csc_med or csc_high
                         # cloud iff bit 4
                         # (cc_med or cc_high) iff bit 6
                         # (csc_med or csc_high) iff bit 8
+
                         def get_bit(np_array, i):
                             """Return an array with the ith bit extracted from each cell."""
                             return (np_array >> i) & 0b1
-                        np_cloudmask = get_bit(npqa, 4) & get_bit(npqa, 6) | get_bit(npqa, 8)
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1) # only one layer
+
+                        np_cloudmask = numpy.logical_not(
+                            get_bit(npqa, 4) &
+                            get_bit(npqa, 6) |
+                            get_bit(npqa, 8)
+                        )
+
+                        # We already have an implicit dependency on scipy (from
+                        # Py6S), but life might be more simple if we just move
+                        # the whole cloudmask extraction into gippy.
+                        from scipy import ndimage
+                        np_cloudmask_erroded = ndimage.binary_erosion(
+                            np_cloudmask,
+                            structure=numpy.ones((10, 10), dtype=numpy.uint8),
+                        )
+                        # 
+
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
                         verbose_out("writing " + fname, 2)
-                        imgout.SetBandName('Cloud Mask', 1)
-                        imgout[0].Write(np_cloudmask)
+                        imgout.SetBandName(
+                            self._products[val[0]]['bands'][0], 1
+                        )
+                        imgout.SetMeta('GIPS_LANDSAT_VERSION', self.version)
+                        imgout[0].SetNoData(0.)
+                        imgout[0].Write(
+                            np_cloudmask_erroded.astype(numpy.uint8)
+                        )
                     elif val[0] == 'rad':
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
                         for i in range(0, imgout.NumBands()):
