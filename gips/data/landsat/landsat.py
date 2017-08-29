@@ -346,7 +346,7 @@ class landsatAsset(Asset):
             with utils.make_temp_dir(prefix='dwnld', dir=stage_dir) as dldir:
                 download(url, dldir)
                 granules = os.listdir(dldir)
-                if len(granules) != 1:
+                if len(granules) == 0:
                     raise Exception(
                         'Download appears to have not produced a file: {}'
                         .format(str(granules))
