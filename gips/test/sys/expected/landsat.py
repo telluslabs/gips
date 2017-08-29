@@ -103,15 +103,18 @@ SENSORS\x1b[0m
 
 t_process = {
     'compare_stderr': False,
-    'updated': {'landsat/tiles/012030/2015352': None},
+    'updated': {
+        'landsat/stage': None,
+        'landsat/tiles/012030/2015352': None
+    },
     'created': {
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_acca.tif': -1532119925,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_bqashadow.tif': -1566662956,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_ndvi-toa.tif': -204896503,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_rad-toa.tif': 1658217796,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_ref-toa.tif': -1766137404,
-        'landsat/tiles/012030/2015352/LC80120302015352LGN00.tar.gz.index': 1896263933,
-        'landsat/tiles/012030/2015352/LC80120302015352LGN00_MTL.txt': 2084350553,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_acca.tif': -234291039,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_bqashadow.tif': -1916096311,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_ndvi-toa.tif': 86505921,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_rad-toa.tif': -69626363,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_ref-toa.tif': -1764173550,
+        'landsat/tiles/012030/2015352/LC08_L1GT_012030_20151218_20170224_01_T2.tar.gz.index': -394988487,
+        'landsat/tiles/012030/2015352/LC08_L1GT_012030_20151218_20170224_01_T2_MTL.txt': -1453474890,
     },
     'ignored': [
         'gips-inv-db.sqlite3',
@@ -143,11 +146,11 @@ t_project = {
     'compare_stderr': False,
     'created': {
         '0': None,
-        '0/2015352_LC8_acca.tif': -1824905460,
-        '0/2015352_LC8_bqashadow.tif': 1603304372,
-        '0/2015352_LC8_ndvi-toa.tif': 844246796,
-        '0/2015352_LC8_rad-toa.tif': -317896577,
-        '0/2015352_LC8_ref-toa.tif': -1496156246,
+        '0/2015352_LC8_acca.tif': 937122749,
+        '0/2015352_LC8_bqashadow.tif': 1754713422,
+        '0/2015352_LC8_ndvi-toa.tif': 271697578,
+        '0/2015352_LC8_rad-toa.tif': 207105644,
+        '0/2015352_LC8_ref-toa.tif': -386189227,
     }
 }
 
@@ -155,11 +158,11 @@ t_project_no_warp = {
     'compare_stderr': False,
     'created': {
         '0': None,
-        '0/2015352_LC8_acca.tif': 1288527028,
-        '0/2015352_LC8_bqashadow.tif': -2134364541,
-        '0/2015352_LC8_ndvi-toa.tif': 1466287813,
-        '0/2015352_LC8_rad-toa.tif': 1618019596,
-        '0/2015352_LC8_ref-toa.tif': -614392204,
+        '0/2015352_LC8_acca.tif': -126711306,
+        '0/2015352_LC8_bqashadow.tif': 1681911857,
+        '0/2015352_LC8_ndvi-toa.tif': 1662486138,
+        '0/2015352_LC8_rad-toa.tif': -196115636,
+        '0/2015352_LC8_ref-toa.tif': -1147999741,
     }
 }
 
@@ -171,18 +174,18 @@ t_tiles_copy = {
     'compare_stderr': False,
     'created': {
         '012030': None,
-	'012030/012030_2015352_LC8_acca.tif': 1593997289,
-	'012030/012030_2015352_LC8_bqashadow.tif': -116702962,
-	'012030/012030_2015352_LC8_ndvi-toa.tif': -1923562909,
-	'012030/012030_2015352_LC8_rad-toa.tif': 525640715,
-	'012030/012030_2015352_LC8_ref-toa.tif': -1287648712,
+	'012030/012030_2015352_LC8_acca.tif': 176561467,
+	'012030/012030_2015352_LC8_bqashadow.tif': 912021217,
+	'012030/012030_2015352_LC8_ndvi-toa.tif': -1333295744,
+	'012030/012030_2015352_LC8_rad-toa.tif': 1609412102,
+	'012030/012030_2015352_LC8_ref-toa.tif': -1797834447,
     }
 }
 
 t_stats = { 'created': {
-    'acca_stats.txt': -789655715,
-    'bqashadow_stats.txt': 1501756012,
-    'ndvi-toa_stats.txt': -77721729,
-    'rad-toa_stats.txt': 1664250177,
-    'ref-toa_stats.txt': 2007199405,
+    'acca_stats.txt': -174967201,
+    'bqashadow_stats.txt': 1868908586,
+    'ndvi-toa_stats.txt': -1084861813,
+    'rad-toa_stats.txt': -545320378,
+    'ref-toa_stats.txt': -1132928652,
 }}
