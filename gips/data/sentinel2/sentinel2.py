@@ -978,22 +978,26 @@ class sentinel2Data(Data):
             "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
             "-v",
         ]
-        # Temp dir for intermediaries.  mask is output to self._temp_proc_dir.
+        # Temp dir for intermediaries that pyfmask generates in the current
+        # working directory.  N.B.: the mask is output to self._temp_proc_dir.
         with utils.make_temp_dir(prefix='gips-py-fmask', dir='/tmp') as tdir:
-            utils.verbose_out('running: ' + ' '.join(angles_cmd_list), 3)
             prev_wd = os.getcwd()
             os.chdir(tdir)
-            subprocess.check_call(
-                angles_cmd_list,
-                #stderr=DEVNULL
-            )
-
-            utils.verbose_out('running: ' + ' '.join(fmask_cmd_list), 3)
-            subprocess.check_call(
-                fmask_cmd_list,
-                stderr=DEVNULL
-            )
-            os.chdir(prev_wd)
+            try:
+                utils.verbose_out('running: ' + ' '.join(angles_cmd_list), 3)
+                subprocess.check_call(
+                    angles_cmd_list,
+                    #stderr=DEVNULL
+                )
+                utils.verbose_out('running: ' + ' '.join(fmask_cmd_list), 3)
+                subprocess.check_call(
+                    fmask_cmd_list,
+                    stderr=DEVNULL
+                )
+            except:
+                raise
+            finally:
+                os.chdir(prev_wd)
 
         DEVNULL.close()
         fmask_image = gippy.GeoImage("%s/cloudmask.tif" % self._temp_proc_dir)
