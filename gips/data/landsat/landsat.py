@@ -931,10 +931,10 @@ class landsatData(Data):
         if assets == set(['C1', 'DN']):
             asset = list(assets.intersection(self.assets.keys()))[0]
         else:
-            if len(assets) != 1:
-                raise Exception('This driver does not support creation of products'
-                                ' from different Assets at the same time')
-
+            if len(assets) > 1:
+                # TODO document the reason why not
+                raise ValueError("Cannot create products from"
+                                 " this combination of assets:  {}".format(assets))
             asset = list(assets)[0]
 
         # TODO: De-hack this
