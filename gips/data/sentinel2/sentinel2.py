@@ -177,7 +177,8 @@ class sentinel2Asset(Asset):
             # TODO '/.*/' can be misleading due to '/' satisfying '.', so rework into '/[^/]*/'
             'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B(?P<band>\d[\dA]).jp2$',
             ## internal metadata file patterns
-            'datastrip-md-re': '^.*/DATASTRIP/.*/.*.xml$', # only XML file under DATASTRIP/
+            # updated assumption: only XML file in DATASTRIP/ (not including subdirs)
+            'datastrip-md-re': '^.*/DATASTRIP/[^/]+/[^/]*.xml$', 
             'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
         },
         _2016_12_07: {
