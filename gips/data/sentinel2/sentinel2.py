@@ -978,6 +978,7 @@ class sentinel2Data(Data):
             "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
             "-v",
         ]
+        # Temp dir for intermediaries.  mask is output to self._temp_proc_dir.
         with utils.make_temp_dir(prefix='gips-py-fmask', dir='/tmp') as tdir:
             utils.verbose_out('running: ' + ' '.join(angles_cmd_list), 3)
             prev_wd = os.getcwd()
