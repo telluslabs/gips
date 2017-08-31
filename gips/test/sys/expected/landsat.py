@@ -3,7 +3,7 @@
 # trailing whitespace and other junk characters are in current output
 t_info = { 'stdout':  u"""\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
 \x1b[1m
-Landsat Products v0.9.0\x1b[0m
+Landsat Products v1.0.0\x1b[0m
   Optional qualifiers listed below each product.
   Specify by appending '-option' to product (e.g., ref-toa)
 \x1b[1m
@@ -59,7 +59,7 @@ Standard Products
                  X: erosion kernel diameter in pixels (default: 5)
                  Y: dilation kernel diameter in pixels (default: 10)
                  Z: cloud height in meters (default: 4000)
-   cloudmask   Cloud mask product based on cloud bits of the quality band
+   cloudmask   Cloud (and shadow) mask product based on cloud bits of the quality band
    dn          Raw digital numbers                     
    fmask       Fmask cloud cover                       
    landmask    Land mask from LC8SR                    
@@ -108,11 +108,11 @@ t_process = {
         'landsat/tiles/012030/2015352': None
     },
     'created': {
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_acca.tif': -234291039,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_bqashadow.tif': -1916096311,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_ndvi-toa.tif': 86505921,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_rad-toa.tif': -69626363,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_ref-toa.tif': -1764173550,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_acca.tif': -531492048,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_bqashadow.tif': -1819149482,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_ndvi-toa.tif': 329107382,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_rad-toa.tif': -1222249885,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_ref-toa.tif': -871936054,
         'landsat/tiles/012030/2015352/LC08_L1GT_012030_20151218_20170224_01_T2.tar.gz.index': -394988487,
         'landsat/tiles/012030/2015352/LC08_L1GT_012030_20151218_20170224_01_T2_MTL.txt': -1453474890,
     },
@@ -146,11 +146,11 @@ t_project = {
     'compare_stderr': False,
     'created': {
         '0': None,
-        '0/2015352_LC8_acca.tif': 937122749,
-        '0/2015352_LC8_bqashadow.tif': 1754713422,
-        '0/2015352_LC8_ndvi-toa.tif': 271697578,
-        '0/2015352_LC8_rad-toa.tif': 207105644,
-        '0/2015352_LC8_ref-toa.tif': -386189227,
+        '0/2015352_LC8_acca.tif': 402348046,
+        '0/2015352_LC8_bqashadow.tif': 923940030,
+        '0/2015352_LC8_ndvi-toa.tif': 728893178,
+        '0/2015352_LC8_rad-toa.tif': -1053542955,
+        '0/2015352_LC8_ref-toa.tif': -1149010214,
     }
 }
 
@@ -174,11 +174,11 @@ t_tiles_copy = {
     'compare_stderr': False,
     'created': {
         '012030': None,
-	'012030/012030_2015352_LC8_acca.tif': 176561467,
-	'012030/012030_2015352_LC8_bqashadow.tif': 912021217,
-	'012030/012030_2015352_LC8_ndvi-toa.tif': -1333295744,
-	'012030/012030_2015352_LC8_rad-toa.tif': 1609412102,
-	'012030/012030_2015352_LC8_ref-toa.tif': -1797834447,
+        '012030/012030_2015352_LC8_acca.tif': 176561467,
+        '012030/012030_2015352_LC8_bqashadow.tif': 912021217,
+        '012030/012030_2015352_LC8_ndvi-toa.tif': -1333295744,
+        '012030/012030_2015352_LC8_rad-toa.tif': 1609412102,
+        '012030/012030_2015352_LC8_ref-toa.tif': -1797834447,
     }
 }
 
