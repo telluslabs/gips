@@ -3,7 +3,7 @@
 # trailing whitespace and other junk characters are in current output
 t_info = { 'stdout':  u"""\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
 \x1b[1m
-Landsat Products v0.9.0\x1b[0m
+Landsat Products v1.0.0\x1b[0m
   Optional qualifiers listed below each product.
   Specify by appending '-option' to product (e.g., ref-toa)
 \x1b[1m
@@ -23,6 +23,8 @@ Index Products
    ndwi        Normalized Difference Water Index       
                  toa: use top of the atmosphere reflectance
    satvi       Soil-Adjusted Total Vegetation Index    
+                 toa: use top of the atmosphere reflectance
+   vari        Visible Atmospherically Resistant Index 
                  toa: use top of the atmosphere reflectance
 \x1b[1m
 LC8SR Products
@@ -52,11 +54,12 @@ Standard Products
                  X: erosion kernel diameter in pixels (default: 5)
                  Y: dilation kernel diameter in pixels (default: 10)
                  Z: cloud height in meters (default: 4000)
-   bqa         LC8 band quality                        
+   bqa         The quality band extracted into separate layers.
    bqashadow   LC8 QA + Shadow Smear                   
                  X: erosion kernel diameter in pixels (default: 5)
                  Y: dilation kernel diameter in pixels (default: 10)
                  Z: cloud height in meters (default: 4000)
+   cloudmask   Cloud (and shadow) mask product based on cloud bits of the quality band
    dn          Raw digital numbers                     
    fmask       Fmask cloud cover                       
    landmask    Land mask from LC8SR                    
@@ -74,8 +77,8 @@ Standard Products
 t_inventory = { 'stdout': u"""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
 Retrieving inventory for site NHseacoast-0
 fname
-LC80120302015352LGN00.tar.gz
-DN asset
+LC08_L1GT_012030_20151218_20170224_01_T2.tar.gz
+C1 asset
 
 \x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
 \x1b[1m
@@ -84,9 +87,9 @@ Tile Coverage
   012030      100.0%        6.7%
   013030        2.4%        0.2%
 
-\x1b[1m\x1b[4m    DATE        DN        SR     Product  \x1b[0m
+\x1b[1m\x1b[4m    DATE        C1        DN        SR     Product  \x1b[0m
 \x1b[1m2015        
-\x1b[0m    352       100.0%             
+\x1b[0m    352       100.0%                       
 
 
 1 files on 1 dates
@@ -100,15 +103,18 @@ SENSORS\x1b[0m
 
 t_process = {
     'compare_stderr': False,
-    'updated': {'landsat/tiles/012030/2015352': None},
+    'updated': {
+        'landsat/stage': None,
+        'landsat/tiles/012030/2015352': None
+    },
     'created': {
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_acca.tif': -1532119925,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_bqashadow.tif': -1566662956,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_ndvi-toa.tif': -204896503,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_rad-toa.tif': 1658217796,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_ref-toa.tif': -1766137404,
-        'landsat/tiles/012030/2015352/LC80120302015352LGN00.tar.gz.index': 1896263933,
-        'landsat/tiles/012030/2015352/LC80120302015352LGN00_MTL.txt': 2084350553,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_acca.tif': -531492048,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_bqashadow.tif': -1819149482,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_ndvi-toa.tif': 329107382,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_rad-toa.tif': -1222249885,
+        'landsat/tiles/012030/2015352/012030_2015352_LC8_ref-toa.tif': -871936054,
+        'landsat/tiles/012030/2015352/LC08_L1GT_012030_20151218_20170224_01_T2.tar.gz.index': -394988487,
+        'landsat/tiles/012030/2015352/LC08_L1GT_012030_20151218_20170224_01_T2_MTL.txt': -1453474890,
     },
     'ignored': [
         'gips-inv-db.sqlite3',
@@ -140,11 +146,11 @@ t_project = {
     'compare_stderr': False,
     'created': {
         '0': None,
-        '0/2015352_LC8_acca.tif': -1824905460,
-        '0/2015352_LC8_bqashadow.tif': 1603304372,
-        '0/2015352_LC8_ndvi-toa.tif': 844246796,
-        '0/2015352_LC8_rad-toa.tif': -317896577,
-        '0/2015352_LC8_ref-toa.tif': -1496156246,
+        '0/2015352_LC8_acca.tif': 402348046,
+        '0/2015352_LC8_bqashadow.tif': 923940030,
+        '0/2015352_LC8_ndvi-toa.tif': 728893178,
+        '0/2015352_LC8_rad-toa.tif': -1053542955,
+        '0/2015352_LC8_ref-toa.tif': -1149010214,
     }
 }
 
@@ -152,11 +158,11 @@ t_project_no_warp = {
     'compare_stderr': False,
     'created': {
         '0': None,
-        '0/2015352_LC8_acca.tif': 1288527028,
-        '0/2015352_LC8_bqashadow.tif': -2134364541,
-        '0/2015352_LC8_ndvi-toa.tif': 1466287813,
-        '0/2015352_LC8_rad-toa.tif': 1618019596,
-        '0/2015352_LC8_ref-toa.tif': -614392204,
+        '0/2015352_LC8_acca.tif': -126711306,
+        '0/2015352_LC8_bqashadow.tif': 1681911857,
+        '0/2015352_LC8_ndvi-toa.tif': 1662486138,
+        '0/2015352_LC8_rad-toa.tif': -196115636,
+        '0/2015352_LC8_ref-toa.tif': -1147999741,
     }
 }
 
@@ -168,18 +174,18 @@ t_tiles_copy = {
     'compare_stderr': False,
     'created': {
         '012030': None,
-	'012030/012030_2015352_LC8_acca.tif': 1593997289,
-	'012030/012030_2015352_LC8_bqashadow.tif': -116702962,
-	'012030/012030_2015352_LC8_ndvi-toa.tif': -1923562909,
-	'012030/012030_2015352_LC8_rad-toa.tif': 525640715,
-	'012030/012030_2015352_LC8_ref-toa.tif': -1287648712,
+        '012030/012030_2015352_LC8_acca.tif': 176561467,
+        '012030/012030_2015352_LC8_bqashadow.tif': 912021217,
+        '012030/012030_2015352_LC8_ndvi-toa.tif': -1333295744,
+        '012030/012030_2015352_LC8_rad-toa.tif': 1609412102,
+        '012030/012030_2015352_LC8_ref-toa.tif': -1797834447,
     }
 }
 
 t_stats = { 'created': {
-    'acca_stats.txt': -789655715,
-    'bqashadow_stats.txt': 1501756012,
-    'ndvi-toa_stats.txt': -77721729,
-    'rad-toa_stats.txt': 1664250177,
-    'ref-toa_stats.txt': 2007199405,
+    'acca_stats.txt': -174967201,
+    'bqashadow_stats.txt': 1868908586,
+    'ndvi-toa_stats.txt': -1084861813,
+    'rad-toa_stats.txt': -545320378,
+    'ref-toa_stats.txt': -1132928652,
 }}

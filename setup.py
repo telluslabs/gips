@@ -62,6 +62,14 @@ setup(
         'python-dateutil',
         'pydap==3.2',
         'pysolar==0.6',
+        'dbfread==2.0.7',
+        'rios==1.4.3',
+        'python-fmask==0.4.5',
+        'usgs', # 0.2.1 known to work
+    ],
+    dependency_links=[
+        'https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3',
+        'https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.4.5.zip#egg=python-fmask-0.4.5',
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,

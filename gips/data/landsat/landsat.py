@@ -181,6 +181,22 @@ class landsatAsset(Asset):
         },
     }
 
+    # Field ids are retrieved with `api.dataset_fields()` call
+    _ee_datasets = {
+        'LANDSAT_8_C1': {
+            'path_field': '20514',
+            'row_field': '20516',
+        },
+        'LANDSAT_ETM_C1': {
+            'path_field': '19884',
+            'row_field': '19887',
+        },
+        'LANDSAT_TM_C1': {
+            'path_field': '19873',
+            'row_field': '19879',
+        },
+    }
+
     # Set the startdate to the min date of the asset's sensors
     for asset, asset_info in _assets.iteritems():
         asset_info['startdate'] = min(
@@ -279,20 +295,24 @@ class landsatAsset(Asset):
         username = settings().REPOS['landsat']['username']
         password = settings().REPOS['landsat']['password']
         api_key = api.login(username, password)['data']
-        response = api.search(
-            'LANDSAT_8_C1', 'EE',
-            start_date=fdate, end_date=fdate,
-            where={             # Field IDs retrieved with `dataset_fields()` call
-                '20514': path,  # Path
-                '20516': row,   # Row
-                #'20515': '90',  # Max cloud cover %, doesn't seem to work at the moment
-            },
-            api_key=api_key
-        )['data']
-
         available = []
-        for result in response['results']:
-            available.append({'basename': result['displayId'] + '.tar.gz', 'sceneID': result['entityId']})
+        for dataset in cls._ee_datasets.keys():
+            response = api.search(
+                dataset, 'EE',
+                start_date=fdate, end_date=fdate,
+                where={
+                    cls._ee_datasets[dataset]['path_field']: path,
+                    cls._ee_datasets[dataset]['row_field']: row,
+                },
+                api_key=api_key
+            )['data']
+
+            for result in response['results']:
+                available.append({
+                    'basename': result['displayId'] + '.tar.gz',
+                    'sceneID': result['entityId'],
+                    'dataset': dataset,
+                })
 
         return available
 
@@ -303,17 +323,32 @@ class landsatAsset(Asset):
         if len(response) > 0:
             verbose_out('Fetching %s %s %s' % (asset, tile, fdate), 1)
             if len(response) != 1:
-                raise Exception('Single date, single location, returned more than one result')
+                raise Exception('Single date, single location, '
+                                'returned more than one result')
             result = response[0]
+            utils.verbose_out(str(response), 4)
             sceneID = result['sceneID']
-            stage_dir = os.path.join(cls.Repository.path(), 'stage')
+            stage_dir = cls.Repository.path('stage')
             sceneIDs = [str(sceneID)]
 
             username = settings().REPOS['landsat']['username']
             password = settings().REPOS['landsat']['password']
             api_key = api.login(username, password)['data']
-            url = api.download('LANDSAT_8_C1', 'EE', sceneIDs, 'STANDARD', api_key)['data'][0]
-            download(url, stage_dir)
+            url = api.download(
+                result['dataset'], 'EE', sceneIDs, 'STANDARD', api_key
+            )['data'][0]
+            with utils.make_temp_dir(prefix='dwnld', dir=stage_dir) as dldir:
+                download(url, dldir)
+                granules = os.listdir(dldir)
+                if len(granules) == 0:
+                    raise Exception(
+                        'Download appears to have not produced a file: {}'
+                        .format(str(granules))
+                    )
+                os.rename(
+                    os.path.join(dldir, granules[0]),
+                    os.path.join(stage_dir, granules[0]),
+                )
 
     def updated(self, newasset):
         '''
@@ -328,13 +363,14 @@ class landsatAsset(Asset):
 
 class landsatData(Data):
     name = 'Landsat'
-    version = '0.9.0'
+    version = '1.0.0'
 
     Asset = landsatAsset
 
     # Group products belong to ('Standard' if not specified)
     _productgroups = {
-        'Index': ['bi', 'evi', 'lswi', 'msavi2', 'ndsi', 'ndvi', 'ndwi', 'satvi'],
+        'Index': ['bi', 'evi', 'lswi', 'msavi2', 'ndsi', 'ndvi', 'ndwi',
+                  'satvi', 'vari'],
         'Tillage': ['ndti', 'crc', 'sti', 'isti'],
         'LC8SR': ['ndvi8sr'],
         'ACOLITE': [
@@ -384,6 +420,12 @@ class landsatData(Data):
             'toa': True,
             'bands': ['finalmask', 'cloudmask', 'PCP', 'clearskywater', 'clearskyland'],
         },
+        'cloudmask': {
+            'assets': ['C1'],
+            'description': 'Cloud (and shadow) mask product based on cloud bits of the quality band',
+            'toa': True,
+            'bands': ['cloudmask'],
+        },
         'tcap': {
             'assets': ['DN', 'C1'],
             'description': 'Tassled cap transformation',
@@ -411,12 +453,14 @@ class landsatData(Data):
         },
         'bqa': {
             'assets': ['DN', 'C1'],
-            'description': ('The bit-packed information in the QA bands is translation of binary strings. '
-            'As a simple example, the integer value "1" translates to the binary value "0001." The binary value '
-            '"0001" has 4 bits, written right to left as bits 0 ("1"), 1 ("0"), 2 ("0"), and 3 ("0"). '
-            'Each of the bits 0-3 represents a yes/no indication of a physical value.'),
+            # TODO prior description was too long; is this a good-enough short replacement?
+            'description': 'The quality band extracted into separate layers.',
+            # 'description': ('The bit-packed information in the QA bands is translation of binary strings. '
+            # 'As a simple example, the integer value "1" translates to the binary value "0001." The binary value '
+            # '"0001" has 4 bits, written right to left as bits 0 ("1"), 1 ("0"), 2 ("0"), and 3 ("0"). '
+            # 'Each of the bits 0-3 represents a yes/no indication of a physical value.'),
             'toa': True,
-            'bands': ['qa bits'],
+            'bands': ['qa bits'], # TODO aren't there 7 bands?
         },
         'bqashadow': {
             'assets': ['DN', 'C1'],
@@ -478,6 +522,12 @@ class landsatData(Data):
             'description': 'Soil-Adjusted Total Vegetation Index',
             'arguments': [__toastring],
             'bands': ['satvi'],
+        },
+        'vari': {
+            'assets': ['DN', 'C1'],
+            'description': 'Visible Atmospherically Resistant Index',
+            'arguments': [__toastring],
+            'bands': ['vari'],
         },
         #'Tillage Indices': {
         'ndti': {
@@ -957,6 +1007,46 @@ class landsatData(Data):
                         if len(val) >= 3:
                             tolerance, dilation = [int(v) for v in val[1:3]]
                         imgout = Fmask(reflimg, fname, tolerance, dilation)
+
+                    elif val[0] == 'cloudmask':
+                        qaimg = self._readqa()
+                        npqa = qaimg.Read()  # read image file into numpy array
+                        # https://landsat.usgs.gov/collectionqualityband
+                        # cloudmaskmask = (cloud and (cc_med or cc_high)) or csc_med or csc_high
+                        # cloud iff bit 4
+                        # (cc_med or cc_high) iff bit 6
+                        # (csc_med or csc_high) iff bit 8
+
+                        def get_bit(np_array, i):
+                            """Return an array with the ith bit extracted from each cell."""
+                            return (np_array >> i) & 0b1
+
+                        np_cloudmask = numpy.logical_not(
+                            get_bit(npqa, 4) &
+                            get_bit(npqa, 6) |
+                            get_bit(npqa, 8)
+                        )
+
+                        # We already have an implicit dependency on scipy (from
+                        # Py6S), but life might be more simple if we just move
+                        # the whole cloudmask extraction into gippy.
+                        from scipy import ndimage
+                        np_cloudmask_erroded = ndimage.binary_erosion(
+                            np_cloudmask,
+                            structure=numpy.ones((10, 10), dtype=numpy.uint8),
+                        )
+                        # 
+
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                        verbose_out("writing " + fname, 2)
+                        imgout.SetBandName(
+                            self._products[val[0]]['bands'][0], 1
+                        )
+                        imgout.SetMeta('GIPS_LANDSAT_VERSION', self.version)
+                        imgout[0].SetNoData(0.)
+                        imgout[0].Write(
+                            np_cloudmask_erroded.astype(numpy.uint8)
+                        )
                     elif val[0] == 'rad':
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
                         for i in range(0, imgout.NumBands()):

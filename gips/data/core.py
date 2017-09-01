@@ -736,7 +736,8 @@ class Data(object):
     def __init__(self, tile=None, date=None, path='', search=True):
         """ Find all data and assets for this tile and date.
 
-        search=False will prevent searching for assets via Asset.discover().
+        Note date should be a datetime.date object. search=False will
+        prevent searching for assets via Asset.discover().
         """
         self.id = tile
         self.date = date
@@ -929,7 +930,7 @@ class Data(object):
         for root, dirs, filenames in os.walk(path):
             for filename in filenames:
                 f = os.path.join(root, filename)
-                VerboseOut(f, 2)
+                VerboseOut(f, 4)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
                     with utils.error_handler('Error parsing product date', continuable=True):
