@@ -222,7 +222,7 @@ class sarAsset(Asset):
                 os.path.basename(path),
                 self.Repository._datedir
             ).date()
-            dates = date
+            self.date = date
             #VerboseOut('Date from repository = '+str(dates),4)
         elif os.path.exists(filename):
             meta = self.get_meta_dict()
