@@ -91,6 +91,7 @@ class sarAsset(Asset):
         },
     }
 
+    # N.B.> JAXA spec incl. blank lines (i.e. 16)
     __JAXA_spec_hdr_lines = {
         'prod': 0,
         'user': 1,
@@ -167,7 +168,8 @@ class sarAsset(Asset):
     }
     _assets['alos2']['hdr_lines'].update(
         {
-            # HACK due to JAXA assets with non-conformant headers
+            # HACK due to JAXA assets ignoring spec and omitting blank lines
+            # (20 is supposed to be blank, but ALOS2 assets seem to ignore this)
             'cal_factor': 20,
             'rows': 22,
             'cols': 23,
@@ -210,7 +212,6 @@ class sarAsset(Asset):
         self.version = int(m.group('serialno'))
 
         self.is_cycle = m.group('year_or_cycle') == 'C'
-        self.is_year = not self.is_cycle
         self.cyid = int(m.group('cyid'))
         self.bname = bname
 
