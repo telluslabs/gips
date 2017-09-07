@@ -296,7 +296,7 @@ class DataInventory(Inventory):
                     tiles_obj.tiles[tile] = data_obj
             return
 
-        # Perofrm filesystem search since user wants that.  Data object instantiation results
+        # Perform filesystem search since user wants that.  Data object instantiation results
         # in filesystem search (thanks to search=True).
         self.data = {} # clear out data dict in case it has partial results
         for date in dates:
