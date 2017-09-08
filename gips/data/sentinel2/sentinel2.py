@@ -56,6 +56,8 @@ from gips import atmosphere
 * update system tests
 """
 
+_asset_type = 'L1C' # only one for the whole driver for now
+
 
 class sentinel2Repository(Repository):
     name = 'Sentinel2'
@@ -605,11 +607,11 @@ class sentinel2Data(Data):
     version = '0.1.0'
     Asset = sentinel2Asset
 
-    _asset_type = 'L1C' # only one for the whole driver for now
-
     _productgroups = {
         'Index': ['ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari', 'brgt',
-                  'ndti', 'crc', 'crcm', 'isti', 'sti'] # <-- tillage indices
+                  'ndti', 'crc', 'crcm', 'isti', 'sti'], # <-- tillage indices
+        'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
+                    'spm655', 'turbidity', 'acoflags'],
     }
 
     _products = {
@@ -637,7 +639,7 @@ class sentinel2Data(Data):
     # add index products to _products
     _products.update(
         (p, {'description': d,
-             'assets': ['L1C'],
+             'assets': [_asset_type],
              'bands': [{'name': p, 'units': Data._unitless}]}
         ) for p, d in [
             ('ndvi',   'Normalized Difference Vegetation Index'),
@@ -661,6 +663,8 @@ class sentinel2Data(Data):
             ('sti',    'Standard Tillage Index'),
         ]
     )
+
+    atmosphere.add_acolite_product_dicts(_products, _asset_type)
 
     _product_dependencies = {
         'indices':      'ref',
@@ -702,10 +706,10 @@ class sentinel2Data(Data):
         return work
 
     def current_asset(self):
-        return self.assets[self._asset_type]
+        return self.assets[_asset_type]
 
     def current_sensor(self):
-        return self.sensors[self._asset_type]
+        return self.sensors[_asset_type]
 
 
     def load_image(self, product):

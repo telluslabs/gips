@@ -39,6 +39,7 @@ import shutil
 import tarfile
 import re
 import glob
+import copy
 
 import numpy
 import netCDF4
@@ -382,6 +383,94 @@ class MODTRAN():
     fout.close()
     """
 
+
+_aco_prod_templs = {
+    'rhow': {
+        'description': 'Water-Leaving Radiance-Reflectance',
+        'acolite-product': 'rhow_vnir',
+        'acolite-key': 'RHOW',
+        'gain': 0.0001,
+        'offset': 0.,
+        'dtype': 'int16',
+        'toa': True,
+        'bands': [],
+    },
+    # Not sure what the issue is with this product, but it doesn't seem to
+    # work as expected (multiband vis+nir product)
+    # 'rhoam': {
+    #     'description': 'Multi-Scattering Aerosol Reflectance',
+    #     'acolite-product': 'rhoam_vnir',
+    #     'acolite-key': 'RHOAM',
+    #     'dtype': 'int16',
+    #     'toa': True,
+    # },
+    'oc2chl': {
+        'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 483 & 561',
+        'acolite-product': 'CHL_OC2',
+        'acolite-key': 'CHL_OC2',
+        'gain': 0.0125,
+        'offset': 250.,
+        'dtype': 'int16',
+        'toa': True,
+        'bands': [],
+    },
+    'oc3chl': {
+        'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561',
+        'acolite-product': 'CHL_OC3',
+        'acolite-key': 'CHL_OC3',
+        'gain': 0.0125,
+        'offset': 250.,
+        'dtype': 'int16',
+        'toa': True,
+        'bands': [],
+    },
+    'fai': {
+        'description': 'Floating Algae Index',
+        'acolite-product': 'FAI',
+        'acolite-key': 'FAI',
+        'dtype': 'float32',
+        'toa': True,
+        'bands': [],
+    },
+    'acoflags': {
+        'description': '0 = water 1 = no data 2 = land',
+        'acolite-product': 'FLAGS',
+        'acolite-key': 'FLAGS',
+        'dtype': 'uint8',
+        'toa': True,
+        'bands': [],
+    },
+    'spm655': {
+        'description': 'Suspended Sediment Concentration 655nm',
+        'acolite-product': 'SPM_NECHAD_655',
+        'acolite-key': 'SPM_NECHAD_655',
+        'offset': 50.,
+        'gain': 0.005,
+        'dtype': 'int16',
+        'toa': True,
+        'bands': [],
+    },
+    'turbidity': {
+        'description': 'Blended Turbidity',
+        'acolite-product': 'T_DOGLIOTTI',
+        'acolite-key': 'T_DOGLIOTTI',
+        'offset': 50.,
+        'gain': 0.005,
+        'dtype': 'int16',
+        'toa': True,
+        'bands': [],
+    },
+}
+
+def add_acolite_product_dicts(_products, *assets):
+    """Add the acolite product dicts to the given Data._products.
+
+    'assets' is different for each driver, so pass it in."""
+    # make copies just in case anything is modified
+    aco_prods = copy.deepcopy(_aco_prod_templs)
+    for inner in aco_prods.values():
+        inner['assets'] = list(assets) # just in case, don't re-use the list
+    _products.update(aco_prods)
 
 def process_acolite(asset, aco_proc_dir, products):
     """Generate acolite products from the given asset.
