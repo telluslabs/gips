@@ -125,17 +125,17 @@ t_process = {
 # to be updated with gh-issue #218
 t_process_acolite = {
     'created': {
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_acoflags.tif': 17586143,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_fai.tif': 1579907653,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_oc2chl.tif': -1985547797,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_oc3chl.tif': -1898611639,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_rhow.tif': 2124023806,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_spm655.tif': 2045846748,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_turbidity.tif': -1302932357,
+        'landsat/tiles/012030/2017213/012030_2017213_LC8_acoflags.tif': -1859740248,
+        'landsat/tiles/012030/2017213/012030_2017213_LC8_fai.tif': -1038257960,
+        'landsat/tiles/012030/2017213/012030_2017213_LC8_oc2chl.tif': 1758567336,
+        'landsat/tiles/012030/2017213/012030_2017213_LC8_oc3chl.tif': -42455946,
+        'landsat/tiles/012030/2017213/012030_2017213_LC8_rhow.tif': -2063068590,
+        'landsat/tiles/012030/2017213/012030_2017213_LC8_spm655.tif': 319134655,
+        'landsat/tiles/012030/2017213/012030_2017213_LC8_turbidity.tif': -857239291,
     },
     'updated': {
         'landsat/stage': None,
-        'landsat/tiles/012030/2015352': None
+        'landsat/tiles/012030/2017213': None
     },
     'ignored': [
         'gips-inv-db.sqlite3',

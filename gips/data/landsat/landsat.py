@@ -594,7 +594,7 @@ class landsatData(Data):
         #     'toa': True,
         # },
         'oc2chl': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 483 & 561',
             'acolite-product': 'CHL_OC2',
             'acolite-key': 'CHL_OC2',
@@ -605,7 +605,7 @@ class landsatData(Data):
             'bands': [],
         },
         'oc3chl': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561',
             'acolite-product': 'CHL_OC3',
             'acolite-key': 'CHL_OC3',
@@ -616,7 +616,7 @@ class landsatData(Data):
             'bands': [],
         },
         'fai': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Floating Algae Index',
             'acolite-product': 'FAI',
             'acolite-key': 'FAI',
@@ -625,7 +625,7 @@ class landsatData(Data):
             'bands': [],
         },
         'acoflags': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': '0 = water 1 = no data 2 = land',
             'acolite-product': 'FLAGS',
             'acolite-key': 'FLAGS',
@@ -634,7 +634,7 @@ class landsatData(Data):
             'bands': [],
         },
         'spm655': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Suspended Sediment Concentration 655nm',
             'acolite-product': 'SPM_NECHAD_655',
             'acolite-key': 'SPM_NECHAD_655',
@@ -645,7 +645,7 @@ class landsatData(Data):
             'bands': [],
         },
         'turbidity': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Blended Turbidity',
             'acolite-product': 'T_DOGLIOTTI',
             'acolite-key': 'T_DOGLIOTTI',
@@ -677,7 +677,7 @@ class landsatData(Data):
         ACOLITEPATHS = {
             'ACO_DIR': settings().REPOS['landsat']['ACOLITE_DIR'],
             # N.B.: only seems to work when run from the ACO_DIR
-            'IDLPATH': 'idl',
+            'IDLPATH': settings().REPOS['landsat']['IDL_PATH'],
             'ACOLITE_BINARY': 'acolite.sav',
             # TODO: template may be the only piece that needs
             #       to be moved for driver-independence.
@@ -841,12 +841,19 @@ class landsatData(Data):
 
         start = datetime.now()
 
-        assets = set()
+        assets = set() # assets needed for this process() run
         for key, val in products.requested.items():
             assets.update(self._products[val[0]]['assets'])
 
         if assets == set(['C1', 'DN']):
-            asset = list(assets.intersection(self.assets.keys()))[0]
+            if 'C1' in self.assets: # prefer C1
+                asset = 'C1'
+            elif 'DN' in self.assets:
+                asset = 'DN'
+            else:
+                raise ValueError(
+                    'No valid asset found for C1 nor DN for {} {}'.format(
+                        self.basename))
         else:
             if len(assets) != 1:
                 raise Exception('This driver does not support creation of products'
