@@ -24,7 +24,7 @@
 
 import os
 import re
-from datetime import datetime
+from datetime import datetime, date
 import shutil
 import glob
 import traceback
@@ -361,12 +361,17 @@ class landsatAsset(Asset):
                 self.date == newasset.date and
                 self.version < newasset.version)
 
+def unitless_bands(*bands):
+    return [{'name': b, 'units': Data._unitless} for b in bands]
 
 class landsatData(Data):
     name = 'Landsat'
     version = '1.0.0'
 
     Asset = landsatAsset
+
+    _lt5_startdate = date(1984, 3, 1)
+    _lc8_startdate = date(2013, 5, 30)
 
     # Group products belong to ('Standard' if not specified)
     _productgroups = {
@@ -388,19 +393,27 @@ class landsatData(Data):
             'assets': ['DN', 'C1'],
             'description': 'Surface-leaving radiance',
             'arguments': [__toastring],
-            'bands': __visible_bands_union,
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            # units given by https://landsat.usgs.gov/landsat-8-l8-data-users-handbook-section-5
+            'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
         'ref': {
             'assets': ['DN', 'C1'],
             'description': 'Surface reflectance',
             'arguments': [__toastring],
-            'bands': __visible_bands_union,
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands(*__visible_bands_union)
         },
         'temp': {
             'assets': ['DN', 'C1'],
             'description': 'Brightness (apparent) temperature',
             'toa': True,
-            'bands': ['LWIR', 'LWIR2'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            # units given by https://landsat.usgs.gov/landsat-8-l8-data-users-handbook-section-5
+            'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
         'acca': {
             'assets': ['DN', 'C1'],
@@ -412,45 +425,63 @@ class landsatData(Data):
             ],
             'nargs': '*',
             'toa': True,
-            'bands': ['finalmask', 'cloudmask', 'ambclouds', 'pass1'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            # percentage, so unitless, per landsat docs:
+            # https://landsat.usgs.gov/how-percentage-cloud-cover-calculated
+            'bands': unitless_bands('finalmask', 'cloudmask', 'ambclouds', 'pass1'),
         },
         'fmask': {
             'assets': ['DN', 'C1'],
             'description': 'Fmask cloud cover',
             'nargs': '*',
             'toa': True,
-            'bands': ['finalmask', 'cloudmask', 'PCP', 'clearskywater', 'clearskyland'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('finalmask', 'cloudmask',
+                                    'PCP', 'clearskywater', 'clearskyland'),
         },
         'cloudmask': {
             'assets': ['C1'],
             'description': 'Cloud (and shadow) mask product based on cloud bits of the quality band',
             'toa': True,
-            'bands': ['cloudmask'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('cloudmask'),
         },
         'tcap': {
             'assets': ['DN', 'C1'],
             'description': 'Tassled cap transformation',
             'toa': True,
-            'bands': ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6'),
         },
         'dn': {
             'assets': ['DN', 'C1'],
             'description': 'Raw digital numbers',
             'toa': True,
-            'bands': __visible_bands_union,
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
         'volref': {
             'assets': ['DN', 'C1'],
             'description': 'Volumetric water reflectance - valid for water only',
             'arguments': [__toastring],
-            'bands': __visible_bands_union,
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            # reflectance is unitless therefore volref should be unitless
+            'bands': unitless_bands(*__visible_bands_union),
         },
         'wtemp': {
             'assets': ['DN', 'C1'],
             'description': 'Water temperature (atmospherically correct) - valid for water only',
             # It's not really TOA, but the product code will take care of atm correction itself
             'toa': True,
-            'bands': ['LWIR', 'LWIR2'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
         'bqa': {
             'assets': ['DN', 'C1'],
@@ -461,7 +492,10 @@ class landsatData(Data):
             # '"0001" has 4 bits, written right to left as bits 0 ("1"), 1 ("0"), 2 ("0"), and 3 ("0"). '
             # 'Each of the bits 0-3 represents a yes/no indication of a physical value.'),
             'toa': True,
-            'bands': ['qa bits'], # TODO aren't there 7 bands?
+            'startdate': _lc8_startdate,
+            'latency': 1,
+            'bands': unitless_bands('allgood', 'notfilled', 'notdropped', 'notterrain',
+                                    'notsnow', 'notcirrus', 'notcloud'),
         },
         'bqashadow': {
             'assets': ['DN', 'C1'],
@@ -473,100 +507,135 @@ class landsatData(Data):
             ],
             'nargs': '*',
             'toa': True,
-            'bands': ['+shadow_smear'],
+            'startdate': _lc8_startdate,
+            'latency': 1,
+            'bands': unitless_bands('bqashadow'),
         },
         #'Indices': {
         'bi': {
             'assets': ['DN', 'C1'],
             'description': 'Brightness Index',
             'arguments': [__toastring],
-            'bands': ['bi'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('bi'),
         },
         'evi': {
             'assets': ['DN', 'C1'],
             'description': 'Enhanced Vegetation Index',
             'arguments': [__toastring],
-            'bands': ['evi'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('evi'),
         },
         'lswi': {
             'assets': ['DN', 'C1'],
             'description': 'Land Surface Water Index',
             'arguments': [__toastring],
-            'bands': ['lswi'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('lswi'),
         },
         'msavi2': {
             'assets': ['DN', 'C1'],
             'description': 'Modified Soil-Adjusted Vegetation Index (revised)',
             'arguments': [__toastring],
-            'bands': ['msavi2'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('msavi2'),
         },
         'ndsi': {
             'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Snow Index',
             'arguments': [__toastring],
-            'bands': ['ndsi'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('ndsi'),
         },
         'ndvi': {
             'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Vegetation Index',
             'arguments': [__toastring],
-            'bands': ['ndvi'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('ndvi'),
         },
         'ndwi': {
             'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Water Index',
             'arguments': [__toastring],
-            'bands': ['ndwi'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('ndwi'),
         },
         'satvi': {
             'assets': ['DN', 'C1'],
             'description': 'Soil-Adjusted Total Vegetation Index',
             'arguments': [__toastring],
-            'bands': ['satvi'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('satvi'),
         },
         'vari': {
             'assets': ['DN', 'C1'],
             'description': 'Visible Atmospherically Resistant Index',
             'arguments': [__toastring],
-            'bands': ['vari'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('vari'),
         },
         #'Tillage Indices': {
         'ndti': {
             'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Tillage Index',
             'arguments': [__toastring],
-            'bands': ['ndti'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('ndti'),
         },
         'crc': {
             'assets': ['DN', 'C1'],
             'description': 'Crop Residue Cover',
             'arguments': [__toastring],
-            'bands': ['crc'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('crc'),
         },
         'sti': {
             'assets': ['DN', 'C1'],
             'description': 'Standard Tillage Index',
             'arguments': [__toastring],
-            'bands': ['sti'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('sti'),
         },
         'isti': {
             'assets': ['DN', 'C1'],
             'description': 'Inverse Standard Tillage Index',
             'arguments': [__toastring],
-            'bands': ['isti'],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('isti'),
         },
         # NEW!!!
         'ndvi8sr': {
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
-            'bands': ['NDVI'],
+            'startdate': _lc8_startdate,
+            'latency': 1,
+            'bands': unitless_bands('ndvi8sr'),
         },
         'landmask': {
             'assets': ['SR'],
             'description': 'Land mask from LC8SR',
-            'bands': ['Land mask'],
+            'startdate': _lc8_startdate,
+            'latency': 1,
+            'bands': unitless_bands('landmask'),
         },
         # ACOLITE products
+        # single-band unitless mostly index or ratio products, per:
+        # https://odnature.naturalsciences.be/downloads/remsem/acolite/
+        #       ACOLITE_processing_options_20170718.0.pdf
         'rhow': {
             'assets': ['DN', 'C1'],
             'description': 'Water-Leaving Radiance-Reflectance',
@@ -576,7 +645,9 @@ class landsatData(Data):
             'offset': 0.,
             'dtype': 'int16',
             'toa': True,
-            'bands': [],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('rhow'),
         },
         # Not sure what the issue is with this product, but it doesn't seem to
         # work as expected (multiband vis+nir product)
@@ -597,7 +668,9 @@ class landsatData(Data):
             'offset': 250.,
             'dtype': 'int16',
             'toa': True,
-            'bands': [],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('oc2chl'),
         },
         'oc3chl': {
             'assets': ['DN', 'C1'],
@@ -608,7 +681,9 @@ class landsatData(Data):
             'offset': 250.,
             'dtype': 'int16',
             'toa': True,
-            'bands': [],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('oc3chl'),
         },
         'fai': {
             'assets': ['DN', 'C1'],
@@ -617,7 +692,9 @@ class landsatData(Data):
             'acolite-key': 'FAI',
             'dtype': 'float32',
             'toa': True,
-            'bands': [],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('fai'),
         },
         'acoflags': {
             'assets': ['DN', 'C1'],
@@ -626,7 +703,9 @@ class landsatData(Data):
             'acolite-key': 'FLAGS',
             'dtype': 'uint8',
             'toa': True,
-            'bands': [],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('acoflags'),
         },
         'spm655': {
             'assets': ['DN', 'C1'],
@@ -637,7 +716,9 @@ class landsatData(Data):
             'gain': 0.005,
             'dtype': 'int16',
             'toa': True,
-            'bands': [],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': [{'name': 'spm655', 'units': 'g/m^3'}],
         },
         'turbidity': {
             'assets': ['DN', 'C1'],
@@ -648,7 +729,9 @@ class landsatData(Data):
             'gain': 0.005,
             'dtype': 'int16',
             'toa': True,
-            'bands': [],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('turbidity'),
         },
     }
 
@@ -709,10 +792,10 @@ class landsatData(Data):
                     'No valid asset found for C1 nor DN for {} {}'.format(
                         self.basename))
         else:
-            if len(assets) != 1:
-                raise Exception('This driver does not support creation of products'
-                                ' from different Assets at the same time')
-
+            if len(assets) > 1:
+                # TODO document the reason why not
+                raise ValueError("Cannot create products from"
+                                 " this combination of assets:  {}".format(assets))
             asset = list(assets)[0]
 
         # TODO: De-hack this
@@ -925,7 +1008,8 @@ class landsatData(Data):
                                 img[col].Process(imgout[col])
                         else:
                             for col in visbands:
-                                ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]).Process(imgout[col])
+                                ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
+                                        ).Process(imgout[col])
                         # Mask out any pixel for which any band is nodata
                         #imgout.ApplyMask(img.DataMask())
                     elif val[0] == 'ref':
@@ -1000,8 +1084,10 @@ class landsatData(Data):
                             dt = self.metadata['datetime']
                             atmos = MODTRAN(m['bandnum'], m['wvlen1'], m['wvlen2'], dt, lat, lon, True)
                             e = 0.95
-                            band = (tmpimg[col] - (atmos.output[1] + (1 - e) * atmos.output[2])) / (atmos.output[0] * e)
-                            band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)) * meta[col]['K2'] - 273.15
+                            band = (tmpimg[col] - (atmos.output[1] + (1 - e) * atmos.output[2])
+                                    ) / (atmos.output[0] * e)
+                            band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
+                                    ) * meta[col]['K2'] - 273.15
                             band.Process(imgout[col])
 
                     elif val[0] == 'bqa':
