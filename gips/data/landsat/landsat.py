@@ -574,7 +574,7 @@ class landsatData(Data):
         },
         # ACOLITE products
         'rhow': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Water-Leaving Radiance-Reflectance',
             'acolite-product': 'rhow_vnir',
             'acolite-key': 'RHOW',
