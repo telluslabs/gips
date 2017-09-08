@@ -40,6 +40,7 @@ from gips import __version__ as __gips_version__
 from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
 from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
+import gips.atmosphere
 from gips.utils import RemoveFiles, basename, settings, verbose_out
 from gips import utils
 
@@ -567,7 +568,7 @@ class landsatData(Data):
         },
         # ACOLITE products
         'rhow': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Water-Leaving Radiance-Reflectance',
             'acolite-product': 'rhow_vnir',
             'acolite-key': 'RHOW',
@@ -588,7 +589,7 @@ class landsatData(Data):
         #     'toa': True,
         # },
         'oc2chl': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 483 & 561',
             'acolite-product': 'CHL_OC2',
             'acolite-key': 'CHL_OC2',
@@ -599,7 +600,7 @@ class landsatData(Data):
             'bands': [],
         },
         'oc3chl': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561',
             'acolite-product': 'CHL_OC3',
             'acolite-key': 'CHL_OC3',
@@ -610,7 +611,7 @@ class landsatData(Data):
             'bands': [],
         },
         'fai': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Floating Algae Index',
             'acolite-product': 'FAI',
             'acolite-key': 'FAI',
@@ -619,7 +620,7 @@ class landsatData(Data):
             'bands': [],
         },
         'acoflags': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': '0 = water 1 = no data 2 = land',
             'acolite-product': 'FLAGS',
             'acolite-key': 'FLAGS',
@@ -628,7 +629,7 @@ class landsatData(Data):
             'bands': [],
         },
         'spm655': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Suspended Sediment Concentration 655nm',
             'acolite-product': 'SPM_NECHAD_655',
             'acolite-key': 'SPM_NECHAD_655',
@@ -639,7 +640,7 @@ class landsatData(Data):
             'bands': [],
         },
         'turbidity': {
-            'assets': ['DN'],
+            'assets': ['DN', 'C1'],
             'description': 'Blended Turbidity',
             'acolite-product': 'T_DOGLIOTTI',
             'acolite-key': 'T_DOGLIOTTI',
@@ -661,147 +662,6 @@ class landsatData(Data):
             product_info['latency'] = landsatAsset._assets['C1']['latency']
         else:
             product_info['latency'] = float("inf")
-
-    def _process_acolite(self, asset, aco_proc_dir, products):
-        '''
-        TODO: Move this to `gips.atmosphere`.
-        TODO: Ensure this is genericized to work for S2 or Landsat.
-        '''
-        import netCDF4
-        ACOLITEPATHS = {
-            'ACO_DIR': settings().REPOS['landsat']['ACOLITE_DIR'],
-            # N.B.: only seems to work when run from the ACO_DIR
-            'IDLPATH': 'idl',
-            'ACOLITE_BINARY': 'acolite.sav',
-            # TODO: template may be the only piece that needs
-            #       to be moved for driver-independence.
-            'SETTINGS_TEMPLATE': os.path.join(
-                os.path.dirname(__file__),
-                'acolite.cfg'
-            )
-        }
-        ACOLITE_NDV = 1.875 * 2 ** 122
-        # mapping from dtype to gdal type and nodata value
-        IMG_PARAMS = {
-            'float32': (gippy.GDT_Float32, -32768.),
-            'int16': (gippy.GDT_Int16, -32768),
-            'uint8': (gippy.GDT_Byte, 1),
-        }
-        imeta = products.pop('meta')
-
-        # TODO: add 'outdir' to `gips.data.core.Asset.extract` method
-        # EXTRACT ASSET
-        tar = tarfile.open(asset.filename)
-        tar.extractall(aco_proc_dir)
-
-        # STASH PROJECTION AND GEOTRANSFORM (in a GeoImage)
-        exts = re.compile(r'.*\.((jp2)|(tif)|(TIF))$')
-        tif = filter(
-            lambda de: exts.match(de),
-            os.listdir(aco_proc_dir)
-        )[0]
-        tmp = gippy.GeoImage(os.path.join(aco_proc_dir, tif))
-
-        # PROCESS SETTINGS TEMPLATE FOR SPECIFIED PRODUCTS
-        settings_path = os.path.join(aco_proc_dir, 'settings.cfg')
-        template_path = ACOLITEPATHS.pop('SETTINGS_TEMPLATE')
-        acolite_products = ','.join(
-            [
-                products[k]['acolite-product']
-                for k in products
-                if k != 'acoflags'  # acoflags is always internally generated
-                                    # by ACOLITE, 
-            ]
-        )
-        if len(acolite_products) == 0:
-            raise Exception(
-                "ACOLITE: Must specify at least 1 product.\n"
-                "'acoflags' cannot be generated on its own.",
-            )
-        with open(template_path, 'r') as aco_template:
-            with open(settings_path, 'w') as aco_settings:
-                for line in aco_template:
-                    aco_settings.write(
-                        re.sub(
-                            r'GIPS_LANDSAT_PRODUCTS',
-                            acolite_products,
-                            line
-                        )
-                    )
-        ACOLITEPATHS['ACOLITE_SETTINGS'] = settings_path
-
-        # PROCESS VIA ACOLITE IDL CALL
-        cmd = (
-            ('cd {ACO_DIR} ; '
-             '{IDLPATH} -IDL_CPU_TPOOL_NTHREADS 1 '
-             '-rt={ACOLITE_BINARY} '
-             '-args settings={ACOLITE_SETTINGS} '
-             'run=1 '
-             'output={OUTPUT} image={IMAGES}')
-            .format(
-                OUTPUT=aco_proc_dir,
-                IMAGES=aco_proc_dir,
-                **ACOLITEPATHS
-            )
-        )
-        utils.verbose_out('Running: {}'.format(cmd), 2)
-        status, output = commands.getstatusoutput(cmd)
-        if status != 0:
-            raise Exception(cmd, output)
-        aco_nc_file = glob.glob(os.path.join(aco_proc_dir, '*_L2.nc'))[0]
-        dsroot = netCDF4.Dataset(aco_nc_file)
-
-        # EXTRACT IMAGES FROM NETCDF AND
-        # COMBINE MULTI-IMAGE PRODUCTS INTO
-        # A MULTI-BAND TIF, ADD METADATA, and MOVE INTO TILES
-        prodout = dict()
-
-        for key in products:
-            ofname = products[key]['fname']
-            aco_key = products[key]['acolite-key']
-            bands = list(filter(
-                lambda x: str(x) == aco_key or x.startswith(aco_key),
-                dsroot.variables.keys()
-            ))
-            npdtype = products[key]['dtype']
-            dtype, missing = IMG_PARAMS[npdtype]
-            gain = products[key].get('gain', 1.0)
-            offset = products[key].get('offset', 0.0)
-            imgout = gippy.GeoImage(ofname, tmp, dtype, len(bands))
-            # # TODO: add units to products dictionary and use here.
-            # imgout.SetUnits(products[key]['units'])
-            pmeta = dict()
-            pmeta.update(imeta)
-            pmeta = {
-                mdi: products[key][mdi]
-                for mdi in ['acolite-key', 'description']
-            }
-            pmeta['source_asset'] = os.path.basename(asset.filename)
-            imgout.SetMeta(pmeta)
-            for i, b in enumerate(bands):
-                imgout.SetBandName(str(b), i + 1)
-
-            for i, b in enumerate(bands):
-                var = dsroot.variables[b][:]
-                arr = numpy.array(var)
-                if hasattr(dsroot.variables[b], '_FillValue'):
-                    fill = dsroot.variables[b]._FillValue
-                else:
-                    fill = ACOLITE_NDV
-                mask = arr != fill
-                arr[numpy.invert(mask)] = missing
-                # if key == 'rhow':
-                #     set_trace()
-                arr[mask] = ((arr[mask] - offset) / gain)
-                imgout[i].Write(arr.astype(npdtype))
-
-            prodout[key] = imgout.Filename()
-            imgout = None
-            imgout = gippy.GeoImage(ofname, True)
-            imgout.SetGain(gain)
-            imgout.SetOffset(offset)
-            imgout.SetNoData(missing)
-        return prodout
 
     def _process_indices(self, image, metadata, sensor, indices):
         """Process the given indices and add their files to the inventory.
@@ -835,12 +695,19 @@ class landsatData(Data):
 
         start = datetime.now()
 
-        assets = set()
+        assets = set() # assets needed for this process() run
         for key, val in products.requested.items():
             assets.update(self._products[val[0]]['assets'])
 
         if assets == set(['C1', 'DN']):
-            asset = list(assets.intersection(self.assets.keys()))[0]
+            if 'C1' in self.assets: # prefer C1
+                asset = 'C1'
+            elif 'DN' in self.assets:
+                asset = 'DN'
+            else:
+                raise ValueError(
+                    'No valid asset found for C1 nor DN for {} {}'.format(
+                        self.basename))
         else:
             if len(assets) != 1:
                 raise Exception('This driver does not support creation of products'
@@ -1261,11 +1128,8 @@ class landsatData(Data):
                         }
                         amd[p].update(self._products[p])
                         amd[p].pop('assets')
-                    prodout = self._process_acolite(
-                        asset=self.assets[asset],
-                        aco_proc_dir=aco_proc_dir,
-                        products=amd,
-                    )
+                    prodout = gips.atmosphere.process_acolite(
+                            self.assets[asset], asset, aco_proc_dir, amd)
                     endtime = datetime.now()
                     for k, fn in prodout.items():
                         self.AddFile(sensor, k, fn)
