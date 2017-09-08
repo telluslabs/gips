@@ -382,7 +382,20 @@ class MODTRAN():
     fout.close()
     """
 
+
 def process_acolite(asset, aco_proc_dir, products):
+    """Generate acolite products from the given asset.
+
+    Args:
+        asset:  Asset instance; only needed for asset.filename
+        aco_proc_dir:  Location to put intermediate files; tempdir is
+            suggested, and the caller is responsible for disposing of it
+        products:  dict specifying how to generate acolite products;
+            format docstring is a TODO.
+
+    Returns:  A mapping of product type strings to generated filenames
+        in the tiles/ directory; Data.AddFile() ready.
+    """
     verbose_out('Starting acolite processing')
     ACOLITEPATHS = {
         'ACO_DIR': utils.settings().ACOLITE['ACOLITE_DIR'],
