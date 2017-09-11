@@ -472,7 +472,9 @@ def add_acolite_product_dicts(_products, *assets):
         inner['assets'] = list(assets) # just in case, don't re-use the list
     _products.update(aco_prods)
 
-def process_acolite(asset, aco_proc_dir, products):
+def process_acolite(asset, aco_proc_dir, products,
+                    model_layer_re=r'.*\.((jp2)|(tif)|(TIF))$',
+                    extracted_asset_glob='.'):
     """Generate acolite products from the given asset.
 
     Args:
@@ -481,6 +483,8 @@ def process_acolite(asset, aco_proc_dir, products):
             suggested, and the caller is responsible for disposing of it
         products:  dict specifying how to generate acolite products;
             format docstring is a TODO.
+        model_layer_re:  A regex for a pathname to a layer image in
+            the asset; it is used as a sort of template for the ouptut image.
 
     Returns:  A mapping of product type strings to generated filenames
         in the tiles/ directory; Data.AddFile() ready.
@@ -509,18 +513,21 @@ def process_acolite(asset, aco_proc_dir, products):
     # EXTRACT ASSET
     verbose_out('acolite processing:  Extracting {} to {}'.format(
                 asset.filename, aco_proc_dir), 2)
-    tar = tarfile.open(asset.filename)
-    tar.extractall(aco_proc_dir)
+    asset.extract(path=aco_proc_dir)
     verbose_out('acolite processing:  Finished extracting {} to {}'.format(
                 asset.filename, aco_proc_dir), 2)
 
     # STASH PROJECTION AND GEOTRANSFORM (in a GeoImage)
-    exts = re.compile(r'.*\.((jp2)|(tif)|(TIF))$')
-    tif = filter(
-        lambda de: exts.match(de),
-        os.listdir(aco_proc_dir)
-    )[0]
-    tmp = gippy.GeoImage(os.path.join(aco_proc_dir, tif))
+    layer_finder = re.compile(model_layer_re)
+    tmp = None
+    for d, _, files in os.walk(aco_proc_dir):
+        for f in files:
+            fp = os.path.join(d, f)
+            if layer_finder.match(fp):
+                tmp = gippy.GeoImage(fp)
+    verbose_out('acolite processing:  model layer located: {}'.format(
+            tmp.Filename()), 3)
+    assert tmp, "No matching raster for {}".format(model_layer_re)
 
     # PROCESS SETTINGS TEMPLATE FOR SPECIFIED PRODUCTS
     settings_path = os.path.join(aco_proc_dir, 'settings.cfg')
@@ -550,6 +557,13 @@ def process_acolite(asset, aco_proc_dir, products):
                 )
     ACOLITEPATHS['ACOLITE_SETTINGS'] = settings_path
 
+    eag_fp = os.path.join(aco_proc_dir, extracted_asset_glob)
+    eag_rv = glob.glob(eag_fp)
+    if len(eag_rv) != 1:
+        err_msg = "Expected exactly one asset glob for {}, found {}"
+        raise IOError(err_msg.format(eag_fp, eag_rv))
+    ea_fp = eag_rv[0]
+
     # PROCESS VIA ACOLITE IDL CALL
     cmd = (
         ('cd {ACO_DIR} ; '
@@ -559,8 +573,8 @@ def process_acolite(asset, aco_proc_dir, products):
          'run=1 '
          'output={OUTPUT} image={IMAGES}')
             .format(
-            OUTPUT=aco_proc_dir,
-            IMAGES=aco_proc_dir,
+            OUTPUT=aco_proc_dir, # acolite seems to ignore this argument
+            IMAGES=ea_fp,        # <-- and put the netcdf file in here
             **ACOLITEPATHS
         )
     )
@@ -569,12 +583,15 @@ def process_acolite(asset, aco_proc_dir, products):
     if status != 0:
         raise Exception("Got exit status {} from `{}`".format(status, cmd),
                         output)
-    # EXTRACT IMAGES FROM NETCDF AND
-    # COMBINE MULTI-IMAGE PRODUCTS INTO
+    verbose_out('acolite processing:  ====== begin acolite output ======', 4)
+    verbose_out(output, 4)
+    verbose_out('acolite processing:  ====== end acolite output ======', 4)
+
+    # EXTRACT IMAGES FROM NETCDF AND COMBINE MULTI-IMAGE PRODUCTS INTO
     # A MULTI-BAND TIF, ADD METADATA, and MOVE INTO TILES
     verbose_out('acolite processing:  acolite completed;'
                 ' starting conversion from netcdf into gips products', 2)
-    aco_nc_file = glob.glob(os.path.join(aco_proc_dir, '*_L2.nc'))[0]
+    aco_nc_file = glob.glob(os.path.join(ea_fp, '*_L2.nc'))[0]
     dsroot = netCDF4.Dataset(aco_nc_file)
 
     prodout = dict()

@@ -1047,7 +1047,7 @@ class landsatData(Data):
                         amd[p].update(self._products[p])
                         amd[p].pop('assets')
                     prodout = gips.atmosphere.process_acolite(
-                            self.assets[asset], asset, aco_proc_dir, amd)
+                            self.assets[asset], aco_proc_dir, amd)
                     endtime = datetime.now()
                     for k, fn in prodout.items():
                         self.AddFile(sensor, k, fn)
