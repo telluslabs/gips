@@ -49,6 +49,7 @@ from gips.utils import List2File, verbose_out
 from gips import utils
 from gips.data.merra import merraData
 from gips.data.aod import aodData
+from gips.data.core import Data
 from gips.inventory import orm
 
 # since Py6S pulls in matplotlib, we need to shut down all that gui business
@@ -383,7 +384,6 @@ class MODTRAN():
     fout.close()
     """
 
-
 _aco_prod_templs = {
     'rhow': {
         'description': 'Water-Leaving Radiance-Reflectance',
@@ -393,7 +393,9 @@ _aco_prod_templs = {
         'offset': 0.,
         'dtype': 'int16',
         'toa': True,
-        'bands': [],
+        'bands': [{'name': bn, 'units': Data._unitless} for bn in (
+                    '444nm', '497nm', '560nm', '664nm', '704nm',
+                    '740nm', '782nm', '835nm', '865nm', '1614nm', '2202nm')]
     },
     # Not sure what the issue is with this product, but it doesn't seem to
     # work as expected (multiband vis+nir product)
@@ -412,7 +414,7 @@ _aco_prod_templs = {
         'offset': 250.,
         'dtype': 'int16',
         'toa': True,
-        'bands': [],
+        'bands': [{'name': 'oc2chl', 'units': Data._unitless}],
     },
     'oc3chl': {
         'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561',
@@ -422,7 +424,7 @@ _aco_prod_templs = {
         'offset': 250.,
         'dtype': 'int16',
         'toa': True,
-        'bands': [],
+        'bands': [{'name': 'oc3chl', 'units': Data._unitless}],
     },
     'fai': {
         'description': 'Floating Algae Index',
@@ -430,7 +432,7 @@ _aco_prod_templs = {
         'acolite-key': 'FAI',
         'dtype': 'float32',
         'toa': True,
-        'bands': [],
+        'bands': [{'name': 'fai', 'units': Data._unitless}],
     },
     'acoflags': {
         'description': '0 = water 1 = no data 2 = land',
@@ -438,7 +440,7 @@ _aco_prod_templs = {
         'acolite-key': 'FLAGS',
         'dtype': 'uint8',
         'toa': True,
-        'bands': [],
+        'bands': [{'name': 'acoflags', 'units': Data._unitless}],
     },
     'spm655': {
         'description': 'Suspended Sediment Concentration 655nm',
@@ -448,7 +450,7 @@ _aco_prod_templs = {
         'gain': 0.005,
         'dtype': 'int16',
         'toa': True,
-        'bands': [],
+        'bands': [{'name': 'spm655', 'units': 'unknown'}],
     },
     'turbidity': {
         'description': 'Blended Turbidity',
@@ -458,7 +460,7 @@ _aco_prod_templs = {
         'gain': 0.005,
         'dtype': 'int16',
         'toa': True,
-        'bands': [],
+        'bands': [{'name': 'turbidity', 'units': Data._unitless}],
     },
 }
 
