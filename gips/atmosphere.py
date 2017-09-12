@@ -476,7 +476,7 @@ def add_acolite_product_dicts(_products, *assets):
 
 def process_acolite(asset, aco_proc_dir, products,
                     model_layer_re=r'.*\.((jp2)|(tif)|(TIF))$',
-                    extracted_asset_glob='.'):
+                    extracted_asset_glob=''):
     """Generate acolite products from the given asset.
 
     Args:
