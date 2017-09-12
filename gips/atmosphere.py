@@ -613,13 +613,12 @@ def process_acolite(asset, aco_proc_dir, products,
         imgout = gippy.GeoImage(ofname, tmp, dtype, len(bands))
         # # TODO: add units to products dictionary and use here.
         # imgout.SetUnits(products[key]['units'])
-        pmeta = dict()
-        pmeta.update(imeta)
         pmeta = {
             mdi: products[key][mdi]
             for mdi in ['acolite-key', 'description']
             }
         pmeta['source_asset'] = os.path.basename(asset.filename)
+        pmeta.update(imeta)
         imgout.SetMeta(pmeta)
         for i, b in enumerate(bands):
             imgout.SetBandName(str(b), i + 1)
