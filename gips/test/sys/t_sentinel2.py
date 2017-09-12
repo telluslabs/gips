@@ -84,6 +84,7 @@ def t_stats(setup_fixture, clean_repo_env, output_tfe, expected):
 
 @slow
 @acolite
+@pytest.mark.skip(reason="Overflows in zlib.crc32")
 def t_process_acolite(setup_fixture, repo_env, expected):
     """Generate acolite products."""
     aco_args = list(STD_ARGS) + \
