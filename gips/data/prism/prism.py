@@ -50,7 +50,6 @@ class prismRepository(Repository):
     name = 'PRISM'
     description = 'PRISM Gridded Climate Data'
     _datedir = '%Y%m%d'
-    _defaultresolution = [4000.0, 4000.0]
     _tile_attribute = 'id'
 
 
@@ -59,29 +58,32 @@ class prismAsset(Asset):
     _sensors = {
         'prism': {'description': 'Daily Gridded Climate Data'}
     }
+    _defaultresolution = [4000.0, 4000.0]
     _startdate = date(1981, 1, 1)
+    _latency = -7
     # LATENCY (approximate)
     # 6 months for stable
     # 1 month for early
     # 1 week for provisional
+    _host = 'prism.nacse.org'
     _assets = {
         '_ppt': {
-            'pattern': 'PRISM_ppt_*.zip',
-            'url': 'ftp://prism.nacse.org/daily/ppt/',
+            'pattern': r'^PRISM_ppt_.+?\.zip$',
+            'path': '/daily/ppt',
             'startdate': _startdate,
-            'latency': -7
+            'latency': _latency,
         },
         '_tmin': {
-            'pattern': 'PRISM_tmin_*.zip',
-            'url': 'ftp://prism.nacse.org/daily/tmin/',
+            'pattern': r'^PRISM_tmin_.+?\.zip$',
+            'path': '/daily/tmin',
             'startdate': _startdate,
-            'latency': -7
+            'latency': _latency,
         },
         '_tmax': {
-            'pattern': 'PRISM_tmax_*.zip',
-            'url': 'ftp://prism.nacse.org/daily/tmax/',
+            'pattern': r'^PRISM_tmax_.+?\.zip$',
+            'path': '/daily/tmax',
             'startdate': _startdate,
-            'latency': -7
+            'latency': _latency,
         },
     }
     _stab_score = {
@@ -91,59 +93,53 @@ class prismAsset(Asset):
     }
 
     @classmethod
-    def fetch_ftp(cls, asset, tile, date):
-        """ Fetch via FTP """
-        url = cls._assets[asset].get('url', '')
-        if url == '':
-            raise Exception("%s: URL not defined for asset %s" % (cls.__name__, asset))
-        utils.verbose_out('%s: fetch tile %s for %s' % (asset, tile, date), 3)
-        if url.startswith('ftp://'):
-            url = url[6:]  # drop ftp:// if given
-        ftpurl = url.split('/')[0]
-        ftpdir = url[len(ftpurl):]
-        try:
-            ftp = ftplib.FTP(ftpurl)
-            ftp.login('anonymous', settings().EMAIL)
-            pth = os.path.join(ftpdir, date.strftime('%Y'))
-            ftp.set_pasv(True)
-            ftp.cwd(pth)
+    def ftp_connect(cls, asset, date):
+        """As super, but make the working dir out of (asset, date)."""
+        wd = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'))
+        return super(prismAsset, cls).ftp_connect(wd)
 
-            filenames = []
-            ftp.retrlines('LIST', filenames.append)
-            filenames = map(lambda x: x.split(' ')[-1], filenames)
-            filenames = filter(
-                lambda x: date.strftime('%Y%m%d') in x,
-                filenames
-            )
-            if len(filenames) > 1:
-                filenames = sorted(filenames, key=lambda x: prismAsset(x).ver_stab, reverse=True)
-            filename = filenames[0]
-            stagedir = tempfile.mkdtemp(
-                prefix='prismDownloader',
-                dir=cls.Repository.path('stage')
-            )
-            ofilename = os.path.join(stagedir, filename)
-            utils.verbose_out("Downloading %s" % filename, 2)
-            with open(ofilename, "wb") as ofile:
-                ftp.retrbinary('RETR %s' % filename, ofile.write)
-            ftp.close()
-        except Exception, e:
-            # TODO error-handling-fix: with handler BUT mind the else
-            raise Exception("Error downloading: %s" % e)
-        else:
-            assets = cls.archive(stagedir)
-        try:
-            os.remove(ofilename)
-        except OSError as ose:
-            # TODO error-handling-fix: change to 'raise'
-            if ose.errno != 2:
-                raise ose
-        os.rmdir(stagedir)
+    @classmethod
+    def query_provider(cls, asset, tile, date, conn=None):
+        """Determine availability of data for the given (asset, tile, date).
+
+        Re-use the given ftp connection if possible; Returns (basename,
+        None) on success; (None, None) otherwise."""
+        if asset not in cls._assets:
+            raise ValueError('{} has no defined asset for {}'.format(cls.Repository.name, asset))
+        private_conn = conn is None # do we have a shared connection?
+        if private_conn:
+            conn = cls.ftp_connect(asset, date)
+        # get the list of filenames for the year, filter down to the specific date
+        filenames = [fn for fn in conn.nlst() if date.strftime('%Y%m%d') in fn]
+        if private_conn:
+            conn.quit()
+        if 0 == len(filenames):
+            return None, None
+        # choose the one that has the most favorable stability & version values (usually only one)
+        return max(filenames, key=(lambda x: prismAsset(x).ver_stab)), None
+
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        """ Get this asset for this tile and date (via FTP) """
-        cls.fetch_ftp(asset, tile, date)
+        """Fetch to the stage.
+
+        Returns a list with one item, the full path to the staged asset.
+        """
+        utils.verbose_out('%s: fetch tile %s for %s' % (asset, tile, date), 3)
+        with utils.error_handler("Error downloading from " + cls._host, continuable=True):
+            ftp = cls.ftp_connect(asset, date) # starts chdir'd to the right directory
+            asset_fn, _ = cls.query_provider(asset, tile, date, ftp)
+            stage_dir_fp = cls.Repository.path('stage')
+            stage_fp = os.path.join(stage_dir_fp, asset_fn)
+            with utils.make_temp_dir(prefix='fetchtmp', dir=stage_dir_fp) as td_name:
+                temp_fp = os.path.join(td_name, asset_fn)
+                utils.verbose_out("Downloading " + asset_fn, 2)
+                with open(temp_fp, "wb") as temp_fo:
+                    ftp.retrbinary('RETR ' + asset_fn, temp_fo.write)
+                ftp.quit()
+                os.rename(temp_fp, stage_fp)
+            return [stage_fp]
+        return []
 
     def __init__(self, filename):
         """ Inspect a PRISM file """
@@ -190,33 +186,43 @@ class prismData(Data):
     name = 'PRISM'
     version = __version__
     Asset = prismAsset
+    # Prism official docs at http://www.prism.oregonstate.edu/FAQ/ say:
+    # "Dataset values are stored . . . precipitation as millimeters and
+    # temperature as degrees Celsius."
     _products = {
         'ppt': {
             'description': 'Precipitate',
             'assets': ['_ppt'],
+            'bands': [{'name': 'ppt', 'units': 'mm'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'pptsum': {
             'description': 'Cumulative Precipitate',
             'assets': ['_ppt'],
-            'arguments': [
-                'days: temporal window width (default: 3 days) .',
-            ]
+            'bands': [{'name': 'pptsum', 'units': 'mm'}],
+            'arguments': ['days: temporal window width (default: 3 days)'],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'tmin': {
             'description': 'Daily Minimum Temperature',
-            'assets': ['_tmin']
+            'assets': ['_tmin'],
+            'bands': [{'name': 'tmin', 'units': 'degree Celcius'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
         'tmax': {
             'description': 'Daily Maximum Temperature',
-            'assets': ['_tmax']
+            'assets': ['_tmax'],
+            'bands': [{'name': 'tmin', 'units': 'degree Celcius'}],
+            'startdate': Asset._startdate,
+            'latency': Asset._latency,
         },
     }
 
     def process(self, *args, **kwargs):
-        """Make sure all products exist and return those that need processing.
-
-        (docstring cribbed from super.)
-        """
+        """Deduce which products need producing, then produce them."""
         products = super(prismData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
@@ -224,7 +230,6 @@ class prismData(Data):
         # utils.verbose_out('\n\noverwrite = {}\n'.format(overwrite), 2)
         # TODO: overwrite doesn't play well with pptsum -- wonder if it would
         #       if it was made into a composite product (which it is)
-        bname = os.path.join(self.path, self.basename)
         assert len(prismAsset._sensors) == 1  # sanity check to force this code to stay current
         sensor = prismAsset._sensors.keys()[0]
 
@@ -240,6 +245,7 @@ class prismData(Data):
             # check that we have required assets
             requiredassets = self.products2assets([val[0]])
             # val[0] s.b. key w/o product args
+            description = self._products['pptsum']['description']
             missingassets = []
             availassets = []
             vsinames = {}
@@ -250,10 +256,10 @@ class prismData(Data):
                     missingassets.append(asset)
                 else:
                     availassets.append(asset)
-                     vsinames[asset] = os.path.join(
-                         '/vsizip/' + self.assets[asset].filename,
-                         bil
-                     )
+                    vsinames[asset] = os.path.join(
+                        '/vsizip/' + self.assets[asset].filename,
+                        bil
+                    )
 
             if not availassets:
                 utils.verbose_out(
@@ -262,28 +268,22 @@ class prismData(Data):
                     5,
                 )
                 continue
-            fname = '{}_{}_{}.tif'.format(bname, 'prism', key)
+            prod_fn = '{}_{}_{}.tif'.format(self.basename, 'prism', key)
+            archived_fp = os.path.join(self.path, prod_fn) # final destination
             if val[0] in ['ppt', 'tmin', 'tmax']:
-                if os.path.lexists(fname):
-                    os.remove(fname)
-                os.symlink(vsinames[self._products[key]['assets'][0]], fname)
+                with self.make_temp_proc_dir() as tmp_dir:
+                    tmp_fp = os.path.join(tmp_dir, prod_fn)
+                    os.symlink(vsinames[self._products[key]['assets'][0]], tmp_fp)
+                    os.rename(tmp_fp, archived_fp)
             elif val[0] == 'pptsum':
-                try:
-                    lag = int(val[1])
-                except ValueError, TypeError:
-                    # TODO error-handling-fix:
-                    #   refactor IndexError to be a conditional
-                    #   use with handler for other types
-                    raise Exception(
-                        'pptsum argument format error (given: {}).'
-                    )
-                except IndexError:
-                    # no argument provided, use
-                    # default lag of 3 days SB configurable.
-                    lag = 3
-                    fname = re.sub(r'\.tif$', '-{}.tif'.format(lag), fname)
-                    utils.verbose_out('Using default lag of {} days.'
-                                      .format(lag), 2)
+                if len(val) < 2:
+                    lag = 3 # no argument provided, use default lag of 3 days SB configurable.
+                    prod_fn = re.sub(r'\.tif$', '-{}.tif'.format(lag), prod_fn)
+                    archived_fp = os.path.join(self.path, prod_fn) # have to regenerate, sigh
+                    utils.verbose_out('Using default lag of {} days.'.format(lag), 2)
+                else:
+                    with utils.error_handler("Error for pptsum lag value '{}').".format(val[1])):
+                        lag = int(val[1])
 
                 date_spec = '{},{}'.format(
                     datetime.strftime(
@@ -307,17 +307,21 @@ class prismData(Data):
                     datobj = tileobj.tiles.values()[0]
                     imgs.append(GeoImage(get_bil_vsifile(datobj, '_ppt')))
 
-                if os.path.exists(fname):
-                    os.remove(fname)
-
-                oimg = GeoImage(fname, imgs[0])
-                for chunk in oimg.Chunks():
-                    oarr = oimg[0].Read(chunk) * 0.0
-                    for img in imgs:
-                        oarr += img[0].Read(chunk)
-                    oimg[0].Write(oarr, chunk)
-                oimg.Process()
+                with self.make_temp_proc_dir() as tmp_dir:
+                    tmp_fp = os.path.join(tmp_dir, prod_fn)
+                    oimg = GeoImage(tmp_fp, imgs[0])
+                    oimg.SetNoData(-9999)
+                    oimg.SetBandName(
+                        description + '({} day window)'.format(lag), 1
+                    )
+                    for chunk in oimg.Chunks():
+                        oarr = oimg[0].Read(chunk) * 0.0 # wat
+                        for img in imgs:
+                            oarr += img[0].Read(chunk)
+                        oimg[0].Write(oarr, chunk)
+                    oimg.Process()
+                    os.rename(tmp_fp, archived_fp)
                 oimg = None  # help swig+gdal with GC
                 products.requested.pop(key)
-            self.AddFile(sensor, key, fname)  # add product to inventory
+            self.AddFile(sensor, key, archived_fp)  # add product to inventory
         return products

@@ -25,8 +25,9 @@ import os
 import sys
 import errno
 from osgeo import gdal, ogr
-from datetime import datetime
+from datetime import datetime, timedelta
 import glob
+import re
 from itertools import groupby
 from shapely.wkt import loads
 import tarfile
@@ -39,11 +40,14 @@ import commands
 import gippy
 from gippy.algorithms import CookieCutter
 from gips import __version__
-from gips.utils import settings, VerboseOut, RemoveFiles, File2List, List2File, Colors, basename, mkdir, open_vector
+from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File, Colors,
+        basename, mkdir, open_vector)
 from gips import utils
 from ..inventory import dbinv, orm
 
-from pdb import set_trace
+from cookielib import CookieJar
+from urllib import urlencode
+import urllib2
 
 
 """
@@ -68,6 +72,7 @@ class Repository(object):
         """ Get tile designation from a geospatial feature (i.e. a row) """
         fldindex = feature.GetFieldIndex(cls._tile_attribute)
         return str(feature.GetField(fldindex))
+
 
     ##########################################################################
     # Override these functions if not using a tile/date directory structure
@@ -120,6 +125,49 @@ class Repository(object):
                 raise Exception('%s is not a valid setting!' % key)
         else:
             return r[key]
+
+    @classmethod
+    def managed_request(cls, url, verbosity=1, debuglevel=0):
+        """Visit the given http URL and return the response.
+
+        Uses auth settings and cls._manager_url, and also follows custom
+        weird redirects (specific to Earthdata servers seemingly).
+        Returns urllib2.urlopen(...), or None if errors are encountered.
+        debuglevel is ultimately passed in to httplib; if >0, http info,
+        such as headers, will be printed on standard out.
+        """
+        username = cls.get_setting('username')
+        password = cls.get_setting('password')
+        manager_url = cls._manager_url
+        password_manager = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        password_manager.add_password(
+            None, manager_url, username, password)
+        cookie_jar = CookieJar()
+        opener = urllib2.build_opener(
+            urllib2.HTTPBasicAuthHandler(password_manager),
+            urllib2.HTTPHandler(debuglevel=debuglevel),
+            urllib2.HTTPSHandler(debuglevel=debuglevel),
+            urllib2.HTTPCookieProcessor(cookie_jar))
+        urllib2.install_opener(opener)
+        try: # try instead of error handler because the exceptions have funny values to unpack
+            request = urllib2.Request(url)
+            response = urllib2.urlopen(request)
+            redirect_url = response.geturl()
+            # some data centers do it differently
+            if "redirect" in redirect_url: # TODO is this the right way to detect redirects?
+                utils.verbose_out('Redirected to ' + redirect_url, 3)
+                redirect_url += "&app_type=401"
+                request = urllib2.Request(redirect_url)
+                response = urllib2.urlopen(request)
+            return response
+        except urllib2.URLError as e:
+            utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
+                              verbosity, sys.stderr)
+            return None
+        except urllib2.HTTPError as e:
+            utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
+                              verbosity, sys.stderr)
+            return None
 
     @classmethod
     def path(cls, subdir=''):
@@ -184,10 +232,9 @@ class Asset(object):
         '': {'description': ''},
     }
     # dictionary of assets
-    # TODO - support regular expressions for patterns
     _assets = {
         '': {
-            'pattern': '*',
+            'pattern': r'.+',
         }
     }
 
@@ -219,6 +266,19 @@ class Asset(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
+    def parse_asset_fp(self):
+        """Parse self.filename using the class's asset patterns.
+
+        On the first successful match, the re lib match object is
+        returned. Raises ValueError on failure to parse.
+        """
+        asset_bn = os.path.basename(self.filename)
+        for av in self._assets.values():
+            match = re.match(av['pattern'], asset_bn)
+            if match is not None:
+                return match
+        raise ValueError("Unparseable asset file name:  " + self.filename)
+
     def datafiles(self):
         """Get list of readable datafiles from asset.
 
@@ -250,7 +310,7 @@ class Asset(object):
                 return [self.filename]
 
 
-    def extract(self, filenames=tuple()):
+    def extract(self, filenames=tuple(), path=None):
         """Extract given files from asset (if it's a tar or zip).
 
         Extracted files are placed in the same dir as the asset file.
@@ -261,16 +321,16 @@ class Asset(object):
             open_file = zipfile.ZipFile(self.filename)
         else:
             raise Exception('%s is not a valid tar or zip file' % self.filename)
-        path = os.path.dirname(self.filename)
+        if not path:
+            path = os.path.dirname(self.filename)
         if len(filenames) == 0:
             filenames = self.datafiles()
         extracted_files = []
         for f in filenames:
             fname = os.path.join(path, f)
             if not os.path.exists(fname):
-                VerboseOut("Extracting %s" % f, 3)
+                utils.verbose_out("Extracting " + f, 3)
                 open_file.extract(f, path)
-            with utils.error_handler('Error processing ' + fname, continuable=True):
                 # this ensures we have permissions on extracted files
                 if not os.path.isdir(fname):
                     os.chmod(fname, 0664)
@@ -303,17 +363,18 @@ class Asset(object):
 
         # The rest of this fn uses the filesystem inventory
         tpath = cls.Repository.data_path(tile, date)
+        if not os.path.isdir(tpath):
+            return []
         if asset is not None:
             assets = [asset]
         else:
             assets = cls._assets.keys()
         found = []
         for a in assets:
-            files = glob.glob(os.path.join(tpath, cls._assets[a]['pattern']))
+            files = utils.find_files(cls._assets[a]['pattern'], tpath)
             # more than 1 asset??
             if len(files) > 1:
-                VerboseOut(files, 2)
-                raise Exception("Duplicate(?) assets found")
+                raise Exception("Duplicate(?) assets found: {}".format(files))
             if len(files) == 1:
                 found.append(cls(files[0]))
         return found
@@ -325,13 +386,17 @@ class Asset(object):
 
     @classmethod
     def end_date(cls, asset):
-        # TODO this method never seems to be called?
-        """ Get ending date for this asset """
-        edate = cls._assets[asset].get('enddate', None)
-        if edate is None:
-            latency = cls._assets[cls.asset].get('latency', None)
-            edate = datetime.now() - datetime.timedelta(latency)
-        return edate
+        """Get ending date for this asset.
+
+        One of 'enddate' or 'latency' must be present in
+        cls._assets[asset]. Returns either the enddate, or else a
+        computation of the most recently-available data, based on the
+        (today's date) - asset's known latency.
+        """
+        a_info = cls._assets[asset]
+        if 'enddate' in a_info:
+            return a_info['enddate']
+        return datetime.now() - timedelta(a_info['latency'])
 
     @classmethod
     def available(cls, asset, date):
@@ -340,7 +405,7 @@ class Asset(object):
         date1 = cls._assets[asset].get(['startdate'], None)
         date2 = cls._assets[asset].get(['enddate'], None)
         if date2 is None:
-            date2 = datetime.now() - datetime.timedelta(cls._asssets[asset]['latency'])
+            date2 = datetime.now() - timedelta(cls._asssets[asset]['latency'])
         if date1 is None or date2 is None:
             return False
         if date < date1 or date > date2:
@@ -358,9 +423,49 @@ class Asset(object):
         return dates
 
     @classmethod
+    def query_provider(cls, asset, tile, date):
+        """Query the data provider for files matching the arguments.
+
+        Drivers must override this method or else query_service. Must
+        return (filename, url), or (None, None) if nothing found. This
+        method has a more convenient return value for drivers that never
+        find multiple files for the given (asset, tile, date), and don't
+        need to unpack a nested data structure in their fetch methods.
+        """
+        raise NotImplementedError('query_provider not supported for' + cls.__name__)
+
+    @classmethod
+    def query_service(cls, asset, tile, date):
+        """Query the data provider for files matching the arguments.
+
+        Drivers must override this method, or else query_provider, to
+        contact a data source regarding the given arguments, and report
+        on whether anything is available for fetching. Must return a
+        list of dicts containing available asset filenames and where to
+        find them:  [{'basename': bn, 'url': url}, ...]. When nothing is
+        avilable, must return [].
+        """
+        bn, url = cls.query_provider(asset, tile, date)
+        if (bn, url) == (None, None):
+            return []
+        return [{'basename': bn, 'url': url}]
+
+
+    @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
         raise NotImplementedError("Fetch not supported for this data source")
+
+    @classmethod
+    def ftp_connect(cls, working_directory):
+        """Connect to an FTP server and chdir according to the args.
+
+        Returns the ftplib connection object."""
+        conn = ftplib.FTP(cls._host)
+        conn.login('anonymous', settings().EMAIL)
+        conn.set_pasv(True)
+        conn.cwd(working_directory)
+        return conn
 
     @classmethod
     def fetch_ftp(cls, asset, tile, date):
@@ -371,38 +476,45 @@ class Asset(object):
         VerboseOut('%s: fetch tile %s for %s' % (asset, tile, date), 3)
         ftpurl = url.split('/')[0]
         ftpdir = url[len(ftpurl):]
-        try:
+        with utils.error_handler("Error downloading from {}".format(ftpurl)):
             ftp = ftplib.FTP(ftpurl)
             ftp.login('anonymous', settings().EMAIL)
             pth = os.path.join(ftpdir, date.strftime('%Y'), date.strftime('%j'))
             ftp.set_pasv(True)
             ftp.cwd(pth)
 
-            filenames = []
-            ftp.retrlines('LIST', filenames.append)
-
             for f in ftp.nlst('*'):
                 VerboseOut("Downloading %s" % f, 2)
-                ftp.retrbinary('RETR %s' % f, open(os.path.join(cls.Repository.path('stage'), f), "wb").write)
+                ftp.retrbinary('RETR %s' % f,
+                               open(os.path.join(cls.Repository.path('stage'), f), "wb").write)
             ftp.close()
-        except Exception, e:
-            # TODO error-handling-fix: use with handler() instead
-            VerboseOut(traceback.format_exc(), 4)
-            raise Exception("Error downloading: %s" % e)
 
     @classmethod
     def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
-        """ Move assets from directory to archive location """
+        """Move asset into the archive.
+
+        Pass in a path to a file or a directory.  If a directory, its
+        contents are scanned for assets and any found are archived; it
+        won't descend into subdirectories unless `recursive`.  Any found
+        assets are given hard links in the archive.  The original is
+        then removed, unless `keep`. If a found asset would replace an
+        extant archived asset, replacement is only performed if
+        `update`.  kwargs is unused and likely without purpose.
+        """
         start = datetime.now()
 
         fnames = []
-        if recursive:
+        if not os.path.isdir(path):
+            fnames.append(path)
+        elif recursive:
             for root, subdirs, files in os.walk(path):
                 for a in cls._assets.values():
-                    fnames.extend(glob.glob(os.path.join(root, a['pattern'])))
+                    files = utils.find_files(a['pattern'], path)
+                    fnames.extend(files)
         else:
             for a in cls._assets.values():
-                fnames.extend(glob.glob(os.path.join(path, a['pattern'])))
+                files = utils.find_files(a['pattern'], path)
+                fnames.extend(files)
         numlinks = 0
         numfiles = 0
         assets = []
@@ -506,6 +618,8 @@ class Data(object):
     version = '0.0.0'
     Asset = Asset
 
+    _unitless = 'unitless' # standard string for expressing that a product has no units
+
     _pattern = '*.tif'
     _products = {}
     _productgroups = {}
@@ -518,7 +632,8 @@ class Data(object):
         """ Make sure all products exist and return those that need processing """
         # TODO calling RequestedProducts twice is strange; rework into something clean
         products = self.RequestedProducts(products)
-        products = self.RequestedProducts([p for p in products.products if p not in self.products or overwrite])
+        products = self.RequestedProducts(
+                [p for p in products.products if p not in self.products or overwrite])
         # TODO - this doesnt know that some products aren't available for all dates
         return products
 
@@ -532,7 +647,8 @@ class Data(object):
         """ Process composite products using provided inventory """
         pass
 
-    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False, overwrite=False, tree=False):
+    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False,
+             overwrite=False, tree=False):
         """ Copy products to new directory, warp to projection if given site.
 
         Arguments
@@ -601,21 +717,35 @@ class Data(object):
         filenames[:] = [f for f in filenames if test(f)]
         return filenames
 
+
+    @classmethod
+    def normalize_tile_string(cls, tile_string):
+        """Override this method to provide custom processing of tile names.
+
+        This method should raise an exception if the tile string is
+        invalid, but should return a corrected string instead if
+        possible.  So for modis, 'H03V01' should return 'h03v01', while
+        'H03V' should raise an exception.
+        """
+        return tile_string
+
+
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
     def __init__(self, tile=None, date=None, path='', search=True):
         """ Find all data and assets for this tile and date.
 
-        search=False will prevent searching for assets via Asset.discover().
+        Note date should be a datetime.date object. search=False will
+        prevent searching for assets via Asset.discover().
         """
         self.id = tile
         self.date = date
-        self.path = path
-        self.basename = ''              # product file name prefix, form is <tile>_<date>
-        self.assets = {}                # dict of <asset type string>: <Asset instance>
-        self.filenames = {}             # dict of (sensor, product): product filename
-        self.sensors = {}               # dict of asset/product: sensor
+        self.path = path      # /full/path/to/{driver}/tiles/{tile}/{date}; overwritten below
+        self.basename = ''    # product file name prefix, form is <tile>_<date>
+        self.assets = {}      # dict of <asset type string>: <Asset instance>
+        self.filenames = {}   # dict of (sensor, product): product filename
+        self.sensors = {}     # dict of asset/product: sensor
         if tile is not None and date is not None:
             self.path = self.Repository.data_path(tile, date)
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)
@@ -725,9 +855,6 @@ class Data(object):
             dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
                                         tile=self.id, date=self.date, name=filename)
 
-
-
-
     def asset_filenames(self, product):
         assets = self._products[product]['assets']
         filenames = []
@@ -803,7 +930,7 @@ class Data(object):
         for root, dirs, filenames in os.walk(path):
             for filename in filenames:
                 f = os.path.join(root, filename)
-                VerboseOut(f, 2)
+                VerboseOut(f, 4)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
                     with utils.error_handler('Error parsing product date', continuable=True):
@@ -831,7 +958,8 @@ class Data(object):
         """ Return list of inventories (size 1 if not looping through geometries) """
         from gips.inventory import DataInventory
         from gips.core import SpatialExtent, TemporalExtent
-        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles, pcov=pcov, ptile=ptile)
+        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles,
+                                        pcov=pcov, ptile=ptile)
         temporal = TemporalExtent(dates, days)
         return DataInventory(cls, spatial[0], temporal, **kwargs)
 
@@ -914,3 +1042,58 @@ class Data(object):
             print "  Optional qualifiers listed below each product."
             print "  Specify by appending '-option' to product (e.g., ref-toa)"
         sys.stdout.write(txt)
+
+    def make_temp_proc_dir(self):
+        """Make a temporary directory in which to perform gips processing.
+
+        Returns a context manager that governs the newly-made directory,
+        which is deleted on exiting the context. It is created in the
+        driver's stage directory, and has a random name.
+        """
+        return utils.make_temp_dir(prefix='proc', dir=self.Repository.path('stage'))
+
+    @staticmethod
+    def proc_temp_dir_manager(wrapped_method):
+        """Decorator for self.process to use a tempdir consistently.
+
+        Decorate a method with it, and it'll create a temp
+        directory for the method's use, then destroy it afterwards.
+        """
+        def wrapper(self, *args, **kwargs):
+            assert not hasattr(self, '_temp_proc_dir')
+            with self.make_temp_proc_dir() as temp_dir:
+                self._temp_proc_dir = temp_dir
+                # keys are temp filenames, vals are tuples:  (sensor, prod-type, archive full path)
+                try:
+                    return wrapped_method(self, *args, **kwargs)
+                finally:
+                    del self._temp_proc_dir
+        return wrapper
+
+    def archive_temp_path(self, temp_fp):
+        """Move the product file from the managed temp dir to the archive.
+
+        The archival full path is returned; an appropriate spot in the
+        archive is chosen automatically.
+        """
+        archive_fp = os.path.join(self.path, os.path.basename(temp_fp))
+        os.rename(temp_fp, archive_fp)
+        return archive_fp
+
+    def generate_temp_path(self, filename):
+        """Return a full path to the filename within the managed temp dir.
+
+        The filename's basename is glued to the end of the temp dir.
+        This method should be called from within proc_temp_dir_manager.
+        """
+        return os.path.join(self._temp_proc_dir, os.path.basename(filename))
+
+    def product_filename(self, sensor, prod_type):
+        """Returns a standardized product file name."""
+        date_string = self.date.strftime(self.Repository._datedir)
+        # reminder: self.id is the tile ID string, eg 'h12v04' or '19TCH'
+        return '{}_{}_{}_{}.tif'.format(self.id, date_string, sensor, prod_type)
+
+    def temp_product_filename(self, sensor, prod_type):
+        """Generates a product filename within the managed temp dir."""
+        return self.generate_temp_path(self.product_filename(sensor, prod_type))

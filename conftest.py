@@ -7,7 +7,7 @@ from _pytest.assertion.util import _compare_eq_dict, _diff_text
 from gips.test.sys.util import GipsProcResult, set_constants
 
 # configure logging (can config in command-line & config file, see below)
-log_format = '%(levelname)-8s %(filename)s:%(lineno)d: %(message)s'
+log_format = '%(levelname)-8s %(asctime)s %(filename)s:%(lineno)d: %(message)s'
 root_logger = logging.getLogger()
 root_streamer = logging.StreamHandler()
 root_streamer.setFormatter(logging.Formatter(log_format))
@@ -107,8 +107,11 @@ def setup_data_repo():
     # set up data root if it isn't there already
     gcp = envoy.run("gips_config env")
     if gcp.status_code != 0:
-        raise RuntimeError("data root setup via `gips_config env` failed",
-                           gcp.std_out, gcp.std_err, gcp)
+        _log.error("data root setup via `gips_config env` failed; stdout:")
+        [_log.error(line) for line in gcp.std_out.split('\n')]
+        _log.error("data root setup via `gips_config env` failed; stderr:")
+        [_log.error(line) for line in gcp.std_err.split('\n')]
+        raise RuntimeError("data root setup via `gips_config env` failed")
     _log.debug("`gips_config env` succeeded; data repo (possibly) created")
 
 

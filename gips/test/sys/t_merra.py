@@ -12,7 +12,7 @@ pytestmark = sys  # skip everything unless --sys
 # changing this will require changes in expected/
 driver = 'merra'
 STD_TILE = 'h01v01'
-STD_DATES = '1982-12-01,1982-12-03'
+STD_DATES = '2015-135'
 STD_ARGS = (driver, '-s', NH_SHP_PATH, '-d', STD_DATES, '-v', '4')
 
 
@@ -22,8 +22,8 @@ def setup_merra_data(pytestconfig):
     if not pytestconfig.getoption('setup_repo'):
         logger.debug("Skipping repo setup per lack of option.")
         return
-    logger.info("Downloading MERRA data . . .")
     cmd_str = 'gips_inventory ' + ' '.join(STD_ARGS) + ' --fetch'
+    logger.info("Downloading MERRA assets with " + cmd_str)
     outcome = envoy.run(cmd_str)
     logger.info("MERRA data download complete.")
     if outcome.status_code != 0:

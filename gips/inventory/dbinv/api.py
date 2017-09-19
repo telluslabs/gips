@@ -1,8 +1,9 @@
-import os, glob, sys, traceback, datetime, time, itertools
+import os, glob, sys, traceback, datetime, time, itertools, re
 
 import django.db.transaction
 
 from gips.utils import verbose_out, basename
+from gips import utils
 
 
 """API for the DB inventory for GIPS.
@@ -80,7 +81,10 @@ def rectify_assets(asset_class):
         # little optimization to make deleting stale records go faster:
         starting_keys = set(mao.filter(driver=driver, asset=ak).values_list('id', flat=True))
 
-        _chunky_transaction(glob.iglob(os.path.join(path_glob, av['pattern'])), rectify_asset)
+        # Use iterators to cut down on memory usage; some asset collections can be pretty big
+        imatches = itertools.chain.from_iterable(utils.find_files(av['pattern'], path)
+                                                 for path in glob.iglob(path_glob))
+        _chunky_transaction(imatches, rectify_asset)
 
         # Remove things from DB that are NOT in FS:
         print "Deleting stale asset records . . . "
@@ -126,11 +130,6 @@ def rectify_products(data_class):
     starting_keys = set(mpo.filter(driver=driver).values_list('id', flat=True))
 
     def rectify_product(full_fn):
-        # TODO if data_class.name == 'Daymet':
-        #   # Daymet assets & products are the same, so use Asset parsing to make Products
-        #   daymet_asset = data_class.Asset(full_fn)
-        #   # extract metadata here
-        #   # save deets as usual
         bfn_parts = basename(full_fn).split('_')
         if not len(bfn_parts) == 4:
             _match_failure_report(full_fn,

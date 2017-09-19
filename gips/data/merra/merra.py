@@ -42,8 +42,6 @@ from gips.data.core import Repository, Asset, Data
 from gips.utils import basename, open_vector
 from gips import utils
 
-from pdb import set_trace
-
 
 class Timeout():
     """Timeout class using ALARM signal."""
@@ -70,6 +68,9 @@ class merraRepository(Repository):
     description = 'Modern Era Retrospective-Analysis for Research and Applications (weather and climate)'
     _tile_attribute = 'tileid'
 
+    # NASA assets require special authentication
+    _manager_url = "https://urs.earthdata.nasa.gov"
+
     @classmethod
     def tile_bounds(cls, tile):
         """ Get the bounds of the tile (in same units as tiles vector) """
@@ -91,8 +92,10 @@ class merraAsset(Asset):
     }
 
     _bandnames = ['%02d30GMT' % i for i in range(24)]
-    _asset_re_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d.nc4"
-    _asset_pattern = "MERRA2_???.{name}.????????.nc4"
+    # used in _assets[asset_type]['pattern'], which is used by data/core.py to search the filesystem
+    _asset_re_pattern = '^MERRA2_\d\d\d\.%s\.\d{4}\d{2}\d{2}\.nc4$'
+    # used in _assets[asset_type]['re_pattern'], which is used exclusively by query_service
+    _asset_re_format_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d\.nc4"
 
     _assets = {
         # MERRA2 SLV
@@ -105,8 +108,8 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXSLV',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Single-Level Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXSLV.5.12.4',
-            'pattern': _asset_pattern.format(name='tavg1_2d_slv_Nx'),
-            're_pattern': _asset_re_pattern.format(name='tavg1_2d_slv_Nx'),
+            'pattern': _asset_re_pattern % 'tavg1_2d_slv_Nx',
+            're_pattern': _asset_re_format_pattern.format(name='tavg1_2d_slv_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -117,8 +120,8 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXFLX',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Surface Flux Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXFLX.5.12.4',
-            'pattern': _asset_pattern.format(name='tavg1_2d_flx_Nx'),
-            're_pattern': _asset_re_pattern.format(name='tavg1_2d_flx_Nx'),
+            'pattern': _asset_re_pattern % 'tavg1_2d_flx_Nx',
+            're_pattern': _asset_re_format_pattern.format(name='tavg1_2d_flx_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -128,8 +131,8 @@ class merraAsset(Asset):
             'shortname': 'M2T1NXRAD',
             'description': '2d,1-Hourly,Time-Averaged,Single-Level,Assimilation,Radiation Diagnostics V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2/M2T1NXRAD.5.12.4',
-            'pattern': _asset_pattern.format(name='tavg1_2d_rad_Nx'),
-            're_pattern': _asset_re_pattern.format(name='tavg1_2d_rad_Nx'),
+            'pattern': _asset_re_pattern % 'tavg1_2d_rad_Nx',
+            're_pattern': _asset_re_format_pattern.format(name='tavg1_2d_rad_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': 60,
         },
@@ -139,8 +142,8 @@ class merraAsset(Asset):
             'shortname': 'M2C0NXASM',
             'description': '2d, constants V5.12.4',
             'url': 'https://goldsmr4.gesdisc.eosdis.nasa.gov/data/MERRA2_MONTHLY/M2C0NXASM.5.12.4/1980',
-            'pattern': _asset_pattern.format(name='const_2d_asm_Nx'),
-            're_pattern': _asset_re_pattern.format(name='const_2d_asm_Nx'),
+            'pattern': _asset_re_pattern % 'const_2d_asm_Nx',
+            're_pattern': _asset_re_format_pattern.format(name='const_2d_asm_Nx'),
             'startdate': datetime.date(1980, 1, 1),
             'latency': None,
         }
@@ -170,7 +173,6 @@ class merraAsset(Asset):
         super(merraAsset, self).__init__(filename)
         self.sensor = 'merra'
         self.tile = 'h01v01'
-
         parts = basename(filename).split('.')
         self.asset = parts[1].split('_')[2].upper()
         self.version = int(parts[0].split('_')[1])
@@ -183,8 +185,6 @@ class merraAsset(Asset):
     @classmethod
     def query_service(cls, asset, tile, date):
         year, month, day = date.timetuple()[:3]
-        username = cls.Repository.get_setting('username')
-        password = cls.Repository.get_setting('password')
         if asset != "ASM":
             mainurl = "%s/%04d/%02d" % (cls._assets[asset]['url'], year, month)
             pattern = cls._assets[asset]['re_pattern'] % (year, month, day)
@@ -193,11 +193,13 @@ class merraAsset(Asset):
             mainurl = cls._assets[asset]['url']
             pattern = cls._assets[asset]['re_pattern'] % (0, 0, 0)
         cpattern = re.compile(pattern)
-        err_msg = "Error downloading"
-        with utils.error_handler(err_msg):
-            listing = urllib.urlopen(mainurl).readlines()
+        with utils.error_handler("Error downloading"):
+            # obtain the list of files
+            response = cls.Repository.managed_request(mainurl, verbosity=2)
+            if response is None:
+                return []
         available = []
-        for item in listing:
+        for item in response.readlines():
             # inspect the page and extract the full name of the needed file
             if cpattern.search(item):
                 if 'xml' in item:
@@ -212,8 +214,9 @@ class merraAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
-
+        """Standard Asset.fetch implementation for downloading assets."""
         if asset == "ASM" and date.date() != cls._assets[asset]['startdate']:
+            #TODO: which should it be? if message then remove comment
             #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
             utils.verbose_out('constants are available for %s only' % cls._assets[asset]['startdate'])
             return
@@ -227,25 +230,18 @@ class merraAsset(Asset):
             outpath = os.path.join(cls.Repository.path('stage'), basename)
 
             with utils.error_handler("Asset fetch error", continuable=True):
-                kw = {'timeout': 30}
-                username = cls.Repository.get_setting('username')
-                password = cls.Repository.get_setting('password')
-                kw['auth'] = (username, password)
-                response = requests.get(url, **kw)
-                if response.status_code != requests.codes.ok:
-                    print('Download of', basename, 'failed:', response.status_code,
-                          response.reason, '\nFull URL:', url, file=sys.stderr)
-                    return
-                # download to a temp file
+                # obtain the data
+                response = cls.Repository.managed_request(url)
+                if response is None:
+                    continue
                 tmp_outpath = tempfile.mkstemp(
                     suffix='.nc4', prefix='downloading',
                     dir=cls.Repository.path('stage')
                 )[1]
                 with open(tmp_outpath, 'w') as fd:
-                    for chunk in response.iter_content():
-                        fd.write(chunk)
+                    fd.write(response.read())
 
-                # Verify that it is a netcdf file
+                # verify that it is a netcdf file
                 try:
                     ncroot = Dataset(tmp_outpath)
                     os.rename(tmp_outpath, outpath)
@@ -253,7 +249,7 @@ class merraAsset(Asset):
                     text = ''
                     if e.message.endswith('Unknown file format'):
                         token = 'Authorize NASA GESDISC DATA ARCHIVE'
-                        html = open(filename, 'r').read(100000)
+                        html = open(tmp_outpath, 'r').read(100000)
                         if token in html:
                             text = ('\n\nYou need to {t} \nfor your NASA '
                                     'EarthData login.\n').format(t=token)
@@ -471,15 +467,16 @@ class merraData(Data):
         imgout.SetAffine(np.array(self._geotransform))
 
 
+    @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
-        """ create products """
+        """Produce requested products."""
         products = super(merraData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
         bname = os.path.join(self.path, self.basename)
         sensor = "merra"
         for key, val in products.requested.items():
-            fout = "%s_%s_%s.tif" % (bname, sensor, key)
+            fout = self.temp_product_filename(sensor, key)
             meta = {}
             VERSION = "1.0"
             meta['VERSION'] = VERSION
@@ -636,4 +633,5 @@ class merraData(Data):
             """
 
             # add product to inventory
-            self.AddFile(sensor, key, fout)
+            archive_fp = self.archive_temp_path(fout)
+            self.AddFile(sensor, key, archive_fp)

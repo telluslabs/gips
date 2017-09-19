@@ -39,7 +39,7 @@ from . import dbinv, orm
 
 class Inventory(object):
     """ Base class for inventories """
-    _colors = [Colors.PURPLE, Colors.RED, Colors.GREEN, Colors.BLUE]
+    _colors = [Colors.PURPLE, Colors.RED, Colors.GREEN, Colors.BLUE, Colors.YELLOW]
 
     def __init__(self):
         pass
@@ -236,10 +236,16 @@ class DataInventory(Inventory):
 
             if orm.use_orm():
                 # save metadata about the fetched assets in the database
+                driver = dataclass.name.lower()
                 for a in archived_assets:
                     dbinv.update_or_add_asset(
                             asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
-                            name=a.archived_filename, driver=dataclass.name.lower())
+                            name=a.archived_filename, driver=driver)
+                    # if the new asset comes with any "free" products, save that info:
+                    for (prod_type, fp) in a.products.items():
+                        dbinv.update_or_add_product(
+                                product=prod_type, sensor=a.sensor, tile=a.tile, date=a.date,
+                                name=fp, driver=driver)
 
         # Build up the inventory:  One Tiles object per date.  Each contains one Data object.  Each
         # of those contain one or more Asset objects.
@@ -272,7 +278,7 @@ class DataInventory(Inventory):
             for a in dbinv.asset_search(**search_criteria).order_by('date', 'tile'):
                 add_to_collection(a.date, a.tile, 'a', str(a.name))
 
-            # the collection is now copmlete so use it to populate the GIPS object hierarchy
+            # the collection is now complete so use it to populate the GIPS object hierarchy
             for k, v in collection.items():
                 (date, tile) = k
                 # find or else make a Tiles object
