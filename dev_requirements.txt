@@ -2,5 +2,6 @@
 pytest
 pytest-timeout
 pytest-mock
+pytest-django
 scripttest
 envoy

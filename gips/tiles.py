@@ -28,28 +28,25 @@ import traceback
 
 import gippy
 from gippy.algorithms import CookieCutter
-from gips.core import SpatialExtent
 from gips.utils import VerboseOut, Colors, mosaic, mkdir
+from gips import utils
 
 
 class Tiles(object):
-    """ Collection of files for single date and multiple regions (tiles) """
+    """ Collection of files for single date and one or more regions (tiles) """
 
-    def __init__(self, dataclass, spatial=None, date=None, products=None, **kwargs):
+    def __init__(self, dataclass, spatial, date=None, products=None, **kwargs):
         """ Locate data matching vector location (or tiles) and date
         self.coverage      dict of tile id: %coverage with site
-        self.tiles              dict of tile id: tile instance
+        self.tiles         mapping of tile IDs to Data instances, eg for modis:
+                           {'h12v04': <modis.modisData object at 0x7fb34ab9e550>}
         """
         self.dataclass = dataclass
-        self.spatial = spatial if spatial is not None else SpatialExtent()
+        self.spatial = spatial
         self.products = products if products is not None else dataclass.RequestedProducts()
         self.date = date
         # For each tile locate files/products
         self.tiles = {}
-        for t in self.spatial.tiles:
-            tile = dataclass(t, self.date)
-            if tile.valid and tile.filter(**kwargs):
-                self.tiles[t] = tile
 
     def __len__(self):
         return len(self.tiles)
@@ -77,7 +74,9 @@ class Tiles(object):
 
     def mosaic(self, datadir, res=None, interpolation=0, crop=False,
                overwrite=False, alltouch=False):
-        """ Combine tiles into a single mosaic, warp if res provided """
+        """For each product, combine its tiles into a single mosaic.
+
+        Warp if res provided."""
         if self.spatial.site is None:
             raise Exception('Site required for creating mosaics')
         start = datetime.now()
@@ -91,7 +90,7 @@ class Tiles(object):
             # TODO - this is assuming a tif file.  Use gippy FileExtension function when it is exposed
             fout = os.path.join(datadir, '%s_%s_%s' % (bname, sensor, product)) + '.tif'
             if not os.path.exists(fout) or overwrite:
-                try:
+                with utils.error_handler("Error mosaicking " + fout, continuable=True):
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
                     if self.spatial.site is not None and res is not None:
@@ -101,9 +100,6 @@ class Tiles(object):
                         )
                     else:
                         mosaic(images, fout, self.spatial.site)
-                except Exception, e:
-                    VerboseOut(traceback.format_exc(), 4)
-                    VerboseOut("Error mosaicking %s: %s" % (fout, e))
         t = datetime.now() - start
         VerboseOut('%s: created project files for %s tiles in %s' % (self.date, len(self.tiles), t), 2)
 

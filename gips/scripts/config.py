@@ -22,12 +22,27 @@
 ################################################################################
 
 import os, sys
+import pprint
+import traceback
+
+import django
+from django.core.management import call_command
+
 import gips
 from gips import __version__ as version
 from gips.parsers import GIPSParser
-from gips.utils import VerboseOut, create_environment_settings, create_user_settings, create_repos
-import pprint
-import traceback
+from gips.utils import create_environment_settings, create_user_settings, create_repos
+from gips import utils
+from gips.inventory import orm
+
+
+def migrate_database():
+    """Migrate the database if the ORM is turned on."""
+    if not orm.use_orm():
+        return
+    print 'Migrating database'
+    orm.setup()
+    call_command('migrate', interactive=False)
 
 
 def main():
@@ -47,8 +62,10 @@ def main():
     args = parser.parse_args()
     print title
 
+    utils.gips_script_setup(None, args.stop_on_error) # Note no driver string for gips_config
+
     if args.command == 'print':
-        try:
+        with utils.error_handler('Unable to access settings'):
             from gips.utils import settings
             s = settings()
             for v in dir(s):
@@ -56,35 +73,28 @@ def main():
                     print
                     print v
                     exec('pprint.pprint(s.%s)' % v)
-        except Exception as e:
-            # print traceback.format_exc()
-            print 'Unable to access settings: {}'.format(e)
-            sys.exit(1)
 
     elif args.command == 'env':
-        try:
+        with utils.error_handler('Could not create environment settings'):
             cfgfile = create_environment_settings(args.repos, email=args.email)
             print 'Environment settings file: %s' % cfgfile
-            print 'Creating repository directories'
-            create_repos()
-        except Exception, e:
-            print traceback.format_exc()
-            print 'Could not create environment settings: %s' % e
 
     elif args.command == 'user':
-        try:
+        with utils.error_handler('Could not create user settings'):
             # first try importing environment settings
             import gips.settings
             cfgfile = create_user_settings()
-        except ImportError:
-            print 'Could not create user settings: %s' % e
 
-        try:
-            print 'User settings file: %s' % cfgfile
+    if args.command in ('user', 'env'):
+        with utils.error_handler('Could not create repos'):
             print 'Creating repository directories'
             create_repos()
-        except Exception as e:
-            print 'Could not create repository directories'
+        with utils.error_handler('Could not migrate database'):
+            print 'Migrating database'
+            migrate_database()
+
+    utils.gips_exit()
+
 
 if __name__ == "__main__":
     main()

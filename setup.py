@@ -55,16 +55,21 @@ setup(
     packages=find_packages(),
     package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf']},
     install_requires=[
-        'Py6S>=1.5.0',
+        'Py6S>=1.7.0',
         'shapely',
         'gippy>=0.3.8',
+        'homura==0.1.3',
         'python-dateutil',
-        'pydap',
+        'pydap==3.2',
         'pysolar==0.6',
-        'landsat-util==0.8.0ircwaves0',
+        'dbfread==2.0.7',
+        'rios==1.4.3',
+        'python-fmask==0.4.5',
+        'usgs', # 0.2.1 known to work
     ],
     dependency_links=[
-        'http://github.com/ircwaves/landsat-util/tarball/landsat_util#egg=landsat-util-0.8.0ircwaves0'
+        'https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3',
+        'https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.4.5.zip#egg=python-fmask-0.4.5',
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
