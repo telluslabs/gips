@@ -361,6 +361,65 @@ def crop2vector(img, vector):
     return img
 
 
+def vectorize(img, vector, oformat=None):
+    """
+    Create vector from img using gdal_polygonize.
+
+    oformat -- defaults to (due to ogr2ogr) "ESRI Shapefile"
+    connectedness -- defaults to "8" to avoid islands as much as possible.
+    """
+    conn_opt = '-8'
+    fmt = ''
+    if oformat:
+        fmt = '-f "{}"'.format(oformat)
+
+    def gso_run(cmd, emsg):
+        '''simple shell command wrapper'''
+        with error_handler(emsg):
+            verbose_out('Running: {}'.format(cmd), 4)
+            status, output = commands.getstatusoutput(cmd)
+            if status != 0:
+                verbose_out(
+                    '++\n Ran command:\n {}\n\n++++\n Console output:\n {}\n++\n'
+                    .format(cmd, output),
+                    1
+                )
+                raise
+
+    # Grab projection because gml doesn't carry it around by default
+    wkt = gippy.GeoImage(img).Projection()
+    # rasterize the vector
+    with make_temp_dir(prefix='vectorize') as td:
+        tvec = os.path.join(td, os.path.basename(vector)[:-4] + '.gml')
+        polygonize = (
+            'gdal_polygonize.py {CONNECTEDNESS} {IMAGE} {VECTOR}'
+            .format(CONNECTEDNESS=conn_opt, IMAGE=img, VECTOR=tvec)
+        )
+        emsg = 'Error vectorizing raster {} to {}'.format(img, tvec)
+        gso_run(polygonize, emsg)
+
+        if gippy.GeoVector(tvec).NumFeatures() != 1:
+            ivec = tvec
+            tvec = tvec[:-4] + '_dissolve.gml'
+            dissolve = (
+                'ogr2ogr -f GML {OVEC} {IVEC} -dialect sqlite '
+                '-sql "SELECT DN as DN, ST_Union(geometryProperty) as '
+                'geometry FROM out GROUP BY DN"'
+                .format(OVEC=tvec, IVEC=ivec)
+            )
+            emsg = 'Error dissolving {} to {}'.format(ivec, tvec)
+            gso_run(dissolve, emsg)
+
+        make_final_prod = (
+            "ogr2ogr {FMT} -a_srs '{WKT}' '{OVEC}' '{IVEC}'"
+            .format(FMT=fmt, WKT=wkt, OVEC=vector, IVEC=ivec)
+        )
+        emsg = 'Error writing final output from {} to {}'.format(ivec, vector)
+        gso_run(make_final_prod, emsg)
+
+    return vector
+
+
 def mosaic(images, outfile, vector):
     """ Mosaic multiple files together, but do not warp """
     nd = images[0][0].NoDataValue()
