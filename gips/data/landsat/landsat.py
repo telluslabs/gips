@@ -891,7 +891,7 @@ class landsatData(Data):
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
                         verbose_out("writing " + fname, 2)
                         imgout.SetBandName(
-                            self._products[val[0]]['bands'][0], 1
+                            self._products[val[0]]['bands'][0]['name'], 1
                         )
                         imgout.SetMeta('GIPS_LANDSAT_VERSION', self.version)
                         imgout[0].SetNoData(0.)
