@@ -259,9 +259,10 @@ class Asset(object):
     def updated(self, newasset):
         '''
         Compare the version info for this asset (self) to that of newasset.
-        Return true if newasset version is greater.
+        Return whether the newasset version is greater than self's version.
         '''
-        return false
+        raise NotImplementedError("{} driverdoes not support versioning"
+                                  .format(self.Repository.name))
 
     ##########################################################################
     # Child classes should not generally have to override anything below here
@@ -562,7 +563,7 @@ class Asset(object):
             if not os.path.exists(newfilename):
                 # check if another asset exists
                 existing = cls.discover(asset.tile, d, asset.asset)
-                if len(existing) > 0 and (not update or not existing[0].updated(asset)):
+                if len(existing) > 0 and not update:
                     # gatekeeper case:  No action taken because existing assets are in the way
                     VerboseOut('%s: other version(s) already exists:' % bname, 1)
                     for ef in existing:
@@ -572,9 +573,8 @@ class Asset(object):
                     # update case:  Remove existing outdated assets and install the new one
                     VerboseOut('%s: removing other version(s):' % bname, 1)
                     for ef in existing:
-                        assert ef.updated(asset), 'Asset is not updated version'
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
-                        with utils.error_handler('Unable to remove old version ' + ef.filename):
+                        with utils.error_handler('Unable to remove existing file: ' + ef.filename):
                             os.remove(ef.filename)
                     files = glob.glob(os.path.join(tpath, '*'))
                     for f in set(files).difference([ef.filename]):
