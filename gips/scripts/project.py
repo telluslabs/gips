@@ -47,7 +47,7 @@ def main():
 
     with utils.error_handler():
         extents = SpatialExtent.factory(
-            cls, args.site, args.key, args.where, args.tiles, args.pcov,
+            cls, args.site, args.rastermask, args.key, args.where, args.tiles, args.pcov,
             args.ptile
         )
 

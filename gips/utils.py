@@ -33,6 +33,7 @@ import commands
 import shutil
 import traceback
 import datetime
+import numpy as np
 
 import gippy
 from gippy import GeoVector
@@ -448,6 +449,44 @@ def mosaic(images, outfile, vector):
     return crop2vector(imgout, vector)
 
 
+def gridded_mosaic(images, outfile, rastermask):
+    """ Mosaic multiple files to grid and mask specified in rastermask """
+    nd = images[0][0].NoDataValue()
+    mask_img = gippy.GeoImage(rastermask)
+    srs = mask_img.Projection()
+    filenames = [images[0].Filename()]
+    for f in range(1, images.NumImages()):
+        filenames.append(images[f].Filename())
+
+    imgout = gippy.GeoImage(outfile, mask_img,
+                            images[0].DataType(), images[0].NumBands())
+
+    print(filenames)
+    
+    imgout.SetNoData(nd)
+    #imgout.ColorTable(images[0])
+    nddata = np.empty((images[0].NumBands(),
+                       mask_img.YSize(), mask_img.XSize()))
+    nddata[:] = nd
+    imgout.Write(nddata)
+    imgout = None
+
+    # run warp command
+    nodatastr = '-n'
+    cmd = "gdalwarp -t_srs '{}' {} {}".format(
+        srs,
+        " ".join(filenames),
+        outfile
+    )
+    print(cmd)
+    result = commands.getstatusoutput(cmd)
+    verbose_out('{}: {}'.format(cmd, result, 4))
+
+    imgout = gippy.GeoImage(outfile, True)
+    imgout.AddMask(mask_img[0])
+    imgout.Process()
+
+    
 def julian_date(date_and_time, variant=None):
     """Returns the julian date for the given datetime object.
 
