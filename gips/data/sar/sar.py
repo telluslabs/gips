@@ -352,6 +352,11 @@ class sarData(Data):
             'description': 'Sigma nought (radar backscatter coefficient)',
             'assets': ['alos1', 'alos2'],
         },
+        'mask': {
+            'description': ('Mask (0:nodata, 50:water, '
+                            '100:layover, 150:shadow, 255:land)'),
+            'assets': ['alos1', 'alos2'],
+        },
         'linci': {
             'description': 'Incident angles',
             'assets': ['alos1', 'alos2'],
@@ -390,19 +395,25 @@ class sarData(Data):
         for key, val in products.requested.items():
             #fname = os.path.join(self.path, self.basename + '_' + key)
             fname = self.temp_product_filename(sensor, key)
-            if val[0] == 'sign':
+            jo = lambda fps: self.assets[asset]._jaxa_opener(
+                    fps, path=self._temp_proc_dir)
+
+            if val[0] == 'mask':
+                mask = jo(datafiles['mask'])
+                imgout = mask.Process(fname)
+                imgout[0].SetNoData(0)
+                imgout.Process()
+            elif val[0] == 'sign':
                 # extract all data from archive
                 bands = [datafiles[b] for b in ["sl_HH", "sl_HV"] if b in datafiles]
                 # bands = [b for b in datafiles
                 #          if any((b.endswith(sl) for sl in ["sl_HH", "sl_HV"]))
                 # ]
-                jo = lambda fps: self.assets[asset]._jaxa_opener(
-                    fps, path=self._temp_proc_dir)
-
                 img = jo(bands)
                 img.SetNoData(0)
                 mask = jo(datafiles['mask'])
-                img.AddMask(mask[0] == 255)
+                mask[0] = mask[0].BXOR(150.) > 0
+                img.AddMask(mask[0])
                 # apply date mask
                 dateimg = jo(datafiles['date'])
                 dateday = (
@@ -418,16 +429,18 @@ class sarData(Data):
                         self.assets[asset].get_meta_dict()['CF']
                     ).Process(imgout[b])
                 fname = imgout.Filename()
-            if val[0] == 'linci':
+            elif val[0] == 'linci':
                 # Note the linci product DOES NOT mask by date
                 img = gippy.GeoImage(datafiles['linci'])
                 img.Process(fname)
-            if val[0] == 'date':
+            elif val[0] == 'date':
                 # Note the date product DOES NOT mask by date
                 img = gippy.GeoImage(datafiles['date'])
                 img.Process(fname)
+            else:
+                raise Exception('Unrecognized product: ' + key)
             archive_fp = self.archive_temp_path(fname)
-            self.AddFile(sensor, key, fname)
+            self.AddFile(sensor, key, archive_fp)
         # Remove unused files
         # TODO - checking key rather than val[0] (the full product suffix)
         if 'hdr' in datafiles:
