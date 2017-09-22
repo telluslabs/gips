@@ -869,9 +869,11 @@ class Data(object):
         """ Open and return a GeoImage """
         if sensor is None:
             sensor = self.sensors[product]
-        with utils.error_handler('Error reading product ({}, {})'.format(sensor, product)):
+        with utils.error_handler('({}, {}) not found.'.format(sensor, product)):
             fname = self.filenames[(sensor, product)]
-            return gippy.GeoImage(fname)
+        with utils.error_handler('Error opening "{}"'.format(fname)):
+            img = gippy.GeoImage(fname)
+        return img
 
 
     def open_assets(self, product):
