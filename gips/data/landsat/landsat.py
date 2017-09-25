@@ -34,6 +34,8 @@ import tempfile
 import tarfile
 
 import numpy
+# once gippy==1.0, switch to GeoRaster.erode
+from scipy.ndimage import binary_erosion
 
 import gippy
 from gips import __version__ as __gips_version__
@@ -355,6 +357,7 @@ class landsatAsset(Asset):
 
 def unitless_bands(*bands):
     return [{'name': b, 'units': Data._unitless} for b in bands]
+
 
 class landsatData(Data):
     name = 'Landsat'
@@ -735,7 +738,8 @@ class landsatData(Data):
                     nir[nir > 1.0] = 1.0
 
                     ndvi = missing + numpy.zeros_like(red)
-                    ndvi[wvalid] = (nir[wvalid] - red[wvalid])/(nir[wvalid] + red[wvalid])
+                    ndvi[wvalid] = ((nir[wvalid] - red[wvalid]) /
+                                    (nir[wvalid] + red[wvalid]))
 
                     verbose_out("writing " + fname, 2)
                     imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
@@ -763,7 +767,6 @@ class landsatData(Data):
 
                 archive_fp = self.archive_temp_path(fname)
                 self.AddFile(sensor, key, archive_fp)
-
 
         elif asset == 'DN' or asset == 'C1':
 
@@ -860,6 +863,9 @@ class landsatData(Data):
                         # (cc_med or cc_high) iff bit 6
                         # (csc_med or csc_high) iff bit 8
 
+                        # GIPPY 1.0 note: rewrite this whole product after
+                        # adding get_bit method to GeoRaster
+
                         def get_bit(np_array, i):
                             """Return an array with the ith bit extracted from each cell."""
                             return (np_array >> i) & 0b1
@@ -870,15 +876,13 @@ class landsatData(Data):
                             get_bit(npqa, 8)
                         )
 
-                        # We already have an implicit dependency on scipy (from
-                        # Py6S), but life might be more simple if we just move
-                        # the whole cloudmask extraction into gippy.
-                        from scipy import ndimage
-                        np_cloudmask_erroded = ndimage.binary_erosion(
-                            np_cloudmask,
-                            structure=numpy.ones((10, 10), dtype=numpy.uint8),
-                        )
-                        # 
+                        erosion_width = 10
+                        elem = numpy.ones((erosion_width,) * 2, dtype='uint8')
+                        np_cloudmask_eroded = binary_erosion(
+                            np_cloudmask, structure=elem,
+                        ).astype('uint8')
+                        np_cloudmask_eroded *= (npqa != 1)
+                        #
 
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
                         verbose_out("writing " + fname, 2)
@@ -886,10 +890,19 @@ class landsatData(Data):
                             self._products[val[0]]['bands'][0]['name'], 1
                         )
                         imgout.SetMeta('GIPS_LANDSAT_VERSION', self.version)
-                        imgout[0].SetNoData(0.)
+                        imgout.SetMeta('GIPS_C1_ERODED_PIXELS', str(erosion_width))
+
+                        ####################
+                        # GIPPY1.0 note: replace this block with
+                        # imgout[0].set_nodata(0.)
+                        # imout[0].write_raw(np_cloudmask_eroded)
                         imgout[0].Write(
-                            np_cloudmask_erroded.astype(numpy.uint8)
+                            np_cloudmask_eroded
                         )
+                        imgout = None
+                        imgout = gippy.GeoImage(fname, True)
+                        imgout[0].SetNoData(0.)
+                        ####################
                     elif val[0] == 'rad':
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
                         for i in range(0, imgout.NumBands()):
@@ -1320,7 +1333,6 @@ class landsatData(Data):
             # with new version.
             #     In [20]: ascale.min() - 1*0.01298554277169103
             #     Out[20]: -64.927711800095906
-
 
         verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image

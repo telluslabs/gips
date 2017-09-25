@@ -64,6 +64,13 @@ class GIPSParser(argparse.ArgumentParser):
                             default=1, type=int)
         parser.add_argument('--stop-on-error', default=False, action='store_true',
                             help='Do not attempt to continue execution after errors')
+        parser.add_argument(
+            '--chunksize', help='Chunk size in MB', default=128.0, type=float
+        )
+        parser.add_argument(
+            '--numprocs', help='Desired number of processors (if allowed)',
+            default=1, type=int
+        )
         self.parent_parsers.append(parser)
         return parser
 
@@ -101,8 +108,6 @@ class GIPSParser(argparse.ArgumentParser):
             parser = self
         group = parser.add_argument_group('processing options')
         group.add_argument('--overwrite', help='Overwrite existing output file(s)', default=False, action='store_true')
-        group.add_argument('--chunksize', help='Chunk size in MB', default=128.0, type=float)
-        group.add_argument('--numprocs', help='Desired number of processors (if allowed)', default=2, type=int)
         group.add_argument('--format', help='Format for output file', default="GTiff")
         h = ('Don\'t process. Instead, generate batch file with single '
              'gips_process command on each line.  \'overwrite\', '
