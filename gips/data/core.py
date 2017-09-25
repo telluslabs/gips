@@ -255,13 +255,22 @@ class Asset(object):
         self.sensor = ''
         # dictionary of existing products in asset {'product name': [filename(s)]}
         self.products = {}
+        # gips interpretation of the version of the asset
+        self._version = 1
 
     def updated(self, newasset):
         '''
-        Compare the version info for this asset (self) to that of newasset.
-        Return true if newasset version is greater.
+        Return:
+            'newasset' and existing represent the same data (time,space,sensor)
+            AND
+            'newasset' _version greater than existing _version.
+
         '''
-        return false
+        return (self.sensor == newasset.sensor and
+                self.tile == newasset.tile and
+                self.date == newasset.date and
+                self._version < newasset._version)
+
 
     ##########################################################################
     # Child classes should not generally have to override anything below here
