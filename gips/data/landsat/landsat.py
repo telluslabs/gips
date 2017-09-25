@@ -280,6 +280,7 @@ class landsatAsset(Asset):
 
         if self.sensor not in self._sensors.keys():
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
+        self._version = self.version
 
     @classmethod
     def query_service(cls, asset, tile, date):
@@ -351,15 +352,6 @@ class landsatAsset(Asset):
                     os.path.join(stage_dir, granules[0]),
                 )
 
-    def updated(self, newasset):
-        '''
-        Compare the version for this to that of newasset.
-        Return true if newasset version is greater.
-        '''
-        return (self.sensor == newasset.sensor and
-                self.tile == newasset.tile and
-                self.date == newasset.date and
-                self.version < newasset.version)
 
 def unitless_bands(*bands):
     return [{'name': b, 'units': Data._unitless} for b in bands]

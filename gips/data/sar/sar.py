@@ -209,7 +209,7 @@ class sarAsset(Asset):
         self.tile = m.group('tile')
         self.sensor = m.group('satellite') + m.group('mode')
 
-        self.version = int(m.group('serialno'))
+        self._version = int(m.group('serialno'))
 
         self.is_cycle = m.group('year_or_cycle') == 'C'
         self.cyid = int(m.group('cyid'))
