@@ -20,18 +20,20 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
-
 import os
 import datetime
-import gdal
-import numpy
 import glob
 import traceback
+import re
+
+import gdal
+import numpy
 
 import gippy
 from gips.data.core import Repository, Asset, Data
 from gips.utils import File2List, List2File
 from gips import utils
+
 
 class aodRepository(Repository):
     name = 'AOD'
@@ -79,11 +81,12 @@ class aodAsset(Asset):
         'MOD': {'description': 'MODIS Terra'},
         #'MYD': {'description': 'MODIS Aqua'},
     }
+    _host = 'ladsweb.nascom.nasa.gov'
     _assets = {
         'MOD08': {
             'pattern': r'^MOD08_D3.+?hdf$',
             'startdate': datetime.date(2000, 2, 18),
-            'url': 'ladsweb.nascom.nasa.gov/allData/6/MOD08_D3',
+            'path': '/allData/6/MOD08_D3',
             'latency': -7,
         },
         #'MYD08': {
@@ -131,9 +134,41 @@ class aodAsset(Asset):
         return datafiles
 
     @classmethod
+    def ftp_connect(cls, asset, date):
+        """As super, but make the working dir out of (asset, date)."""
+        wd = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%j'))
+        return super(aodAsset, cls).ftp_connect(wd)
+
+    @classmethod
+    def query_provider(cls, asset, tile, date):
+        """Query the data provider for files matching the arguments.
+
+        Returns (filename, url), or (None, None) if nothing found.
+        """
+        utils.verbose_out('{}: query tile {} for {}'.format(asset, tile, date), 3)
+        if asset not in cls._assets:
+            raise ValueError('{} has no defined asset for {}'.format(cls.Repository.name, asset))
+        with utils.error_handler("Error querying " + cls._host, continuable=True):
+            ftp = cls.ftp_connect(asset, date)
+            filenames = [fn for fn in ftp.nlst('*')
+                         if re.match(cls._assets[asset]['pattern'], fn)]
+            ftp.quit()
+            if len(filenames) > 1: # 0 assets happens all the time
+                raise ValueError("Expected one asset, found {}".format(len(filenames)))
+            return filenames[0], None # urls are not relevant for ftp
+        return None, None
+
+    @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
-        cls.fetch_ftp(asset, tile, date)
+        fname, _ = cls.query_provider(asset, tile, date)
+        if fname is None:
+            return []
+        stage_fp = os.path.join(cls.Repository.path('stage'), fname)
+        ftp = cls.ftp_connect(asset, date)
+        ftp.retrbinary('RETR ' + fname, open(stage_fp, "wb").write)
+        ftp.quit()
+        return [stage_fp]
 
     #@classmethod
     #def archive(cls, path='.', recursive=False, keep=False):
@@ -273,7 +308,7 @@ class aodData(Data):
         """ Read single point from mean/var file and return if valid, or mean/var of 3x3 neighborhood """
         if not os.path.exists(filename):
             return (numpy.nan, numpy.nan)
-        try:
+        with utils.error_handler('Unable to read point from {}'.format(filename), continuable=True):
             img = gippy.GeoImage(filename)
             vals = img[0].Read(roi).squeeze()
             variances = img[1].Read(roi)
@@ -291,18 +326,22 @@ class aodData(Data):
                 var = numpy.mean(variances[~numpy.isnan(variances)])
             img = None
             return (val, var)
-        except:
-            # TODO error-handling-fix: read through for refactor, otherwise standard handler
-            utils.verbose_out(traceback.format_exc(), 4)
-            return (numpy.nan, numpy.nan)
+        return (numpy.nan, numpy.nan)
 
     @classmethod
     def get_aod(cls, lat, lon, date, fetch=True):
+        """Returns an aod value for the given lat/lon.
+
+        If the pixel has a no-data value, nearby values are averaged.  If
+        no nearby values are available, it makes an estimate using
+        long-term averages.
+        """
         pixx = int(numpy.round(float(lon) + 179.5))
         pixy = int(numpy.round(89.5 - float(lat)))
         roi = gippy.Recti(pixx - 1, pixy - 1, 3, 3)
         # try reading actual data file first
-        try:
+        aod = numpy.nan
+        with utils.error_handler('Unable to load aod values', continuable=True):
             # this is just for fetching the data
             inv = cls.inventory(dates=date.strftime('%Y-%j'), fetch=fetch, products=['aod'])
             img = inv[date].tiles[cls.Asset.Repository._the_tile].open('aod')
@@ -316,54 +355,60 @@ class aodData(Data):
             if numpy.isnan(aod) and numpy.any(~numpy.isnan(vals)):
                 aod = numpy.mean(vals[~numpy.isnan(vals)])
                 source = 'MODIS (MOD08_D3) spatial average'
-        except Exception:
-            # TODO error-handling-fix: std handler but mind `aod`
-            utils.verbose_out(traceback.format_exc(), 4)
-            aod = numpy.nan
 
-        var = 0
-        totalvar = 0
-
-        day = date.strftime('%j')
         # Calculate best estimate from multiple sources
-        repo = cls.Asset.Repository
-        cpath = repo.path('composites')
         if numpy.isnan(aod):
-            aod = 0.0
-            norm = 0.0
-            cnt = 0
+            day = date.strftime('%j')
+            repo = cls.Asset.Repository
+            cpath = repo.path('composites')
             nodata = -32768
 
             source = 'Weighted estimate using MODIS LTA values'
+
+            def _calculate_estimate(filename):
+                val, var = cls._read_point(filename, roi, nodata)
+                aod = numpy.nan
+                norm = numpy.nan
+
+                # Negative values don't make sense
+                if val < 0:
+                    val = 0
+
+                if var == 0:
+                    # There is only one observation, so make up
+                    # the variance.
+                    if val == 0:
+                        var = 0.15
+                    else:
+                        var = val / 2
+
+                if not numpy.isnan(val) and not numpy.isnan(var):
+                    aod = val / var
+                    norm = 1.0 / var
+                    utils.verbose_out('AOD: LTA-Daily = %s, %s' % (val, var), 3)
+
+                return aod, norm
+
             # LTA-Daily
-            filename = os.path.join(cpath, 'ltad', 'ltad%s.tif' % str(day).zfill(3))
-            val, var = cls._read_point(filename, roi, nodata)
-            var = var if var != 0.0 else val
-            if not numpy.isnan(val) and not numpy.isnan(var):
-                aod = val / var
-                totalvar = var
-                norm = 1.0 / var
-                cnt = cnt + 1
-                utils.verbose_out('AOD: LTA-Daily = %s, %s' % (val, var), 3)
+            filename = os.path.join(cpath, 'ltad', 'ltad%s.tif' % str(day).zfill(4))
+            daily_aod, daily_norm = _calculate_estimate(filename)
 
             # LTA
-            val, var = cls._read_point(os.path.join(cpath, 'lta.tif'), roi, nodata)
-            var = var if var != 0.0 else val
-            if not numpy.isnan(val) and not numpy.isnan(var):
-                aod = aod + val / var
-                totalvar = totalvar + var
-                norm = norm + 1.0 / var
-                cnt = cnt + 1
-                utils.verbose_out('AOD: LTA = %s, %s' % (val, var), 3)
+            lta_aod, lta_norm = _calculate_estimate(os.path.join(cpath, 'lta.tif'))
+
+            if numpy.isnan(lta_aod):
+                raise Exception("Could not retrieve AOD")
+
+            aod = lta_aod
+            norm = lta_norm
+            if not numpy.isnan(daily_aod):
+                aod = aod + daily_aod
+                norm = norm + daily_norm
 
             # TODO - adjacent days
 
             # Final AOD estimate
             aod = aod / norm
-            totalvar = totalvar / cnt
-
-        if numpy.isnan(aod):
-            raise Exception("Could not retrieve AOD")
 
         utils.verbose_out('AOD: Source = %s Value = %s' % (source, aod), 2)
         return (source, aod)

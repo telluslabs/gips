@@ -207,8 +207,12 @@ def find_files(regex, path='.'):
     Only regular files and symbolic links to regular files are returned.
     """
     compiled_re = re.compile(regex)
-    return [os.path.join(path, f) for f in os.listdir(path)
-            if os.path.isfile(os.path.join(path, f)) and compiled_re.match(f)]
+    ret = []
+    for f in os.listdir(path):
+        fpath = os.path.join(path, f)
+        if os.path.isfile(fpath) and compiled_re.match(f):
+            ret.append(fpath)
+    return ret
 
 
 ##############################################################################
@@ -295,7 +299,7 @@ def create_environment_settings(
     cfgfile = os.path.join(gipspath, 'settings.py')
     if src[-1] == 'c':
         src = src[:-1]
-    # try:
+
     if not os.path.exists(cfgfile) or update_config:
         with open(cfgfile, 'w') as fout:
             with open(src, 'r') as fin:

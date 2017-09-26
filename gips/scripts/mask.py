@@ -51,7 +51,9 @@ def main():
 
     # TODO - check that at least 1 of filemask or pmask is supplied
 
-    try:
+    utils.gips_script_setup(None, args.stop_on_error)
+
+    with utils.error_handler('Masking error'):
         VerboseOut(title)
         for projdir in args.projdir:
 
@@ -93,11 +95,7 @@ def main():
                     img = None
             mask_file = None
 
-    except Exception, e:
-        # TODO error-handling-fix: standard script-level handler
-        import traceback
-        VerboseOut(traceback.format_exc(), 4)
-        print 'Masking error: %s' % e
+    utils.gips_exit()
 
 
 if __name__ == "__main__":

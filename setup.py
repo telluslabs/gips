@@ -55,17 +55,22 @@ console_scripts += [
 #  orm - required to use DB based gips
 #   dh - required to run the gips.datahandler
 _lib_requirements = [
-    'gippy>=0.3.8,<0.4.0',
+    'gippy>=0.3.11,<0.4.0',
     'shapely',
     'python-dateutil',
 ]
 _full_requirements = _lib_requirements + [
-    'landsat-util==0.8.0ircwaves0',
+    'homura==0.1.3',
+    'usgs==0.2.1',
     'Py6S>=1.7.0',
     'pysolar==0.6',
     'requests',
     'pydap==3.2',
     'netCDF4',
+    'dbfread==2.0.7',
+    'rios==1.4.3',
+    'python-fmask==0.4.5',
+    'pydap==3.2', 
 ]
 _orm_requirements = _full_requirements + [
     'django==1.10',
@@ -97,8 +102,9 @@ setup(
         'dh-torque': _orm_requirements,
     },
     dependency_links=[
-        'http://github.com/ircwaves/landsat-util/tarball/landsat_util#egg=landsat-util-0.8.0ircwaves0',
-        'http://github.com/Applied-GeoSolutions/gippy/archive/v0.3.9.tar.gz#egg=gippy-0.3.9',
+        'http://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy-0.3.11',
+        'https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3',
+        'https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.4.5.zip#egg=python-fmask-0.4.5',
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,

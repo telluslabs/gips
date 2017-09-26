@@ -46,23 +46,23 @@ DATABASES = {
 EARTHDATA_USER = "$EARTHDATA_USER"
 EARTHDATA_PASSWORD = "$EARTHDATA_PASSWORD"
 
+# For USGS machine-to-machine authentication
+USGS_USER = ""
+USGS_PASS = ""
+
 REPOS = dict()
 
 
 """
-# To enable a data-driver add a `${driver_dir}/settings_template.py` of the
-# form below to the driver
-REPOS['dataname'] = {
-        # REQUIRED: path to top level directory of data
-        'repository': '$TLD/dataname',
-        # OPTIONAL: path to driver directory location
-        #(default to gips/data/dataname/ if not given)
+# to add repository add new key to the REPOS dictionary
+    'dataname': {
+        # path to driver directory location (default to gips/data/dataname/ if not given)
         'driver': '',
-        # OPTIONAL: override location of tiles vector
-        # (default to gips/data/dataname/tiles.shp)
+        # path to top level directory of data
+        'repository': '',
+        # override location of tiles vector (default to gips/data/dataname/tiles.shp)
        'tiles': '',
         #'tiles': 'mydatabase:mydatatype_tiles',        # database format
         #'tiles': '~/randomdir/dataname_tiles.shp'      # file format
     }
-# Driver specific system configurations need to be made manually
 """

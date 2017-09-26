@@ -34,16 +34,20 @@ import tempfile
 import tarfile
 
 import numpy
+# once gippy==1.0, switch to GeoRaster.erode
+from scipy.ndimage import binary_erosion
 
 import gippy
 from gips import __version__ as __gips_version__
 from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
 from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
-from gips.utils import VerboseOut, RemoveFiles, basename, settings
+import gips.atmosphere
+from gips.utils import RemoveFiles, basename, settings, verbose_out
 from gips import utils
 
-from landsat_util import search, downloader
+from usgs import api
+from homura import download
 
 from pdb import set_trace
 
@@ -91,6 +95,8 @@ class landsatAsset(Asset):
         #},
         'LT5': {
             'description': 'Landsat 5',
+            'startdate': datetime(1984, 3, 1),
+            'enddate': datetime(2013, 1, 1),
             'bands': ['1', '2', '3', '4', '5', '6', '7'],
             'oldbands': ['1', '2', '3', '4', '5', '6', '7'],
             'colors': ["BLUE", "GREEN", "RED", "NIR", "SWIR1", "LWIR", "SWIR2"],
@@ -104,6 +110,7 @@ class landsatAsset(Asset):
         },
         'LE7': {
             'description': 'Landsat 7',
+            'startdate': datetime(1999, 4, 15),
             #bands = ['1','2','3','4','5','6_VCID_1','6_VCID_2','7','8']
             'bands': ['1', '2', '3', '4', '5', '6_VCID_1', '7'],
             'oldbands': ['1', '2', '3', '4', '5', '61', '7'],
@@ -117,6 +124,7 @@ class landsatAsset(Asset):
         },
         'LC8': {
             'description': 'Landsat 8',
+            'startdate': datetime(2013, 4, 1),
             'bands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
             'oldbands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
             'colors': ["COASTAL", "BLUE", "GREEN", "RED", "NIR",
@@ -142,13 +150,15 @@ class landsatAsset(Asset):
         },
         'LC8SR': {
             'description': 'Landsat 8 Surface Reflectance',
+            'startdate': datetime(2013, 4, 1),
         }
 
     }
 
-    # TODO - consider assets and sensors relationship ?
     _assets = {
         'DN': {
+            'sensors': ['LT5', 'LE7', 'LC8'],
+            'enddate': datetime(2017, 4, 30),
             'pattern': (
                 r'^L(?P<sensor>[A-Z])(?P<satellie>\d)'
                 r'(?P<path>\d{3})(?P<row>\d{3})'
@@ -157,18 +167,45 @@ class landsatAsset(Asset):
             ),
         },
         'SR': {
+            'sensors': ['LC8SR'],
             'pattern': r'^L.*?-SC.*?\.tar\.gz$',
         },
         'C1': {
+            'sensors': ['LT5', 'LE7', 'LC8'],
             'pattern': (
                 r'^L(?P<sensor>\w)(?P<satellite>\d{2})_'
                 r'(?P<correction_level>.{4})_(?P<path>\d{3})(?P<row>\d{3})_'
+
                 r'(?P<acq_year>\d{4})(?P<acq_month>\d{2})(?P<acq_day>\d{2})_'
                 r'(?P<proc_year>\d{4})(?P<proc_month>\d{2})(?P<proc_day>\d{2})_'
                 r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})\.tar\.gz$'
             ),
+            'latency': 12,
         },
     }
+
+    # Field ids are retrieved with `api.dataset_fields()` call
+    _ee_datasets = {
+        'LANDSAT_8_C1': {
+            'path_field': '20514',
+            'row_field': '20516',
+        },
+        'LANDSAT_ETM_C1': {
+            'path_field': '19884',
+            'row_field': '19887',
+        },
+        'LANDSAT_TM_C1': {
+            'path_field': '19873',
+            'row_field': '19879',
+        },
+    }
+
+    # Set the startdate to the min date of the asset's sensors
+    for asset, asset_info in _assets.iteritems():
+        asset_info['startdate'] = min(
+            [_sensors[sensor]['startdate']
+                for sensor in asset_info['sensors']]
+        )
 
     _defaultresolution = [30.0, 30.0]
 
@@ -178,7 +215,7 @@ class landsatAsset(Asset):
 
         fname = os.path.basename(filename)
 
-        VerboseOut(("fname", fname), 2)
+        verbose_out(("fname", fname), 2)
 
         sr_pattern_re = re.compile(self._assets['SR']['pattern'])
         dn_pattern_re = re.compile(self._assets['DN']['pattern'])
@@ -189,16 +226,15 @@ class landsatAsset(Asset):
         c1_match = c1_pattern_re.match(fname)
 
         if sr_match:
-            VerboseOut('SR asset', 2)
+            verbose_out('SR asset', 2)
             self.asset = 'SR'
             self.sensor = 'LC8SR'
             self.version = int(fname[20:22])
-        elif dn_match:
-            VerboseOut('DN asset', 2)
+            self.tile = fname[3:9]
+            self.date = datetime.strptime(fname[9:16], "%Y%j")
 
-            #self.tile = fname[3:9]
-            #year = fname[9:13]
-            #doy = fname[13:16]
+        elif dn_match:
+            verbose_out('DN asset', 2)
             self.tile = dn_match.group('path') + dn_match.group('row')
             year = dn_match.group('acq_year')
             doy = dn_match.group('acq_day')
@@ -248,41 +284,74 @@ class landsatAsset(Asset):
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
 
     @classmethod
-    def fetch(cls, asset, tile, date):
+    def query_service(cls, asset, tile, date):
+        available = []
 
-        # 'SR' not fetchable at the moment
-        if asset == 'SR':
-            VerboseOut('SR assets are never fetchable', 4)
-            return
-        paths_rows = tile[:3] + "," + tile[3:]
+        if asset in ['DN', 'SR']:
+            verbose_out('Landsat "{}" assets are no longer fetchable'.format(asset), 4)
+            return available
+
+        path = tile[:3]
+        row = tile[3:]
         fdate = date.strftime('%Y-%m-%d')
 
-        s = search.Search()
-        response = s.search(paths_rows=paths_rows, start_date=fdate, end_date=fdate, cloud_max=90)
-        if response['status'] == 'SUCCESS' and response['total'] > 0:
-            VerboseOut('Fetching %s %s %s' % (asset, tile, fdate), 1)
-            if response['total_returned'] != 1:
-                raise Exception('Single date, single location, returned more than one result')
-            result = response['results'][0]
-            cloudpct = result['cloud']
+        username = settings().REPOS['landsat']['username']
+        password = settings().REPOS['landsat']['password']
+        api_key = api.login(username, password)['data']
+        available = []
+        for dataset in cls._ee_datasets.keys():
+            response = api.search(
+                dataset, 'EE',
+                start_date=fdate, end_date=fdate,
+                where={
+                    cls._ee_datasets[dataset]['path_field']: path,
+                    cls._ee_datasets[dataset]['row_field']: row,
+                },
+                api_key=api_key
+            )['data']
+
+            for result in response['results']:
+                available.append({
+                    'basename': result['displayId'] + '.tar.gz',
+                    'sceneID': result['entityId'],
+                    'dataset': dataset,
+                })
+
+        return available
+
+    @classmethod
+    def fetch(cls, asset, tile, date):
+        fdate = date.strftime('%Y-%m-%d')
+        response = cls.query_service(asset, tile, date)
+        if len(response) > 0:
+            verbose_out('Fetching %s %s %s' % (asset, tile, fdate), 1)
+            if len(response) != 1:
+                raise Exception('Single date, single location, '
+                                'returned more than one result')
+            result = response[0]
+            utils.verbose_out(str(response), 4)
             sceneID = result['sceneID']
-            stage_dir = os.path.join(cls.Repository.path(), 'stage')
+            stage_dir = cls.Repository.path('stage')
             sceneIDs = [str(sceneID)]
-            d = downloader.Downloader(download_dir=stage_dir)
-            d.download(sceneIDs)
-            # do the following because the downloaded .bz file has owner/group
-            # settings that cause the GDAL virtual filesystem access to fail
-            bz_path = glob.glob(os.path.join(stage_dir, sceneID + '*'))[0]
-            gz_path = os.path.splitext(bz_path)[0] + ".gz"
-            cmd = "tar xvfj %s -C %s |xargs tar cvfz %s -C %s" % (bz_path, stage_dir, gz_path, stage_dir)
-            VerboseOut("Reformatting bz->gz", 1)
-            result = commands.getstatusoutput(cmd)
-            VerboseOut("removing %s" % bz_path)
-            bands_path = glob.glob(os.path.join(stage_dir, sceneID + '_*.*'))
-            # clean up - the .tar.gz will get moved on archive
-            os.remove(bz_path)
-            for band_path in bands_path:
-                os.remove(band_path)
+
+            username = settings().REPOS['landsat']['username']
+            password = settings().REPOS['landsat']['password']
+            api_key = api.login(username, password)['data']
+            url = api.download(
+                result['dataset'], 'EE', sceneIDs, 'STANDARD', api_key
+            )['data'][0]
+            with utils.make_temp_dir(prefix='dwnld', dir=stage_dir) as dldir:
+                download(url, dldir)
+                granules = os.listdir(dldir)
+                if len(granules) == 0:
+                    raise Exception(
+                        'Download appears to have not produced a file: {}'
+                        .format(str(granules))
+                    )
+                os.rename(
+                    os.path.join(dldir, granules[0]),
+                    os.path.join(stage_dir, granules[0]),
+                )
 
     def updated(self, newasset):
         '''
@@ -294,10 +363,13 @@ class landsatAsset(Asset):
                 self.date == newasset.date and
                 self.version < newasset.version)
 
+def unitless_bands(*bands):
+    return [{'name': b, 'units': Data._unitless} for b in bands]
+
 
 class landsatData(Data):
     name = 'Landsat'
-    version = '0.9.0'
+    version = '1.0.0'
 
     Asset = landsatAsset
 
@@ -306,7 +378,8 @@ class landsatData(Data):
 
     # Group products belong to ('Standard' if not specified)
     _productgroups = {
-        'Index': ['bi', 'evi', 'lswi', 'msavi2', 'ndsi', 'ndvi', 'ndwi', 'satvi'],
+        'Index': ['bi', 'evi', 'lswi', 'msavi2', 'ndsi', 'ndvi', 'ndwi',
+                  'satvi', 'vari'],
         'Tillage': ['ndti', 'crc', 'sti', 'isti'],
         'LC8SR': ['ndvi8sr'],
         'ACOLITE': [
@@ -316,6 +389,7 @@ class landsatData(Data):
         ],
     }
     __toastring = 'toa: use top of the atmosphere reflectance'
+    __visible_bands_union = [color for color in Asset._sensors['LC8']['colors'] if 'LWIR' not in color]
     _products = {
         #'Standard':
         'rad': {
@@ -324,6 +398,8 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            # units given by https://landsat.usgs.gov/landsat-8-l8-data-users-handbook-section-5
+            'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
         'ref': {
             'assets': ['DN', 'C1'],
@@ -331,6 +407,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands(*__visible_bands_union)
         },
         'temp': {
             'assets': ['DN', 'C1'],
@@ -338,6 +415,8 @@ class landsatData(Data):
             'toa': True,
             'startdate': _lt5_startdate,
             'latency': 1,
+            # units given by https://landsat.usgs.gov/landsat-8-l8-data-users-handbook-section-5
+            'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
         'acca': {
             'assets': ['DN', 'C1'],
@@ -351,6 +430,9 @@ class landsatData(Data):
             'toa': True,
             'startdate': _lt5_startdate,
             'latency': 1,
+            # percentage, so unitless, per landsat docs:
+            # https://landsat.usgs.gov/how-percentage-cloud-cover-calculated
+            'bands': unitless_bands('finalmask', 'cloudmask', 'ambclouds', 'pass1'),
         },
         'fmask': {
             'assets': ['DN', 'C1'],
@@ -359,6 +441,16 @@ class landsatData(Data):
             'toa': True,
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('finalmask', 'cloudmask',
+                                    'PCP', 'clearskywater', 'clearskyland'),
+        },
+        'cloudmask': {
+            'assets': ['C1'],
+            'description': 'Cloud (and shadow) mask product based on cloud bits of the quality band',
+            'toa': True,
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('cloudmask'),
         },
         'tcap': {
             'assets': ['DN', 'C1'],
@@ -366,6 +458,7 @@ class landsatData(Data):
             'toa': True,
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6'),
         },
         'dn': {
             'assets': ['DN', 'C1'],
@@ -373,6 +466,7 @@ class landsatData(Data):
             'toa': True,
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
         'volref': {
             'assets': ['DN', 'C1'],
@@ -380,6 +474,8 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            # reflectance is unitless therefore volref should be unitless
+            'bands': unitless_bands(*__visible_bands_union),
         },
         'wtemp': {
             'assets': ['DN', 'C1'],
@@ -388,13 +484,21 @@ class landsatData(Data):
             'toa': True,
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
         'bqa': {
             'assets': ['DN', 'C1'],
-            'description': 'LC8 band quality',
+            # TODO prior description was too long; is this a good-enough short replacement?
+            'description': 'The quality band extracted into separate layers.',
+            # 'description': ('The bit-packed information in the QA bands is translation of binary strings. '
+            # 'As a simple example, the integer value "1" translates to the binary value "0001." The binary value '
+            # '"0001" has 4 bits, written right to left as bits 0 ("1"), 1 ("0"), 2 ("0"), and 3 ("0"). '
+            # 'Each of the bits 0-3 represents a yes/no indication of a physical value.'),
             'toa': True,
             'startdate': _lc8_startdate,
             'latency': 1,
+            'bands': unitless_bands('allgood', 'notfilled', 'notdropped', 'notterrain',
+                                    'notsnow', 'notcirrus', 'notcloud'),
         },
         'bqashadow': {
             'assets': ['DN', 'C1'],
@@ -408,6 +512,7 @@ class landsatData(Data):
             'toa': True,
             'startdate': _lc8_startdate,
             'latency': 1,
+            'bands': unitless_bands('bqashadow'),
         },
         #'Indices': {
         'bi': {
@@ -416,6 +521,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('bi'),
         },
         'evi': {
             'assets': ['DN', 'C1'],
@@ -423,6 +529,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('evi'),
         },
         'lswi': {
             'assets': ['DN', 'C1'],
@@ -430,6 +537,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('lswi'),
         },
         'msavi2': {
             'assets': ['DN', 'C1'],
@@ -437,6 +545,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('msavi2'),
         },
         'ndsi': {
             'assets': ['DN', 'C1'],
@@ -444,6 +553,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('ndsi'),
         },
         'ndvi': {
             'assets': ['DN', 'C1'],
@@ -451,6 +561,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('ndvi'),
         },
         'ndwi': {
             'assets': ['DN', 'C1'],
@@ -458,6 +569,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('ndwi'),
         },
         'satvi': {
             'assets': ['DN', 'C1'],
@@ -465,6 +577,15 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('satvi'),
+        },
+        'vari': {
+            'assets': ['DN', 'C1'],
+            'description': 'Visible Atmospherically Resistant Index',
+            'arguments': [__toastring],
+            'startdate': _lt5_startdate,
+            'latency': 1,
+            'bands': unitless_bands('vari'),
         },
         #'Tillage Indices': {
         'ndti': {
@@ -473,6 +594,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('ndti'),
         },
         'crc': {
             'assets': ['DN', 'C1'],
@@ -480,6 +602,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('crc'),
         },
         'sti': {
             'assets': ['DN', 'C1'],
@@ -487,6 +610,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('sti'),
         },
         'isti': {
             'assets': ['DN', 'C1'],
@@ -494,6 +618,7 @@ class landsatData(Data):
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
             'latency': 1,
+            'bands': unitless_bands('isti'),
         },
         # NEW!!!
         'ndvi8sr': {
@@ -501,246 +626,29 @@ class landsatData(Data):
             'description': 'Normalized Difference Vegetation from LC8SR',
             'startdate': _lc8_startdate,
             'latency': 1,
+            'bands': unitless_bands('ndvi8sr'),
         },
         'landmask': {
             'assets': ['SR'],
             'description': 'Land mask from LC8SR',
             'startdate': _lc8_startdate,
             'latency': 1,
-        },
-        # ACOLITE products
-        'rhow': {
-            'assets': ['DN'],
-            'description': 'Water-Leaving Radiance-Reflectance',
-            'acolite-product': 'rhow_vnir',
-            'acolite-key': 'RHOW',
-            'gain': 0.0001,
-            'offset': 0.,
-            'dtype': 'int16',
-            'toa': True,
-            'startdate': _lt5_startdate,
-            'latency': 1,
-        },
-        # Not sure what the issue is with this product, but it doesn't seem to
-        # work as expected (multiband vis+nir product)
-        # 'rhoam': {
-        #     'assets': ['DN'],
-        #     'description': 'Multi-Scattering Aerosol Reflectance',
-        #     'acolite-product': 'rhoam_vnir',
-        #     'acolite-key': 'RHOAM',
-        #     'dtype': 'int16',
-        #     'toa': True,
-        # },
-        'oc2chl': {
-            'assets': ['DN'],
-            'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 483 & 561',
-            'acolite-product': 'CHL_OC2',
-            'acolite-key': 'CHL_OC2',
-            'gain': 0.0125,
-            'offset': 250.,
-            'dtype': 'int16',
-            'toa': True,
-            'startdate': _lt5_startdate,
-            'latency': 1,
-        },
-        'oc3chl': {
-            'assets': ['DN'],
-            'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561',
-            'acolite-product': 'CHL_OC3',
-            'acolite-key': 'CHL_OC3',
-            'gain': 0.0125,
-            'offset': 250.,
-            'dtype': 'int16',
-            'toa': True,
-            'startdate': _lt5_startdate,
-            'latency': 1,
-        },
-        'fai': {
-            'assets': ['DN'],
-            'description': 'Floating Algae Index',
-            'acolite-product': 'FAI',
-            'acolite-key': 'FAI',
-            'dtype': 'float32',
-            'toa': True,
-            'startdate': _lt5_startdate,
-            'latency': 1,
-        },
-        'acoflags': {
-            'assets': ['DN'],
-            'description': '0 = water 1 = no data 2 = land',
-            'acolite-product': 'FLAGS',
-            'acolite-key': 'FLAGS',
-            'dtype': 'uint8',
-            'toa': True,
-            'startdate': _lt5_startdate,
-            'latency': 1,
-        },
-        'spm655': {
-            'assets': ['DN'],
-            'description': 'Suspended Sediment Concentration 655nm',
-            'acolite-product': 'SPM_NECHAD_655',
-            'acolite-key': 'SPM_NECHAD_655',
-            'offset': 50.,
-            'gain': 0.005,
-            'dtype': 'int16',
-            'toa': True,
-            'startdate': _lt5_startdate,
-            'latency': 1,
-        },
-        'turbidity': {
-            'assets': ['DN'],
-            'description': 'Blended Turbidity',
-            'acolite-product': 'T_DOGLIOTTI',
-            'acolite-key': 'T_DOGLIOTTI',
-            'offset': 50.,
-            'gain': 0.005,
-            'dtype': 'int16',
-            'toa': True,
-            'startdate': _lt5_startdate,
-            'latency': 1,
+            'bands': unitless_bands('landmask'),
         },
     }
 
-    def _process_acolite(self, asset, aco_proc_dir, products):
-        '''
-        TODO: Move this to `gips.atmosphere`.
-        TODO: Ensure this is genericized to work for S2 or Landsat.
-        '''
-        import netCDF4
-        ACOLITEPATHS = {
-            'ACO_DIR': settings().REPOS['landsat']['ACOLITE_DIR'],
-            # N.B.: only seems to work when run from the ACO_DIR
-            'IDLPATH': 'idl',
-            'ACOLITE_BINARY': 'acolite.sav',
-            # TODO: template may be the only piece that needs
-            #       to be moved for driver-independence.
-            'SETTINGS_TEMPLATE': os.path.join(
-                os.path.dirname(__file__),
-                'acolite.cfg'
-            )
-        }
-        ACOLITE_NDV = 1.875 * 2 ** 122
-        # mapping from dtype to gdal type and nodata value
-        IMG_PARAMS = {
-            'float32': (gippy.GDT_Float32, -32768.),
-            'int16': (gippy.GDT_Int16, -32768),
-            'uint8': (gippy.GDT_Byte, 1),
-        }
-        imeta = products.pop('meta')
+    gips.atmosphere.add_acolite_product_dicts(_products, 'DN', 'C1')
 
-        # TODO: add 'outdir' to `gips.data.core.Asset.extract` method
-        # EXTRACT ASSET
-        tar = tarfile.open(asset.filename)
-        tar.extractall(aco_proc_dir)
-
-        # STASH PROJECTION AND GEOTRANSFORM (in a GeoImage)
-        exts = re.compile(r'.*\.((jp2)|(tif)|(TIF))$')
-        tif = filter(
-            lambda de: exts.match(de),
-            os.listdir(aco_proc_dir)
-        )[0]
-        tmp = gippy.GeoImage(os.path.join(aco_proc_dir, tif))
-
-        # PROCESS SETTINGS TEMPLATE FOR SPECIFIED PRODUCTS
-        settings_path = os.path.join(aco_proc_dir, 'settings.cfg')
-        template_path = ACOLITEPATHS.pop('SETTINGS_TEMPLATE')
-        acolite_products = ','.join(
-            [
-                products[k]['acolite-product']
-                for k in products
-                if k != 'acoflags'  # acoflags is always internally generated
-                                    # by ACOLITE,
-            ]
+    for product, product_info in _products.iteritems():
+        product_info['startdate'] = min(
+            [landsatAsset._assets[asset]['startdate']
+                for asset in product_info['assets']]
         )
-        if len(acolite_products) == 0:
-            raise Exception(
-                "ACOLITE: Must specify at least 1 product.\n"
-                "'acoflags' cannot be generated on its own.",
-            )
-        with open(template_path, 'r') as aco_template:
-            with open(settings_path, 'w') as aco_settings:
-                for line in aco_template:
-                    aco_settings.write(
-                        re.sub(
-                            r'GIPS_LANDSAT_PRODUCTS',
-                            acolite_products,
-                            line
-                        )
-                    )
-        ACOLITEPATHS['ACOLITE_SETTINGS'] = settings_path
 
-        # PROCESS VIA ACOLITE IDL CALL
-        cmd = (
-            ('cd {ACO_DIR} ; '
-             '{IDLPATH} -IDL_CPU_TPOOL_NTHREADS 1 '
-             '-rt={ACOLITE_BINARY} '
-             '-args settings={ACOLITE_SETTINGS} '
-             'run=1 '
-             'output={OUTPUT} image={IMAGES}')
-            .format(
-                OUTPUT=aco_proc_dir,
-                IMAGES=aco_proc_dir,
-                **ACOLITEPATHS
-            )
-        )
-        utils.verbose_out('Running: {}'.format(cmd), 2)
-        status, output = commands.getstatusoutput(cmd)
-        if status != 0:
-            raise Exception(cmd, output)
-        aco_nc_file = glob.glob(os.path.join(aco_proc_dir, '*_L2.nc'))[0]
-        dsroot = netCDF4.Dataset(aco_nc_file)
-
-        # EXTRACT IMAGES FROM NETCDF AND
-        # COMBINE MULTI-IMAGE PRODUCTS INTO
-        # A MULTI-BAND TIF, ADD METADATA, and MOVE INTO TILES
-        prodout = dict()
-
-        for key in products:
-            ofname = products[key]['fname']
-            aco_key = products[key]['acolite-key']
-            bands = list(filter(
-                lambda x: str(x) == aco_key or x.startswith(aco_key),
-                dsroot.variables.keys()
-            ))
-            npdtype = products[key]['dtype']
-            dtype, missing = IMG_PARAMS[npdtype]
-            gain = products[key].get('gain', 1.0)
-            offset = products[key].get('offset', 0.0)
-            imgout = gippy.GeoImage(ofname, tmp, dtype, len(bands))
-            # # TODO: add units to products dictionary and use here.
-            # imgout.SetUnits(products[key]['units'])
-            pmeta = dict()
-            pmeta.update(imeta)
-            pmeta = {
-                mdi: products[key][mdi]
-                for mdi in ['acolite-key', 'description']
-            }
-            pmeta['source_asset'] = os.path.basename(asset.filename)
-            imgout.SetMeta(pmeta)
-            for i, b in enumerate(bands):
-                imgout.SetBandName(str(b), i + 1)
-
-            for i, b in enumerate(bands):
-                var = dsroot.variables[b][:]
-                arr = numpy.array(var)
-                if hasattr(dsroot.variables[b], '_FillValue'):
-                    fill = dsroot.variables[b]._FillValue
-                else:
-                    fill = ACOLITE_NDV
-                mask = arr != fill
-                arr[numpy.invert(mask)] = missing
-                # if key == 'rhow':
-                #     set_trace()
-                arr[mask] = ((arr[mask] - offset) / gain)
-                imgout[i].Write(arr.astype(npdtype))
-
-            prodout[key] = imgout.Filename()
-            imgout = None
-            imgout = gippy.GeoImage(ofname, True)
-            imgout.SetGain(gain)
-            imgout.SetOffset(offset)
-            imgout.SetNoData(missing)
-        return prodout
+        if 'C1' in product_info['assets']:
+            product_info['latency'] = landsatAsset._assets['C1']['latency']
+        else:
+            product_info['latency'] = float("inf")
 
     def _process_indices(self, image, metadata, sensor, indices):
         """Process the given indices and add their files to the inventory.
@@ -774,17 +682,24 @@ class landsatData(Data):
 
         start = datetime.now()
 
-        assets = set()
+        assets = set() # assets needed for this process() run
         for key, val in products.requested.items():
             assets.update(self._products[val[0]]['assets'])
 
         if assets == set(['C1', 'DN']):
-            asset = list(assets.intersection(self.assets.keys()))[0]
+            if 'C1' in self.assets: # prefer C1
+                asset = 'C1'
+            elif 'DN' in self.assets:
+                asset = 'DN'
+            else:
+                raise ValueError(
+                    'No valid asset found for C1 nor DN for {} {}'.format(
+                        self.basename))
         else:
-            if len(assets) != 1:
-                raise Exception('This driver does not support creation of products'
-                                ' from different Assets at the same time')
-
+            if len(assets) > 1:
+                # TODO document the reason why not
+                raise ValueError("Cannot create products from"
+                                 " this combination of assets:  {}".format(assets))
             asset = list(assets)[0]
 
         # TODO: De-hack this
@@ -831,9 +746,10 @@ class landsatData(Data):
                     nir[nir > 1.0] = 1.0
 
                     ndvi = missing + numpy.zeros_like(red)
-                    ndvi[wvalid] = (nir[wvalid] - red[wvalid])/(nir[wvalid] + red[wvalid])
+                    ndvi[wvalid] = ((nir[wvalid] - red[wvalid]) /
+                                    (nir[wvalid] + red[wvalid]))
 
-                    VerboseOut("writing " + fname, 2)
+                    verbose_out("writing " + fname, 2)
                     imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
                     imgout.SetNoData(-9999.)
                     imgout.SetOffset(0.0)
@@ -852,14 +768,13 @@ class landsatData(Data):
                     cfmask[cfmask == 0] = 1
                     cfmask[cfmask == 2] = 0
 
-                    VerboseOut("writing " + fname, 2)
+                    verbose_out("writing " + fname, 2)
                     imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
                     imgout.SetBandName('Land mask', 1)
                     imgout[0].Write(cfmask)
 
                 archive_fp = self.archive_temp_path(fname)
                 self.AddFile(sensor, key, archive_fp)
-
 
         elif asset == 'DN' or asset == 'C1':
 
@@ -946,6 +861,56 @@ class landsatData(Data):
                         if len(val) >= 3:
                             tolerance, dilation = [int(v) for v in val[1:3]]
                         imgout = Fmask(reflimg, fname, tolerance, dilation)
+
+                    elif val[0] == 'cloudmask':
+                        qaimg = self._readqa()
+                        npqa = qaimg.Read()  # read image file into numpy array
+                        # https://landsat.usgs.gov/collectionqualityband
+                        # cloudmaskmask = (cloud and (cc_med or cc_high)) or csc_med or csc_high
+                        # cloud iff bit 4
+                        # (cc_med or cc_high) iff bit 6
+                        # (csc_med or csc_high) iff bit 8
+
+                        # GIPPY 1.0 note: rewrite this whole product after
+                        # adding get_bit method to GeoRaster
+
+                        def get_bit(np_array, i):
+                            """Return an array with the ith bit extracted from each cell."""
+                            return (np_array >> i) & 0b1
+
+                        np_cloudmask = numpy.logical_not(
+                            get_bit(npqa, 4) &
+                            get_bit(npqa, 6) |
+                            get_bit(npqa, 8)
+                        )
+
+                        erosion_width = 10
+                        elem = numpy.ones((erosion_width,) * 2, dtype='uint8')
+                        np_cloudmask_eroded = binary_erosion(
+                            np_cloudmask, structure=elem,
+                        ).astype('uint8')
+                        np_cloudmask_eroded *= (npqa != 1)
+                        #
+
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                        verbose_out("writing " + fname, 2)
+                        imgout.SetBandName(
+                            self._products[val[0]]['bands'][0]['name'], 1
+                        )
+                        imgout.SetMeta('GIPS_LANDSAT_VERSION', self.version)
+                        imgout.SetMeta('GIPS_C1_ERODED_PIXELS', str(erosion_width))
+
+                        ####################
+                        # GIPPY1.0 note: replace this block with
+                        # imgout[0].set_nodata(0.)
+                        # imout[0].write_raw(np_cloudmask_eroded)
+                        imgout[0].Write(
+                            np_cloudmask_eroded
+                        )
+                        imgout = None
+                        imgout = gippy.GeoImage(fname, True)
+                        imgout[0].SetNoData(0.)
+                        ####################
                     elif val[0] == 'rad':
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
                         for i in range(0, imgout.NumBands()):
@@ -957,7 +922,8 @@ class landsatData(Data):
                                 img[col].Process(imgout[col])
                         else:
                             for col in visbands:
-                                ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]).Process(imgout[col])
+                                ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
+                                        ).Process(imgout[col])
                         # Mask out any pixel for which any band is nodata
                         #imgout.ApplyMask(img.DataMask())
                     elif val[0] == 'ref':
@@ -1032,8 +998,10 @@ class landsatData(Data):
                             dt = self.metadata['datetime']
                             atmos = MODTRAN(m['bandnum'], m['wvlen1'], m['wvlen2'], dt, lat, lon, True)
                             e = 0.95
-                            band = (tmpimg[col] - (atmos.output[1] + (1 - e) * atmos.output[2])) / (atmos.output[0] * e)
-                            band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)) * meta[col]['K2'] - 273.15
+                            band = (tmpimg[col] - (atmos.output[1] + (1 - e) * atmos.output[2])
+                                    ) / (atmos.output[0] * e)
+                            band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
+                                    ) * meta[col]['K2'] - 273.15
                             band.Process(imgout[col])
 
                     elif val[0] == 'bqa':
@@ -1119,21 +1087,20 @@ class landsatData(Data):
                         img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
                                 ) * (1.0 / atm6s.results[col][2])
                     self._process_indices(img, md, sensor, indices)
-                VerboseOut(' -> %s: processed %s in %s' % (
+                verbose_out(' -> %s: processed %s in %s' % (
                         self.basename, indices0.keys(), datetime.now() - start), 1)
             img = None
             # cleanup scene directory by removing (most) extracted files
-            try:
+            with utils.error_handler('Error removing extracted files', continuable=True):
                 if settings().REPOS[self.Repository.name.lower()]['extract']:
                     for bname in self.assets[asset].datafiles():
                         if bname[-7:] != 'MTL.txt':
                             files = glob.glob(os.path.join(self.path, bname) + '*')
                             RemoveFiles(files)
-                shutil.rmtree(os.path.join(self.path, 'modtran'))
-            except:
-                # TODO error-handling-fix: continuable handler
-                # VerboseOut(traceback.format_exc(), 4)
-                pass
+                # TODO only wtemp uses MODTRAN; do the dir removal there?
+                modtran_path = os.path.join(self.path, 'modtran')
+                if os.path.exists(modtran_path):
+                    shutil.rmtree(modtran_path)
 
             if groups['ACOLITE']:
                 start = datetime.now()
@@ -1161,15 +1128,12 @@ class landsatData(Data):
                         }
                         amd[p].update(self._products[p])
                         amd[p].pop('assets')
-                    prodout = self._process_acolite(
-                        asset=self.assets[asset],
-                        aco_proc_dir=aco_proc_dir,
-                        products=amd,
-                    )
+                    prodout = gips.atmosphere.process_acolite(
+                            self.assets[asset], aco_proc_dir, amd)
                     endtime = datetime.now()
                     for k, fn in prodout.items():
                         self.AddFile(sensor, k, fn)
-                    VerboseOut(
+                    verbose_out(
                         ' -> {}: processed {} in {}'
                         .format(self.basename, prodout.keys(), endtime - start),
                         1
@@ -1256,11 +1220,11 @@ class landsatData(Data):
         lat = (min(lats) + max(lats)) / 2.0
         lon = (min(lons) + max(lons)) / 2.0
         dt = datetime.strptime(mtl['DATE_ACQUIRED'] + ' ' + mtl['SCENE_CENTER_TIME'][:-2], '%Y-%m-%d %H:%M:%S.%f')
-        try:
+        clouds = 0.0
+        with utils.error_handler('Error reading CLOUD_COVER metadata', continuable=True):
+            # CLOUD_COVER isn't trusted for unknown reasons; previously errors were silenced, but
+            # now maybe explicit error reports will reveal something.
             clouds = float(mtl['CLOUD_COVER'])
-        except:
-            # TODO error-handling-fix: no try-except needed
-            clouds = 0
 
         filenames = []
         gain = []
@@ -1285,12 +1249,6 @@ class landsatData(Data):
             'lon': lon,
         }
 
-        try:
-            qafilename = [f for f in datafiles if '_BQA.TIF' in f][0]
-        except Exception:
-            # TODO error-handling-fix: no try-except needed
-            qafilename = None
-
         self.metadata = {
             'filenames': filenames,
             'gain': gain,
@@ -1299,7 +1257,7 @@ class landsatData(Data):
             'geometry': _geometry,
             'datetime': dt,
             'clouds': clouds,
-            'qafilename': qafilename
+            'qafilename': next((f for f in datafiles if '_BQA.TIF' in f), None) # defaults to None
         }
         #self.metadata.update(smeta)
 
@@ -1384,6 +1342,5 @@ class landsatData(Data):
             #     In [20]: ascale.min() - 1*0.01298554277169103
             #     Out[20]: -64.927711800095906
 
-
-        VerboseOut('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
+        verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image

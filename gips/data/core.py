@@ -46,7 +46,9 @@ from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File,
 from gips import utils
 from ..inventory import dbinv, orm
 
-from pdb import set_trace
+from cookielib import CookieJar
+from urllib import urlencode
+import urllib2
 
 
 """
@@ -124,6 +126,49 @@ class Repository(object):
                 raise Exception('%s is not a valid setting!' % key)
         else:
             return r[key]
+
+    @classmethod
+    def managed_request(cls, url, verbosity=1, debuglevel=0):
+        """Visit the given http URL and return the response.
+
+        Uses auth settings and cls._manager_url, and also follows custom
+        weird redirects (specific to Earthdata servers seemingly).
+        Returns urllib2.urlopen(...), or None if errors are encountered.
+        debuglevel is ultimately passed in to httplib; if >0, http info,
+        such as headers, will be printed on standard out.
+        """
+        username = cls.get_setting('username')
+        password = cls.get_setting('password')
+        manager_url = cls._manager_url
+        password_manager = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        password_manager.add_password(
+            None, manager_url, username, password)
+        cookie_jar = CookieJar()
+        opener = urllib2.build_opener(
+            urllib2.HTTPBasicAuthHandler(password_manager),
+            urllib2.HTTPHandler(debuglevel=debuglevel),
+            urllib2.HTTPSHandler(debuglevel=debuglevel),
+            urllib2.HTTPCookieProcessor(cookie_jar))
+        urllib2.install_opener(opener)
+        try: # try instead of error handler because the exceptions have funny values to unpack
+            request = urllib2.Request(url)
+            response = urllib2.urlopen(request)
+            redirect_url = response.geturl()
+            # some data centers do it differently
+            if "redirect" in redirect_url: # TODO is this the right way to detect redirects?
+                utils.verbose_out('Redirected to ' + redirect_url, 3)
+                redirect_url += "&app_type=401"
+                request = urllib2.Request(redirect_url)
+                response = urllib2.urlopen(request)
+            return response
+        except urllib2.URLError as e:
+            utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
+                              verbosity, sys.stderr)
+            return None
+        except urllib2.HTTPError as e:
+            utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
+                              verbosity, sys.stderr)
+            return None
 
     @classmethod
     def path(cls, subdir=''):
@@ -294,7 +339,7 @@ class Asset(object):
                 return [self.filename]
 
 
-    def extract(self, filenames=tuple()):
+    def extract(self, filenames=tuple(), path=None):
         """Extract given files from asset (if it's a tar or zip).
 
         Extracted files are placed in the same dir as the asset file.
@@ -305,16 +350,16 @@ class Asset(object):
             open_file = zipfile.ZipFile(self.filename)
         else:
             raise Exception('%s is not a valid tar or zip file' % self.filename)
-        path = os.path.dirname(self.filename)
+        if not path:
+            path = os.path.dirname(self.filename)
         if len(filenames) == 0:
             filenames = self.datafiles()
         extracted_files = []
         for f in filenames:
             fname = os.path.join(path, f)
             if not os.path.exists(fname):
-                VerboseOut("Extracting %s" % f, 3)
+                utils.verbose_out("Extracting " + f, 3)
                 open_file.extract(f, path)
-            with utils.error_handler('Error processing ' + fname, continuable=True):
                 # this ensures we have permissions on extracted files
                 if not os.path.isdir(fname):
                     os.chmod(fname, 0664)
@@ -440,6 +485,17 @@ class Asset(object):
         raise NotImplementedError("Fetch not supported for this data source")
 
     @classmethod
+    def ftp_connect(cls, working_directory):
+        """Connect to an FTP server and chdir according to the args.
+
+        Returns the ftplib connection object."""
+        conn = ftplib.FTP(cls._host)
+        conn.login('anonymous', settings().EMAIL)
+        conn.set_pasv(True)
+        conn.cwd(working_directory)
+        return conn
+
+    @classmethod
     def fetch_ftp(cls, asset, tile, date):
         """ Fetch via FTP """
         url = cls._assets[asset].get('url', '')
@@ -448,24 +504,18 @@ class Asset(object):
         VerboseOut('%s: fetch tile %s for %s' % (asset, tile, date), 3)
         ftpurl = url.split('/')[0]
         ftpdir = url[len(ftpurl):]
-        try:
+        with utils.error_handler("Error downloading from {}".format(ftpurl)):
             ftp = ftplib.FTP(ftpurl)
             ftp.login('anonymous', settings().EMAIL)
             pth = os.path.join(ftpdir, date.strftime('%Y'), date.strftime('%j'))
             ftp.set_pasv(True)
             ftp.cwd(pth)
 
-            filenames = []
-            ftp.retrlines('LIST', filenames.append)
-
             for f in ftp.nlst('*'):
                 VerboseOut("Downloading %s" % f, 2)
-                ftp.retrbinary('RETR %s' % f, open(os.path.join(cls.Repository.path('stage'), f), "wb").write)
+                ftp.retrbinary('RETR %s' % f,
+                               open(os.path.join(cls.Repository.path('stage'), f), "wb").write)
             ftp.close()
-        except Exception, e:
-            # TODO error-handling-fix: use with handler() instead
-            VerboseOut(traceback.format_exc(), 4)
-            raise Exception("Error downloading: %s" % e)
 
     @classmethod
     def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
@@ -716,7 +766,8 @@ class Data(object):
     def __init__(self, tile=None, date=None, path='', search=True):
         """ Find all data and assets for this tile and date.
 
-        search=False will prevent searching for assets via Asset.discover().
+        Note date should be a datetime.date object. search=False will
+        prevent searching for assets via Asset.discover().
         """
         self.id = tile
         self.date = date
@@ -910,7 +961,7 @@ class Data(object):
         for root, dirs, filenames in os.walk(path):
             for filename in filenames:
                 f = os.path.join(root, filename)
-                VerboseOut(f, 2)
+                VerboseOut(f, 4)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
                     with utils.error_handler('Error parsing product date', continuable=True):

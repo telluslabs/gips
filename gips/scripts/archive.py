@@ -43,7 +43,7 @@ def main():
     )
     args = parser.parse_args()
 
-    cls = utils.gips_script_setup(args.command)
+    utils.gips_script_setup(None, args.stop_on_error)
 
     with utils.error_handler('Data archive error'):
         print title
@@ -55,6 +55,8 @@ def main():
             for a in archived_assets:
                 dbinv.update_or_add_asset(asset=a.asset, sensor=a.sensor, tile=a.tile, date=a.date,
                                           name=a.archived_filename, driver=cls.name.lower())
+
+    utils.gips_exit()
 
 
 if __name__ == "__main__":

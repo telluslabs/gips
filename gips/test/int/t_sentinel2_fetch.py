@@ -173,24 +173,17 @@ json_response = """{"feed": {
 }}
 """
 
-expected_tiles = [
-    '18TXK', '18SVA', '18SWJ', '18SXJ', '18SUA', '18SWH', '18SXH', '18SWB', '18SWG', '18SXG',
-    '18SVB', '18SWF', '19TCL', '19TBG', '18SVE', '18SWE', '18SVD', '18SWD', '18SWC', '18SVC',
-    '18TYR', '18RVV', '18TYL', '18TYQ', '18TXL', '18TYS', '18TYM', '18RUV', '18TXM', '19TBF',
-    '18TYN', '18TYP', '18TXN', '19TCK', '19TCJ', '18SXF', '18TXP', '18TYK', '18TWK', '19TCM',
-    '18SVF', '19TBE', '18SUB', '18SWA', '18TXQ', '18SXE', '19TCH', '18SYJ', '18TWL', '18RVU',
-    '19TDL', '18SVG', '18SUC', '18RWV', '18TXR', '19TDM', '19SBD', '18SXD', '18SYH', '19TCG',
-    '18TWM', '18RUU', '18SVH', '19TDK', '18TXS', '18SUD', '18RTV', '18RWU', '18SXC', '18SYG',
-    '19SBC', '18TWN', '19TCF', '18SVJ', '18RTU', '18SUE', '18STA', '19TDJ', '18TYT', '18SXB',
-    '18SYF', '18TWP', '18TXT', '19SBB', '18TVK', '19TCN', '19TCE', '18SUF', '19TEM', '18STB',
-    '18SXA',
-]
+expected_tiles = ['18TYM', '18TYN', '19TCG', '19TBG', '18TYL', '19TBF', '18TWM',
+                  '18TWN', '18TXM', '18TXL', '18TWL', '19TCF', '19TCH', '18TXN']
 
 test_asset_bn = 'S2A_OPER_PRD_MSIL1C_PDMC_20160119T230435_R011_V20160119T155447_20160119T155447.zip'
 
+def build_asset_fp(fn):
+    return os.path.join(os.path.dirname(__file__), 'data', fn)
+
 @pytest.fixture
 def test_asset_fn():
-    return os.path.join(os.path.dirname(__file__), 'data', test_asset_bn)
+    return build_asset_fp(test_asset_bn)
 
 @pytest.fixture
 def fetch_mocks(mocker, test_asset_fn):
@@ -268,12 +261,17 @@ def t_fetch_old_asset_duplicate(fetch_mocks, mocker):
     finally:
         os.path.exists(staged_fn) and os.remove(staged_fn)
 
+# found in the field; dunno why, but it's fetchable even though it only contains one granule:
+strange_asset_bn = 'S2A_OPER_PRD_MSIL1C_PDMC_20161030T191653_R079_V20161030T095132_20161030T095132.zip'
 
-def t_tile_list(test_asset_fn):
+@pytest.mark.parametrize('asset_fp, expected_tiles', (
+    (build_asset_fp(test_asset_bn), expected_tiles),
+    (build_asset_fp(strange_asset_bn), ['31PHN']),
+))
+def t_tile_list(asset_fp, expected_tiles):
     """Use the test asset file to confirm tile_list()."""
-    tiles = sentinel2.sentinel2Asset.tile_list(test_asset_fn)
-    assert expected_tiles == tiles
-
+    actual_tiles = sentinel2.sentinel2Asset.tile_list(asset_fp)
+    assert sorted(expected_tiles) == sorted(actual_tiles)
 
 @pytest.fixture
 def archive_setup(test_asset_fn):

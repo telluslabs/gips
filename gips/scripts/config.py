@@ -29,7 +29,7 @@ import traceback
 import gips
 from gips import __version__ as version
 from gips.parsers import GIPSParser
-from gips.utils import (VerboseOut, create_environment_settings,
+from gips.utils import (create_environment_settings,
     create_user_settings, create_repos, get_data_variables)
 from gips import utils
 from gips.inventory import orm
@@ -131,10 +131,14 @@ def main():
     args = parser.parse_args()
     print title
 
-    utils.gips_script_setup(setup_orm=False)
+    utils.gips_script_setup(
+        driver_string=None, 
+        stop_on_error=args.stop_on_error,
+        setup_orm=False,
+    )
 
     if args.command == 'print':
-        try:
+        with utils.error_handler('Unable to access settings'):
             from gips.utils import settings
             s = settings()
             for v in dir(s):
@@ -142,34 +146,24 @@ def main():
                     print
                     print v
                     exec('pprint.pprint(s.%s)' % v)
-        except Exception as e:
-            # TODO error-handling-fix: standard script-level handler
-            # print traceback.format_exc()
-            print 'Unable to access settings: {}'.format(e)
-            sys.exit(1)
 
     elif args.command == 'env':
         configure_environment(**vars(args))
     elif args.command == 'user':
-        try:
+        with utils.error_handler('Could not create user settings'):
             # first try importing environment settings
             import gips.settings
             cfgfile = create_user_settings()
-        except ImportError:
-            # TODO error-handling-fix: standard script-level handler
-            print 'Could not create user settings: %s' % e
 
-        try:
-            print 'User settings file: %s' % cfgfile
+    if args.command in ('user', 'env'):
+        with utils.error_handler('Could not create repos'):
             print 'Creating repository directories'
             create_repos()
+        with utils.error_handler('Could not migrate database'):
+            print 'Migrating database'
             migrate_database()
-            create_data_variables()
-        except Exception as e:
-            # TODO error-handling-fix: standard script-level handler
-            print traceback.format_exc()
-            print 'Could not create repository directories'
-            sys.exit(1)
+
+    utils.gips_exit()
 
 
 if __name__ == "__main__":
