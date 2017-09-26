@@ -256,6 +256,7 @@ class Asset(object):
         # dictionary of existing products in asset {'product name': [filename(s)]}
         self.products = {}
         # gips interpretation of the version of the asset
+        # (which may differ from 'version' already used by some drivers)
         self._version = 1
 
     def updated(self, newasset):
@@ -572,18 +573,21 @@ class Asset(object):
                 # check if another asset exists
                 existing = cls.discover(asset.tile, d, asset.asset)
                 if len(existing) > 0 and (not update or not existing[0].updated(asset)):
-                    # gatekeeper case:  No action taken because existing assets are in the way
+                    # gatekeeper case:  No action taken because other assets exist
                     VerboseOut('%s: other version(s) already exists:' % bname, 1)
                     for ef in existing:
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
                     otherversions = True
                 elif len(existing) > 0 and update:
-                    # update case:  Remove existing outdated assets and install the new one
+                    # update case:  Remove existing outdated assets
+                    #               and install the new one
                     VerboseOut('%s: removing other version(s):' % bname, 1)
                     for ef in existing:
-                        assert ef.updated(asset), 'Asset is not updated version'
+                        if not ef.updated(asset):
+                            'Asset is not updated version'
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
-                        with utils.error_handler('Unable to remove old version ' + ef.filename):
+                        errmsg = 'Unable to remove existing version: ' + ef.filename
+                        with utils.error_handler(errmsg):
                             os.remove(ef.filename)
                     files = glob.glob(os.path.join(tpath, '*'))
                     for f in set(files).difference([ef.filename]):
