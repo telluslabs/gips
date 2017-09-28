@@ -682,11 +682,7 @@ class landsatData(Data):
 
         start = datetime.now()
 
-        assets = set() # assets needed for this process() run
-        for key, val in products.requested.items():
-            assets.update(self._products[val[0]]['assets'])
-
-        if assets == set(['C1', 'DN']):
+        if set(self.assets.keys()) == set(['C1', 'DN']):
             if 'C1' in self.assets: # prefer C1
                 asset = 'C1'
             elif 'DN' in self.assets:
@@ -696,11 +692,11 @@ class landsatData(Data):
                     'No valid asset found for C1 nor DN for {} {}'.format(
                         self.basename))
         else:
-            if len(assets) > 1:
+            if len(self.assets) > 1:
                 # TODO document the reason why not
                 raise ValueError("Cannot create products from"
                                  " this combination of assets:  {}".format(assets))
-            asset = list(assets)[0]
+            asset = self.assets.keys()[0]
 
         # TODO: De-hack this
         # Better approach, but needs some thought, is to loop over assets
