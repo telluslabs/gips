@@ -122,8 +122,10 @@ class SIXS():
         # TODO - dynamically adjust AeroProfile?
         s.aero_profile = AeroProfile.PredefinedType(AeroProfile.Continental)
 
-        self.aod = aodData.get_aod(geometry['lat'], geometry['lon'], date_time.date())
-
+        self.aod = aodData.get_aod(
+            geometry['lat'], geometry['lon'], date_time.date()
+        )
+        
         # sixs throws IEEE_UNDERFLOW_FLAG IEEE_DENORMAL for small aod.
         # and if using a predefined AeroProfile, visible or aot550 must be
         # specified.   Small here was determined emprically on my laptop, and
