@@ -267,7 +267,8 @@ class Asset(object):
             'newasset' _version greater than existing _version.
 
         '''
-        return (self.sensor == newasset.sensor and
+        return (self.asset == newasset.asset and
+                self.sensor == newasset.sensor and
                 self.tile == newasset.tile and
                 self.date == newasset.date and
                 self._version < newasset._version)
