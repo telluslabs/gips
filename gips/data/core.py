@@ -572,6 +572,9 @@ class Asset(object):
             newfilename = os.path.join(tpath, bname)
             if not os.path.exists(newfilename):
                 # check if another asset exists
+                # QUESTION: can it be that len(existing) > 1?
+                # IF NOT, then seems like some of these for-loops could go, and
+                # the overall logic could be simplified.
                 existing = cls.discover(asset.tile, d, asset.asset)
                 if len(existing) > 0 and (not update or not existing[0].updated(asset)):
                     # gatekeeper case:  No action taken because other assets exist
@@ -585,7 +588,14 @@ class Asset(object):
                     VerboseOut('%s: removing other version(s):' % bname, 1)
                     for ef in existing:
                         if not ef.updated(asset):
-                            'Asset is not updated version'
+                            utils.verbose_out(
+                                'Asset {} is not updated version of {}.'
+                                .format(ef.filename, asset.filename) +
+                                ' Remove existing asset to replace.', 2
+                            )
+                            # NOTE: This return makes sense iff len(existing)
+                            # cannot be greater than 1
+                            return (None, 0)
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
                         errmsg = 'Unable to remove existing version: ' + ef.filename
                         with utils.error_handler(errmsg):

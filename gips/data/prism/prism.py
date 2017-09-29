@@ -116,7 +116,7 @@ class prismAsset(Asset):
         if 0 == len(filenames):
             return None, None
         # choose the one that has the most favorable stability & version values (usually only one)
-        return max(filenames, key=(lambda x: prismAsset(x).ver_stab)), None
+        return max(filenames, key=(lambda x: prismAsset(x)._version)), None
 
 
     @classmethod
