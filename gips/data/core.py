@@ -859,7 +859,9 @@ class Data(object):
         assets = self._products[product]['assets']
         filenames = []
         for asset in assets:
-            filenames.extend(self.assets[asset].datafiles())
+            emsg = 'no "{}" assets here'.format(asset)
+            with utils.error_handler(emsg, continuable=True):
+                filenames.extend(self.assets[asset].datafiles())
         if len(filenames) == 0:
             VerboseOut('There are no available assets on %s for tile %s' % (str(self.date), str(self.id), ), 3)
             return None
