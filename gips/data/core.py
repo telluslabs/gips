@@ -572,10 +572,16 @@ class Asset(object):
             newfilename = os.path.join(tpath, bname)
             if not os.path.exists(newfilename):
                 # check if another asset exists
-                # QUESTION: can it be that len(existing) > 1?
-                # IF NOT, then seems like some of these for-loops could go, and
-                # the overall logic could be simplified.
+                # QUESTION: Can it be that len(existing) > 1?
+                # Not changing much now, but adding an immediate assert to
+                # verify that there can only be one-or-none of an asset in the
+                # archive (2017-09-29).  Assuming it isn't a problem, we could
+                # drop some of these for-loops.
                 existing = cls.discover(asset.tile, d, asset.asset)
+                assert len(existing) in (0, 1), (
+                    'Apparently there can be more than one asset file for a'
+                    ' given ({}, {}, {}).'.format(asset.tile, d, asset.asset)
+                )
                 if len(existing) > 0 and (not update or not existing[0].updated(asset)):
                     # gatekeeper case:  No action taken because other assets exist
                     VerboseOut('%s: other version(s) already exists:' % bname, 1)
