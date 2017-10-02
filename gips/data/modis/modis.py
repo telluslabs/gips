@@ -177,7 +177,7 @@ class modisAsset(Asset):
 
         collection = int(parts[3])
         file_version = int(parts[4])
-        self.version = float('{}.{}'.format(collection, file_version))
+        self._version = float('{}.{}'.format(collection, file_version))
 
 
     @classmethod
@@ -249,17 +249,6 @@ class modisAsset(Asset):
                 retrieved_filenames.append(outpath)
 
         return retrieved_filenames
-
-
-    def updated(self, newasset):
-        '''
-        Compare the version for this to that of newasset.
-        Return true if newasset version is greater.
-        '''
-        return (self.sensor == newasset.sensor and
-                self.tile == newasset.tile and
-                self.date == newasset.date and
-                self.version < newasset.version)
 
 
 class modisData(Data):

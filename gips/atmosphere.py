@@ -122,8 +122,18 @@ class SIXS():
         # TODO - dynamically adjust AeroProfile?
         s.aero_profile = AeroProfile.PredefinedType(AeroProfile.Continental)
 
-        self.aod = aodData.get_aod(geometry['lat'], geometry['lon'], date_time.date())
-        s.aot550 = self.aod[1]
+        self.aod = aodData.get_aod(
+            geometry['lat'], geometry['lon'], date_time.date()
+        )
+        
+        # sixs throws IEEE_UNDERFLOW_FLAG IEEE_DENORMAL for small aod.
+        # and if using a predefined AeroProfile, visible or aot550 must be
+        # specified.   Small here was determined emprically on my laptop, and
+        # visible = 1000 km is essentially setting the visibility to infinite.
+        if self.aod[1] < 0.0103:
+            s.visible = 1000
+        else:
+            s.aot550 = self.aod[1]
 
         # Other settings
         s.ground_reflectance = GroundReflectance.HomogeneousLambertian(GroundReflectance.GreenVegetation)
