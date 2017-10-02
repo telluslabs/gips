@@ -62,7 +62,11 @@ def main():
     args = parser.parse_args()
     print title
 
-    utils.gips_script_setup(None, args.stop_on_error) # Note no driver string for gips_config
+    utils.gips_script_setup(
+        driver_string=None,  # NOTE: no driver string for gips_config
+        stop_on_error=args.stop_on_error,
+        setup_orm=False,  # NOTE: ORM cannot be setup before `gips_config env`
+    )                     # has been run
 
     if args.command == 'print':
         with utils.error_handler('Unable to access settings'):
