@@ -70,7 +70,7 @@ setup(
     dependency_links=[
         'https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3',
         'https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.4.5.zip#egg=python-fmask-0.4.5',
-        'http://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy-0.3.11',
+        'https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy-0.3.11',
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
