@@ -284,13 +284,24 @@ class Asset(object):
         self.sensor = ''
         # dictionary of existing products in asset {'product name': [filename(s)]}
         self.products = {}
+        # gips interpretation of the version of the asset
+        # (which may differ from 'version' already used by some drivers)
+        self._version = 1
 
     def updated(self, newasset):
         '''
-        Compare the version info for this asset (self) to that of newasset.
-        Return true if newasset version is greater.
+        Return:
+            'newasset' and existing represent the same data (time,space,sensor)
+            AND
+            'newasset' _version greater than existing _version.
+
         '''
-        return false
+        return (self.asset == newasset.asset and
+                self.sensor == newasset.sensor and
+                self.tile == newasset.tile and
+                self.date == newasset.date and
+                self._version < newasset._version)
+
 
     ##########################################################################
     # Child classes should not generally have to override anything below here
@@ -586,49 +597,65 @@ class Asset(object):
         for d in dates:
             tpath = cls.Repository.data_path(asset.tile, d)
             newfilename = os.path.join(tpath, bname)
-            if os.path.exists(newfilename):
-                utils.verbose_out(
-                        "Unexpected asset file detected in archive, attempting to quarantine.",
-                        1, sys.stderr)
-                qfn = cls.Repository.quarantine_file(newfilename)
-                utils.verbose_out("Unexpected asset file quarantined to " + qfn, 1, sys.stderr)
-            # check if another asset exists
-            existing = cls.discover(asset.tile, d, asset.asset)
-            if len(existing) > 0 and (not update or not existing[0].updated(asset)):
-                # gatekeeper case:  No action taken because existing assets are in the way
-                VerboseOut('%s: other version(s) already exists:' % bname, 1)
-                for ef in existing:
-                    VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
-                otherversions = True
-            elif len(existing) > 0 and update:
-                # update case:  Remove existing outdated assets and install the new one
-                VerboseOut('%s: removing other version(s):' % bname, 1)
-                for ef in existing:
-                    assert ef.updated(asset), 'Asset is not updated version'
-                    VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
-                    with utils.error_handler('Unable to remove old version ' + ef.filename):
-                        os.remove(ef.filename)
-                files = glob.glob(os.path.join(tpath, '*'))
-                for f in set(files).difference([ef.filename]):
-                    msg = 'Unable to remove product {} from {}'.format(f, tpath)
-                    with utils.error_handler(msg, continuable=True):
-                        os.remove(f)
-                with utils.error_handler('Problem adding {} to archive'.format(filename)):
-                    os.link(os.path.abspath(filename), newfilename)
-                    asset.archived_filename = newfilename
-                    VerboseOut(bname + ' -> ' + newfilename, 2)
-                    numlinks = numlinks + 1
+            if not os.path.exists(newfilename):
+                # check if another asset exists
+                # QUESTION: Can it be that len(existing) > 1?
+                # Not changing much now, but adding an immediate assert to
+                # verify that there can only be one-or-none of an asset in the
+                # archive (2017-09-29).  Assuming it isn't a problem, we could
+                # drop some of these for-loops.
+                existing = cls.discover(asset.tile, d, asset.asset)
+                assert len(existing) in (0, 1), (
+                    'Apparently there can be more than one asset file for a'
+                    ' given ({}, {}, {}).'.format(asset.tile, d, asset.asset)
+                )
+                if len(existing) > 0 and (not update or not existing[0].updated(asset)):
+                    # gatekeeper case:  No action taken because other assets exist
+                    VerboseOut('%s: other version(s) already exists:' % bname, 1)
+                    for ef in existing:
+                        VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
+                    otherversions = True
+                elif len(existing) > 0 and update:
+                    # update case:  Remove existing outdated assets
+                    #               and install the new one
+                    VerboseOut('%s: removing other version(s):' % bname, 1)
+                    for ef in existing:
+                        if not ef.updated(asset):
+                            utils.verbose_out(
+                                'Asset {} is not updated version of {}.'
+                                .format(ef.filename, asset.filename) +
+                                ' Remove existing asset to replace.', 2
+                            )
+                            # NOTE: This return makes sense iff len(existing)
+                            # cannot be greater than 1
+                            return (None, 0)
+                        VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
+                        errmsg = 'Unable to remove existing version: ' + ef.filename
+                        with utils.error_handler(errmsg):
+                            os.remove(ef.filename)
+                    files = glob.glob(os.path.join(tpath, '*'))
+                    for f in set(files).difference([ef.filename]):
+                        msg = 'Unable to remove product {} from {}'.format(f, tpath)
+                        with utils.error_handler(msg, continuable=True):
+                            os.remove(f)
+                    with utils.error_handler('Problem adding {} to archive'.format(filename)):
+                        os.link(os.path.abspath(filename), newfilename)
+                        asset.archived_filename = newfilename
+                        VerboseOut(bname + ' -> ' + newfilename, 2)
+                        numlinks = numlinks + 1
+
+                else:
+                    # 'normal' case:  Just add the asset to the archive; no other work needed
+                    if not os.path.exists(tpath):
+                        with utils.error_handler('Unable to make data directory ' + tpath):
+                            os.makedirs(tpath)
+                    with utils.error_handler('Problem adding {} to archive'.format(filename)):
+                        os.link(os.path.abspath(filename), newfilename)
+                        asset.archived_filename = newfilename
+                        VerboseOut(bname + ' -> ' + newfilename, 2)
+                        numlinks = numlinks + 1
             else:
-                # 'normal' case:  Just add the asset to the archive; no other work needed
-                if not os.path.exists(tpath):
-                    with utils.error_handler('Unable to make data directory ' + tpath):
-                        os.makedirs(tpath)
-                with utils.error_handler('Problem adding {} to archive'.format(filename)):
-                    # needs full path
-                    os.link(os.path.abspath(filename), newfilename)
-                    asset.archived_filename = newfilename
-                    VerboseOut(bname + ' -> ' + newfilename, 2)
-                    numlinks = numlinks + 1
+                VerboseOut('%s already in archive' % filename, 2)
         if otherversions and numlinks == 0:
             return (asset, -1)
         else:
@@ -885,12 +912,13 @@ class Data(object):
             dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
                                         tile=self.id, date=self.date, name=filename)
 
-
     def asset_filenames(self, product):
         assets = self._products[product]['assets']
         filenames = []
         for asset in assets:
-            filenames.extend(self.assets[asset].datafiles())
+            emsg = 'no "{}" assets here'.format(asset)
+            with utils.error_handler(emsg, continuable=True):
+                filenames.extend(self.assets[asset].datafiles())
         if len(filenames) == 0:
             VerboseOut('There are no available assets on %s for tile %s' % (str(self.date), str(self.id), ), 3)
             return None
@@ -900,9 +928,11 @@ class Data(object):
         """ Open and return a GeoImage """
         if sensor is None:
             sensor = self.sensors[product]
-        with utils.error_handler('Error reading product ({}, {})'.format(sensor, product)):
+        with utils.error_handler('({}, {}) not found.'.format(sensor, product)):
             fname = self.filenames[(sensor, product)]
-            return gippy.GeoImage(fname)
+        with utils.error_handler('Error opening "{}"'.format(fname)):
+            img = gippy.GeoImage(fname)
+        return img
 
 
     def open_assets(self, product):
@@ -1004,68 +1034,6 @@ class Data(object):
             else:
                 assets.append('')
         return set(assets)
-
-    @classmethod
-    def query_service(cls, products, tiles, textent, update=False, force=False, grouped=False):
-        """
-        Returns a list (or dict) of asset files that are available for
-        download, given the arguments provided.
-
-        These constraints include specific products, tiles, and temporal
-        extent.
-
-        Additionally, the return value is either grouped into a dict mapping
-        (prod, tile, date) --> url
-        or simply a list of URLs, based on the 'grouped' parameter.
-        """
-        if grouped:
-            response = {}
-        else:
-            response  = []
-        for p in products:
-            assets = cls.products2assets([p])
-            for t in tiles:
-                for a in assets:
-                    asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                    for d in asset_dates:
-                        # if we don't have it already, or if 'update' flag
-                        local_assets = cls.Asset.discover(t, d, a)
-                        if force or len(local_assets) == 0 or update:
-                            date_str = d.strftime("%F")
-                            msg_prefix = (
-                                'query_service for {}, {}, {}'
-                                .format(a, t, date_str)
-                            )
-                            with utils.error_handler(msg_prefix, continuable=False):
-                                resp = cls.Asset.query_service(a, t, d)
-                                if len(resp) == 0:
-                                    continue
-                                elif len(resp) > 1:
-                                    raise Exception('should only be one asset')
-                                aobj = cls.Asset(resp[0]['basename'])
-
-                                if (force or len(local_assets) == 0 or
-                                    (len(local_assets) == 1 and
-                                     local_assets[0].updated(aobj))
-                                ):
-                                    rec = {
-                                        'product': p,
-                                        'sensor': aobj.sensor,
-                                        'tile': t,
-                                        'asset': a,
-                                        'date': d
-                                    }
-                                    # useful to datahandler to have this
-                                    # grouped by (p,t,d) there is a fair bit of
-                                    # duplicated info this way, but oh well
-                                    if grouped:
-                                        if (p,t,d) in response:
-                                            response[(p,t,d)].append(rec)
-                                        else:
-                                            response[(p,t,d)] = [rec]
-                                    else:
-                                        response.append(rec)
-        return response
 
     @classmethod
     def fetch(cls, products, tiles, textent, update=False):

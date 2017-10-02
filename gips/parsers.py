@@ -64,13 +64,6 @@ class GIPSParser(argparse.ArgumentParser):
                             default=1, type=int)
         parser.add_argument('--stop-on-error', default=False, action='store_true',
                             help='Do not attempt to continue execution after errors')
-        parser.add_argument(
-            '--chunksize', help='Chunk size in MB', default=128.0, type=float
-        )
-        parser.add_argument(
-            '--numprocs', help='Desired number of processors (if allowed)',
-            default=1, type=int
-        )
         self.parent_parsers.append(parser)
         return parser
 
@@ -100,7 +93,13 @@ class GIPSParser(argparse.ArgumentParser):
                            default=False, action='store_true')
         group.add_argument('--update', help='Force fetch and/ or update data (if supported)',
                            default=False, action='store_true')
-
+        group.add_argument(
+            '--chunksize', help='Chunk size in MB', default=128.0, type=float
+        )
+        group.add_argument(
+            '--numprocs', help='Desired number of processors (if allowed)',
+            default=1, type=int
+        )
         group.add_argument('-p', '--products', help='Requested Products', nargs='*')
         self.parent_parsers.append(parser)
         return parser

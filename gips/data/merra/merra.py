@@ -181,7 +181,7 @@ class merraAsset(Asset):
         self.tile = 'h01v01'
         parts = basename(filename).split('.')
         self.asset = parts[1].split('_')[2].upper()
-        self.version = int(parts[0].split('_')[1])
+        self._version = int(parts[0].split('_')[1])
         if self.asset == "ASM":
             # assign date of static data sets
             self.date = self._assets[self.asset]['startdate']
@@ -264,16 +264,6 @@ class merraAsset(Asset):
             utils.verbose_out('Retrieved %s' % basename, 2)
 
         return retrieved_filenames
-
-    def updated(self, newasset):
-        '''
-        Compare the version for this to that of newasset.
-        Return true if newasset version is greater.
-        '''
-        return (self.sensor == newasset.sensor and
-                self.tile == newasset.tile and
-                self.date == newasset.date and
-                self.version < newasset.version)
 
 
 class merraData(Data):

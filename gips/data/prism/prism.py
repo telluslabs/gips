@@ -116,7 +116,7 @@ class prismAsset(Asset):
         if 0 == len(filenames):
             return None, None
         # choose the one that has the most favorable stability & version values (usually only one)
-        return max(filenames, key=(lambda x: prismAsset(x).ver_stab)), None
+        return max(filenames, key=(lambda x: prismAsset(x)._version)), None
 
 
     @classmethod
@@ -156,20 +156,9 @@ class prismAsset(Asset):
         self.scale = scale
         self.version = version
         self.stability = stability
-        self.ver_stab = self._stab_score[self.stability] * .01 + int(self.version[1:])
+        self._version = self._stab_score[self.stability] * .01 + int(self.version[1:])
         # only one tile
         self.tile = 'CONUS'
-
-    def updated(self, newasset):
-        '''
-        Compare the version for this to that of newasset.
-        Return true if newasset version is greater.
-        '''
-        return (self.sensor == newasset.sensor and
-                self.tile == newasset.tile and
-                self.date == newasset.date and
-                self.asset == self.asset and
-                self.ver_stab < newasset.ver_stab)
 
     def datafiles(self):
         datafiles = super(prismAsset, self).datafiles()
