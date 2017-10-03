@@ -316,11 +316,12 @@ class landsatAsset(Asset):
             for result in response['results']:
                 metadata = requests.get(result['metadataUrl']).text
                 xml = ElementTree.fromstring(metadata)
-                scene_cloud_cover = list(
-                    xml.find(".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Scene Cloud Cover']")
+                # Indexing an Element instance returns it's children
+                scene_cloud_cover = xml.find(
+                    ".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Scene Cloud Cover']"
                 )[0].text
-                land_cloud_cover = list(
-                    xml.find(".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Land Cloud Cover']")
+                land_cloud_cover = xml.find(
+                    ".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Land Cloud Cover']"
                 )[0].text
 
                 if float(scene_cloud_cover) < 90.0:
