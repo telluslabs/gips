@@ -32,6 +32,7 @@ from copy import deepcopy
 import commands
 import tempfile
 import tarfile
+from xml.etree import ElementTree
 
 import numpy
 # once gippy==1.0, switch to GeoRaster.erode
@@ -46,6 +47,7 @@ import gips.atmosphere
 from gips.utils import RemoveFiles, basename, settings, verbose_out
 from gips import utils
 
+import requests
 from usgs import api
 from homura import download
 
@@ -312,11 +314,23 @@ class landsatAsset(Asset):
             )['data']
 
             for result in response['results']:
-                available.append({
-                    'basename': result['displayId'] + '.tar.gz',
-                    'sceneID': result['entityId'],
-                    'dataset': dataset,
-                })
+                metadata = requests.get(result['metadataUrl']).text
+                xml = ElementTree.fromstring(metadata)
+                scene_cloud_cover = list(
+                    xml.find(".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Scene Cloud Cover']")
+                )[0].text
+                land_cloud_cover = list(
+                    xml.find(".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Land Cloud Cover']")
+                )[0].text
+
+                if float(scene_cloud_cover) < 90.0:
+                    available.append({
+                        'basename': result['displayId'] + '.tar.gz',
+                        'sceneID': result['entityId'],
+                        'dataset': dataset,
+                        'sceneCloudCover': float(scene_cloud_cover),
+                        'landCloudCover': float(land_cloud_cover),
+                    })
 
         return available
 
