@@ -87,10 +87,12 @@ def install_system_requirements(PKGS):
 def install_gips(gips_version=GIPS_VERSION, developer_install=False, extras=()):
     repo_url = 'https://github.com/Applied-GeoSolutions/gips.git'
     if gips_version == '.':
-        url = gips_version
-    else:
+        url = 'file://{}/#egg=devinst-gips'.format(
+            os.path.abspath(gips_version)
+        )
+    else:  # assume it is a tag
         url = (
-            'git+{repo}@{ver}#egg={ver}'
+            'git+{repo}@{ver}#egg=gips-{ver}'
         ).format(repo=repo_url, ver=gips_version)
     cmd = ''
     dev_opt = ''
@@ -98,11 +100,16 @@ def install_gips(gips_version=GIPS_VERSION, developer_install=False, extras=()):
         dev_opt = '-e'
         if gips_version != '.':
             cmd += (
-                'git clone {repo} ; '
+                # 'rm -rf gips ; '
+                # 'git clone {repo} ; '
                 'cd gips ; '
                 'git checkout {ver} ; '
             ).format(repo=repo_url, ver=gips_version)
-            url = '.'
+            url = ('file://{}/#egg=devinst-gips'
+                   .format(os.path.abspath('gips')))
+        else:
+            url = ('file://{}/#egg=devinst-gips'
+                   .format(os.path.abspath('.')))
     url += '[{extras}]'.format(extras=','.join(extras))
     print url
     cmd += (sys.executable +
