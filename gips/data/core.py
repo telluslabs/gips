@@ -1036,6 +1036,66 @@ class Data(object):
         return set(assets)
 
     @classmethod
+    def query_service(cls, products, tiles, textent, update=False, force=False, grouped=False):
+        """
+        Returns a list (or dict) of asset files that are available for
+        download, given the arguments provided.
+        These constraints include specific products, tiles, and temporal
+        extent.
+        Additionally, the return value is either grouped into a dict mapping
+        (prod, tile, date) --> url
+        or simply a list of URLs, based on the 'grouped' parameter.
+        """
+        if grouped:
+            response = {}
+        else:
+            response  = []
+        for p in products:
+            assets = cls.products2assets([p])
+            for t in tiles:
+                for a in assets:
+                    asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
+                    for d in asset_dates:
+                        # if we don't have it already, or if 'update' flag
+                        local_assets = cls.Asset.discover(t, d, a)
+                        if force or len(local_assets) == 0 or update:
+                            date_str = d.strftime("%F")
+                            msg_prefix = (
+                                'query_service for {}, {}, {}'
+                                .format(a, t, date_str)
+                            )
+                            with utils.error_handler(msg_prefix, continuable=False):
+                                resp = cls.Asset.query_service(a, t, d)
+                                if len(resp) == 0:
+                                    continue
+                                elif len(resp) > 1:
+                                    raise Exception('should only be one asset')
+                                aobj = cls.Asset(resp[0]['basename'])
+
+                                if (force or len(local_assets) == 0 or
+                                    (len(local_assets) == 1 and
+                                     local_assets[0].updated(aobj))
+                                ):
+                                    rec = {
+                                        'product': p,
+                                        'sensor': aobj.sensor,
+                                        'tile': t,
+                                        'asset': a,
+                                        'date': d
+                                    }
+                                    # useful to datahandler to have this
+                                    # grouped by (p,t,d) there is a fair bit of
+                                    # duplicated info this way, but oh well
+                                    if grouped:
+                                        if (p,t,d) in response:
+                                            response[(p,t,d)].append(rec)
+                                        else:
+                                            response[(p,t,d)] = [rec]
+                                    else:
+                                        response.append(rec)
+        return response
+
+    @classmethod
     def fetch(cls, products, tiles, textent, update=False):
         available_assets = cls.query_service(
             products, tiles, textent, update
