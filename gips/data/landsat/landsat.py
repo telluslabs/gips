@@ -287,7 +287,7 @@ class landsatAsset(Asset):
         self._version = self.version
 
     @classmethod
-    def query_service(cls, asset, tile, date):
+    def query_service(cls, asset, tile, date, pcover=90.0):
         available = []
 
         if asset in ['DN', 'SR']:
@@ -324,7 +324,7 @@ class landsatAsset(Asset):
                     ".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Land Cloud Cover']"
                 )[0].text
 
-                if float(scene_cloud_cover) < 90.0:
+                if float(scene_cloud_cover) < pcover:
                     available.append({
                         'basename': result['displayId'] + '.tar.gz',
                         'sceneID': result['entityId'],
