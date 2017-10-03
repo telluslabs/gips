@@ -678,6 +678,10 @@ class landsatData(Data):
         """ Make sure all products have been processed """
         products = super(landsatData, self).process(products, overwrite, **kwargs)
         if len(products) == 0:
+            verbose_out("Skipping processing; no products requested.", 5)
+            return
+        if len(self.assets) == 0:
+            verbose_out("Skipping processing; no assets found.", 5)
             return
 
         start = datetime.now()
