@@ -100,8 +100,8 @@ def install_gips(gips_version=GIPS_VERSION, developer_install=False, extras=()):
         dev_opt = '-e'
         if gips_version != '.':
             cmd += (
-                # 'rm -rf gips ; '
-                # 'git clone {repo} ; '
+                'rm -rf gips ; '
+                'git clone {repo} ; '
                 'cd gips ; '
                 'git checkout {ver} ; '
             ).format(repo=repo_url, ver=gips_version)
