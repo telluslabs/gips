@@ -1114,7 +1114,8 @@ class sentinel2Data(Data):
         surf_indices  = {k: v for (k, v) in indices.items() if 'toa' not in v}
         self.process_indices('surf', sensor, surf_indices)
 
-        self.process_acolite(products.groups()['ACOLITE'])
+        if len(products.groups()['ACOLITE']) > 0:
+            self.process_acolite(products.groups()['ACOLITE'])
 
         self._product_images = {} # hint for gc; may be needed due to C++/swig weirdness
         self._time_report('Processing complete for this spatial-temporal unit')
