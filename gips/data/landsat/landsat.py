@@ -670,15 +670,15 @@ class landsatData(Data):
         """ Make sure all products have been processed """
         products = super(landsatData, self).process(products, overwrite, **kwargs)
         if len(products) == 0:
+            verbose_out("Skipping processing; no products requested.", 5)
+            return
+        if len(self.assets) == 0:
+            verbose_out("Skipping processing; no assets found.", 5)
             return
 
         start = datetime.now()
 
-        assets = set() # assets needed for this process() run
-        for key, val in products.requested.items():
-            assets.update(self._products[val[0]]['assets'])
-
-        if assets == set(['C1', 'DN']):
+        if set(self.assets.keys()) == set(['C1', 'DN']):
             if 'C1' in self.assets: # prefer C1
                 asset = 'C1'
             elif 'DN' in self.assets:
@@ -688,11 +688,11 @@ class landsatData(Data):
                     'No valid asset found for C1 nor DN for {} {}'.format(
                         self.basename))
         else:
-            if len(assets) > 1:
+            if len(self.assets) > 1:
                 # TODO document the reason why not
                 raise ValueError("Cannot create products from"
                                  " this combination of assets:  {}".format(assets))
-            asset = list(assets)[0]
+            asset = self.assets.keys()[0]
 
         # TODO: De-hack this
         # Better approach, but needs some thought, is to loop over assets
@@ -777,7 +777,7 @@ class landsatData(Data):
 
             # Read the assets
             with utils.error_handler('Error reading ' + basename(self.assets[asset].filename)):
-                img = self._readraw()
+                img = self._readraw(asset)
 
             meta = self.assets[asset].meta
             visbands = self.assets[asset].visbands
@@ -855,7 +855,7 @@ class landsatData(Data):
                         imgout = Fmask(reflimg, fname, tolerance, dilation)
 
                     elif val[0] == 'cloudmask':
-                        qaimg = self._readqa()
+                        qaimg = self._readqa(asset)
                         npqa = qaimg.Read()  # read image file into numpy array
                         # https://landsat.usgs.gov/collectionqualityband
                         # cloudmaskmask = (cloud and (cc_med or cc_high)) or csc_med or csc_high
@@ -949,7 +949,7 @@ class landsatData(Data):
                         imgout.SetGain(0.1)
                         [reflimg[col].Process(imgout[col]) for col in lwbands]
                     elif val[0] == 'dn':
-                        rawimg = self._readraw()
+                        rawimg = self._readraw(asset)
                         rawimg.SetGain(1.0)
                         rawimg.SetOffset(0.0)
                         imgout = rawimg.Process(fname)
@@ -1000,7 +1000,7 @@ class landsatData(Data):
                         if 'LC8' not in self.sensor_set:
                             continue
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 7)
-                        qaimg = self._readqa()
+                        qaimg = self._readqa(asset)
                         qadata = qaimg.Read()
                         notfilled = ~binmask(qadata, 1)
                         notdropped = ~binmask(qadata, 2)
@@ -1021,7 +1021,7 @@ class landsatData(Data):
                             continue
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_UInt16, 1)
                         imgout[0].SetNoData(0)
-                        qaimg = self._readqa()
+                        qaimg = self._readqa(asset)
                         qadata = qaimg.Read()
                         fill = binmask(qadata, 1)
                         dropped = binmask(qadata, 2)
@@ -1140,7 +1140,8 @@ class landsatData(Data):
         isn't used.
         """
         if pclouds < 100:
-            self.meta()
+            raise NotImplementedError('pclouds is not supported')
+            self.meta() # TODO meta() needs to know what kind of asset to read
             if self.metadata['clouds'] > pclouds:
                 return False
         if sensors:
@@ -1152,31 +1153,29 @@ class landsatData(Data):
                 return False
         return True
 
-    def meta(self):
+    def meta(self, asset_type):
         """ Read in Landsat MTL (metadata) file """
-
         # test if metadata already read in, if so, return
-        if 'C1' in self.assets.keys():
-            asset = 'C1'
-        elif 'DN' in self.assets.keys():
-            asset = 'DN'
+        if hasattr(self, 'metadata'):
+            return
 
-        datafiles = self.assets[asset].datafiles()
+        asset_obj = self.assets[asset_type]
+        datafiles = asset_obj.datafiles()
 
         # locate MTL file and save it to disk if it isn't saved already
         mtlfilename = [f for f in datafiles if 'MTL.txt' in f][0]
         if os.path.exists(mtlfilename) and os.stat(mtlfilename).st_size == 0:
             os.remove(mtlfilename)
         if not os.path.exists(mtlfilename):
-            mtlfilename = self.assets[asset].extract([mtlfilename])[0]
+            mtlfilename = asset_obj.extract([mtlfilename])[0]
         # Read MTL file
         with utils.error_handler('Error reading metadata file ' + mtlfilename):
             text = open(mtlfilename, 'r').read()
         if len(text) < 10:
             raise Exception('MTL file is too short. {}'.format(mtlfilename))
 
-        sensor = self.assets[asset].sensor
-        smeta = self.assets[asset]._sensors[sensor]
+        sensor = asset_obj.sensor
+        smeta = asset_obj._sensors[sensor]
 
         # Process MTL text - replace old metadata tags with new
         # NOTE This is not comprehensive, there may be others
@@ -1259,37 +1258,33 @@ class landsatData(Data):
         meta['GIPS-landsat Version'] = cls.version
         return meta
 
-    def _readqa(self):
-        asset = self.assets.keys()[0]
-
-        # make sure metadata is loaded
-        if not hasattr(self, 'metadata'):
-            self.meta()
+    def _readqa(self, asset_type):
+        self.meta(asset_type)
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract files
-            qadatafile = self.assets[asset].extract([self.metadata['qafilename']])
+            qadatafile = self.assets[asset_type].extract([self.metadata['qafilename']])
         else:
             # Use tar.gz directly using GDAL's virtual filesystem
-            qadatafile = os.path.join('/vsitar/' + self.assets[asset].filename, self.metadata['qafilename'])
+            qadatafile = os.path.join(
+                    '/vsitar/' + self.assets[asset_type].filename,
+                    self.metadata['qafilename'])
         qaimg = gippy.GeoImage(qadatafile)
         return qaimg
 
 
-    def _readraw(self):
+    def _readraw(self, asset_type):
         """ Read in Landsat bands using original tar.gz file """
         start = datetime.now()
-        asset = self.assets.keys()[0]
+        asset_obj = self.assets[asset_type]
 
-        # make sure metadata is loaded
-        if not hasattr(self, 'metadata'):
-            self.meta()
+        self.meta(asset_type)
 
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract all files
-            datafiles = self.assets[asset].extract(self.metadata['filenames'])
+            datafiles = asset_obj.extract(self.metadata['filenames'])
         else:
             # Use tar.gz directly using GDAL's virtual filesystem
-            datafiles = [os.path.join('/vsitar/' + self.assets[asset].filename, f)
+            datafiles = [os.path.join('/vsitar/' + asset_obj.filename, f)
                     for f in self.metadata['filenames']]
 
         image = gippy.GeoImage(datafiles)
@@ -1302,8 +1297,8 @@ class landsatData(Data):
         # Geometry used for calculating incident irradiance
         # colors = self.assets['DN']._sensors[self.sensor_set[0]]['colors']
 
-        sensor = self.assets[asset].sensor
-        colors = self.assets[asset]._sensors[sensor]['colors']
+        sensor = asset_obj.sensor
+        colors = asset_obj._sensors[sensor]['colors']
 
         for bi in range(0, len(self.metadata['filenames'])):
             image.SetBandName(colors[bi], bi + 1)
