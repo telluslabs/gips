@@ -33,9 +33,9 @@ class chirpsRepository(Repository):
     _tile_attribute = 'tileid'
 
 # sort of a singleton driver:  one asset, one sensor, one product, set them here
-_tile_id = 'africa'
+_tile_id = 'global'
 _sensor = 'chirps'
-_asset_type = 'africa-daily'
+_asset_type = 'global-daily'
 _product_type = 'precip'
 
 class chirpsAsset(Asset):
@@ -48,10 +48,12 @@ class chirpsAsset(Asset):
 
     _assets = {
         _asset_type: {
-            # chirps-v2.0.2017.01.12.tif.gz	<-- note no sign of 'africa' or 'daily', sigh
-            'pattern': (r'^africa-daily-chirps-v2\.0\.'
+
+            # ftp://ftp.chg.ucsb.edu/pub/org/chg/products/CHIRPS-2.0/global_daily/tifs/p05/2010/chirps-v2.0.2010.12.11.tif.gz
+
+            'pattern': (r'^global-daily-chirps-v2\.0\.'
                         r'(?P<year>\d{4})\.(?P<month>\d{2})\.(?P<day>\d{2})\.tif\.gz$'),
-            'ftp-basedir': '/pub/org/chg/products/CHIRPS-2.0/africa_daily/tifs/p05/',
+            'ftp-basedir': '/pub/org/chg/products/CHIRPS-2.0/global_daily/tifs/p05/',
             'fn-prefix': _asset_type + '-',
             'startdate': datetime.date(1981, 1, 1), # used to prevent impossible searches
             'latency': 21, # latency appears to be approx. 3 weeks
