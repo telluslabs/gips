@@ -228,6 +228,9 @@ class sentinel2Asset(Asset):
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
         self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
         self.set_style_regular_expressions()
+        self._version = int(''.join(
+            match.group('pyear', 'pmon', 'pday', 'phour', 'pmin', 'psec')
+        ))
 
 
     def set_style_regular_expressions(self):
@@ -426,17 +429,6 @@ class sentinel2Asset(Asset):
                 .format(file_name)
             )
         return list(tiles)
-
-
-    def updated(self, newasset):
-        '''
-        Compare the version for this to that of newasset.
-        Return true if newasset version is greater.
-        '''
-        return (self.sensor == newasset.sensor and
-                self.tile == newasset.tile and
-                self.date == newasset.date and
-                self.version < newasset.version)
 
 
     def xml_subtree(self, md_file_type, subtree_tag):
@@ -1122,7 +1114,8 @@ class sentinel2Data(Data):
         surf_indices  = {k: v for (k, v) in indices.items() if 'toa' not in v}
         self.process_indices('surf', sensor, surf_indices)
 
-        self.process_acolite(products.groups()['ACOLITE'])
+        if len(products.groups()['ACOLITE']) > 0:
+            self.process_acolite(products.groups()['ACOLITE'])
 
         self._product_images = {} # hint for gc; may be needed due to C++/swig weirdness
         self._time_report('Processing complete for this spatial-temporal unit')
