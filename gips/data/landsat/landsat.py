@@ -217,7 +217,7 @@ class landsatAsset(Asset):
 
         fname = os.path.basename(filename)
 
-        verbose_out(("fname", fname), 2)
+        verbose_out("LandsatAsset({})".format(fname), 4)
 
         sr_pattern_re = re.compile(self._assets['SR']['pattern'])
         dn_pattern_re = re.compile(self._assets['DN']['pattern'])
@@ -228,7 +228,7 @@ class landsatAsset(Asset):
         c1_match = c1_pattern_re.match(fname)
 
         if sr_match:
-            verbose_out('SR asset', 2)
+            verbose_out('SR asset', 4)
             self.asset = 'SR'
             self.sensor = 'LC8SR'
             self.version = int(fname[20:22])
@@ -236,7 +236,7 @@ class landsatAsset(Asset):
             self.date = datetime.strptime(fname[9:16], "%Y%j")
 
         elif dn_match:
-            verbose_out('DN asset', 2)
+            verbose_out('DN asset', 4)
             self.tile = dn_match.group('path') + dn_match.group('row')
             year = dn_match.group('acq_year')
             doy = dn_match.group('acq_day')
@@ -246,7 +246,7 @@ class landsatAsset(Asset):
             self.sensor = fname[0:3]
             self.version = int(fname[19:21])
         elif c1_match:
-            utils.verbose_out('C1 asset', 2)
+            utils.verbose_out('C1 asset', 4)
 
             self.tile = c1_match.group('path') + c1_match.group('row')
             year = c1_match.group('acq_year')
@@ -286,12 +286,18 @@ class landsatAsset(Asset):
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
 
+    _already_warned_about_fetchability = set()
+
     @classmethod
     def query_service(cls, asset, tile, date, pcover=90.0):
         available = []
+        verbose_out('Querying for asset, tile, date:  {}, {}, {}'.format(
+                asset, tile, date), 3)
 
         if asset in ['DN', 'SR']:
-            verbose_out('Landsat "{}" assets are no longer fetchable'.format(asset), 4)
+            if asset not in cls._already_warned_about_fetchability:
+                cls._already_warned_about_fetchability.add(asset)
+                verbose_out('Landsat "{}" assets are no longer fetchable'.format(asset), 4)
             return available
 
         path = tile[:3]
@@ -345,7 +351,7 @@ class landsatAsset(Asset):
                 raise Exception('Single date, single location, '
                                 'returned more than one result')
             result = response[0]
-            utils.verbose_out(str(response), 4)
+            utils.verbose_out(str(response), 3)
             sceneID = result['sceneID']
             stage_dir = cls.Repository.path('stage')
             sceneIDs = [str(sceneID)]

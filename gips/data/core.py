@@ -1014,7 +1014,9 @@ class Data(object):
         assets = cls.products2assets(products)
         fetched = []
         for a in assets:
+            utils.verbose_out('Starting fetches for asset {}'.format(a), 2)
             for t in tiles:
+                utils.verbose_out('Starting fetches for tile {}'.format(t), 2)
                 asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                 for d in asset_dates:
                     # if we don't have it already, or if update (force) flag
