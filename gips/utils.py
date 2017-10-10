@@ -413,9 +413,9 @@ def vectorize(img, vector, oformat=None):
 
         make_final_prod = (
             "ogr2ogr {FMT} -a_srs '{WKT}' '{OVEC}' '{IVEC}'"
-            .format(FMT=fmt, WKT=wkt, OVEC=vector, IVEC=ivec)
+            .format(FMT=fmt, WKT=wkt, OVEC=vector, IVEC=tvec)
         )
-        emsg = 'Error writing final output from {} to {}'.format(ivec, vector)
+        emsg = 'Error writing final output from {} to {}'.format(tvec, vector)
         gso_run(make_final_prod, emsg)
 
     return vector
@@ -449,7 +449,7 @@ def mosaic(images, outfile, vector):
     return crop2vector(imgout, vector)
 
 
-def gridded_mosaic(images, outfile, rastermask):
+def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     """ Mosaic multiple files to grid and mask specified in rastermask """
     nd = images[0][0].NoDataValue()
     mask_img = gippy.GeoImage(rastermask)
@@ -461,8 +461,6 @@ def gridded_mosaic(images, outfile, rastermask):
     imgout = gippy.GeoImage(outfile, mask_img,
                             images[0].DataType(), images[0].NumBands())
 
-    print(filenames)
-    
     imgout.SetNoData(nd)
     #imgout.ColorTable(images[0])
     nddata = np.empty((images[0].NumBands(),
@@ -472,17 +470,19 @@ def gridded_mosaic(images, outfile, rastermask):
     imgout = None
 
     # run warp command
-    nodatastr = '-n'
-    cmd = "gdalwarp -t_srs '{}' {} {}".format(
+    resampler = ['near', 'bilinear', 'cubic']
+    cmd = "gdalwarp -t_srs '{}' -r {} {} {}".format(
         srs,
+        resampler[interpolation],
         " ".join(filenames),
         outfile
     )
-    print(cmd)
     result = commands.getstatusoutput(cmd)
     verbose_out('{}: {}'.format(cmd, result, 4))
 
     imgout = gippy.GeoImage(outfile, True)
+    for b in range(0, images[0].NumBands()):
+        imgout[b].CopyMeta(images[0][b])
     imgout.AddMask(mask_img[0])
     imgout.Process()
 

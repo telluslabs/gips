@@ -47,8 +47,9 @@ def main():
 
     with utils.error_handler():
         extents = SpatialExtent.factory(
-            cls, args.site, args.rastermask, args.key, args.where, args.tiles, args.pcov,
-            args.ptile
+            cls, site=args.site, rastermask=args.rastermask,
+            key=args.key, where=args.where, tiles=args.tiles,
+            pcov=args.pcov, ptile=args.ptile
         )
 
         # create tld: SITENAME--KEY_DATATYPE_SUFFIX
