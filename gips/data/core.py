@@ -255,13 +255,24 @@ class Asset(object):
         self.sensor = ''
         # dictionary of existing products in asset {'product name': [filename(s)]}
         self.products = {}
+        # gips interpretation of the version of the asset
+        # (which may differ from 'version' already used by some drivers)
+        self._version = 1
 
     def updated(self, newasset):
         '''
-        Compare the version info for this asset (self) to that of newasset.
-        Return true if newasset version is greater.
+        Return:
+            'newasset' and existing represent the same data (time,space,sensor)
+            AND
+            'newasset' _version greater than existing _version.
+
         '''
-        return false
+        return (self.asset == newasset.asset and
+                self.sensor == newasset.sensor and
+                self.tile == newasset.tile and
+                self.date == newasset.date and
+                self._version < newasset._version)
+
 
     ##########################################################################
     # Child classes should not generally have to override anything below here
@@ -561,20 +572,39 @@ class Asset(object):
             newfilename = os.path.join(tpath, bname)
             if not os.path.exists(newfilename):
                 # check if another asset exists
+                # QUESTION: Can it be that len(existing) > 1?
+                # Not changing much now, but adding an immediate assert to
+                # verify that there can only be one-or-none of an asset in the
+                # archive (2017-09-29).  Assuming it isn't a problem, we could
+                # drop some of these for-loops.
                 existing = cls.discover(asset.tile, d, asset.asset)
+                assert len(existing) in (0, 1), (
+                    'Apparently there can be more than one asset file for a'
+                    ' given ({}, {}, {}).'.format(asset.tile, d, asset.asset)
+                )
                 if len(existing) > 0 and (not update or not existing[0].updated(asset)):
-                    # gatekeeper case:  No action taken because existing assets are in the way
+                    # gatekeeper case:  No action taken because other assets exist
                     VerboseOut('%s: other version(s) already exists:' % bname, 1)
                     for ef in existing:
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
                     otherversions = True
                 elif len(existing) > 0 and update:
-                    # update case:  Remove existing outdated assets and install the new one
+                    # update case:  Remove existing outdated assets
+                    #               and install the new one
                     VerboseOut('%s: removing other version(s):' % bname, 1)
                     for ef in existing:
-                        assert ef.updated(asset), 'Asset is not updated version'
+                        if not ef.updated(asset):
+                            utils.verbose_out(
+                                'Asset {} is not updated version of {}.'
+                                .format(ef.filename, asset.filename) +
+                                ' Remove existing asset to replace.', 2
+                            )
+                            # NOTE: This return makes sense iff len(existing)
+                            # cannot be greater than 1
+                            return (None, 0)
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
-                        with utils.error_handler('Unable to remove old version ' + ef.filename):
+                        errmsg = 'Unable to remove existing version: ' + ef.filename
+                        with utils.error_handler(errmsg):
                             os.remove(ef.filename)
                     files = glob.glob(os.path.join(tpath, '*'))
                     for f in set(files).difference([ef.filename]):
@@ -859,7 +889,9 @@ class Data(object):
         assets = self._products[product]['assets']
         filenames = []
         for asset in assets:
-            filenames.extend(self.assets[asset].datafiles())
+            emsg = 'no "{}" assets here'.format(asset)
+            with utils.error_handler(emsg, continuable=True):
+                filenames.extend(self.assets[asset].datafiles())
         if len(filenames) == 0:
             VerboseOut('There are no available assets on %s for tile %s' % (str(self.date), str(self.id), ), 3)
             return None
@@ -869,9 +901,11 @@ class Data(object):
         """ Open and return a GeoImage """
         if sensor is None:
             sensor = self.sensors[product]
-        with utils.error_handler('Error reading product ({}, {})'.format(sensor, product)):
+        with utils.error_handler('({}, {}) not found.'.format(sensor, product)):
             fname = self.filenames[(sensor, product)]
-            return gippy.GeoImage(fname)
+        with utils.error_handler('Error opening "{}"'.format(fname)):
+            img = gippy.GeoImage(fname)
+        return img
 
 
     def open_assets(self, product):

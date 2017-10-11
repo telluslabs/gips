@@ -52,6 +52,8 @@ def main():
             tdl = []
             batchargs = '--chunksize ' + str(args.chunksize)
             batchargs += ' --format ' + str(args.format)
+            batchargs += ' --numprocs ' + str(args.numprocs)
+            batchargs += ' --verbose ' + str(args.verbose)
             if args.overwrite:
                 batchargs += ' --overwrite '
             if args.products:
