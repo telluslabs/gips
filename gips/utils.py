@@ -367,9 +367,8 @@ def vectorize(img, vector, oformat=None):
     Create vector from img using gdal_polygonize.
 
     oformat -- defaults to (due to ogr2ogr) "ESRI Shapefile"
-    connectedness -- defaults to "8" to avoid islands as much as possible.
     """
-    conn_opt = '-8'
+    conn_opt = '-8' # avoid islands as much as possible
     fmt = ''
     if oformat:
         fmt = '-f "{}"'.format(oformat)
@@ -385,7 +384,7 @@ def vectorize(img, vector, oformat=None):
                     .format(cmd, output),
                     1
                 )
-                raise
+                raise IOError(emsg)
 
     # Grab projection because gml doesn't carry it around by default
     wkt = gippy.GeoImage(img).Projection()
