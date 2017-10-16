@@ -384,7 +384,7 @@ def vectorize(img, vector, oformat=None):
                     .format(cmd, output),
                     1
                 )
-                raise IOError(emsg)
+                raise RuntimeError(emsg)
 
     # Grab projection because gml doesn't carry it around by default
     wkt = gippy.GeoImage(img).Projection()
