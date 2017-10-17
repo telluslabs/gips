@@ -593,8 +593,14 @@ def process_acolite(asset, aco_proc_dir, products,
     verbose_out('acolite processing:  starting acolite: `{}`'.format(cmd), 2)
     status, output = commands.getstatusoutput(cmd)
     if status != 0:
-        raise Exception("Got exit status {} from `{}`".format(status, cmd),
-                        output)
+        if 'Unable to connect to X Windows display' in output:
+            msg = ("Looks like there isn't a license for IDL available.\n"
+                   "If a license cannot be acquired, you can run"
+                   " interactively.")
+        else:
+            msg = "Got exit status {} from `{}`".format(status, cmd)
+        raise Exception(msg, output)
+
     verbose_out('acolite processing:  ====== begin acolite output ======', 4)
     verbose_out(output, 4)
     verbose_out('acolite processing:  ====== end acolite output ======', 4)
