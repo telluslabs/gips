@@ -831,14 +831,15 @@ class landsatData(Data):
             coreg = True
             for val in products.requested.values():
                 coreg = coreg and ('coreg' in val)
-            print coreg
-            print glob.glob(os.path.join(self.path, "*cp_log.txt"))
-            if coreg and not glob.glob(os.path.join(self.path, "*cp_log.txt")):
-                # run arop and store coefficients
-                with perm_temp_dir() as tmpdir:
-                    s2_export = self.sentinel2_coreg_export(tmpdir)
-                    utm_zone = self.utm_zone()
-                    self.run_arop(s2_export, utm_zone)
+            if coreg:
+                if not glob.glob(os.path.join(self.path, "*cp_log.txt")):
+                    # run arop and store coefficients
+                    with perm_temp_dir() as tmpdir:
+                        utm_zone = self.utm_zone()
+                        s2_export = self.sentinel2_coreg_export(tmpdir, utm_zone)
+                        self.run_arop(s2_export, utm_zone)
+                coreg_xshift, coref_yshift = self.parse_coreg_coefficients()
+                print "shift: ", coreg_xshift, coref_yshift
 
             # Break down by group
             groups = products.groups()
@@ -1090,6 +1091,10 @@ class landsatData(Data):
                         os.remove(abfn + '.tif')
                     fname = imgout.Filename()
                     imgout.SetMeta(md)
+
+                    if coreg:
+                        pass
+
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
                     self.AddFile(sensor, key, archive_fp)
@@ -1371,7 +1376,7 @@ class landsatData(Data):
         verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image
 
-    def sentinel2_coreg_export(self, tmpdir):
+    def sentinel2_coreg_export(self, tmpdir, utm_zone):
         landsat_shp = landsatRepository.get_setting('tiles')
         sentinel2Data = import_data_class('sentinel2')
         sentinel2Asset = sentinel2Data.Asset
@@ -1383,7 +1388,6 @@ class landsatData(Data):
 
         # If there is no available sentinel2 scene on that day, search before and after
         # until one is found.
-        """
         delta = timedelta(1)
         date_found = date
         while not results[0]['url']:
@@ -1420,10 +1424,10 @@ class landsatData(Data):
             im.SetNoData(0)
             im.Process()
             im = None
-            tif_images.append(tif_name)
+            subprocess.call(["gdalwarp", "-t_srs", "EPSG:326" + utm_zone, tif_name, tif_name[:-4] + "_utm.tif"])
+            tif_images.append(tif_name[:-4] + "_utm.tif")
 
         CookieCutter(gippy.GeoImages(tif_images), landsat_tile, tmpdir + '/sentinel_mosaic', 10, 10)
-        """
 
         return tmpdir + '/sentinel_mosaic.tif'
 
@@ -1541,8 +1545,9 @@ class landsatData(Data):
         utm_zone_re = re.compile(".+UTM[ |_][Z|z]one[ |_](\d{2})[N|S].+", flags=re.DOTALL)
         return utm_zone_re.match(info).group(1)
 
-    def parse_coreg_coeffients(self):
-        cp_log = "{}/{}_{}_cp_log.txt".format(self.path, self.id, self.date)
+    def parse_coreg_coefficients(self):
+        date = datetime.strftime(self.date, "%Y%j")
+        cp_log = "{}/{}_{}_cp_log.txt".format(self.path, self.id, date)
         with open(cp_log, 'r') as log:
             xcoef_re = re.compile(r"x' += +([\d|\-|\.]+) +\+ +[\d|\-|\.]+ +\* +x +\+ +[\d|\-|\.]+ +\* y")
             ycoef_re = re.compile(r"y' += +([\d|\-|\.]+) +\+ +[\d|\-|\.]+ +\* +x +\+ +[\d|\-|\.]+ +\* y")

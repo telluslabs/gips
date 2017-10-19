@@ -30,7 +30,7 @@ OUT_EXTENT = WARP
 OUT_LANDSAT_BAND = {out_bands}
 OUT_BASE_MATCH_BAND = {out_base_band}
 OUT_BASE_POLY_ORDER = 1
-CP_LOG_FILE = {log_file}_cp_log.txt
+CP_LOG_FILE = {log_file}
 
 CP_PARAMETERS_FILE = lndortho.cps_par.ini
 
