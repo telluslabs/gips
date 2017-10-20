@@ -769,22 +769,6 @@ class sentinel2Data(Data):
                     for f in self.metadata['filenames']]
         self.metadata['abs-filenames'] = datafiles
 
-    def _time_report(self, msg, reset_clock=False, verbosity=None):
-        """Provide the user with progress reports, including elapsed time.
-
-        Reset elapsed time with reset_clock=True; when starting or
-        resetting the clock, specify a verbosity, or else accept the
-        default of 3.
-        """
-        start = getattr(self, '_time_report_start', None)
-        if reset_clock or start is None:
-            start = self._time_report_start = datetime.datetime.now()
-            self._time_report_verbosity = 3 if verbosity is None else verbosity
-        elif verbosity is not None:
-            raise ValueError('Changing verbosity is only permitted when resetting the clock')
-        utils.verbose_out('{}:  {}'.format(datetime.datetime.now() - start, msg),
-                self._time_report_verbosity)
-
 
     def ref_toa_geoimage(self, sensor, data_spec):
         """Make a proto-product which acts as a basis for several products.
