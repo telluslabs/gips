@@ -650,8 +650,10 @@ class sentinel2Data(Data):
     Asset = sentinel2Asset
 
     _productgroups = {
-        'Index': ['ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari', 'brgt',
-                  'ndti', 'crc', 'crcm', 'isti', 'sti'], # <-- tillage indices
+        'Index': [
+            'ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari',
+            'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti'  # <-- tillage indices
+        ],
         'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
                     'spm655', 'turbidity', 'acoflags'],
     }
@@ -675,7 +677,7 @@ class sentinel2Data(Data):
             'description': 'Cloud, cloud shadow, and water classification',
             'assets': [_asset_type],
             'bands': {'name': 'cfmask', 'units': Data._unitless},
-        }
+        },
     }
 
     # add index products to _products
@@ -703,6 +705,8 @@ class sentinel2Data(Data):
             ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
             ('isti',   'Inverse Standard Tillage Index'),
             ('sti',    'Standard Tillage Index'),
+            ('mtci',    'MERIS Terrestrial Chlorophyll Index'),
+            ('s2rep',    'Sentinel-2 Red-Edge Position'),
         ]
     )
 
@@ -828,47 +832,36 @@ class sentinel2Data(Data):
 
         It is equivalent to ref-toa; it's needed because the asset's
         spatial resolution must be resampled to be equal for all bands
-        of interest.  Due to equivalence with ref-toa, if that product
-        exists in the filesystem, it's opened and returned in a GeoImage
-        instead of newly upsampled data.
+        of interest.
         """
-        # TODO data_spec can be refactored out of argslist; only depends on self & asset_type ('L1C')
-        self._time_report('Starting upsample of Sentinel-2 asset bands')
-        # TODO this upsamples everything, when only two bands need it.  The first attempt to remedy
-        # this was actually slower, however; see branch 200-optimize-upsampling, commit 2e97ba0.
-        # compile a list of the files needed for the proto-product
+        # TODO data_spec can be refactored out of argslist;
+        #      only depends on self & asset_type ('L1C') 
+        self._time_report('Starting to build VRT of all Sentinel-2 asset bands')
         src_filenames = [f for f in self.metadata['abs-filenames']
-                if f[-6:-4] in data_spec['indices-bands']]
-        # upsample each one in turn (some don't need it but do them all for simplicity)
+                         if f[-6:-4] in data_spec['band-strings']]
         with utils.make_temp_dir() as tmpdir:
-            upsampled_filenames = [os.path.join(tmpdir, os.path.basename(f) + '.tif')
-                    for f in src_filenames]
-            #  TODO:  this should be stuffed into the 'env' of Popen, but is a
-            #         necessary hack for now.
-            os.putenv(
-                'GDAL_NUM_THREADS',
-                str(int(gippy.Options.NumCores()))
-            )
-            for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
-                cmd_str = 'gdal_translate -tr 20 20 -oo NUM_THREADS=1 {} {}'.format(in_fn, out_fn)
-                cmd_args = shlex.split(cmd_str)
-                self._time_report('Upsampling:  ' + cmd_str)
-                p = subprocess.Popen(cmd_args)
-                p.communicate()
-                if p.returncode != 0:
-                    raise IOError("Expected gdal_translate exit status 0, got {}".format(
-                            p.returncode))
-            upsampled_img = gippy.GeoImage(upsampled_filenames)
-            upsampled_img.SetMeta(self.meta_dict())
-            upsampled_img.SetNoData(0)
-            upsampled_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
+            vrt_filename = os.path.join(tmpdir, self.basename + '_ref-toa.vrt')
+            cmd_str = (
+                'gdalbuildvrt -resolution highest -separate '
+                '-vrtnodata 0 {} {}'  # NOTE: -vrtnodata has no effect for jp2s
+            ).format(vrt_filename, ' '.join(src_filenames))
+            cmd_args = shlex.split(cmd_str)
+            p = subprocess.Popen(cmd_args)
+            p.communicate()
+            if p.returncode != 0:
+                raise IOError("Expected gdalbuildvrt exit status 0, got {}"
+                              .format(p.returncode))
+            vrt_img = gippy.GeoImage(vrt_filename)
+            vrt_img.SetMeta(self.meta_dict())
+            vrt_img.SetNoData(0)
+            vrt_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
             # eg:   3        '08'
             for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
-                band_index = data_spec['band-strings'].index(band_string) # starts at 0
+                band_index = data_spec['band-strings'].index(band_string)  # starts at 0
                 color_name = data_spec['colors'][band_index]
-                upsampled_img.SetBandName(color_name, band_num)
-        self._product_images['ref-toa'] = upsampled_img
-        self._time_report('Completed upsampling of Sentinel-2 asset bands')
+                vrt_img.SetBandName(color_name, band_num)
+        self._product_images['ref-toa'] = vrt_img
+        self._time_report('Built VRT of Sentinel-2 asset bands')
 
 
     def rad_toa_geoimage(self, asset_type, sensor):
@@ -878,13 +871,13 @@ class sentinel2Data(Data):
         product.
         """
         self._time_report('Starting reversion to TOA radiance.')
-        upsampled_img = self.load_image('ref-toa')
-        asset_instance = self.assets[asset_type] # sentinel2Asset
+        reftoa_img = self.load_image('ref-toa')
+        asset_instance = self.assets[asset_type]  # sentinel2Asset
         colors = asset_instance._sensors[sensor]['colors']
 
         radiance_factors = asset_instance.radiance_factors()
 
-        rad_image = gippy.GeoImage(upsampled_img)
+        rad_image = gippy.GeoImage(reftoa_img)
 
         for i in range(len(rad_image)):
             color = rad_image[i].Description()
@@ -993,17 +986,15 @@ class sentinel2Data(Data):
         """
         self._time_report('Computing atmospheric corrections for surface reflectance')
         atm6s = self.assets[asset_type].generate_atmo_corrector()
-        scaling_factor = 0.001 # to prevent chunky small ints
-        rad_toa_image = self.load_image('rad-toa')
-        sr_image = gippy.GeoImage(rad_toa_image)
+        scaling_factor = 0.001  # to prevent chunky small ints
+        rad_rev_img = self.load_image('rad-toa')
+        sr_image = gippy.GeoImage(rad_rev_img)
         # set meta to pass along to indices
         sr_image._aod_source = str(atm6s.aod[0])
         sr_image._aod_value  = str(atm6s.aod[1])
         for c in self.assets[asset_type]._sensors[sensor]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c]
             lu = 0.0001 * Lu # see rad_geoimage for reason for this
-            # believed to be faster to compute TLdS ahead of time (otherwise
-            # it may repeat the computation once per pixel)
             TLdS = T * Ld * scaling_factor
             sr_image[c] = (rad_toa_image[c] - lu) / TLdS
         self._product_images['ref'] = sr_image
