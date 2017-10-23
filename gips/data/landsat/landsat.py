@@ -43,11 +43,12 @@ from scipy.ndimage import binary_erosion
 import osr
 import gippy
 from gips import __version__ as __gips_version__
-from gips.core import SpatialExtent
+from gips.core import SpatialExtent, TemporalExtent
 from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask, CookieCutter
 from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
 import gips.atmosphere
+from gips.inventory import DataInventory
 from gips.utils import RemoveFiles, basename, settings, verbose_out, import_data_class, make_temp_dir, open_vector, transform_shape
 from gips import utils
 
@@ -1395,37 +1396,35 @@ class landsatData(Data):
         landsat_shp = landsatRepository.get_setting('tiles')
         sentinel2Data = import_data_class('sentinel2')
         sentinel2Asset = sentinel2Data.Asset
-        sentinel2Repository = sentinel2Asset.Repository
-        extent = SpatialExtent.factory(sentinel2Data, site=landsat_shp, where="pr = '%s'" % self.id, pcov=33.0)
-        tiles = extent[0].tiles
-        date = datetime(self.date.year, self.date.month, self.date.day)
-        results = sentinel2Asset.query_service('L1C', tiles[0], date)
+        spatial_extent = SpatialExtent.factory(sentinel2Data, site=landsat_shp, where="pr = '%s'" % self.id, pcov=33.0)[0]
+        temporal_extent = TemporalExtent(self.date.strftime("%Y-%j"))
 
         self._time_report("querying for most recent sentinel2 images")
+        inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=False)
+
         # If there is no available sentinel2 scene on that day, search before and after
         # until one is found.
         delta = timedelta(1)
-        date_found = date
-        while not results[0]['url']:
-            results = sentinel2Asset.query_service('L1C', tiles[0], date + delta)
+        date_found = self.date
+        while len(inventory) == 0:
+            temporal_extent = TemporalExtent((self.date + delta).strftime("%Y-%j"))
+            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=False)
 
-            if results[0]['url']:
-                date_found = date + delta
+            if len(inventory) != 0:
+                date_found = self.date + delta
                 break
 
-            results = sentinel2Asset.query_service('L1C', tiles[0], date - delta)
+            temporal_extent = TemporalExtent((self.date - delta).strftime("%Y-%j"))
+            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=False)
 
-            date_found = date - delta
+            date_found = self.date - delta
+            delta = delta + timedelta(1)
             delta = delta + timedelta(1)
 
-        self._time_report("fetching needed sentinel2 images")
         geo_images = []
+        tiles = inventory.data.values()[0].tiles.keys()
         for tile in tiles:
             assets = sentinel2Asset.discover(tile, date_found, 'L1C')
-            if not assets:
-                sentinel2Asset.fetch('L1C', tile, date_found)
-                sentinel2Asset.archive(sentinel2Repository.path('stage'))
-                assets = sentinel2Asset.discover(tile, date_found, 'L1C')
             band_8 = [f for f in assets[0].datafiles() if f.endswith('B08.jp2')]
             assets[0].extract(band_8, tmpdir)
             geo_images.append(os.path.join(tmpdir, band_8[0]))
