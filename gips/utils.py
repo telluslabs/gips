@@ -415,7 +415,7 @@ def julian_date(date_and_time, variant=None):
 # Error handling and script setup & teardown
 ##############################################################################
 
-_traceback_verbosity = 4    # only print a traceback if the user selects this verbosity or higher
+_traceback_verbosity = 3    # only print a traceback if the user selects this verbosity or higher
 _accumulated_errors = []    # used for tracking success/failure & doing final error reporting when
                             # GIPS is running as a command-line application
 _stop_on_error = False      # should GIPS try to recover from errors?  Set by gips_script_setup
