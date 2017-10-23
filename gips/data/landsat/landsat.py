@@ -661,7 +661,7 @@ class landsatData(Data):
         else:
             product_info['latency'] = float("inf")
 
-    def _process_indices(self, image, metadata, sensor, indices):
+    def _process_indices(self, image, metadata, sensor, indices, coreg_shift=None):
         """Process the given indices and add their files to the inventory.
 
         Image is a GeoImage suitable for generating the indices.
@@ -678,6 +678,17 @@ class landsatData(Data):
             tempfps_to_ptypes[temp_fp] = prod_type
 
         prodout = Indices(image, gippy_input, metadata)
+
+        if coreg_shift:
+            for key, val in prodout.iteritems():
+                self._time_report("coregistering index")
+                img = gippy.GeoImage(val, True)
+                affine = img.Affine()
+                affine[0] += coreg_shift.get('x', 0)
+                affine[3] += coreg_shift.get('y', 0)
+                img.SetAffine(affine)
+                img.Process()
+                img = None
 
         for temp_fp in prodout.values():
             archived_fp = self.archive_temp_path(temp_fp)
@@ -1094,6 +1105,7 @@ class landsatData(Data):
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
                     self.AddFile(sensor, key, archive_fp)
+                    print "about to print status line"
                     product_finished_msg = ' -> {}: processed in {}'.format(
                             os.path.basename(archive_fp), datetime.now() - start)
                     utils.verbose_out(product_finished_msg, level=2)
@@ -1109,16 +1121,23 @@ class landsatData(Data):
                         indices_toa[key] = val
                     else:
                         indices[key] = val
+
+                coreg_shift = {}
+
+                if coreg:
+                    coreg_shift['x'] = coreg_xshift
+                    coreg_shift['y'] = coreg_yshift
+
                 # Run TOA
                 if len(indices_toa) > 0:
-                    self._process_indices(reflimg, md, sensor, indices_toa)
+                    self._process_indices(reflimg, md, sensor, indices_toa, coreg_shift)
 
                 # Run atmospherically corrected
                 if len(indices) > 0:
                     for col in visbands:
                         img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
                                 ) * (1.0 / atm6s.results[col][2])
-                    self._process_indices(img, md, sensor, indices)
+                    self._process_indices(img, md, sensor, indices, coreg_shift)
                 verbose_out(' -> %s: processed %s in %s' % (
                         self.basename, indices0.keys(), datetime.now() - start), 1)
             img = None
