@@ -817,6 +817,19 @@ class landsatData(Data):
             lwbands = self.assets[asset].lwbands
             md = self.meta_dict()
 
+            product_is_coreg = [(v and 'coreg' in v) for v in products.requested.values()]
+            coreg = all(product_is_coreg)
+            if not coreg and any(product_is_coreg):
+                raise Exception("Mixing coreg and non-coreg products is not allowed")
+            if coreg:
+                if not glob.glob(os.path.join(self.path, "*coreg_args.txt")):
+                    # run arop and store coefficients
+                    with utils.make_temp_dir() as tmpdir:
+                        utm_zone = self.utm_zone()
+                        s2_export = self.sentinel2_coreg_export(tmpdir, utm_zone)
+                        self.run_arop(s2_export, utm_zone)
+                coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
+
             # running atmosphere if any products require it
             toa = True
             for val in products.requested.values():
@@ -833,18 +846,6 @@ class landsatData(Data):
                                  sensor=self.sensor_set[0])
                     md["AOD Source"] = str(atm6s.aod[0])
                     md["AOD Value"] = str(atm6s.aod[1])
-
-            coreg = True
-            for val in products.requested.values():
-                coreg = coreg and ('coreg' in val)
-            if coreg:
-                if not glob.glob(os.path.join(self.path, "*coreg_args.txt")):
-                    # run arop and store coefficients
-                    with utils.make_temp_dir() as tmpdir:
-                        utm_zone = self.utm_zone()
-                        s2_export = self.sentinel2_coreg_export(tmpdir, utm_zone)
-                        self.run_arop(s2_export, utm_zone)
-                coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
 
             # Break down by group
             groups = products.groups()
