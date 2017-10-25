@@ -1421,7 +1421,6 @@ class landsatData(Data):
 
             date_found = self.date - delta
             delta = delta + timedelta(1)
-            delta = delta + timedelta(1)
 
         geo_images = []
         tiles = inventory.data.values()[0].tiles.keys()
