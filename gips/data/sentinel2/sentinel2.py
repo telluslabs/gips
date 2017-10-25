@@ -729,6 +729,13 @@ class sentinel2Data(Data):
             raise IOError(err_msg)
         return tile_string.upper()
 
+    def filter(self, pclouds=100, **kwargs):
+        if pclouds < 100:
+            self.load_metadata()
+            if self.metadata['clouds'] > pclouds:
+                return False
+
+        return True
 
     @classmethod
     def meta_dict(cls):
@@ -755,6 +762,15 @@ class sentinel2Data(Data):
         # sorting is weird because the bands aren't named consistently
         fnl.sort(key=lambda f: band_strings.index(f[-6:-4]))
         self.metadata = {'filenames': fnl}
+
+        with utils.make_temp_dir() as tmpdir:
+            metadata_file = [f for f in datafiles if f.endswith("MTD_MSIL1C.xml")][0]
+            asset.extract([metadata_file], path=tmpdir)
+            tree = ElementTree.parse(tmpdir + '/' + metadata_file)
+            root = tree.getroot()
+            ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
+            cloud_coverage_el = root.findall("./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns))[0]
+            self.metadata['clouds'] = float(cloud_coverage_el.text)
 
     def read_raw(self):
         """Read in bands using original SAFE asset file (a .zip)."""
