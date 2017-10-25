@@ -75,10 +75,10 @@ def main():
             if not orm.use_orm():
                 raise ValueError("--rectify can only be used if GIPS_ORM=true.")
             for k, v in vars(args).items():
-                # don't give the user false expectations about rectification
+                # Let the user know not to expect other options to effect rectify
                 if v and k not in ('rectify', 'verbose', 'command'):
-                    msg = "Option '--{}' is not compatible with --rectify."
-                    raise ValueError(msg.format(k))
+                    msg = "INFO: Option '--{}' is has no effect on --rectify."
+                    utils.verbose_out(msg.format(k), 1)
             print("Rectifying inventory DB with filesystem archive:")
             print("Rectifying assets:")
             dbinv.rectify_assets(cls.Asset)
@@ -86,8 +86,11 @@ def main():
             dbinv.rectify_products(cls)
             return
 
-        extents = SpatialExtent.factory(cls, args.site, args.key, args.where, 
-                                        args.tiles, args.pcov, args.ptile)
+        extents = SpatialExtent.factory(
+            cls, site=args.site, rastermask=args.rastermask,
+            key=args.key, where=args.where, tiles=args.tiles,
+            pcov=args.pcov, ptile=args.ptile
+        )
         for extent in extents:
             inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
             inv.pprint(md=args.md)            
