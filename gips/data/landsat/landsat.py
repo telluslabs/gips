@@ -44,12 +44,12 @@ import osr
 import gippy
 from gips import __version__ as __gips_version__
 from gips.core import SpatialExtent, TemporalExtent
-from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask, CookieCutter
+from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
 from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
 import gips.atmosphere
 from gips.inventory import DataInventory
-from gips.utils import RemoveFiles, basename, settings, verbose_out, import_data_class, make_temp_dir, open_vector, transform_shape
+from gips.utils import RemoveFiles, basename, settings, verbose_out
 from gips import utils
 
 import requests
@@ -669,7 +669,9 @@ class landsatData(Data):
         Metadata is passed in to the gippy Indices() call.  Sensor is
         used to generate index filenames and saving info about the
         product to self. Indices is a dict of desired keys; keys and
-        values are the same as requested products in process().
+        values are the same as requested products in process(). Coreg_shift
+        is a dict with keys `x` and `y` used to make affine
+        transformation for `-coreg` products.
         """
         gippy_input = {} # map prod types to temp output filenames for feeding to gippy
         tempfps_to_ptypes = {} # map temp output filenames to prod types, for AddFile
@@ -685,8 +687,8 @@ class landsatData(Data):
                 self._time_report("coregistering index")
                 img = gippy.GeoImage(val, True)
                 affine = img.Affine()
-                affine[0] += coreg_shift.get('x', 0)
-                affine[3] += coreg_shift.get('y', 0)
+                affine[0] += coreg_shift.get('x', 0.0)
+                affine[3] += coreg_shift.get('y', 0.0)
                 img.SetAffine(affine)
                 img.Process()
                 img = None
@@ -838,7 +840,7 @@ class landsatData(Data):
             if coreg:
                 if not glob.glob(os.path.join(self.path, "*coreg_args.txt")):
                     # run arop and store coefficients
-                    with make_temp_dir() as tmpdir:
+                    with utils.make_temp_dir() as tmpdir:
                         utm_zone = self.utm_zone()
                         s2_export = self.sentinel2_coreg_export(tmpdir, utm_zone)
                         self.run_arop(s2_export, utm_zone)
@@ -1106,7 +1108,6 @@ class landsatData(Data):
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
                     self.AddFile(sensor, key, archive_fp)
-                    print "about to print status line"
                     product_finished_msg = ' -> {}: processed in {}'.format(
                             os.path.basename(archive_fp), datetime.now() - start)
                     utils.verbose_out(product_finished_msg, level=2)
@@ -1394,7 +1395,7 @@ class landsatData(Data):
 
     def sentinel2_coreg_export(self, tmpdir, utm_zone):
         landsat_shp = landsatRepository.get_setting('tiles')
-        sentinel2Data = import_data_class('sentinel2')
+        sentinel2Data = utils.import_data_class('sentinel2')
         sentinel2Asset = sentinel2Data.Asset
         spatial_extent = SpatialExtent.factory(sentinel2Data, site=landsat_shp, where="pr = '%s'" % self.id, pcov=33.0)[0]
         temporal_extent = TemporalExtent(self.date.strftime("%Y-%j"))
@@ -1479,9 +1480,9 @@ class landsatData(Data):
 
             asset.extract(filenames=filenames, path=outdir)
 
-        warp_data_class = import_data_class(warp_satellite)
+        warp_data_class = utils.import_data_class(warp_satellite)
 
-        with make_temp_dir() as tmpdir:
+        with utils.make_temp_dir() as tmpdir:
             warp_data = warp_data_class(warp_tile, warp_date, "%Y%j")
             warp_band_filenames = band_filenames(warp_satellite, warp_data, warp_bands)
             extract(warp_satellite, warp_data, warp_band_filenames, tmpdir)
