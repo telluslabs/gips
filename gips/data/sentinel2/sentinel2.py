@@ -36,6 +36,7 @@ import glob
 from xml.etree import ElementTree, cElementTree
 
 import numpy
+import requests
 
 import gippy
 import gippy.algorithms
@@ -212,7 +213,8 @@ class sentinel2Asset(Asset):
         """
         super(sentinel2Asset, self).__init__(filename)
         with utils.error_handler("Error opening asset '({})'".format(filename)):
-            zipfile.ZipFile(filename) # sanity check; exception if file isn't a valid zip
+            if os.path.exists(filename):  # __init__ should work even if file doesn't exist
+                zipfile.ZipFile(filename)  # exception if file isn't a valid zip
         base_filename = os.path.basename(filename)
 
         for style, style_dict in self._asset_styles.items():
@@ -246,14 +248,14 @@ class sentinel2Asset(Asset):
 
 
     @classmethod
-    def query_service(cls, asset, tile, date):
+    def query_service(cls, asset, tile, date, pclouds=100):
         """Compatibility method; not used by fetch."""
-        bn, url = cls.query_provider(asset, tile, date)
+        bn, url = cls.query_provider(asset, tile, date, pclouds)
         return [{'basename': bn, 'url': url}]
 
 
     @classmethod
-    def query_provider(cls, asset, tile, date):
+    def query_provider(cls, asset, tile, date, pclouds=100):
         """Search for a matching asset in the Sentinel-2 servers.
 
         Uses the given (asset, tile, date) tuple as a search key, and
@@ -321,6 +323,12 @@ class sentinel2Asset(Asset):
             utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
                     output_file_name))
             return None, None
+
+        if pclouds < 100:
+            asset = cls(output_file_name)
+            if not asset.filter(pclouds):
+                return None, None
+
         return output_file_name, asset_url
 
 
@@ -429,6 +437,48 @@ class sentinel2Asset(Asset):
                 .format(file_name)
             )
         return list(tiles)
+
+
+    def filter(self, pclouds=100, **kwargs):
+        if pclouds < 100:
+            if os.path.exists(self.filename):
+                with utils.make_temp_dir() as tmpdir:
+                    metadata_file = [f for f in self.datafiles() if f.endswith("MTD_MSIL1C.xml")][0]
+                    self.extract([metadata_file], path=tmpdir)
+                    tree = ElementTree.parse(tmpdir + '/' + metadata_file)
+                    root = tree.getroot()
+            else:
+                scihub = "https://scihub.copernicus.eu/dhus/odata/v1"
+                username = self.Repository.get_setting('username')
+                password = self.Repository.get_setting('password')
+                asset_name = os.path.basename(self.filename)[0:-4]
+                query_url = "{}/Products?$filter=Name eq '{}'".format(scihub, asset_name)
+                r = requests.get(query_url, auth=(username, password))
+                r.raise_for_status()
+                root = ElementTree.fromstring(r.content)
+                namespaces = {
+                    'a': "http://www.w3.org/2005/Atom",
+                    'm': "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
+                    'd': "http://schemas.microsoft.com/ado/2007/08/dataservices",
+                }
+                product_id_el = root.find("./a:entry/m:properties/d:Id", namespaces)
+                if product_id_el is None:
+                    raise Exception("{} is not a valid asset".format(asset_name))
+                metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL1C.xml')/$value".format(
+                    scihub, product_id_el.text, asset_name
+                )
+                r = requests.get(metadata_url, auth=(username, password))
+                r.raise_for_status()
+                root = ElementTree.fromstring(r.content)
+
+            ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
+            cloud_coverage_el = root.findall(
+                "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
+            )[0]
+            if float(cloud_coverage_el.text) > pclouds:
+                return False
+
+        return True
 
 
     def xml_subtree(self, md_file_type, subtree_tag):
@@ -730,12 +780,7 @@ class sentinel2Data(Data):
         return tile_string.upper()
 
     def filter(self, pclouds=100, **kwargs):
-        if pclouds < 100:
-            self.load_metadata()
-            if self.metadata['clouds'] > pclouds:
-                return False
-
-        return True
+        return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
     @classmethod
     def meta_dict(cls):
@@ -763,14 +808,6 @@ class sentinel2Data(Data):
         fnl.sort(key=lambda f: band_strings.index(f[-6:-4]))
         self.metadata = {'filenames': fnl}
 
-        with utils.make_temp_dir() as tmpdir:
-            metadata_file = [f for f in datafiles if f.endswith("MTD_MSIL1C.xml")][0]
-            asset.extract([metadata_file], path=tmpdir)
-            tree = ElementTree.parse(tmpdir + '/' + metadata_file)
-            root = tree.getroot()
-            ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
-            cloud_coverage_el = root.findall("./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns))[0]
-            self.metadata['clouds'] = float(cloud_coverage_el.text)
 
     def read_raw(self):
         """Read in bands using original SAFE asset file (a .zip)."""
