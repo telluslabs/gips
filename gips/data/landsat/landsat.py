@@ -1522,7 +1522,7 @@ class landsatData(Data):
                 os.path.join(tmpdir, 'lndortho.cps_par.ini')
             )
 
-            subprocess.call(["ortho", "-r", parameter_file])
+            subprocess.check_call(["ortho", "-r", parameter_file])
             
             with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
                 xcoef_re = re.compile(r"x' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
