@@ -329,8 +329,6 @@ class landsatAsset(Asset):
                     ".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Land Cloud Cover']"
                 )[0].text
 
-                print scene_cloud_cover
-
                 if float(scene_cloud_cover) < pcover:
                     available.append({
                         'basename': result['displayId'] + '.tar.gz',
@@ -1443,7 +1441,6 @@ class landsatData(Data):
 
         geo_images = []
         tiles = inventory[date_found].tiles.keys()
-        print tiles
         for tile in tiles:
             asset = inventory[date_found][tile].assets['L1C']
             band_8 = [f for f in asset.datafiles() if f.endswith('B08.jp2')]
