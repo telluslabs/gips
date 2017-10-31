@@ -297,7 +297,7 @@ class landsatAsset(Asset):
                 with utils.error_handler('Error reading metadata file ' + mtlfilename):
                     with open(mtlfilename, 'r') as mtlfile:
                         text = mtlfile.read()
-                    cloud_cover = re.match(r" *CLOUD_COVER = (\d+.?\d*)", text, flags=re.MULTILINE)
+                    cloud_cover = re.match(r".*CLOUD_COVER = (\d+.?\d*)", text, flags=re.DOTALL)
                     if not cloud_cover:
                         raise Exception("Error parsing MTL file")
                     scene_cloud_cover = float(cloud_cover.group(1))
@@ -314,12 +314,12 @@ class landsatAsset(Asset):
                     end_date=datetime.strftime(self.date, "%Y-%m-%d"),
                     api_key=api_key
                 )
-                metadata = requests.get(response['results'][0]['metadataUrl']).text
+                metadata = requests.get(response['data']['results'][0]['metadataUrl']).text
                 xml = ElementTree.fromstring(metadata)
                 # Indexing an Element instance returns it's children
                 scene_cloud_cover_el = xml.find(
                     ".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Scene Cloud Cover']"
-                )[0].text
+                )[0]
 
                 scene_cloud_cover = float(scene_cloud_cover_el.text)
 
@@ -1196,9 +1196,7 @@ class landsatData(Data):
         isn't used.
         """
         if pclouds < 100:
-            raise NotImplementedError('pclouds is not supported')
-            self.meta() # TODO meta() needs to know what kind of asset to read
-            if self.metadata['clouds'] > pclouds:
+            if not all([a.filter(pclouds) for a in self.assets.values()]):
                 return False
         if sensors:
             if type(sensors) is str:
