@@ -297,12 +297,19 @@ class landsatAsset(Asset):
                 with utils.error_handler('Error reading metadata file ' + mtlfilename):
                     with open(mtlfilename, 'r') as mtlfile:
                         text = mtlfile.read()
-                    cloud_cover = re.match(r".*CLOUD_COVER = (\d+.?\d*)", text, flags=re.DOTALL)
+                    cloud_cover = re.match(
+                        r".*CLOUD_COVER = (\d+.?\d*)",
+                        text,
+                        flags=re.DOTALL
+                    )
                     if not cloud_cover:
                         raise Exception("Error parsing MTL file")
                     scene_cloud_cover = float(cloud_cover.group(1))
             else:
-                api_key = api.login(self.Repository.get_setting('username'), self.Repository.get_setting('password'))
+                api_key = api.login(
+                    self.Repository.get_setting('username'),
+                    self.Repository.get_setting('password')
+                )
                 dataset_name = landsatAsset._sensors[self.sensor]['ee_dataset']
                 path_field = landsatAsset._ee_datasets[dataset_name]['path_field']
                 row_field = landsatAsset._ee_datasets[dataset_name]['row_field']
@@ -314,7 +321,9 @@ class landsatAsset(Asset):
                     end_date=datetime.strftime(self.date, "%Y-%m-%d"),
                     api_key=api_key
                 )
-                metadata = requests.get(response['data']['results'][0]['metadataUrl']).text
+                metadata = requests.get(
+                    response['data']['results'][0]['metadataUrl']
+                ).text
                 xml = ElementTree.fromstring(metadata)
                 # Indexing an Element instance returns it's children
                 scene_cloud_cover_el = xml.find(
