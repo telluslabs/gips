@@ -58,7 +58,11 @@ def main():
                 tld = tld + '_' + args.suffix
         mkdir(tld)
 
-        extents = SpatialExtent.factory(cls, args.site, args.key, args.where, args.tiles, args.pcov, args.ptile)
+        extents = SpatialExtent.factory(
+            cls, site=args.site, rastermask=args.rastermask,
+            key=args.key, where=args.where, tiles=args.tiles,
+            pcov=args.pcov, ptile=args.ptile
+        )
         for extent in extents:
             inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
             for date in inv.dates:

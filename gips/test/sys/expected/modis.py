@@ -213,3 +213,15 @@ t_stats = { 'created': {
     'temp8tn_stats.txt': -312645073,
     'temp_stats.txt': 2580004,
 }}
+
+
+t_gridded_export = { 'created': {
+    '0': None,
+    '0/2005001_MCD_indices.tif': 1618619735,
+}}
+
+
+t_cubic_gridded_export = { 'created': {
+    '0': None,
+    '0/2005001_MCD_indices.tif': 1939857358,
+}}

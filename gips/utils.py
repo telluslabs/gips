@@ -33,6 +33,7 @@ import commands
 import shutil
 import traceback
 import datetime
+import numpy as np
 
 import gippy
 from gippy import GeoVector
@@ -361,6 +362,64 @@ def crop2vector(img, vector):
     return img
 
 
+def vectorize(img, vector, oformat=None):
+    """
+    Create vector from img using gdal_polygonize.
+
+    oformat -- defaults to (due to ogr2ogr) "ESRI Shapefile"
+    """
+    conn_opt = '-8' # avoid islands as much as possible
+    fmt = ''
+    if oformat:
+        fmt = '-f "{}"'.format(oformat)
+
+    def gso_run(cmd, emsg):
+        '''simple shell command wrapper'''
+        with error_handler(emsg):
+            verbose_out('Running: {}'.format(cmd), 4)
+            status, output = commands.getstatusoutput(cmd)
+            if status != 0:
+                verbose_out(
+                    '++\n Ran command:\n {}\n\n++++\n Console output:\n {}\n++\n'
+                    .format(cmd, output),
+                    1
+                )
+                raise RuntimeError(emsg)
+
+    # Grab projection because gml doesn't carry it around by default
+    wkt = gippy.GeoImage(img).Projection()
+    # rasterize the vector
+    with make_temp_dir(prefix='vectorize') as td:
+        tvec = os.path.join(td, os.path.basename(vector)[:-4] + '.gml')
+        polygonize = (
+            'gdal_polygonize.py {CONNECTEDNESS} {IMAGE} {VECTOR}'
+            .format(CONNECTEDNESS=conn_opt, IMAGE=img, VECTOR=tvec)
+        )
+        emsg = 'Error vectorizing raster {} to {}'.format(img, tvec)
+        gso_run(polygonize, emsg)
+
+        if gippy.GeoVector(tvec).NumFeatures() != 1:
+            ivec = tvec
+            tvec = tvec[:-4] + '_dissolve.gml'
+            dissolve = (
+                'ogr2ogr -f GML {OVEC} {IVEC} -dialect sqlite '
+                '-sql "SELECT DN as DN, ST_Union(geometryProperty) as '
+                'geometry FROM out GROUP BY DN"'
+                .format(OVEC=tvec, IVEC=ivec)
+            )
+            emsg = 'Error dissolving {} to {}'.format(ivec, tvec)
+            gso_run(dissolve, emsg)
+
+        make_final_prod = (
+            "ogr2ogr {FMT} -a_srs '{WKT}' '{OVEC}' '{IVEC}'"
+            .format(FMT=fmt, WKT=wkt, OVEC=vector, IVEC=tvec)
+        )
+        emsg = 'Error writing final output from {} to {}'.format(tvec, vector)
+        gso_run(make_final_prod, emsg)
+
+    return vector
+
+
 def mosaic(images, outfile, vector):
     """ Mosaic multiple files together, but do not warp """
     nd = images[0][0].NoDataValue()
@@ -389,6 +448,44 @@ def mosaic(images, outfile, vector):
     return crop2vector(imgout, vector)
 
 
+def gridded_mosaic(images, outfile, rastermask, interpolation=0):
+    """ Mosaic multiple files to grid and mask specified in rastermask """
+    nd = images[0][0].NoDataValue()
+    mask_img = gippy.GeoImage(rastermask)
+    srs = mask_img.Projection()
+    filenames = [images[0].Filename()]
+    for f in range(1, images.NumImages()):
+        filenames.append(images[f].Filename())
+
+    imgout = gippy.GeoImage(outfile, mask_img,
+                            images[0].DataType(), images[0].NumBands())
+
+    imgout.SetNoData(nd)
+    #imgout.ColorTable(images[0])
+    nddata = np.empty((images[0].NumBands(),
+                       mask_img.YSize(), mask_img.XSize()))
+    nddata[:] = nd
+    imgout.Write(nddata)
+    imgout = None
+
+    # run warp command
+    resampler = ['near', 'bilinear', 'cubic']
+    cmd = "gdalwarp -t_srs '{}' -r {} {} {}".format(
+        srs,
+        resampler[interpolation],
+        " ".join(filenames),
+        outfile
+    )
+    result = commands.getstatusoutput(cmd)
+    verbose_out('{}: {}'.format(cmd, result, 4))
+
+    imgout = gippy.GeoImage(outfile, True)
+    for b in range(0, images[0].NumBands()):
+        imgout[b].CopyMeta(images[0][b])
+    imgout.AddMask(mask_img[0])
+    imgout.Process()
+
+    
 def julian_date(date_and_time, variant=None):
     """Returns the julian date for the given datetime object.
 
