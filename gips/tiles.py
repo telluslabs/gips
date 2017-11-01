@@ -28,7 +28,7 @@ import traceback
 
 import gippy
 from gippy.algorithms import CookieCutter
-from gips.utils import VerboseOut, Colors, mosaic, mkdir
+from gips.utils import VerboseOut, Colors, mosaic, gridded_mosaic, mkdir
 from gips import utils
 
 
@@ -93,7 +93,9 @@ class Tiles(object):
                 with utils.error_handler("Error mosaicking " + fout, continuable=True):
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
-                    if self.spatial.site is not None and res is not None:
+                    if self.spatial.rastermask is not None:
+                        gridded_mosaic(images, fout, self.spatial.rastermask, interpolation)
+                    elif self.spatial.site is not None and res is not None:
                         CookieCutter(
                             images, self.spatial.site, fout, res[0], res[1],
                             crop, interpolation, {}, alltouch,
