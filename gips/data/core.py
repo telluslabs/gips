@@ -340,7 +340,7 @@ class Asset(object):
         for f in filenames:
             fname = os.path.join(path, f)
             if not os.path.exists(fname):
-                utils.verbose_out("Extracting " + f, 3)
+                utils.verbose_out("Extracting " + f, 5)
                 open_file.extract(f, path)
                 # this ensures we have permissions on extracted files
                 if not os.path.isdir(fname):

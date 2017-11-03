@@ -929,10 +929,12 @@ class sentinel2Data(Data):
             aps_p.update(self._products[p])
             aps_p.pop('assets')
 
+        w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(a_obj.tile)
         prodout = atmosphere.process_acolite(
                 a_obj, aco_tmp_dir, acolite_product_spec,
                 a_obj.style_res['raster-re'].format(tileid=a_obj._tile_re),
-                '*.SAFE')
+                extracted_asset_glob='*.SAFE',
+                roi=(s_lat, w_lon, n_lat, e_lon))
 
         [self.AddFile(sensor, pt, fn) for pt, fn in prodout.items()]
         self._time_report(' -> {}: processed {}'.format(

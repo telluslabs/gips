@@ -486,7 +486,7 @@ def add_acolite_product_dicts(_products, *assets):
 
 def process_acolite(asset, aco_proc_dir, products,
                     model_layer_re=r'.*\.((jp2)|(tif)|(TIF))$',
-                    extracted_asset_glob=''):
+                    extracted_asset_glob='', roi=tuple()):
     """Generate acolite products from the given asset.
 
     Args:
@@ -497,6 +497,11 @@ def process_acolite(asset, aco_proc_dir, products,
             format docstring is a TODO.
         model_layer_re:  A regex for a pathname to a layer image in
             the asset; it is used as a sort of template for the ouptut image.
+        extracted_asset_glob:  If needed, pass in a glob to find assets
+            inside aco_proc_dir.
+        roi:  Region of interest; lat/lon bounding box to crop data and thus
+            reduce processing; defaults to entire scene being processed.
+            Format is floats, in decimal degrees: s_lat, w_lon, n_lat, e_lon.
 
     Returns:  A mapping of product type strings to generated filenames
         in the tiles/ directory; Data.AddFile() ready.
@@ -567,6 +572,15 @@ def process_acolite(asset, aco_proc_dir, products,
                         line
                     )
                 )
+            if roi is not None:
+                settings_fo.write(
+                    'limit=' + ','.join(str(i) for i in roi) + '\n')
+
+    with open(settings_path, 'r') as settings_fo:
+        verbose_out('acolite processing:  ====== begin acolite.cfg ======', 4)
+        verbose_out(settings_fo.read(), 4)
+        verbose_out('acolite processing:  ====== end acolit.cfg ======', 4)
+
     ACOLITEPATHS['ACOLITE_SETTINGS'] = settings_path
 
     eag_fp = os.path.join(aco_proc_dir, extracted_asset_glob)
