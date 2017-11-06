@@ -808,6 +808,7 @@ class sentinel2Data(Data):
             upsampled_img = gippy.GeoImage(upsampled_filenames)
             upsampled_img.SetMeta(self.meta_dict())
             upsampled_img.SetNoData(0)
+            upsampled_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
             # eg:   3        '08'
             for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
                 band_index = data_spec['band-strings'].index(band_string) # starts at 0
@@ -1071,6 +1072,8 @@ class sentinel2Data(Data):
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)
+                if prod_type in ('ref-toa', 'ref'):
+                    output_image.SetGain(0.0001)
                 if prod_type == 'cfmask':
                     output_image.SetMeta('FMASK_0', 'nodata')
                     output_image.SetMeta('FMASK_1', 'valid')
