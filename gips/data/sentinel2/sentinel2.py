@@ -1072,7 +1072,7 @@ class sentinel2Data(Data):
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)
-                if prod_type in ('ref-toa', 'ref'):
+                if prod_type in ('ref-toa', 'rad-toa', 'ref'):
                     output_image.SetGain(0.0001)
                 if prod_type == 'cfmask':
                     output_image.SetMeta('FMASK_0', 'nodata')
