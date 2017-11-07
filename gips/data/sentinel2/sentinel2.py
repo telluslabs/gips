@@ -851,13 +851,22 @@ class sentinel2Data(Data):
         atm6s = ca.generate_atmo_corrector()
 
         rad_image = gippy.GeoImage(rad_toa_img)
+        # to check the gain & other values set on the object:
+        # print('rad_image info:', rad_image.Info()
+
         # set meta to pass along to indices
         rad_image._aod_source = str(atm6s.aod[0])
         rad_image._aod_value  = str(atm6s.aod[1])
 
         for c in ca._sensors[self.current_sensor()]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c] # Ld is unused for this product
-            rad_image[c] = (rad_toa_img[c] - Lu) / T
+            # 6SV1/Py6S/SIXS produces atmo correction values suitable
+            # for raw values ("digital numbers") from landsat, but
+            # rad_toa_img isn't a raw value; it has a gain.  So, apply
+            # that same gain to Lu, apparently the atmosphere's
+            # inherent radiance, to get a reasonable difference.
+            lu = 0.0001 * Lu
+            rad_image[c] = (rad_toa_img[c] - lu) / T
         self._product_images['rad'] = rad_image
 
 
@@ -1072,7 +1081,7 @@ class sentinel2Data(Data):
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)
-                if prod_type in ('ref-toa', 'rad-toa', 'ref'):
+                if prod_type in ('ref-toa', 'rad-toa', 'rad'):
                     output_image.SetGain(0.0001)
                 if prod_type == 'cfmask':
                     output_image.SetMeta('FMASK_0', 'nodata')
