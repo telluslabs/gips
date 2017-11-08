@@ -941,15 +941,18 @@ class sentinel2Data(Data):
         self._time_report('Computing atmospheric corrections for surface reflectance')
         atm6s = self.assets[asset_type].generate_atmo_corrector()
         scaling_factor = 0.001 # to prevent chunky small ints
-        rad_rev_img = self.load_image('rad-toa')
-        sr_image = gippy.GeoImage(rad_rev_img)
+        rad_toa_image = self.load_image('rad-toa')
+        sr_image = gippy.GeoImage(rad_toa_image)
         # set meta to pass along to indices
         sr_image._aod_source = str(atm6s.aod[0])
         sr_image._aod_value  = str(atm6s.aod[1])
         for c in self.assets[asset_type]._sensors[sensor]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c]
-            TLdS = T * Ld * scaling_factor # don't do it every pixel; believed to be faster
-            sr_image[c] = (rad_rev_img[c] - Lu) / TLdS
+            lu = 0.0001 * Lu # see rad_geoimage for reason for this
+            # believed to be faster to compute TLdS ahead of time (otherwise
+            # it may repeat the computation once per pixel)
+            TLdS = T * Ld * scaling_factor
+            sr_image[c] = (rad_toa_image[c] - lu) / TLdS
         self._product_images['ref'] = sr_image
 
 
@@ -1081,7 +1084,7 @@ class sentinel2Data(Data):
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)
-                if prod_type in ('ref-toa', 'rad-toa', 'rad'):
+                if prod_type in ('ref-toa', 'rad-toa', 'rad', 'ref'):
                     output_image.SetGain(0.0001)
                 if prod_type == 'cfmask':
                     output_image.SetMeta('FMASK_0', 'nodata')
