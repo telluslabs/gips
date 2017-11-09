@@ -102,6 +102,7 @@ class landsatAsset(Asset):
         #},
         'LT5': {
             'description': 'Landsat 5',
+            'ee_dataset': 'LANDSAT_TM_C1',
             'startdate': datetime(1984, 3, 1),
             'enddate': datetime(2013, 1, 1),
             'bands': ['1', '2', '3', '4', '5', '6', '7'],
@@ -117,6 +118,7 @@ class landsatAsset(Asset):
         },
         'LE7': {
             'description': 'Landsat 7',
+            'ee_dataset': 'LANDSAT_EMT_C1',
             'startdate': datetime(1999, 4, 15),
             #bands = ['1','2','3','4','5','6_VCID_1','6_VCID_2','7','8']
             'bands': ['1', '2', '3', '4', '5', '6_VCID_1', '7'],
@@ -131,6 +133,7 @@ class landsatAsset(Asset):
         },
         'LC8': {
             'description': 'Landsat 8',
+            'ee_dataset': 'LANDSAT_8_C1',
             'startdate': datetime(2013, 4, 1),
             'bands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
             'oldbands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
@@ -290,6 +293,60 @@ class landsatAsset(Asset):
         if self.sensor not in self._sensors.keys():
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
+
+    def filter(self, pclouds=100, **kwargs):
+        """
+        Filters current asset, currently based on cloud cover.
+
+        pclouds is a number between 0 and 100.
+
+        kwargs is reserved for future filtering parameters.
+        """
+        if pclouds >= 100:
+            return True
+
+        if os.path.exists(self.filename):
+            mtlfilename = self.extract([f for f in self.datafiles() if f.endswith('MTL.txt')])[0]
+            with utils.error_handler('Error reading metadata file ' + mtlfilename):
+                with open(mtlfilename, 'r') as mtlfile:
+                    text = mtlfile.read()
+                cc_pattern = r".*CLOUD_COVER = (\d+.?\d*)"
+                cloud_cover = re.match(
+                    cc_pattern,
+                    text,
+                    flags=re.DOTALL
+                )
+                if not cloud_cover:
+                    raise ValueError("No match for '{}' found in {}".format(cc_pattern, mtlfilename))
+                scene_cloud_cover = float(cloud_cover.group(1))
+        else:
+            api_key = api.login(
+                self.Repository.get_setting('username'),
+                self.Repository.get_setting('password')
+            )
+            dataset_name = landsatAsset._sensors[self.sensor]['ee_dataset']
+            path_field = landsatAsset._ee_datasets[dataset_name]['path_field']
+            row_field = landsatAsset._ee_datasets[dataset_name]['row_field']
+            response = api.search(
+                dataset_name, 'EE',
+                where={
+                    path_field: self.tile[0:3], row_field: self.tile[3:]},
+                start_date=datetime.strftime(self.date, "%Y-%m-%d"),
+                end_date=datetime.strftime(self.date, "%Y-%m-%d"),
+                api_key=api_key
+            )
+            metadata = requests.get(
+                response['data']['results'][0]['metadataUrl']
+            ).text
+            xml = ElementTree.fromstring(metadata)
+            # Indexing an Element instance returns it's children
+            scene_cloud_cover_el = xml.find(
+                ".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Scene Cloud Cover']"
+            )[0]
+
+            scene_cloud_cover = float(scene_cloud_cover_el.text)
+
+        return scene_cloud_cover < pclouds
 
     @classmethod
     def query_service(cls, asset, tile, date, pcover=90.0):
@@ -1205,9 +1262,7 @@ class landsatData(Data):
         isn't used.
         """
         if pclouds < 100:
-            raise NotImplementedError('pclouds is not supported')
-            self.meta() # TODO meta() needs to know what kind of asset to read
-            if self.metadata['clouds'] > pclouds:
+            if not all([a.filter(pclouds) for a in self.assets.values()]):
                 return False
         if sensors:
             if type(sensors) is str:
