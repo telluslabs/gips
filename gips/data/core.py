@@ -977,6 +977,23 @@ class Data(object):
                 sys.stdout.write(colors[self.sensors[p]] + p + Colors.OFF + '  ')
         sys.stdout.write('\n')
 
+
+    def _time_report(self, msg, reset_clock=False, verbosity=None):
+        """Provide the user with progress reports, including elapsed time.
+
+        Reset elapsed time with reset_clock=True; when starting or
+        resetting the clock, specify a verbosity, or else accept the
+        default of 3.
+        """
+        start = getattr(self, '_time_report_start', None)
+        if reset_clock or start is None:
+            start = self._time_report_start = datetime.now()
+            self._time_report_verbosity = 3 if verbosity is None else verbosity
+        elif verbosity is not None:
+            raise ValueError('Changing verbosity is only permitted when resetting the clock')
+        utils.verbose_out('{}:  {}'.format(datetime.now() - start, msg),
+                self._time_report_verbosity)
+
     ##########################################################################
     # Class methods
     ##########################################################################

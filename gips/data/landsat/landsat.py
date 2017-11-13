@@ -22,14 +22,16 @@
 ################################################################################
 
 
+from contextlib import contextmanager
 import os
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import shutil
 import glob
 import traceback
 from copy import deepcopy
 import commands
+import subprocess
 import tempfile
 import tarfile
 from xml.etree import ElementTree
@@ -38,12 +40,15 @@ import numpy
 # once gippy==1.0, switch to GeoRaster.erode
 from scipy.ndimage import binary_erosion
 
+import osr
 import gippy
 from gips import __version__ as __gips_version__
+from gips.core import SpatialExtent, TemporalExtent
 from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
 from gips.data.core import Repository, Asset, Data
 from gips.atmosphere import SIXS, MODTRAN
 import gips.atmosphere
+from gips.inventory import DataInventory
 from gips.utils import RemoveFiles, basename, settings, verbose_out
 from gips import utils
 
@@ -97,6 +102,7 @@ class landsatAsset(Asset):
         #},
         'LT5': {
             'description': 'Landsat 5',
+            'ee_dataset': 'LANDSAT_TM_C1',
             'startdate': datetime(1984, 3, 1),
             'enddate': datetime(2013, 1, 1),
             'bands': ['1', '2', '3', '4', '5', '6', '7'],
@@ -112,6 +118,7 @@ class landsatAsset(Asset):
         },
         'LE7': {
             'description': 'Landsat 7',
+            'ee_dataset': 'LANDSAT_EMT_C1',
             'startdate': datetime(1999, 4, 15),
             #bands = ['1','2','3','4','5','6_VCID_1','6_VCID_2','7','8']
             'bands': ['1', '2', '3', '4', '5', '6_VCID_1', '7'],
@@ -126,6 +133,7 @@ class landsatAsset(Asset):
         },
         'LC8': {
             'description': 'Landsat 8',
+            'ee_dataset': 'LANDSAT_8_C1',
             'startdate': datetime(2013, 4, 1),
             'bands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
             'oldbands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
@@ -285,6 +293,60 @@ class landsatAsset(Asset):
         if self.sensor not in self._sensors.keys():
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
+
+    def filter(self, pclouds=100, **kwargs):
+        """
+        Filters current asset, currently based on cloud cover.
+
+        pclouds is a number between 0 and 100.
+
+        kwargs is reserved for future filtering parameters.
+        """
+        if pclouds >= 100:
+            return True
+
+        if os.path.exists(self.filename):
+            mtlfilename = self.extract([f for f in self.datafiles() if f.endswith('MTL.txt')])[0]
+            with utils.error_handler('Error reading metadata file ' + mtlfilename):
+                with open(mtlfilename, 'r') as mtlfile:
+                    text = mtlfile.read()
+                cc_pattern = r".*CLOUD_COVER = (\d+.?\d*)"
+                cloud_cover = re.match(
+                    cc_pattern,
+                    text,
+                    flags=re.DOTALL
+                )
+                if not cloud_cover:
+                    raise ValueError("No match for '{}' found in {}".format(cc_pattern, mtlfilename))
+                scene_cloud_cover = float(cloud_cover.group(1))
+        else:
+            api_key = api.login(
+                self.Repository.get_setting('username'),
+                self.Repository.get_setting('password')
+            )
+            dataset_name = landsatAsset._sensors[self.sensor]['ee_dataset']
+            path_field = landsatAsset._ee_datasets[dataset_name]['path_field']
+            row_field = landsatAsset._ee_datasets[dataset_name]['row_field']
+            response = api.search(
+                dataset_name, 'EE',
+                where={
+                    path_field: self.tile[0:3], row_field: self.tile[3:]},
+                start_date=datetime.strftime(self.date, "%Y-%m-%d"),
+                end_date=datetime.strftime(self.date, "%Y-%m-%d"),
+                api_key=api_key
+            )
+            metadata = requests.get(
+                response['data']['results'][0]['metadataUrl']
+            ).text
+            xml = ElementTree.fromstring(metadata)
+            # Indexing an Element instance returns it's children
+            scene_cloud_cover_el = xml.find(
+                ".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Scene Cloud Cover']"
+            )[0]
+
+            scene_cloud_cover = float(scene_cloud_cover_el.text)
+
+        return scene_cloud_cover < pclouds
 
     @classmethod
     def query_service(cls, asset, tile, date, pcover=90.0):
@@ -657,14 +719,16 @@ class landsatData(Data):
         else:
             product_info['latency'] = float("inf")
 
-    def _process_indices(self, image, metadata, sensor, indices):
+    def _process_indices(self, image, metadata, sensor, indices, coreg_shift=None):
         """Process the given indices and add their files to the inventory.
 
         Image is a GeoImage suitable for generating the indices.
         Metadata is passed in to the gippy Indices() call.  Sensor is
         used to generate index filenames and saving info about the
         product to self. Indices is a dict of desired keys; keys and
-        values are the same as requested products in process().
+        values are the same as requested products in process(). Coreg_shift
+        is a dict with keys `x` and `y` used to make affine
+        transformation for `-coreg` products.
         """
         gippy_input = {} # map prod types to temp output filenames for feeding to gippy
         tempfps_to_ptypes = {} # map temp output filenames to prod types, for AddFile
@@ -674,6 +738,17 @@ class landsatData(Data):
             tempfps_to_ptypes[temp_fp] = prod_type
 
         prodout = Indices(image, gippy_input, metadata)
+
+        if coreg_shift:
+            for key, val in prodout.iteritems():
+                self._time_report("coregistering index")
+                img = gippy.GeoImage(val, True)
+                affine = img.Affine()
+                affine[0] += coreg_shift.get('x', 0.0)
+                affine[3] += coreg_shift.get('y', 0.0)
+                img.SetAffine(affine)
+                img.Process()
+                img = None
 
         for temp_fp in prodout.values():
             archived_fp = self.archive_temp_path(temp_fp)
@@ -798,6 +873,22 @@ class landsatData(Data):
             visbands = self.assets[asset].visbands
             lwbands = self.assets[asset].lwbands
             md = self.meta_dict()
+
+            product_is_coreg = [(v and 'coreg' in v) for v in products.requested.values()]
+            coreg = all(product_is_coreg)
+            if not coreg and any(product_is_coreg):
+                # Disallow coreg and non-coreg products in same processing
+                # call both to avoid having to check each if each product
+                # needs to be shifted as well as a hint to users who will
+                # likely only do this as an accident anyway.
+                raise ValueError("Mixing coreg and non-coreg products is not allowed")
+            if coreg:
+                if not glob.glob(os.path.join(self.path, "*coreg_args.txt")):
+                    # run arop and store coefficients
+                    with utils.make_temp_dir() as tmpdir:
+                        s2_export = self.sentinel2_coreg_export(tmpdir)
+                        self.run_arop(s2_export)
+                coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
 
             # running atmosphere if any products require it
             toa = True
@@ -1066,6 +1157,15 @@ class landsatData(Data):
                         os.remove(abfn + '.tif')
                     fname = imgout.Filename()
                     imgout.SetMeta(md)
+
+                    if coreg:
+                        self._time_report("Setting affine of product")
+                        affine = imgout.Affine()
+                        affine[0] += coreg_xshift
+                        affine[3] += coreg_yshift
+                        imgout.SetAffine(affine)
+                        imgout.Process()
+
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
                     self.AddFile(sensor, key, archive_fp)
@@ -1084,16 +1184,23 @@ class landsatData(Data):
                         indices_toa[key] = val
                     else:
                         indices[key] = val
+
+                coreg_shift = {}
+
+                if coreg:
+                    coreg_shift['x'] = coreg_xshift
+                    coreg_shift['y'] = coreg_yshift
+
                 # Run TOA
                 if len(indices_toa) > 0:
-                    self._process_indices(reflimg, md, sensor, indices_toa)
+                    self._process_indices(reflimg, md, sensor, indices_toa, coreg_shift)
 
                 # Run atmospherically corrected
                 if len(indices) > 0:
                     for col in visbands:
                         img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
                                 ) * (1.0 / atm6s.results[col][2])
-                    self._process_indices(img, md, sensor, indices)
+                    self._process_indices(img, md, sensor, indices, coreg_shift)
                 verbose_out(' -> %s: processed %s in %s' % (
                         self.basename, indices0.keys(), datetime.now() - start), 1)
             img = None
@@ -1155,9 +1262,7 @@ class landsatData(Data):
         isn't used.
         """
         if pclouds < 100:
-            raise NotImplementedError('pclouds is not supported')
-            self.meta() # TODO meta() needs to know what kind of asset to read
-            if self.metadata['clouds'] > pclouds:
+            if not all([a.filter(pclouds) for a in self.assets.values()]):
                 return False
         if sensors:
             if type(sensors) is str:
@@ -1346,3 +1451,187 @@ class landsatData(Data):
 
         verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image
+
+    def sentinel2_coreg_export(self, tmpdir):
+        """
+        Grabs closest (temporally) sentinel2 tiles and stitches them together
+        to match this landsat tile's footprint.
+
+        tmpdir is a directory name
+        """
+        from gips.data.sentinel2 import sentinel2Asset, sentinel2Data
+        landsat_shp = landsatRepository.get_setting('tiles')
+        spatial_extent = SpatialExtent.factory(sentinel2Data, site=landsat_shp, where="pr = '{}'".format(self.id), pcov=33.0)[0]
+        fetch = False
+
+        # If there is no available sentinel2 scene on that day, search before and after
+        # until one is found.
+        delta = timedelta(1)
+
+        if self.date < sentinel2Asset._assets['L1C']['startdate']:
+            date_found = starting_date = date(2017, self.date.month, self.date.day)
+        else:
+            date_found = starting_date = self.date
+
+        temporal_extent = TemporalExtent(starting_date.strftime("%Y-%j"))
+        self._time_report("querying for most recent sentinel2 images")
+        inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch)
+
+        while len(inventory) == 0:
+            if delta > timedelta(90):
+                raise ValueError("No sentinel2 data could be found within 180 days")
+
+            temporal_extent = TemporalExtent((starting_date + delta).strftime("%Y-%j"))
+            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch)
+
+            if len(inventory) != 0:
+                date_found = starting_date + delta
+                break
+
+            temporal_extent = TemporalExtent((starting_date - delta).strftime("%Y-%j"))
+            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch)
+
+            date_found = starting_date - delta
+            delta += timedelta(1)
+
+        geo_images = []
+        tiles = inventory[date_found].tiles.keys()
+        for tile in tiles:
+            asset = inventory[date_found][tile].assets['L1C']
+            band_8 = [f for f in asset.datafiles() if f.endswith('B08.jp2')]
+            asset.extract(band_8, tmpdir)
+            geo_images.append(os.path.join(tmpdir, band_8[0]))
+
+        self._time_report("merge sentinel images to bin")
+        merge_args = ["gdal_merge.py", "-o", tmpdir + "/sentinel_mosaic.bin", "-of", "ENVI", "-a_nodata", "0"]
+        # only use images that are in the same proj as landsat tile
+        merge_args.extend([i for i in geo_images if basename(i)[1:3] == self.utm_zone()])
+        subprocess.call(merge_args)
+
+        self._time_report("done with s2 export")
+        return tmpdir + '/sentinel_mosaic.bin'
+
+    def run_arop(self, base_band_filename):
+        """
+        Runs AROP's `ortho` program.
+
+        base_band_filename is the filename of the sentinel2 image you want
+        to warp to
+        """
+        warp_tile = self.id
+        warp_date = self.date
+
+        with utils.make_temp_dir() as tmpdir:
+            warp_data = landsatData(warp_tile, warp_date, "%Y%j")
+            warp_band_filenames = [f for f in warp_data.assets['C1'].datafiles() if f.endswith("B5.TIF")]
+            warp_data.assets['C1'].extract(filenames=warp_band_filenames, path=tmpdir)
+
+            warp_bands_bin = []
+            for band in warp_band_filenames:
+                band_bin = basename(band) + '.bin'
+                subprocess.call(["gdal_translate", "-of", "ENVI", os.path.join(tmpdir, band), os.path.join(tmpdir, band_bin)])
+                warp_bands_bin.append(band_bin)
+
+            # make parameter file
+            with open(os.path.join(os.path.dirname(__file__), 'input_file_tmp.inp'), 'r') as input_template:
+                template = input_template.read()
+
+            base_band_img = gippy.GeoImage(base_band_filename)
+            warp_base_band_filename = [f for f in warp_bands_bin if f.endswith("B5.bin")][0]
+            warp_base_band_img = gippy.GeoImage(os.path.join(tmpdir, warp_base_band_filename))
+            base_pixel_size = abs(base_band_img.Resolution().x())
+            warp_pixel_size = abs(warp_base_band_img.Resolution().x())
+            out_pixel_size = max(base_pixel_size, warp_pixel_size)
+            parameters = template.format(
+                base_satellite='Sentinel2',
+                base_band=base_band_filename,
+                base_nsample=base_band_img.XSize(),
+                base_nline=base_band_img.YSize(),
+                base_pixel_size=base_pixel_size,
+                base_upper_left_x=base_band_img.MinXY().x(),
+                base_upper_left_y=base_band_img.MaxXY().y(),
+                base_utm=self.utm_zone(),
+                warp_satellite='Landsat8',
+                warp_nbands=len(warp_bands_bin),
+                warp_bands=' '.join([os.path.join(tmpdir, band) for band in warp_bands_bin]),
+                warp_base_band=os.path.join(tmpdir, warp_base_band_filename),
+                warp_data_type=' '.join((['2'] * len(warp_bands_bin))),
+                warp_nsample=warp_base_band_img.XSize(),
+                warp_nline=warp_base_band_img.YSize(),
+                warp_pixel_size=warp_pixel_size,
+                warp_upper_left_x=warp_base_band_img.MinXY().x(),
+                warp_upper_left_y=warp_base_band_img.MaxXY().y(),
+                warp_utm=self.utm_zone(),
+                out_bands=' '.join([os.path.join(tmpdir, basename(band) + '_warped.bin') for band in warp_bands_bin]),
+                out_base_band=os.path.join(tmpdir, basename(warp_base_band_filename)) + '_warped.bin',
+                out_pixel_size=out_pixel_size,
+                log_file='{}/cp_log.txt'.format(tmpdir),
+            )
+
+            parameter_file = os.path.join(tmpdir, 'parameter_file.inp')
+            with open(parameter_file, 'w') as param_file:
+                param_file.write(parameters)
+
+            shutil.copyfile(
+                os.path.join(os.path.dirname(__file__), 'lndortho.cps_par.ini'),
+                os.path.join(tmpdir, 'lndortho.cps_par.ini')
+            )
+
+            subprocess.check_call(["ortho", "-r", parameter_file])
+            
+            with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
+                xcoef_re = re.compile(r"x' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
+                ycoef_re = re.compile(r"y' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
+
+                for line in log:
+                    x_match = xcoef_re.match(line)
+                    if x_match:
+                        xcoef = float(x_match.group(1))
+                    y_match = ycoef_re.match(line)
+                    if y_match:
+                        ycoef = float(y_match.group(1))
+
+            x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
+            y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
+
+            with open('{}/{}_{}_coreg_args.txt'.format(self.path, self.id, datetime.strftime(self.date, "%Y%j")), 'w') as coreg_args:
+                coreg_args.write("x: {}\n".format(x_shift))
+                coreg_args.write("y: {}".format(y_shift))
+
+    def utm_zone(self):
+        """
+        Parse UTM zone out of `gdalinfo` output.
+        """
+        if getattr(self, 'utm_zone_number', None):
+            return self.utm_zone_number
+
+        asset = self.assets['C1']
+        any_band = [band for band in asset.datafiles() if band.endswith("TIF")][0]
+        ps = subprocess.Popen(["gdalinfo", "/vsitar/" + asset.filename + "/" + any_band], stdout=subprocess.PIPE)
+        ps.wait()
+        info = ps.stdout.read()
+        utm_zone_re = re.compile(".+UTM[ _][Z|z]one[ _](\d{2})[N|S].+", flags=re.DOTALL)
+        self.utm_zone_number = utm_zone_re.match(info).group(1)
+        
+        return self.utm_zone_number
+
+    def parse_coreg_coefficients(self):
+        """
+        Parse out coregistration coefficients from asset's `*_coreg_args.txt`
+        file.
+        """
+        date = datetime.strftime(self.date, "%Y%j")
+        cp_log = "{}/{}_{}_coreg_args.txt".format(self.path, self.id, date)
+        with open(cp_log, 'r') as log:
+            xcoef_re = re.compile(r"x: (-?\d+\.?\d*)")
+            ycoef_re = re.compile(r"y: (-?\d+\.?\d*)")
+
+            for line in log:
+                x_match = xcoef_re.match(line)
+                if x_match:
+                    xcoef = float(x_match.groups()[0])
+                y_match = ycoef_re.match(line)
+                if y_match:
+                    ycoef = float(y_match.groups()[0])
+
+        return xcoef, ycoef

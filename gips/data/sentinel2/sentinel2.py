@@ -23,7 +23,6 @@ from __future__ import print_function
 import math
 import os
 import shutil
-import glob
 import sys
 import datetime
 import shlex
@@ -74,9 +73,7 @@ class sentinel2Repository(Repository):
         Returns (x0, x1, y0, y1), which is
         (west lon, east lon, south lat, north lat) in degrees.
         """
-        # ascii encoding to protect gippy from django/etc's unicode
-        atileid = tileid.encode('ascii', 'ignore')
-        e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[atileid].Extent()
+        e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[tileid].Extent()
         return e.x0(), e.x1(), e.y0(), e.y1()
 
 
@@ -148,7 +145,7 @@ class sentinel2Asset(Asset):
 
     }
 
-    _2016_12_07 = datetime.date(2016, 12, 7) # first day of new-style assets, UTC
+    _2016_12_07 = datetime.datetime(2016, 12, 7, 0, 0) # first day of new-style assets, UTC
 
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
@@ -179,7 +176,8 @@ class sentinel2Asset(Asset):
         'original': {
             # original-style assets can't use the same name for downloading and archiving, because
             # each downloaded file contains multiple tiles of data
-            'name-re': '^' + _tile_re + '_' + _orig_name_re,
+            'downloaded-name-re': _orig_name_re,
+            'archived-name-re': '^' + _tile_re + '_' + _orig_name_re,
             # raster file pattern
             # TODO '/.*/' can be misleading due to '/' satisfying '.', so rework into '/[^/]*/'
             'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B(?P<band>\d[\dA]).jp2$',
@@ -190,7 +188,8 @@ class sentinel2Asset(Asset):
         },
         _2016_12_07: {
             # post-2016 assets use their downloaded FN as their archived FN
-            'name-re': _2016_12_07_name_re,
+            'downloaded-name-re': _2016_12_07_name_re,
+            'archived-name-re': _2016_12_07_name_re,
             # raster file pattern
             'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B(?P<band>\d[\dA]).jp2$',
             # internal metadata file patterns
@@ -212,10 +211,12 @@ class sentinel2Asset(Asset):
         https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
         """
         super(sentinel2Asset, self).__init__(filename)
+        with utils.error_handler("Error opening asset '({})'".format(filename)):
+            zipfile.ZipFile(filename) # sanity check; exception if file isn't a valid zip
         base_filename = os.path.basename(filename)
 
         for style, style_dict in self._asset_styles.items():
-            match = re.match(style_dict['name-re'], base_filename)
+            match = re.match(style_dict['archived-name-re'], base_filename)
             if match is not None:
                 break
         if match is None:
@@ -243,6 +244,14 @@ class sentinel2Asset(Asset):
             self.style_res['tile-md-re'] = sr['tile-md-re'].format(tileid=self.tile)
             self.style_res['datastrip-md-re'] = sr['datastrip-md-re'].format(tileid=self.tile)
 
+
+    @classmethod
+    def query_service(cls, asset, tile, date):
+        """Compatibility method; not used by fetch."""
+        bn, url = cls.query_provider(asset, tile, date)
+        return [{'basename': bn, 'url': url}]
+
+
     @classmethod
     def query_provider(cls, asset, tile, date):
         """Search for a matching asset in the Sentinel-2 servers.
@@ -256,9 +265,7 @@ class sentinel2Asset(Asset):
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
 
-        # date is a datetime() for vanilla gips, but a date() for datahandler,
-        # but only needs to be a date() for this code's needs.
-        style = 'original' if datetime.date(year, month, day) < cls._2016_12_07 else cls._2016_12_07
+        style = 'original' if date < cls._2016_12_07 else cls._2016_12_07
 
         # search step:  locate the asset corresponding to (asset, tile, date)
         url_head = 'https://scihub.copernicus.eu/dhus/search?q='
@@ -305,20 +312,25 @@ class sentinel2Asset(Asset):
             if 'rel' in entry['link'][0]: # sanity check - the right one doesn't have a 'rel' attrib
                 raise IOError("Unexpected 'rel' attribute in search link", link)
             asset_url = entry['link'][0]['href']
-            filename = entry['title'] + '.zip'
+            output_file_name = entry['title'] + '.zip'
 
         if style != 'original':
-            return filename, asset_url
+            return output_file_name, asset_url
 
         # old-style assets cover many tiles, so there may be duplication of effort; avoid that by
         # aborting if the stage already contains the desired asset
-        staged_fp_glob = os.path.join(cls.Repository.path('stage'), '?????_' + filename)
-        if len(glob.glob(staged_fp_glob)) > 0:
-            utils.verbose_out('Asset {} needed but matching asset(s)'
-                              ' already in stage/, skipping.'.format(filename))
+        full_staged_path = os.path.join(cls.Repository.path('stage'), output_file_name)
+        if os.path.exists(full_staged_path):
+            utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
+                    output_file_name))
             return None, None
-        tile_fn = tile + '_' + filename
-        return tile_fn, asset_url
+
+        if pclouds < 100:
+            asset = cls(output_file_name)
+            if not asset.filter(pclouds):
+                return None, None
+
+        return output_file_name, asset_url
 
 
     @classmethod
@@ -326,7 +338,7 @@ class sentinel2Asset(Asset):
         """Fetch the asset corresponding to the given asset type, tile, and date."""
         output_file_name, asset_url = cls.query_provider(asset, tile, date)
         if (output_file_name, asset_url) == (None, None):
-            return [] # nothing found
+            return # nothing found
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage
@@ -348,10 +360,9 @@ class sentinel2Asset(Asset):
                 p.communicate()
                 if p.returncode != 0:
                     raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-                stage_fp = cls.stage_asset(output_full_path, output_file_name)
+                cls.stage_asset(output_full_path, output_file_name)
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
-        return [stage_fp]
 
 
     @classmethod
@@ -374,7 +385,7 @@ class sentinel2Asset(Asset):
             with utils.error_handler('Error archiving asset', continuable=True):
                 bn = os.path.basename(fn)
                 for style, style_dict in cls._asset_styles.items():
-                    match = re.match(style_dict['name-re'], bn)
+                    match = re.match(style_dict['downloaded-name-re'], bn)
                     if match is not None:
                         found_files[style].append(fn) # save the found path, not the basename
                         break
@@ -387,12 +398,10 @@ class sentinel2Asset(Asset):
 
         for fn in found_files['original']:
             tile_list = cls.tile_list(fn)
-            # trim off the tile ID so it can be used as the basis for all its internal tile IDs
-            asset_bn = os.path.basename(fn)[6:]
             # use the stage dir since it's likely not to break anything (ie on same filesystem)
             with utils.make_temp_dir(dir=cls.Repository.path('stage')) as tdname:
                 for tile in tile_list:
-                    tiled_fp = os.path.join(tdname, tile + '_' + asset_bn)
+                    tiled_fp = os.path.join(tdname, tile + '_' + os.path.basename(fn))
                     os.link(fn, tiled_fp)
                 assets += super(sentinel2Asset, cls).archive(tdname, False, False, update)
             if not keep:
@@ -407,7 +416,6 @@ class sentinel2Asset(Asset):
         stage_path = cls.Repository.path('stage')
         stage_full_path = os.path.join(stage_path, asset_base_name)
         os.rename(asset_full_path, stage_full_path) # on POSIX, if it works, it's atomic
-        return stage_full_path
 
 
     @classmethod
@@ -612,21 +620,12 @@ class sentinel2Data(Data):
         'rad': {
             'description': 'Surface-leaving radiance',
             'assets': [_asset_type],
-            'arguments': ['toa: use top of atmosphere values'],
             'bands': [{'name': band_name, 'units': 'W/m^2/um'} # aka watts/(m^2 * micrometers)
                       for band_name in Asset._sensors['S2A']['indices-colors']],
             # 'startdate' and 'latency' are optional for DH
         },
         'ref': {
             'description': 'Surface reflectance',
-            'assets': [_asset_type],
-            'arguments': ['toa: use top of atmosphere values'],
-            'bands': [{'name': band_name, 'units': Data._unitless}
-                      for band_name in Asset._sensors['S2A']['indices-colors']],
-        },
-        'reftoa': {
-            'description': "TOA reflectance; ugly hack due to datahandler's failure to support"
-                           " product arguments",
             'assets': [_asset_type],
             'bands': [{'name': band_name, 'units': Data._unitless}
                       for band_name in Asset._sensors['S2A']['indices-colors']],
@@ -642,7 +641,6 @@ class sentinel2Data(Data):
     _products.update(
         (p, {'description': d,
              'assets': [_asset_type],
-             'arguments': ['toa: use top of atmosphere values'],
              'bands': [{'name': p, 'units': Data._unitless}]}
         ) for p, d in [
             ('ndvi',   'Normalized Difference Vegetation Index'),
@@ -653,12 +651,12 @@ class sentinel2Data(Data):
             ('satvi',  'Soil-Adjusted Total Vegetation Index'),
             ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
             ('vari',   'Visible Atmospherically Resistant Index'),
+            # index products related to tillage
             # rbraswell's original description of brgt:  "Brightness index:
             # Visible to near infrared reflectance weighted by" approximate
             # energy distribution of the solar spectrum. A proxy for
             # broadband albedo."
             ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
-            # index products related to tillage
             ('ndti',   'Normalized Difference Tillage Index'),
             ('crc',    'Crop Residue Cover (uses BLUE)'),
             ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
@@ -675,7 +673,6 @@ class sentinel2Data(Data):
         'ref':          'rad-toa',
         'rad':          'rad-toa',
         'rad-toa':      'ref-toa',
-        'reftoa':       'ref-toa', # hack hack
         'ref-toa':      None, # has no deps but the asset
         'cfmask':       None,
     }
@@ -724,7 +721,7 @@ class sentinel2Data(Data):
         """
         if product in self._product_images:
             return self._product_images[product]
-        image = utils.gippy_geoimage(self.filenames[(self.current_sensor(), product)])
+        image = gippy.GeoImage(self.filenames[(self.current_sensor(), product)])
         self._product_images[product] = image
         return image
 
@@ -798,17 +795,6 @@ class sentinel2Data(Data):
                 self._time_report_verbosity)
 
 
-
-    def reftoa_dh_workaround_geoimage(self):
-        """Just a hack to work around DH's failure to support product arguments."""
-        self._time_report('Starting "reftoa" DH workaround hack product.')
-        real_ref_toa = self.load_image('ref-toa')
-        reftoa_image = utils.gippy_geoimage(real_ref_toa)
-        reftoa_image.SetNoData(0)
-        self._product_images['reftoa'] = reftoa_image
-
-
-
     def ref_toa_geoimage(self, sensor, data_spec):
         """Make a proto-product which acts as a basis for several products.
 
@@ -844,7 +830,7 @@ class sentinel2Data(Data):
                 if p.returncode != 0:
                     raise IOError("Expected gdal_translate exit status 0, got {}".format(
                             p.returncode))
-            upsampled_img = utils.gippy_geoimage(upsampled_filenames)
+            upsampled_img = gippy.GeoImage(upsampled_filenames)
             upsampled_img.SetMeta(self.meta_dict())
             upsampled_img.SetNoData(0)
             # eg:   3        '08'
@@ -869,7 +855,7 @@ class sentinel2Data(Data):
 
         radiance_factors = asset_instance.radiance_factors()
 
-        rad_image = utils.gippy_geoimage(upsampled_img)
+        rad_image = gippy.GeoImage(upsampled_img)
 
         for i in range(len(rad_image)):
             color = rad_image[i].Description()
@@ -888,7 +874,7 @@ class sentinel2Data(Data):
         ca = self.current_asset()
         atm6s = ca.generate_atmo_corrector()
 
-        rad_image = utils.gippy_geoimage(rad_toa_img)
+        rad_image = gippy.GeoImage(rad_toa_img)
         # set meta to pass along to indices
         rad_image._aod_source = str(atm6s.aod[0])
         rad_image._aod_value  = str(atm6s.aod[1])
@@ -971,7 +957,7 @@ class sentinel2Data(Data):
         atm6s = self.assets[asset_type].generate_atmo_corrector()
         scaling_factor = 0.001 # to prevent chunky small ints
         rad_rev_img = self.load_image('rad-toa')
-        sr_image = utils.gippy_geoimage(rad_rev_img)
+        sr_image = gippy.GeoImage(rad_rev_img)
         # set meta to pass along to indices
         sr_image._aod_source = str(atm6s.aod[0])
         sr_image._aod_value  = str(atm6s.aod[1])
@@ -1083,8 +1069,6 @@ class sentinel2Data(Data):
         # only do the bits that need doing
         if 'ref-toa' in work:
             self.ref_toa_geoimage(sensor, data_spec)
-        if 'reftoa' in work:
-            self.reftoa_dh_workaround_geoimage()
         if 'rad-toa' in work:
             self.rad_toa_geoimage(asset_type, sensor)
         if 'rad' in work:
@@ -1106,7 +1090,7 @@ class sentinel2Data(Data):
                 # have to reproduce the whole object because gippy refuses to write metadata when
                 # you do image.Process(filename).
                 source_image = self._product_images[prod_type]
-                output_image = utils.gippy_geoimage(temp_fp, source_image)
+                output_image = gippy.GeoImage(temp_fp, source_image)
                 output_image.SetNoData(0)
                 output_image.SetMeta(self.meta_dict()) # add standard metadata
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
