@@ -73,7 +73,7 @@ class landsatRepository(Repository):
     """ Singleton (all class methods) to be overridden by child data classes """
     name = 'Landsat'
     description = 'Landsat 5 (TM), 7 (ETM+), 8 (OLI)'
-    _tile_attribute = 'pr'
+    _tile_attribute = 'PR'
 
     @classmethod
     def feature2tile(cls, feature):
