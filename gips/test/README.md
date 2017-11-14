@@ -10,14 +10,18 @@ directories.
 
 ```
 [pytest]
+# these will save time/prevent certain errors
+testpaths = gips/test
+norecursedirs = .venv data-root
 # GIPS' configured data repository:
 data-repo = /home/your-user-name-here/src/gips/data-repo
 # a directory of your choice, used for output from, e.g., gips_project
 output-dir = /home/your-user-name-here/src/gips/testout
-# These should remain as they are (placing them in a config file is a TODO):
+# These should remain as they are (placing them in a committed file is a TODO):
 python_functions =  t_
 python_classes =    T_
 python_files =      t_*.py
+DJANGO_SETTINGS_MODULE=gips.inventory.orm.settings
 ```
 
 Library Dependencies
@@ -29,25 +33,31 @@ library for gluing them together (pytest-mock).  These are installed by
 * Pytest:  http://docs.pytest.org/en/latest/index.html
 * Mock:  http://www.voidspace.org.uk/python/mock/
 * pytest-mock:  https://pypi.python.org/pypi/pytest-mock
+* pytest-django:  https://pytest-django.readthedocs.io/en/latest/
 
 Test selection
 --------------
-Running tests is straightforward, but deselect the system tests to save time:
+Running unit tests is straightforward, as is selecting specific tests:
 
 ```
-py.test 	  	# runs all tests, even slow system tests
-py.test -k unit # only runs super-fast unit tests
-============================= test session starts ==============================
+py.test                 # only runs fast tests; all unit tests at the moment
+py.test -k inventory    # use py.test's -k to select tests conveniently:
+========================= test session starts =========================
 platform linux2 -- Python 2.7.11+, pytest-2.9.2, py-1.4.31, pluggy-0.3.1
+Django settings: gips.inventory.orm.settings (from ini file)
 rootdir: /home/tolson/src/gips, inifile: pytest.ini
-plugins: mock-1.1, cov-2.2.1, timeout-1.0.0
-collected 23 items
+plugins: mock-1.1, django-3.0.0, cov-2.2.1, timeout-1.0.0
+collected 112 items
 
-gips/test/unit/t_core.py .
-gips/test/unit/t_modis_fetch.py ...........
+gips/test/sys/t_landsat.py s    # skips system tests by default; see --sys
+gips/test/sys/t_modis.py s
+gips/test/sys/t_prism.py s
+gips/test/sys/t_script_invocation.py s
+gips/test/unit/t_inventory.py ..
+gips/test/unit/t_inventory_settings.py ..
 
-======================= 11 tests deselected by '-kunit' ========================
-=================== 12 passed, 11 deselected in 0.21 seconds ===================
+=============== 104 tests deselected by '-kinventory' =================
+======== 4 passed, 4 skipped, 104 deselected in 0.51 seconds ==========
 ```
 
 Select specific tests per usual for pytest:
@@ -90,6 +100,25 @@ Mocking is a complex subject; read about it here:
 
 http://www.voidspace.org.uk/python/mock/
 
+And here, for the pytest version: https://pypi.python.org/pypi/pytest-mock
+
+Testing in Conjunction with the Django ORM
+==========================================
+Mark unit tests that will interact with the database with
+`@pytest.mark.django_db`.  That causes the test to be isolated from the
+configured GIPS database, and instead work with a cleanly instantiated test
+database.  Usually the application of this mark is all that is required for the
+test; no other special code is needed.
+
+That mark is from pytest-django, a special plugin to glue the Django testing
+framework to pytest.  Django's testing framework:
+
+https://docs.djangoproject.com/en/1.10/topics/testing/
+
+Docs for the plugin:
+
+https://pytest-django.readthedocs.io/en/latest/
+
 Running System Tests
 ====================
 Each test runs `gips_something` commands, usually just one, as subprocesses.
@@ -115,11 +144,14 @@ are not downloaded again to improve performance.  Use options to control this
 behavior:
 
 ```
-py.test                 # run tests without fetching data files first; may fail
-py.test --setup-repo    # fetch data files then run tests
-py.test                 # now this will work since data files are retained
-py.test --clear-repo    # delete the entire repo, then fetch data files,
-                        # then run tests
+py.test --sys              # run tests without fetching data files first; may fail
+py.test --sys --setup-repo # fetch data files then run tests
+py.test --sys              # now this will work since data files are retained
+py.test --sys --clear-repo # delete the entire repo, then fetch data files,
+                           # then run tests
+# a more realistic system test run, with several useful options specified:
+# (see py.test --help for details; several are GIPS-custom options):
+py.test --ll debug -s -x -vv --sys --setup-repo -k prism
 ```
 
 Also some specially-marked tests are skipped unless command-line options are
@@ -200,8 +232,9 @@ which is convenient for making assertions in these system tests.
 
 The known-good values stored in `expected/` are usually captured from initial
 test runs.  For convenience, newly developed tests may be run with
-`py.test -s --log-level debug`; parts of the output can be cutpasted into an
-`expected/` file to establish these needed known-good values.
+`py.test -s --log-level debug --expectation-format`; parts of the output can
+be cutpasted into an `expected/` file to establish these needed known-good
+values.
 
 Caveats & Tips
 ==============
@@ -213,7 +246,12 @@ test run output by default.
 Quick Start
 ===========
 ```
-py.test -k unit # to run unit tests (after activating your virtualenv):
-py.test         # run both the system & unit tests (be prepared to wait; note
-                # also that additional configuration may be necessary).
+py.test # run unit tests (after activating your virtualenv)
+
+# realistically, a system test run for a specific driver looks like this:
+py.test --ll debug -s -x -vv --sys --setup-repo -k prism
+
+# the help message for pytest includes help for custom options, such as
+# --ll, --sys, and --setup-repo:
+py.test --help
 ```

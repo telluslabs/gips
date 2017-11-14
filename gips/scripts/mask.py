@@ -27,16 +27,16 @@ import gippy
 from gips.parsers import GIPSParser
 from gips.inventory import ProjectInventory
 from gips.utils import Colors, VerboseOut, basename
+from gips import utils
 
 __version__ = '0.1.0'
 
 def main():
     title = Colors.BOLD + 'GIPS Project Masking (v%s)' % __version__ + Colors.OFF
 
-    parser0 = GIPSParser(datasources=False, description=title)
-    parser0.add_default_parser()
-    parser0.add_projdir_parser()
-    group = parser0.add_argument_group('masking options')
+    parser = GIPSParser(datasources=False, description=title)
+    parser.add_projdir_parser()
+    group = parser.add_argument_group('masking options')
     group.add_argument('--filemask', help='Mask all files with this static mask', default=None)
     group.add_argument('--pmask', help='Mask files with this corresponding product', nargs='*', default=[])
     h = 'Write mask to original image instead of creating new image'
@@ -45,13 +45,13 @@ def main():
     group.add_argument('--overwrite', help=h, default=False, action='store_true')
     h = 'Suffix to apply to masked file (not compatible with --original)'
     group.add_argument('--suffix', help=h, default='-masked')
-    #parser0.add_argument('-i', '--invert', help='Invert mask (0->1, 1->0)', default=False, action='store_true')
-    #parser0.add_argument('--value', help='Mask == val', default=1)
-    args = parser0.parse_args()
+    args = parser.parse_args()
 
     # TODO - check that at least 1 of filemask or pmask is supplied
 
-    try:
+    utils.gips_script_setup(None, args.stop_on_error)
+
+    with utils.error_handler('Masking error'):
         VerboseOut(title)
         for projdir in args.projdir:
 
@@ -93,10 +93,7 @@ def main():
                     img = None
             mask_file = None
 
-    except Exception, e:
-        import traceback
-        VerboseOut(traceback.format_exc(), 4)
-        print 'Masking error: %s' % e
+    utils.gips_exit()
 
 
 if __name__ == "__main__":

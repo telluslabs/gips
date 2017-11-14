@@ -24,18 +24,20 @@
 import sys
 import argparse
 
-from gips.utils import data_sources
+from gips.utils import data_sources, verbose_out
 import gippy
 
 
 class GIPSParser(argparse.ArgumentParser):
     """ Extends argparser parser to print help on error """
 
-    def __init__(self, datasources=True, **kwargs):
+    def __init__(self, datasources=True, with_default=True, **kwargs):
         super(GIPSParser, self).__init__(**kwargs)
         self.datasources = datasources
         self.formatter_class = argparse.ArgumentDefaultsHelpFormatter
         self.parent_parsers = []
+        if with_default:
+            self.add_default_parser()
 
     def parse_args(self, **kwargs):
         if self.datasources:
@@ -55,22 +57,28 @@ class GIPSParser(argparse.ArgumentParser):
     def add_default_parser(self):
         """ This adds a parser with default options """
         if self.datasources:
-            parser = GIPSParser(add_help=False)
+            parser = GIPSParser(add_help=False, with_default=False)
         else:
             parser = self
-        parser.add_argument('-v', '--verbose', help='Verbosity - 0: quiet, 1: normal, 2: debug', default=1, type=int)
+        parser.add_argument('-v', '--verbose', help='Verbosity - 0: quiet, 1: normal, 2+: debug',
+                            default=1, type=int)
+        parser.add_argument('--stop-on-error', default=False, action='store_true',
+                            help='Do not attempt to continue execution after errors')
         self.parent_parsers.append(parser)
         return parser
 
     def add_inventory_parser(self, site_required=False):
         """ This adds a parser with inventory options """
         if self.datasources:
-            parser = GIPSParser(add_help=False)
+            parser = GIPSParser(add_help=False, with_default=False)
         else:
             parser = self
         group = parser.add_argument_group('inventory options')
+        sitegroup = group.add_mutually_exclusive_group(required=site_required)
         h = 'Vector layer (file or db) for region of interest'
-        group.add_argument('-s', '--site', help=h, default=None, required=site_required)
+        sitegroup.add_argument('-s', '--site', help=h, default=None)
+        h = 'Raster mask for region of interest'
+        sitegroup.add_argument('-r', '--rastermask', help=h, default=None)
         h = 'Attribute to use as lookup in in vector file (defaults to index)'
         group.add_argument('-k', '--key', help=h, default="")
         group.add_argument('-w', '--where', help="attribute=value pairs to limit features", default='')
@@ -80,10 +88,16 @@ class GIPSParser(argparse.ArgumentParser):
         group.add_argument('--sensors', help='Sensors to include', nargs='*', default=None)
         group.add_argument('--%cov', dest='pcov', help='Threshold of %% tile coverage over site', default=0, type=int)
         group.add_argument('--%tile', dest='ptile', help='Threshold of %% tile used', default=0, type=int)
-        group.add_argument('--fetch', help='Fetch any missing data (if supported)', default=False, action='store_true')
+        group.add_argument('--fetch', help='Fetch any missing data (if supported)',
+                           default=False, action='store_true')
         group.add_argument('--update', help='Force fetch and/ or update data (if supported)', default=False, action='store_true')
-
-        group.add_argument('-v', '--verbose', help='Verbosity - 0: quiet, 1: normal, 2: debug', default=1, type=int)
+        parser.add_argument(
+            '--chunksize', help='Chunk size in MB', default=128.0, type=float
+        )
+        parser.add_argument(
+            '--numprocs', help='Desired number of processors (if allowed)',
+            default=1, type=int
+        )
         group.add_argument('-p', '--products', help='Requested Products', nargs='*')
         self.parent_parsers.append(parser)
         return parser
@@ -91,13 +105,11 @@ class GIPSParser(argparse.ArgumentParser):
     def add_process_parser(self):
         """ This adds a parser with processing options """
         if self.datasources:
-            parser = GIPSParser(add_help=False)
+            parser = GIPSParser(add_help=False, with_default=False)
         else:
             parser = self
         group = parser.add_argument_group('processing options')
         group.add_argument('--overwrite', help='Overwrite existing output file(s)', default=False, action='store_true')
-        group.add_argument('--chunksize', help='Chunk size in MB', default=128.0, type=float)
-        group.add_argument('--numprocs', help='Desired number of processors (if allowed)', default=2, type=int)
         group.add_argument('--format', help='Format for output file', default="GTiff")
         h = ('Don\'t process. Instead, generate batch file with single '
              'gips_process command on each line.  \'overwrite\', '
@@ -110,7 +122,7 @@ class GIPSParser(argparse.ArgumentParser):
     def add_project_parser(self):
         """ This adds a parser with project options """
         if self.datasources:
-            parser = GIPSParser(add_help=False)
+            parser = GIPSParser(add_help=False, with_default=False)
         else:
             parser = self
         group = parser.add_argument_group('project directory options')
@@ -127,7 +139,7 @@ class GIPSParser(argparse.ArgumentParser):
     def add_warp_parser(self):
         """ This adds a parser with warping options """
         if self.datasources:
-            parser = GIPSParser(add_help=False)
+            parser = GIPSParser(add_help=False, with_default=False)
         else:
             parser = self
         group = parser.add_argument_group('warp options')
@@ -146,7 +158,7 @@ class GIPSParser(argparse.ArgumentParser):
     def add_projdir_parser(self):
         """ This adds a parser with options for reading a project output directory """
         if self.datasources:
-            parser = GIPSParser(add_help=False)
+            parser = GIPSParser(add_help=False, with_default=False)
         else:
             parser = self
         group = parser.add_argument_group('input project options')
@@ -158,7 +170,10 @@ class GIPSParser(argparse.ArgumentParser):
     def add_data_sources(self):
         """ Adds data sources to parser """
         subparser = self.add_subparsers(dest='command')
-        for src, desc in data_sources().items():
+        sources = data_sources()
+        if len(sources) == 0:
+            verbose_out("There are no available data sources!", 1, sys.stderr)
+        for src, desc in sources.items():
             subparser.add_parser(src, help=desc, parents=self.parent_parsers)
 
 

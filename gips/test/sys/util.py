@@ -1,26 +1,42 @@
-import logging, os, shutil
+import logging, os, shutil, re
 import importlib
 from pprint import pformat
 
 import pytest
 from scripttest import TestFileEnvironment, ProcResult, FoundFile, FoundDir
+import envoy
 
+from gips.inventory import orm # believed to be safe even though it's the code under test
 
 _log = logging.getLogger(__name__)
 
 
 def set_constants(config):
     """Use pytest config API to set globals pointing at needed file paths."""
-    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH
+    global TEST_DATA_DIR, DATA_REPO_ROOT, OUTPUT_DIR, NH_SHP_PATH, DURHAM_SHP_PATH, NE_SHP_PATH
     TEST_DATA_DIR  = str(config.rootdir.join('gips/test'))
     DATA_REPO_ROOT = config.getini('data-repo')
     OUTPUT_DIR     = config.getini('output-dir')
     NH_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NHseacoast.shp')
+    NE_SHP_PATH    = os.path.join(TEST_DATA_DIR, 'NE.shp')
+    DURHAM_SHP_PATH = os.path.join(TEST_DATA_DIR, 'durham.shp')
 
 slow = pytest.mark.skipif('not config.getoption("slow")',
                           reason="--slow is required for this test")
+acolite = pytest.mark.skipif('not config.getoption("acolite")',
+                          reason="--acolite is required for this test")
+sys = pytest.mark.skipif('not config.getoption("sys")', reason="--sys is required for this test")
+
 
 def extract_hashes(files):
+    """Return a dict of file names and unique hashes of their content.
+
+    `files` should be a dict in a result object from TestFileEnvironment.run().
+    Directories' don't have hashes so use None instead."""
+    return {k: getattr(v, 'hash', None) for k, v in files.items()}
+
+
+def extract_timestamps(files):
     """Return a dict of file names and unique hashes of their content.
 
     `files` should be a dict in a result object from TestFileEnvironment.run().
@@ -46,10 +62,17 @@ class GipsTestFileEnv(TestFileEnvironment):
         """As super().run but store result & prevent premature exits."""
         logging.debug("command line: `{}`".format(' '.join(args)))
         self.proc_result = super(GipsTestFileEnv, self).run(
-                *args, expect_error=True, expect_stderr=True, **kwargs)
+            *args, expect_error=True, expect_stderr=True, **kwargs)
         self.gips_proc_result = gpr = GipsProcResult(self.proc_result)
-        logging.debug("standard output: {}".format(gpr.stdout))
-        logging.debug("standard error: {}".format(gpr.stderr))
+        logging.debug("standard output: {}".format(
+            gpr.stdout if gpr.stdout != '' else '(None)'))
+        logging.debug("standard error: {}".format(
+            gpr.stderr if gpr.stderr != '' else '(None)'))
+        if pytest.config.getoption("--expectation-format"):
+            print ('standard output (expectation format): """' +
+                   re.sub('\\\\n', '\n', repr(gpr.stdout))[2:-1] + '"""')
+            print ('standard error (expectation format):  """' +
+                   re.sub('\\\\n', '\n', repr(gpr.stderr))[2:-1] + '"""')
         self.log_findings("Created files", gpr.created)
         self.log_findings("Updated files", gpr.updated)
         self.log_findings("Deleted files", gpr.deleted)
@@ -77,6 +100,15 @@ class GipsTestFileEnv(TestFileEnvironment):
             if os.path.lexists(full_n):
                 shutil.rmtree(full_n)
 
+    def _find_files(self, *args, **kwargs):
+        """As super, but log that the checksums are being computed.
+
+        Logs are needed because the process takes time for large assets."""
+        _log.debug("Starting file detection & checksumming")
+        rv = super(GipsTestFileEnv, self)._find_files(*args, **kwargs)
+        _log.debug("Completed file detection & checksumming")
+        return rv
+
 
 class GipsProcResult(object):
     """Storage & equality comparison for a process's various outcomes.
@@ -84,10 +116,12 @@ class GipsProcResult(object):
     Standard output is handled specially for equality comparison; see __eq__.
     Can accept scripttest.ProcResult objects at initialization; see __init__.
     """
-    attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted', 'created')
+    attribs = ('exit_status', 'stdout', 'stderr', 'updated', 'deleted',
+               'created', 'ignored',)  # 'timestamps')
+
     def __init__(self, proc_result=None, compare_stdout=None, compare_stderr=True, **kwargs):
         """Initialize the object using a ProcResult, explicit kwargs, or both.
-        
+
         ProcResults' reports on files (created, deleted, updated) are saved as
         their names and hashes.  compare_stdout is an explicit way to request
         stdout be considered in __eq__; see below.  If it is not set, then
@@ -102,6 +136,7 @@ class GipsProcResult(object):
             self.updated = {}
             self.deleted = {}
             self.created = {}
+            # self.timestamps = {}
         else:
             # self.proc_result = proc_result # not sure if this is needed
             self.exit_status = proc_result.returncode
@@ -110,13 +145,19 @@ class GipsProcResult(object):
             self.updated = extract_hashes(proc_result.files_updated)
             self.deleted = extract_hashes(proc_result.files_deleted)
             self.created = extract_hashes(proc_result.files_created)
+            # self.timestamps = dict()
+            # for files in [proc_result.files_updated, proc_result.files_created]:
+            #     self.timestamps.update(extract_timestamps(files))
 
-        input_fields = set(kwargs.keys())
+        self.ignored = []  # list of filenames to ignore for comparison purposes
+
+        # special keys are permitted if they begin with an underscore
+        input_fields = set(k for k in kwargs.keys() if k[0] != '_')
         if not input_fields.issubset(set(self.attribs)):
             raise ValueError('Unknown attributes for GipsProcResult',
                              list(input_fields - set(self.attribs)))
 
-        self.__dict__.update(kwargs) # set user's desired values
+        self.__dict__.update(kwargs)  # set user's desired values
 
         # guess the user's wishes regarding stdout comparison;
         # explicit request should override guesswork
@@ -125,8 +166,16 @@ class GipsProcResult(object):
         else:
             self.compare_stdout = self.stdout is not None
         # need a valid value to compare against either way
-        #self.stdout = self.stdout or u''
+        # self.stdout = self.stdout or u''
         self.compare_stderr = compare_stderr
+
+    def strip_ignored(self, d):
+        """Return a copy of dict d but strip out items in self.ignored.
+
+        If self.ignored = ['a', 'b'] then
+        strip_ignored({'a': 1, 'b': 2, 'c': 2}) returns {'c': 2}.
+        """
+        return {k: v for k, v in d.items() if k not in self.ignored}
 
     def __eq__(self, other):
         """Equality means all attributes must match, except possibly stdout & stderr.
@@ -140,16 +189,29 @@ class GipsProcResult(object):
             self.exit_status == other.exit_status,
             not compare_stdout or self.stdout == other.stdout,
             not compare_stderr or self.stderr == other.stderr,
-            self.updated == other.updated,
-            self.deleted == other.deleted,
-            self.created == other.created,
+            self.strip_ignored(self.updated) == self.strip_ignored(other.updated),
+            self.strip_ignored(self.deleted) == self.strip_ignored(other.deleted),
+            self.strip_ignored(self.created) == self.strip_ignored(other.created),
         )
         return all(matches)
 
 
+def rectify(driver):
+    """Ensure inv DB matches files on disk."""
+    if not orm.use_orm():
+        return
+    rectify_cmd = 'gips_inventory {} --rectify'.format(driver)
+    outcome = envoy.run(rectify_cmd)
+    if outcome.status_code != 0:
+        raise RuntimeError("failed: " + rectify_cmd,
+                           outcome.std_out, outcome.std_err, outcome)
+
+
 @pytest.yield_fixture
-def repo_env():
+def repo_env(request):
     """Provide means to test files created by run & clean them up after."""
+    if not orm.use_orm():
+        _log.warning("ORM is deactivated; check GIPS_ORM.")
     gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     yield gtfe
     # This step isn't effective if DATA_REPO_ROOT isn't right; in that case it
@@ -157,6 +219,7 @@ def repo_env():
     # Maybe add self-healing by having setup_modis_data run in a TFE and
     # detecting which files are present when it starts.
     gtfe.remove_created()
+    rectify(request.module.driver)
 
 
 @pytest.yield_fixture(scope='module')
@@ -166,6 +229,8 @@ def clean_repo_env(request):
     This emulates tfe.run()'s checking the directory before and after a run,
     then working out how the directory has changed.  Unfortunately half the
     work is done in tfe, the other half in ProcResult."""
+    if not orm.use_orm():
+        _log.warning("ORM is deactivated; check GIPS_ORM.")
     file_env = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
     before = file_env._find_files()
     _log.debug("Generating file env: {}".format(file_env))
@@ -173,6 +238,7 @@ def clean_repo_env(request):
     after = file_env._find_files()
     file_env.proc_result = ProcResult(file_env, ['N/A'], '', '', '', 0, before, after)
     file_env.remove_created()
+    rectify(request.module.driver)
     _log.debug("Finalized file env: {}".format(file_env))
 
 

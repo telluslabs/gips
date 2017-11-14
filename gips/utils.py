@@ -20,17 +20,23 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
+from __future__ import print_function
 
+import imp
+import sys
 import os
+import re
 import errno
-import gippy
-from gippy import GeoVector
+from contextlib import contextmanager
 import tempfile
 import commands
 import shutil
 import traceback
+import datetime
+import numpy as np
 
-from pdb import set_trace
+import gippy
+from gippy import GeoVector
 
 
 class Colors():
@@ -60,24 +66,30 @@ class Colors():
     _WHITE  = _c + '47m'
 
 
-def VerboseOut(obj, level=1):
-    '''
-    TODO: Add real documentation of rules regarding levels used within
-          GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
-          "let me see everything" level.
-    '''
+def verbose_out(obj, level=1, stream=sys.stdout):
+    """print(obj) but only if the user's chosen verbosity level warrants it.
+
+    Print to stdout by default, but select any stream the user wishes.  Finally
+    if the obj is a list or tuple, print each contained object consecutively on
+    separate lines.
+    """
+    #TODO: Add real documentation of rules regarding levels used within
+    #      GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
+    #      "let me see everything" level.
     if gippy.Options.Verbose() >= level:
-        #pprint.PrettyPrinter().pprint(obj)
         if not isinstance(obj, (list, tuple)):
             obj = [obj]
         for o in obj:
-            print o
+            print(o, file=stream)
+
+VerboseOut = verbose_out # VerboseOut name is deprecated
 
 ##############################################################################
 # Filesystem functions
 ##############################################################################
 
 def File2List(filename):
+    """Return contents of file as a list of lines, sans newlines."""
     f = open(filename)
     txt = f.readlines()
     txt2 = []
@@ -87,23 +99,35 @@ def File2List(filename):
 
 
 def List2File(lst, filename):
+    """Overwrite the given file with the contents of the list.
+
+    Each item in the list is given a trailing newline.
+    """
     f = open(filename, 'w')
     f.write('\n'.join(lst) + '\n')
     f.close()
 
 
-def RemoveFiles(filenames, extensions=['']):
-    for f in filenames:
-        for ext in ([''] + extensions):
-            try:
-                os.remove(f + ext)
-            except OSError as e:
-                if e.errno != errno.ENOENT:
-                    raise
-                continue
+def remove_files(filenames, extensions=()):
+    """Remove the given files and all permutations with the given extensions.
 
+    So remove_files(['a.hdf', 'b.hdf'], ['.index', '.aux.xml']) attempts to
+    these files:  a.hdf, b.hdf, a.hdf.index, a.hdf.aux.xml, b.hdf,
+    b.hdf.index, and b.hdf.aux.xml.  Doesn't raise an error if any file doesn't exist.
+    """
+    for f in (list(filenames) + [f + e for f in filenames for e in extensions]):
+        with error_handler(continuable=True, msg_prefix="Error removing '{}'".format(f)):
+            if os.path.isfile(f):
+                os.remove(f)
+
+RemoveFiles = remove_files # RemoveFiles name is deprecated
 
 def basename(str):
+    """Return the input string, stripped of directories and extensions.
+
+    So, basename('/home/al-haytham/book-of-optics.pdf') returns
+    'book-of-optics'.
+    """
     return os.path.splitext(os.path.basename(str))[0]
 
 
@@ -125,6 +149,37 @@ def link(src, dst, hard=False):
         os.symlink(os.path.relpath(src, os.path.dirname(dst)), os.path.abspath(dst))
     return dst
 
+@contextmanager
+def make_temp_dir(suffix='', prefix='tmp', dir=None):
+    """Context manager to create then delete a temporary directory.
+
+    Arguments are the same as tempfile.mkdtemp, which it calls.  Yields
+    the absolute pathname to the new directory.  Deletes the directory
+    at the exit of the context, regardless of exceptions raised in the
+    context.
+    """
+    absolute_pathname = tempfile.mkdtemp(suffix, prefix, dir)
+    try:
+        yield absolute_pathname
+    finally:
+        shutil.rmtree(absolute_pathname)
+
+
+def find_files(regex, path='.'):
+    """Find filenames in the given directory that match the regex.
+
+    Returns a list of matching filenames; each includes the given path.
+    Only regular files and symbolic links to regular files are returned.
+    """
+    compiled_re = re.compile(regex)
+    ret = []
+    for f in os.listdir(path):
+        fpath = os.path.join(path, f)
+        if os.path.isfile(fpath) and compiled_re.match(f):
+            ret.append(fpath)
+    return ret
+
+
 ##############################################################################
 # Settings functions
 ##############################################################################
@@ -132,20 +187,15 @@ def link(src, dst, hard=False):
 
 def settings():
     """ Retrieve GIPS settings - first from user, then from system """
-    import imp
-    try:
-        # import user settings first
-        src = imp.load_source(
-            'settings',
-            os.path.expanduser('~/.gips/settings.py')
-        )
-        return src
-    except (ImportError, IOError) as e:
-        try:
-            import gips.settings
-            return gips.settings
-        except ImportError:
-            raise ImportError('No settings found...did you run gips_config?')
+    settings_path = os.path.expanduser('~/.gips/settings.py')
+    if os.path.isfile(settings_path):
+        with error_handler("Error loading '{}'".format(settings_path)):
+            # import user settings first
+            src = imp.load_source('settings', settings_path)
+            return src
+    with error_handler("gips.settings not found; consider running gips_config"):
+        import gips.settings
+        return gips.settings
 
 
 def create_environment_settings(repos_path, email=''):
@@ -155,17 +205,13 @@ def create_environment_settings(repos_path, email=''):
     cfgfile = os.path.join(cfgpath, 'settings.py')
     if src[-1] == 'c':
         src = src[:-1]
-    try:
-        if not os.path.exists(cfgfile):
-            with open(cfgfile, 'w') as fout:
-                with open(src, 'r') as fin:
-                    for line in fin:
-                        fout.write(line.replace('$TLD', repos_path).replace('$EMAIL', email))
+    if os.path.exists(cfgfile):
         return cfgfile
-    except OSError:
-        # no permissions, so no environment level config installed
-        #print traceback.format_exc()
-        return None
+    with open(cfgfile, 'w') as fout:
+        with open(src, 'r') as fin:
+            for line in fin:
+                fout.write(line.replace('$TLD', repos_path).replace('$EMAIL', email))
+    return cfgfile
 
 
 def create_user_settings(email=''):
@@ -188,11 +234,7 @@ def create_user_settings(email=''):
 
 def create_repos():
     """ Create any necessary repository directories """
-    try:
-        repos = settings().REPOS
-    except:
-        print traceback.format_exc()
-        raise Exception('Problem reading repository...check settings files')
+    repos = settings().REPOS
     for key in repos.keys():
         repo = import_repository_class(key)
         for d in repo._subdirs:
@@ -205,19 +247,12 @@ def data_sources():
     """ Get enabled data sources (and verify) from settings """
     sources = {}
     repos = settings().REPOS
-    found = False
     for key in sorted(repos.keys()):
-        if os.path.isdir(repos[key]['repository']):
-            try:
-                repo = import_repository_class(key)
-                sources[key] = repo.description
-                found = True
-            except:
-                VerboseOut(traceback.format_exc(), 1)
-        else:
+        if not os.path.isdir(repos[key]['repository']):
             raise Exception('ERROR: archive %s is not a directory or is not available' % key)
-    if not found:
-        print "There are no available data sources!"
+        with error_handler(continuable=True):
+            repo = import_repository_class(key)
+            sources[key] = repo.description
     return sources
 
 
@@ -227,12 +262,10 @@ def import_data_module(clsname):
     path = settings().REPOS[clsname].get('driver', '')
     if path == '':
         path = os.path.join( os.path.dirname(__file__), 'data', clsname)
-    try:
+    with error_handler('Error loading driver ' + clsname):
         fmtup = imp.find_module(clsname, [path])
         mod = imp.load_module(clsname, *fmtup)
         return mod
-    except:
-        print traceback.format_exc()
 
 
 def import_repository_class(clsname):
@@ -246,6 +279,9 @@ def import_data_class(clsname):
     """ Get clsnameData class object """
     mod = import_data_module(clsname)
     exec('repo = mod.%sData' % clsname)
+    # prevent use of database inventory for certain incompatible drivers
+    from gips.inventory import orm
+    orm.driver_for_dbinv_feature_toggle = repo.name.lower()
     return repo
 
 
@@ -254,7 +290,7 @@ def import_data_class(clsname):
 ##############################################################################
 
 def open_vector(fname, key="", where=''):
-    """ Open vector or feature """
+    """Open vector or feature, returned as a gippy GeoVector or GeoFeature."""
     parts = fname.split(':')
     if len(parts) == 1:
         vector = GeoVector(fname)
@@ -263,22 +299,14 @@ def open_vector(fname, key="", where=''):
         # or it is a database
         if parts[0] not in settings().DATABASES.keys():
             raise Exception("%s is not a valid database" % parts[0])
-        try:
-            db = settings().DATABASES[parts[0]]
-            filename = ("PG:dbname=%s host=%s port=%s user=%s password=%s" %
-                        (db['NAME'], db['HOST'], db['PORT'], db['USER'], db['PASSWORD']))
-            vector = GeoVector(filename, parts[1])
-            vector.SetPrimaryKey(key)
-
-        except Exception as e:
-            VerboseOut(traceback.format_exc(), 4)
+        db = settings().DATABASES[parts[0]]
+        filename = ("PG:dbname=%s host=%s port=%s user=%s password=%s" %
+                    (db['NAME'], db['HOST'], db['PORT'], db['USER'], db['PASSWORD']))
+        vector = GeoVector(filename, parts[1])
+        vector.SetPrimaryKey(key)
     if where != '':
         # return array of features
-
-        # set_trace()
-
         return vector.where(where)
-        features = []
     else:
         return vector
 
@@ -334,6 +362,64 @@ def crop2vector(img, vector):
     return img
 
 
+def vectorize(img, vector, oformat=None):
+    """
+    Create vector from img using gdal_polygonize.
+
+    oformat -- defaults to (due to ogr2ogr) "ESRI Shapefile"
+    """
+    conn_opt = '-8' # avoid islands as much as possible
+    fmt = ''
+    if oformat:
+        fmt = '-f "{}"'.format(oformat)
+
+    def gso_run(cmd, emsg):
+        '''simple shell command wrapper'''
+        with error_handler(emsg):
+            verbose_out('Running: {}'.format(cmd), 4)
+            status, output = commands.getstatusoutput(cmd)
+            if status != 0:
+                verbose_out(
+                    '++\n Ran command:\n {}\n\n++++\n Console output:\n {}\n++\n'
+                    .format(cmd, output),
+                    1
+                )
+                raise RuntimeError(emsg)
+
+    # Grab projection because gml doesn't carry it around by default
+    wkt = gippy.GeoImage(img).Projection()
+    # rasterize the vector
+    with make_temp_dir(prefix='vectorize') as td:
+        tvec = os.path.join(td, os.path.basename(vector)[:-4] + '.gml')
+        polygonize = (
+            'gdal_polygonize.py {CONNECTEDNESS} {IMAGE} {VECTOR}'
+            .format(CONNECTEDNESS=conn_opt, IMAGE=img, VECTOR=tvec)
+        )
+        emsg = 'Error vectorizing raster {} to {}'.format(img, tvec)
+        gso_run(polygonize, emsg)
+
+        if gippy.GeoVector(tvec).NumFeatures() != 1:
+            ivec = tvec
+            tvec = tvec[:-4] + '_dissolve.gml'
+            dissolve = (
+                'ogr2ogr -f GML {OVEC} {IVEC} -dialect sqlite '
+                '-sql "SELECT DN as DN, ST_Union(geometryProperty) as '
+                'geometry FROM out GROUP BY DN"'
+                .format(OVEC=tvec, IVEC=ivec)
+            )
+            emsg = 'Error dissolving {} to {}'.format(ivec, tvec)
+            gso_run(dissolve, emsg)
+
+        make_final_prod = (
+            "ogr2ogr {FMT} -a_srs '{WKT}' '{OVEC}' '{IVEC}'"
+            .format(FMT=fmt, WKT=wkt, OVEC=vector, IVEC=tvec)
+        )
+        emsg = 'Error writing final output from {} to {}'.format(tvec, vector)
+        gso_run(make_final_prod, emsg)
+
+    return vector
+
+
 def mosaic(images, outfile, vector):
     """ Mosaic multiple files together, but do not warp """
     nd = images[0][0].NoDataValue()
@@ -362,14 +448,145 @@ def mosaic(images, outfile, vector):
     return crop2vector(imgout, vector)
 
 
-# old code utilizing shared memory array
-# Chunk it up
-# chunksz = int(data.shape[0] / nproc)
-# extra = data.shape[0] - chunksz * nproc
-# chunks = [chunksz] * (nproc - extra) + [chunksz + 1] * extra
+def gridded_mosaic(images, outfile, rastermask, interpolation=0):
+    """ Mosaic multiple files to grid and mask specified in rastermask """
+    nd = images[0][0].NoDataValue()
+    mask_img = gippy.GeoImage(rastermask)
+    srs = mask_img.Projection()
+    filenames = [images[0].Filename()]
+    for f in range(1, images.NumImages()):
+        filenames.append(images[f].Filename())
 
-# queue = multiprocessing.Queue()
-# from agspy.contrib import shmarray
-# classmap = shmarray.create_copy(classmap)
-# tmp = numpy.ctypeslib.as_ctypes(classmap)
-# cmap = sharedctypes.Array(tmp._type_, tmp, lock=False)
+    imgout = gippy.GeoImage(outfile, mask_img,
+                            images[0].DataType(), images[0].NumBands())
+
+    imgout.SetNoData(nd)
+    #imgout.ColorTable(images[0])
+    nddata = np.empty((images[0].NumBands(),
+                       mask_img.YSize(), mask_img.XSize()))
+    nddata[:] = nd
+    imgout.Write(nddata)
+    imgout = None
+
+    # run warp command
+    resampler = ['near', 'bilinear', 'cubic']
+    cmd = "gdalwarp -t_srs '{}' -r {} {} {}".format(
+        srs,
+        resampler[interpolation],
+        " ".join(filenames),
+        outfile
+    )
+    result = commands.getstatusoutput(cmd)
+    verbose_out('{}: {}'.format(cmd, result, 4))
+
+    imgout = gippy.GeoImage(outfile, True)
+    for b in range(0, images[0].NumBands()):
+        imgout[b].CopyMeta(images[0][b])
+    imgout.AddMask(mask_img[0])
+    imgout.Process()
+
+    
+def julian_date(date_and_time, variant=None):
+    """Returns the julian date for the given datetime object.
+
+    If no variant is chosen, the original julian date is given (days
+    since noon, Jan 1, 4713 BC, fractions included).  If a variant is
+    chosen, that julian date is returned instead.  Supported variants:
+    'modified' (JD - 2400000.5) and 'cnes' (JD - 2433282.5).  See
+    https://en.wikipedia.org/wiki/Julian_day for more details.
+    """
+    mjd_td = date_and_time - datetime.datetime(1858, 11, 17)
+    # note day-length isn't constant under UTC due to leap seconds; hopefully this is close enough
+    mjd = mjd_td.days + mjd_td.seconds / 86400.0
+
+    offsets = {
+        None:       2400000.5,
+        'modified': 0.0,
+        'cnes':     -33282.0,
+    }
+
+    return mjd + offsets[variant]
+
+
+##############################################################################
+# Error handling and script setup & teardown
+##############################################################################
+
+_traceback_verbosity = 4    # only print a traceback if the user selects this verbosity or higher
+_accumulated_errors = []    # used for tracking success/failure & doing final error reporting when
+                            # GIPS is running as a command-line application
+_stop_on_error = False      # should GIPS try to recover from errors?  Set by gips_script_setup
+
+
+def set_error_handler(handler):
+    """Set the active error handler (generally for entire life of process)."""
+    global error_handler
+    error_handler = handler
+
+
+def report_error(error, msg_prefix, show_tb=True):
+    """Print an error report on stderr, possibly including a traceback.
+
+    Caller can suppress the traceback with show_tb.  The user can suppress
+    it via the GIPS global verbosity setting."""
+    if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
+        verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
+        traceback.print_exc()
+    else:
+        verbose_out(msg_prefix + ': ' + str(error), 1, stream=sys.stderr)
+
+
+@contextmanager
+def lib_error_handler(msg_prefix='Error', continuable=False):
+    """Handle errors appropriately for GIPS running as a library."""
+    try:
+        yield
+    except Exception as e:
+        if continuable and not _stop_on_error:
+            report_error(e, msg_prefix)
+        else:
+            raise
+
+
+error_handler = lib_error_handler # set this so gips code can use the right error handler
+
+
+def gips_exit():
+    """Deliver an error report if needed, then exit."""
+    if len(_accumulated_errors) == 0:
+        sys.exit(0)
+    verbose_out("Fatal: {} error(s) occurred:".format(len(_accumulated_errors)), 1, sys.stderr)
+    [report_error(error, error.msg_prefix) for error in _accumulated_errors]
+    sys.exit(1)
+
+
+@contextmanager
+def cli_error_handler(msg_prefix='Error', continuable=False):
+    """Context manager for uniform error handling for command-line users.
+
+    Exceptions are caught and reported to stderr; _gips_exit() is called
+    if halt is indicated.
+    """
+    try:
+        yield
+    except Exception as e:
+        e.msg_prefix = msg_prefix # for use by gips_exit
+        _accumulated_errors.append(e)
+        if continuable and not _stop_on_error:
+            report_error(e, msg_prefix)
+        else:
+            gips_exit()
+
+
+def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
+    """Run this at the beginning of a GIPS CLI program to do setup."""
+    global _stop_on_error
+    _stop_on_error = stop_on_error
+    set_error_handler(cli_error_handler)
+    from gips.inventory import orm # avoids a circular import
+    with error_handler():
+        # must run before orm.setup
+        data_class = None if driver_string is None else import_data_class(driver_string)
+        if setup_orm:
+            orm.setup()
+        return data_class

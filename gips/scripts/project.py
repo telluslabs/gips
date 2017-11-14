@@ -26,7 +26,9 @@ from gips import __version__
 from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
 from gips.utils import Colors, VerboseOut, import_data_class
+from gips import utils
 from gips.inventory import DataInventory, ProjectInventory
+from gips.inventory import orm
 
 
 def main():
@@ -40,13 +42,14 @@ def main():
     parser0.add_warp_parser()
     args = parser0.parse_args()
 
-    try:
-        print title
-        cls = import_data_class(args.command)
+    cls = utils.gips_script_setup(args.command, args.stop_on_error)
+    print title
 
+    with utils.error_handler():
         extents = SpatialExtent.factory(
-            cls, args.site, args.key, args.where, args.tiles, args.pcov,
-            args.ptile
+            cls, site=args.site, rastermask=args.rastermask,
+            key=args.key, where=args.where, tiles=args.tiles,
+            pcov=args.pcov, ptile=args.ptile
         )
 
         # create tld: SITENAME--KEY_DATATYPE_SUFFIX
@@ -80,10 +83,8 @@ def main():
                     .format(str(t_extent), str(t_extent)),
                     2,
                 )
-    except Exception as e:
-        import traceback
-        VerboseOut(traceback.format_exc(), 4)
-        print 'Data Project error: %s' % e
+
+    utils.gips_exit() # produce a summary error report then quit with a proper exit status
 
 
 if __name__ == "__main__":
