@@ -240,12 +240,12 @@ class landsatAsset(Asset):
             self.asset = 'SR'
             self.sensor = 'LC8SR'
             self.version = int(fname[20:22])
-            self.tile = fname[3:9]
+            self.tile = int(fname[3:9])
             self.date = datetime.strptime(fname[9:16], "%Y%j")
 
         elif dn_match:
             verbose_out('DN asset', 2)
-            self.tile = dn_match.group('path') + dn_match.group('row')
+            self.tile = int(dn_match.group('path') + dn_match.group('row'))
             year = dn_match.group('acq_year')
             doy = dn_match.group('acq_day')
             self.date = datetime.strptime(year + doy, "%Y%j")
@@ -256,7 +256,7 @@ class landsatAsset(Asset):
         elif c1_match:
             utils.verbose_out('C1 asset', 2)
 
-            self.tile = c1_match.group('path') + c1_match.group('row')
+            self.tile = int(c1_match.group('path') + c1_match.group('row'))
             year = c1_match.group('acq_year')
             month = c1_match.group('acq_month')
             day = c1_match.group('acq_day')
