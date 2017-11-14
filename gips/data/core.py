@@ -275,6 +275,12 @@ class Asset(object):
 
 
     def get_geometry(self):
+        """Get the geometry of the asset
+
+        For tiled assets, this will return the geometry of the tile in the
+        respective 'tiles.shp' file as WKT. Needs to be extended for
+        untiled assets.
+        """
         # If tileID is a number, drop leading 0
         try:
             tile_num = int(self.tile)
