@@ -19,6 +19,24 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
+v0.9.2
+- PR#448 from Applied-GeoSolutions/445-get-geometry
+- PR#440 from Applied-GeoSolutions/433-sentinel2-gain
+- PR#447 from Applied-GeoSolutions/444-install
+- PR#434 from Applied-GeoSolutions/428-sentinel2-cloud-filter
+- PR#435 from Applied-GeoSolutions/landsat-cloud-cover-filter
+- PR#431 from Applied-GeoSolutions/landsat-coreg-product
+- PR#422 from Applied-GeoSolutions/388-spatialextent-from-raster
+- PR#421 from Applied-GeoSolutions/chirps-goes-global
+- PR#411 from Applied-GeoSolutions/fix-gips-config-env-bug
+- PR#410 from Applied-GeoSolutions/85-silly-bugs
+- PR#408 from Applied-GeoSolutions/366-aot550
+- PR#406 from Applied-GeoSolutions/palsar-mask-fix
+- drink versioning DRY
+- added "mask" product; updated implicit "sign" masking
+- PR#402 from Applied-GeoSolutions/113-numprocs-toplevel
+- proposed fix for IEEE_UNDERFLOW_FLAG and DENORMAL issues
+
 v0.9.1
 - Optional database inventory using the Django ORM, currently used for
   managing metadata for products and assets.
