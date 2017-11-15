@@ -36,6 +36,7 @@ import glob
 from xml.etree import ElementTree, cElementTree
 
 import numpy
+import requests
 
 import gippy
 import gippy.algorithms
@@ -212,7 +213,8 @@ class sentinel2Asset(Asset):
         """
         super(sentinel2Asset, self).__init__(filename)
         with utils.error_handler("Error opening asset '({})'".format(filename)):
-            zipfile.ZipFile(filename) # sanity check; exception if file isn't a valid zip
+            if os.path.exists(filename):  # __init__ should work even if file doesn't exist
+                zipfile.ZipFile(filename)  # exception if file isn't a valid zip
         base_filename = os.path.basename(filename)
 
         for style, style_dict in self._asset_styles.items():
@@ -246,14 +248,14 @@ class sentinel2Asset(Asset):
 
 
     @classmethod
-    def query_service(cls, asset, tile, date):
+    def query_service(cls, asset, tile, date, pclouds=100):
         """Compatibility method; not used by fetch."""
-        bn, url = cls.query_provider(asset, tile, date)
+        bn, url = cls.query_provider(asset, tile, date, pclouds)
         return [{'basename': bn, 'url': url}]
 
 
     @classmethod
-    def query_provider(cls, asset, tile, date):
+    def query_provider(cls, asset, tile, date, pclouds=100):
         """Search for a matching asset in the Sentinel-2 servers.
 
         Uses the given (asset, tile, date) tuple as a search key, and
@@ -321,6 +323,12 @@ class sentinel2Asset(Asset):
             utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
                     output_file_name))
             return None, None
+
+        if pclouds < 100:
+            asset = cls(output_file_name)
+            if not asset.filter(pclouds):
+                return None, None
+
         return output_file_name, asset_url
 
 
@@ -429,6 +437,48 @@ class sentinel2Asset(Asset):
                 .format(file_name)
             )
         return list(tiles)
+
+
+    def filter(self, pclouds=100, **kwargs):
+        if pclouds < 100:
+            if os.path.exists(self.filename):
+                with utils.make_temp_dir() as tmpdir:
+                    metadata_file = [f for f in self.datafiles() if f.endswith("MTD_MSIL1C.xml")][0]
+                    self.extract([metadata_file], path=tmpdir)
+                    tree = ElementTree.parse(tmpdir + '/' + metadata_file)
+                    root = tree.getroot()
+            else:
+                scihub = "https://scihub.copernicus.eu/dhus/odata/v1"
+                username = self.Repository.get_setting('username')
+                password = self.Repository.get_setting('password')
+                asset_name = os.path.basename(self.filename)[0:-4]
+                query_url = "{}/Products?$filter=Name eq '{}'".format(scihub, asset_name)
+                r = requests.get(query_url, auth=(username, password))
+                r.raise_for_status()
+                root = ElementTree.fromstring(r.content)
+                namespaces = {
+                    'a': "http://www.w3.org/2005/Atom",
+                    'm': "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
+                    'd': "http://schemas.microsoft.com/ado/2007/08/dataservices",
+                }
+                product_id_el = root.find("./a:entry/m:properties/d:Id", namespaces)
+                if product_id_el is None:
+                    raise Exception("{} is not a valid asset".format(asset_name))
+                metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL1C.xml')/$value".format(
+                    scihub, product_id_el.text, asset_name
+                )
+                r = requests.get(metadata_url, auth=(username, password))
+                r.raise_for_status()
+                root = ElementTree.fromstring(r.content)
+
+            ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
+            cloud_coverage_el = root.findall(
+                "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
+            )[0]
+            if float(cloud_coverage_el.text) > pclouds:
+                return False
+
+        return True
 
 
     def xml_subtree(self, md_file_type, subtree_tag):
@@ -729,6 +779,8 @@ class sentinel2Data(Data):
             raise IOError(err_msg)
         return tile_string.upper()
 
+    def filter(self, pclouds=100, **kwargs):
+        return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
     @classmethod
     def meta_dict(cls):
@@ -756,6 +808,7 @@ class sentinel2Data(Data):
         fnl.sort(key=lambda f: band_strings.index(f[-6:-4]))
         self.metadata = {'filenames': fnl}
 
+
     def read_raw(self):
         """Read in bands using original SAFE asset file (a .zip)."""
         self.load_metadata()
@@ -768,22 +821,6 @@ class sentinel2Data(Data):
             datafiles = [os.path.join('/vsizip/' + self.assets['L1C'].filename, f)
                     for f in self.metadata['filenames']]
         self.metadata['abs-filenames'] = datafiles
-
-    def _time_report(self, msg, reset_clock=False, verbosity=None):
-        """Provide the user with progress reports, including elapsed time.
-
-        Reset elapsed time with reset_clock=True; when starting or
-        resetting the clock, specify a verbosity, or else accept the
-        default of 3.
-        """
-        start = getattr(self, '_time_report_start', None)
-        if reset_clock or start is None:
-            start = self._time_report_start = datetime.datetime.now()
-            self._time_report_verbosity = 3 if verbosity is None else verbosity
-        elif verbosity is not None:
-            raise ValueError('Changing verbosity is only permitted when resetting the clock')
-        utils.verbose_out('{}:  {}'.format(datetime.datetime.now() - start, msg),
-                self._time_report_verbosity)
 
 
     def ref_toa_geoimage(self, sensor, data_spec):
@@ -824,6 +861,7 @@ class sentinel2Data(Data):
             upsampled_img = gippy.GeoImage(upsampled_filenames)
             upsampled_img.SetMeta(self.meta_dict())
             upsampled_img.SetNoData(0)
+            upsampled_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
             # eg:   3        '08'
             for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
                 band_index = data_spec['band-strings'].index(band_string) # starts at 0
@@ -866,13 +904,22 @@ class sentinel2Data(Data):
         atm6s = ca.generate_atmo_corrector()
 
         rad_image = gippy.GeoImage(rad_toa_img)
+        # to check the gain & other values set on the object:
+        # print('rad_image info:', rad_image.Info()
+
         # set meta to pass along to indices
         rad_image._aod_source = str(atm6s.aod[0])
         rad_image._aod_value  = str(atm6s.aod[1])
 
         for c in ca._sensors[self.current_sensor()]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c] # Ld is unused for this product
-            rad_image[c] = (rad_toa_img[c] - Lu) / T
+            # 6SV1/Py6S/SIXS produces atmo correction values suitable
+            # for raw values ("digital numbers") from landsat, but
+            # rad_toa_img isn't a raw value; it has a gain.  So, apply
+            # that same gain to Lu, apparently the atmosphere's
+            # inherent radiance, to get a reasonable difference.
+            lu = 0.0001 * Lu
+            rad_image[c] = (rad_toa_img[c] - lu) / T
         self._product_images['rad'] = rad_image
 
 
@@ -947,15 +994,18 @@ class sentinel2Data(Data):
         self._time_report('Computing atmospheric corrections for surface reflectance')
         atm6s = self.assets[asset_type].generate_atmo_corrector()
         scaling_factor = 0.001 # to prevent chunky small ints
-        rad_rev_img = self.load_image('rad-toa')
-        sr_image = gippy.GeoImage(rad_rev_img)
+        rad_toa_image = self.load_image('rad-toa')
+        sr_image = gippy.GeoImage(rad_toa_image)
         # set meta to pass along to indices
         sr_image._aod_source = str(atm6s.aod[0])
         sr_image._aod_value  = str(atm6s.aod[1])
         for c in self.assets[asset_type]._sensors[sensor]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c]
-            TLdS = T * Ld * scaling_factor # don't do it every pixel; believed to be faster
-            sr_image[c] = (rad_rev_img[c] - Lu) / TLdS
+            lu = 0.0001 * Lu # see rad_geoimage for reason for this
+            # believed to be faster to compute TLdS ahead of time (otherwise
+            # it may repeat the computation once per pixel)
+            TLdS = T * Ld * scaling_factor
+            sr_image[c] = (rad_toa_image[c] - lu) / TLdS
         self._product_images['ref'] = sr_image
 
 
@@ -1087,6 +1137,8 @@ class sentinel2Data(Data):
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)
+                if prod_type in ('ref-toa', 'rad-toa', 'rad', 'ref'):
+                    output_image.SetGain(0.0001)
                 if prod_type == 'cfmask':
                     output_image.SetMeta('FMASK_0', 'nodata')
                     output_image.SetMeta('FMASK_1', 'valid')

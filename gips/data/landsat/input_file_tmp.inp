@@ -1,0 +1,37 @@
+PARAMETER_FILE
+
+BASE_LANDSAT = {base_band}
+BASE_FILE_TYPE = BINARY
+BASE_DATA_TYPE = 2
+BASE_NSAMPLE = {base_nsample}
+BASE_NLINE = {base_nline}
+BASE_PIXEL_SIZE = {base_pixel_size}
+BASE_UPPER_LEFT_CORNER = {base_upper_left_x}, {base_upper_left_y}
+BASE_UTM_ZONE = {base_utm}
+BASE_DATUM = 12
+BASE_SATELLITE = {base_satellite}
+
+WARP_NBANDS = {warp_nbands}
+WARP_LANDSAT_BAND = {warp_bands}
+WARP_BASE_MATCH_BAND = {warp_base_band}
+WARP_BAND_DATA_TYPE = {warp_data_type}
+WARP_FILE_TYPE = BINARY
+WARP_NSAMPLE = {warp_nsample}
+WARP_NLINE = {warp_nline}
+WARP_PIXEL_SIZE = {warp_pixel_size}
+WARP_UPPER_LEFT_CORNER = {warp_upper_left_x}, {warp_upper_left_y}
+WARP_UTM_ZONE = {warp_utm}
+WARP_DATUM = 12
+WARP_SATELLITE = {warp_satellite}
+
+OUT_PIXEL_SIZE = {out_pixel_size}
+RESAMPLE_METHOD = BI
+OUT_EXTENT = WARP
+OUT_LANDSAT_BAND = {out_bands}
+OUT_BASE_MATCH_BAND = {out_base_band}
+OUT_BASE_POLY_ORDER = 1
+CP_LOG_FILE = {log_file}
+
+CP_PARAMETERS_FILE = lndortho.cps_par.ini
+
+END

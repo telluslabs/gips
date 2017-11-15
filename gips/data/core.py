@@ -274,6 +274,19 @@ class Asset(object):
                 self._version < newasset._version)
 
 
+    def get_geometry(self):
+        """Get the geometry of the asset
+
+        For tiled assets, this will return the geometry of the tile in the
+        respective 'tiles.shp' file as WKT. Needs to be extended for
+        untiled assets.
+        """
+        v = gippy.GeoVector(self.Repository.get_setting("tiles"))
+        v.SetPrimaryKey(self.Repository._tile_attribute)
+        feat = v[self.tile]
+
+        return feat.WKT()
+
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
@@ -949,6 +962,23 @@ class Data(object):
             for p in sorted(self.products):
                 sys.stdout.write(colors[self.sensors[p]] + p + Colors.OFF + '  ')
         sys.stdout.write('\n')
+
+
+    def _time_report(self, msg, reset_clock=False, verbosity=None):
+        """Provide the user with progress reports, including elapsed time.
+
+        Reset elapsed time with reset_clock=True; when starting or
+        resetting the clock, specify a verbosity, or else accept the
+        default of 3.
+        """
+        start = getattr(self, '_time_report_start', None)
+        if reset_clock or start is None:
+            start = self._time_report_start = datetime.now()
+            self._time_report_verbosity = 3 if verbosity is None else verbosity
+        elif verbosity is not None:
+            raise ValueError('Changing verbosity is only permitted when resetting the clock')
+        utils.verbose_out('{}:  {}'.format(datetime.now() - start, msg),
+                self._time_report_verbosity)
 
     ##########################################################################
     # Class methods
