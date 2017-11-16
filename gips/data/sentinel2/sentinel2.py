@@ -843,7 +843,7 @@ class sentinel2Data(Data):
             vrt_filename = os.path.join(tmpdir, self.basename + '_ref-toa.vrt')
             cmd_str = (
                 'gdalbuildvrt -resolution highest -separate '
-                '-vrtnodata 0 {} {}'  # NOTE: -vrtnodata has no effect for jp2s
+                '-srcnodata 0 -vrtnodata 0 {} {}'
             ).format(vrt_filename, ' '.join(src_filenames))
             cmd_args = shlex.split(cmd_str)
             p = subprocess.Popen(cmd_args)
