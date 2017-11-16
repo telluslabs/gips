@@ -119,9 +119,10 @@ class sentinel2Asset(Asset):
 
             # colors needed for computing indices products such as NDVI
             # color names are ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2']
-            'indices-bands': ['02', '03', '04', '08', '11', '12'],
+            'indices-bands': ['02', '03', '04', '05', '06', '07', '08', '8A', '11', '12'],
             # similar to landsat's "visbands"
-            'indices-colors': ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'],
+            'indices-colors': ['BLUE', 'GREEN', 'RED', 'REDEDGE1', 'REDEDGE2',
+                 'REDEDGE3', 'NIR', 'REDEDGE4', 'SWIR1', 'SWIR2'],
             # landsat version: ['COASTAL', 'BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'CIRRUS'],
         },
     }
@@ -646,13 +647,13 @@ class sentinel2Asset(Asset):
 
 class sentinel2Data(Data):
     name = 'Sentinel2'
-    version = '0.1.0'
+    version = '0.1.1'
     Asset = sentinel2Asset
 
     _productgroups = {
         'Index': [
             'ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari',
-            'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti'  # <-- tillage indices
+            'brgt', 'mtci', 's2rep', 'ndti', 'crc', 'crcm', 'isti', 'sti',
         ],
         'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
                     'spm655', 'turbidity', 'acoflags'],
