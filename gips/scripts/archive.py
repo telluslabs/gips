@@ -23,13 +23,12 @@
 
 from gips import __version__ as gipsversion
 from gips.parsers import GIPSParser
-from gips.utils import Colors, VerboseOut, import_data_class
 from gips import utils
 from gips.inventory import orm, dbinv
 
 
 def main():
-    title = Colors.BOLD + 'GIPS Data Archive Utility (v%s)' % gipsversion + Colors.OFF
+    title = utils.Colors.BOLD + 'GIPS Data Archive Utility (v%s)' % gipsversion + utils.Colors.OFF
 
     # argument parsing
     parser = GIPSParser(description=title)
@@ -48,8 +47,6 @@ def main():
 
     with utils.error_handler('Data archive error'):
         print title
-        cls = import_data_class(args.command)
-        orm.setup() # set up DB orm in case it's needed for Asset.archive()
         # TODO archive accepts limited args, pass them in explicitly
         archived_assets = cls.Asset.archive(**vars(args))
 

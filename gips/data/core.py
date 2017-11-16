@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 import glob
 import re
 from itertools import groupby
+import itertools
 from shapely.wkt import loads
 import tarfile
 import zipfile
@@ -176,6 +177,30 @@ class Repository(object):
 
 
     @classmethod
+    def quarantine_file(cls, filename):
+        """Move file to the quarantine area of the repo.
+
+        If the filename exists in the quarantine, integer suffixes will
+        be tried, '-1', '-2', etc.  Returns the final absolute path &
+        filename.
+        """
+        afn = os.path.abspath(filename)
+        base_qfn = os.path.join(cls.path('quarantine'), os.path.basename(filename))
+        def quarantined_fn_gen(): # Generate sequence of candidate filenames
+            yield base_qfn
+            for n in itertools.count(start=1):
+                yield base_qfn + '-' + str(n)
+        for qfn in quarantined_fn_gen():
+            try:
+                os.link(afn, qfn) # os.rename silently clobbers, so do this instead
+            except OSError as o:
+                if o.errno != errno.EEXIST: # try again if file exists
+                    raise
+            else:
+                os.remove(afn) # hardlink to new name in place, safe to remove original
+                return qfn
+
+    @classmethod
     def vector2tiles(cls, vector, pcov=0.0, ptile=0.0, tilelist=None):
         """ Return matching tiles and coverage % for provided vector """
         from osgeo import ogr, osr
@@ -242,7 +267,11 @@ class Asset(object):
     _defaultresolution = [30.0, 30.0]
 
     def __init__(self, filename):
-        """ Inspect a single file and populate variables. Needs to be extended """
+        """Inspect given filename and populate self.
+
+        Don't assume the file is actually present, as the datahandler
+        instantiates for requested files.
+        """
         # full filename to asset
         self.filename = filename
         # the asset code
@@ -273,6 +302,19 @@ class Asset(object):
                 self.date == newasset.date and
                 self._version < newasset._version)
 
+
+    def get_geometry(self):
+        """Get the geometry of the asset
+
+        For tiled assets, this will return the geometry of the tile in the
+        respective 'tiles.shp' file as WKT. Needs to be extended for
+        untiled assets.
+        """
+        v = gippy.GeoVector(self.Repository.get_setting("tiles"))
+        v.SetPrimaryKey(self.Repository._tile_attribute)
+        feat = v[self.tile]
+
+        return feat.WKT()
 
     ##########################################################################
     # Child classes should not generally have to override anything below here
@@ -461,7 +503,6 @@ class Asset(object):
             return []
         return [{'basename': bn, 'url': url}]
 
-
     @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
@@ -556,9 +597,8 @@ class Asset(object):
         except Exception, e:
             # if problem with inspection, move to quarantine
             utils.report_error(e, 'File error, quarantining ' + filename)
-            qname = os.path.join(cls.Repository.path('quarantine'), bname)
-            if not os.path.exists(qname):
-                os.link(os.path.abspath(filename), qname)
+            qfn = cls.Repository.quarantine_file(filename)
+            utils.verbose_out("Asset file quarantined to " + qfn, 1, sys.stderr)
             return (None, 0)
 
         # make an array out of asset.date if it isn't already
@@ -1026,22 +1066,85 @@ class Data(object):
         return set(assets)
 
     @classmethod
-    def fetch(cls, products, tiles, textent, update=False):
-        """ Download data for tiles and add to archive. update forces fetch """
-        assets = cls.products2assets(products)
-        fetched = []
-        for a in assets:
+    def query_service(cls, products, tiles, textent, update=False, force=False, grouped=False):
+        """
+        Returns a list (or dict) of asset files that are available for
+        download, given the arguments provided.
+        These constraints include specific products, tiles, and temporal
+        extent.
+        Additionally, the return value is either grouped into a dict mapping
+        (prod, tile, date) --> url
+        or simply a list of URLs, based on the 'grouped' parameter.
+        """
+        if grouped:
+            response = {}
+        else:
+            response  = []
+        for p in products:
+            assets = cls.products2assets([p])
             for t in tiles:
-                asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                for d in asset_dates:
-                    # if we don't have it already, or if update (force) flag
-                    if not cls.Asset.discover(t, d, a) or update == True:
-                        date_str = d.strftime("%y-%m-%d")
-                        msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
-                        with utils.error_handler(msg_prefix, continuable=True):
-                            cls.Asset.fetch(a, t, d)
-                            # fetched may contain both fetched things and unfetchable things
-                            fetched.append((a, t, d))
+                for a in assets:
+                    asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
+                    for d in asset_dates:
+                        # if we don't have it already, or if 'update' flag
+                        local_assets = cls.Asset.discover(t, d, a)
+                        if force or len(local_assets) == 0 or update:
+                            date_str = d.strftime("%F")
+                            msg_prefix = (
+                                'query_service for {}, {}, {}'
+                                .format(a, t, date_str)
+                            )
+                            with utils.error_handler(msg_prefix, continuable=False):
+                                resp = cls.Asset.query_service(a, t, d)
+                                if len(resp) == 0:
+                                    continue
+                                elif len(resp) > 1:
+                                    raise Exception('should only be one asset')
+                                aobj = cls.Asset(resp[0]['basename'])
+
+                                if (force or len(local_assets) == 0 or
+                                    (len(local_assets) == 1 and
+                                     local_assets[0].updated(aobj))
+                                ):
+                                    rec = {
+                                        'product': p,
+                                        'sensor': aobj.sensor,
+                                        'tile': t,
+                                        'asset': a,
+                                        'date': d
+                                    }
+                                    # useful to datahandler to have this
+                                    # grouped by (p,t,d) there is a fair bit of
+                                    # duplicated info this way, but oh well
+                                    if grouped:
+                                        if (p,t,d) in response:
+                                            response[(p,t,d)].append(rec)
+                                        else:
+                                            response[(p,t,d)] = [rec]
+                                    else:
+                                        response.append(rec)
+        return response
+
+    @classmethod
+    def fetch(cls, products, tiles, textent, update=False):
+        available_assets = cls.query_service(
+            products, tiles, textent, update
+        )
+        fetched = []
+        for asset_info in available_assets:
+            asset = asset_info['asset']
+            tile = asset_info['tile']
+            date = asset_info['date']
+            msg_prefix = (
+                'Problem fetching asset for {}, {}, {}'
+                .format(asset, tile, str(date))
+            )
+            with utils.error_handler(msg_prefix, continuable=True):
+                filenames = cls.Asset.fetch(asset, tile, date)
+                # fetched may contain both fetched things and unfetchable things
+                if len(filenames) == 1:
+                    fetched.append((asset, tile, date))
+
         return fetched
 
     @classmethod

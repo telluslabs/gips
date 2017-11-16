@@ -197,14 +197,14 @@ class prismData(Data):
         'tmin': {
             'description': 'Daily Minimum Temperature',
             'assets': ['_tmin'],
-            'bands': [{'name': 'tmin', 'units': 'degree Celcius'}],
+            'bands': [{'name': 'tmin', 'units': 'degree Celsius'}],
             'startdate': Asset._startdate,
             'latency': Asset._latency,
         },
         'tmax': {
             'description': 'Daily Maximum Temperature',
             'assets': ['_tmax'],
-            'bands': [{'name': 'tmin', 'units': 'degree Celcius'}],
+            'bands': [{'name': 'tmax', 'units': 'degree Celsius'}],
             'startdate': Asset._startdate,
             'latency': Asset._latency,
         },

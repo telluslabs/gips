@@ -44,7 +44,42 @@ for f in glob.glob('gips/scripts/*.py'):
             console_scripts.append(script)
     except:
         print traceback.format_exc()
+console_scripts += [
+    'gips_scheduler = gips.datahandler.scheduler:main',
+    'gips_dhd       = gips.datahandler.dhd:main',
+]
 
+# GIPS requirements should be added at the level appropriate
+#  lib - required to install and import gips.core classes
+# full - required to use gips.data.* drivers (file-system based)
+#  orm - required to use DB based gips
+#   dh - required to run the gips.datahandler
+_lib_requirements = [
+    'gippy>=0.3.11,<0.4.0',
+    'shapely',
+    'python-dateutil',
+]
+_full_requirements = _lib_requirements + [
+    'homura==0.1.3',
+    'usgs==0.2.1',
+    'Py6S>=1.7.0',
+    'pysolar==0.6',
+    'requests',
+    'pydap==3.2',
+    'netCDF4',
+    'dbfread==2.0.7',
+    'rios==1.4.3',
+    'python-fmask==0.4.5',
+    'pydap==3.2', 
+]
+_orm_requirements = _full_requirements + [
+    'django==1.10',
+    'psycopg2<=2.6',
+]
+_dh_requirements = _orm_requirements + [
+    'rq',
+    'python-crontab',
+]
 
 setup(
     name='gips',
@@ -52,21 +87,20 @@ setup(
     description='Geospatial Image Processing System',
     author='Matthew Hanson',
     author_email='matt.a.hanson@gmail.com',
+    maintainer='Ian Cooke',
+    maintainer_email='icooke@ags.io',
     packages=find_packages(),
-    package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf']},
-    install_requires=[
-        'Py6S>=1.7.0',
-        'shapely',
-        'gippy>=0.3.11,<0.4',
-        'homura==0.1.3',
-        'python-dateutil',
-        'pydap==3.2',
-        'pysolar==0.6',
-        'dbfread==2.0.7',
-        'rios==1.4.3',
-        'python-fmask==0.4.5',
-        'usgs', # 0.2.1 known to work
-    ],
+    package_data={
+        '': ['*.shp', '*.prj', '*.shx', '*.dbf'],
+        'gips.datahandler': ['*.service.template',],
+    },
+    install_requires=_lib_requirements,
+    extras_require={
+        'full': _full_requirements,
+        'orm': _orm_requirements,
+        'dh-rq': _dh_requirements,
+        'dh-torque': _orm_requirements,
+    },
     dependency_links=[
         'https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3',
         'https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.4.5.zip#egg=python-fmask-0.4.5',

@@ -27,12 +27,20 @@ import sys
 import os
 import re
 import errno
+import logging
+import logging.config
 from contextlib import contextmanager
 import tempfile
 import commands
 import shutil
 import traceback
 import datetime
+import itertools
+import collections
+
+from shapely.wkt import loads as wktloads
+from osr import SpatialReference, CoordinateTransformation
+from ogr import CreateGeometryFromWkt
 import numpy as np
 
 import gippy
@@ -65,22 +73,50 @@ class Colors():
     _CYAN   = _c + '46m'
     _WHITE  = _c + '47m'
 
+def v_to_ll(v):
+    """Converts verbosity values (`-v 3`) to python log levels.
+
+    verbosity levels don't map to match log levels.  Log levels describe
+    severity, but verbosity describes level of detail or noisiness on
+    the console.  Most of gips CLI output is probably INFO or DEBUG,
+    whereas the WARNING, ERROR, and CRITICAL stuff is all (or had better
+    be) at -v1, and will be in the context of error handling anyway.
+    """
+    # gips.parsers says verbosity 0 means "quiet" mode, and the gips defaul for -v is 1.
+    if v < 1:
+        return logging.WARNING
+    if v == 1:
+        return logging.INFO
+    if v > 1:
+        return logging.DEBUG
+
+_named_logger = 'gips'
 
 def verbose_out(obj, level=1, stream=sys.stdout):
-    """print(obj) but only if the user's chosen verbosity level warrants it.
+    """print() or log() the object, conditional on _lib_mode.
 
-    Print to stdout by default, but select any stream the user wishes.  Finally
-    if the obj is a list or tuple, print each contained object consecutively on
-    separate lines.
+    If _lib_mode, python's logging is used and `stream` is ignored.
+    Otherwise, print the object to the stream, but only if the user's
+    chosen verbosity level warrants it. Finally if the obj is a list or
+    tuple, print each contained object consecutively on separate lines.
     """
     #TODO: Add real documentation of rules regarding levels used within
     #      GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
     #      "let me see everything" level.
-    if gippy.Options.Verbose() >= level:
-        if not isinstance(obj, (list, tuple)):
-            obj = [obj]
-        for o in obj:
-            print(o, file=stream)
+    listish = isinstance(obj, (list, tuple))
+    if _lib_mode:
+        l = logging.getLogger(_named_logger)
+        # consider passing in stream as another clue about log level to use
+        ll = v_to_ll(level)
+        if listish:
+            [l.log(ll, o) for o in obj]
+        else:
+            l.log(ll, obj)
+    elif gippy.Options.Verbose() >= level:
+        if listish:
+            [print(o, file=stream) for o in obj]
+        else:
+            print(obj, file=stream)
 
 VerboseOut = verbose_out # VerboseOut name is deprecated
 
@@ -198,19 +234,115 @@ def settings():
         return gips.settings
 
 
-def create_environment_settings(repos_path, email=''):
+def get_setting(setting, default=None):
+    """Fetch a GIPS setting named by the given string.
+
+    If the setting isn't present in gips settings, the default is
+    returned instead.  If an exception should be raised due to absence
+    of the given setting, settings().SETTING should be used instead.
+    """
+    return settings().__dict__.get(setting, default)
+
+
+def add_datahandler_settings(
+        fout, task_queue, db_host, db_name, db_user, db_password, db_port,
+        dh_server='localhost', dh_port=8001, dh_log_port=8002,
+        dh_export_dir='/tmp/', queue_name='datahandler', queue_server='localhost',
+        remote_python='/usr/bin/env python',
+        update=False, **kwargs
+):
+    from . import datahandler as gdh
+    gdh_path = gdh.__path__[0]
+    cfgfile = os.path.join(gdh_path, 'settings_template.py')
+    with open(cfgfile, 'r') as fin:
+        for line in fin:
+            fout.write(
+                line.replace(
+                    '$DH_SERVER', dh_server
+                ).replace(
+                    '$DH_PORT', str(dh_port)
+                ).replace(
+                    '$DH_LOG_PORT', str(dh_log_port)
+                ).replace(
+                    '$DH_EXPORT_DIR', dh_export_dir
+                ).replace(
+                    '$DB_NAME', db_name
+                ).replace(
+                    '$DB_USER', db_user
+                ).replace(
+                    '$DB_PASSWORD', db_password
+                ).replace(
+                    '$DB_HOST', db_host
+                ).replace(
+                    '$DB_PORT', str(db_port)
+                )
+            )
+    qcfgfile = os.path.join(gdh_path, 'queue', task_queue+'_settings_template.py')
+    with open(qcfgfile, 'r') as fin:
+        for line in fin:
+            fout.write(
+                line.replace(
+                    '$QUEUE_NAME', queue_name
+                ).replace(
+                    '$QUEUE_SERVER', queue_server
+                ).replace(
+                    '$REMOTE_PYTHON', remote_python
+                )
+            )
+
+def create_environment_settings(
+        repos_path, email, drivers, earthdata_user='', earthdata_password='',
+        update_config=False, **kwargs
+):
     """ Create settings file and data directory """
     from gips.settings_template import __file__ as src
-    cfgpath = os.path.dirname(__file__)
-    cfgfile = os.path.join(cfgpath, 'settings.py')
+    gipspath = os.path.dirname(__file__)
+    cfgfile = os.path.join(gipspath, 'settings.py')
     if src[-1] == 'c':
         src = src[:-1]
-    if os.path.exists(cfgfile):
-        return cfgfile
-    with open(cfgfile, 'w') as fout:
-        with open(src, 'r') as fin:
-            for line in fin:
-                fout.write(line.replace('$TLD', repos_path).replace('$EMAIL', email))
+
+    if not os.path.exists(cfgfile) or update_config:
+        with open(cfgfile, 'w') as fout:
+            with open(src, 'r') as fin:
+                for line in fin:
+                    fout.write(
+                        line.replace(
+                            '$TLD', repos_path
+                        ).replace(
+                            '$EMAIL', email
+                        ).replace(
+                            '$EARTHDATA_USER', earthdata_user
+                        ).replace(
+                            '$EARTHDATA_PASSWORD', earthdata_password
+                        )
+                    )
+            for driver in drivers:
+                from . import data as gipsdata
+                gd_path = gipsdata.__path__[0]
+                built_in_drivers = filter(
+                    lambda e: (not e.endswith('.py') and
+                               not e.endswith('.pyc')),
+                    os.listdir(gd_path)
+                )
+
+                # get the settings_template file for the selected driver
+                if driver in built_in_drivers:
+                    cfgfile = os.path.join(
+                        gd_path, driver, 'settings_template.py')
+                elif os.path.isdir(driver) and os.path.isabs(driver):
+                    # full path to a driver directory
+                    cfgfile = os.path.join(driver, 'settings_template.py')
+                else:
+                    # try import, dirname, and checking for template
+                    import imp
+                    fmtup = imp.find_module(driver)
+                    cfgfile = os.path.join(fmtup[1], 'settings_template.py')
+
+                with open(cfgfile, 'r') as fin:
+                    for line in fin:
+                        fout.write(line.replace('$TLD', repos_path))
+            if 'task_queue' in kwargs:
+                add_datahandler_settings(fout, **kwargs)
     return cfgfile
 
 
@@ -219,10 +351,10 @@ def create_user_settings(email=''):
     from gips.user_settings_template import __file__ as src
     if src[-1] == 'c':
         src = src[:-1]
-    cfgpath = os.path.expanduser('~/.gips')
-    if not os.path.exists(cfgpath):
-        os.mkdir(cfgpath)
-    cfgfile = os.path.join(cfgpath, 'settings.py')
+    dotgips = os.path.expanduser('~/.gips')
+    if not os.path.exists(dotgips):
+        os.mkdir(dotgips)
+    cfgfile = os.path.join(dotgips, 'settings.py')
     if os.path.exists(cfgfile):
         raise Exception('User settings file already exists: %s' % cfgfile)
     with open(cfgfile, 'w') as fout:
@@ -268,6 +400,44 @@ def import_data_module(clsname):
         return mod
 
 
+def get_data_variables():
+    """ Get data varaible information using enabled data sources from settings"""
+    sources = data_sources()
+
+    data_variables = []
+
+    # ex asset = modis
+    for driver in sources.keys():
+        data_class = import_data_class(driver)
+        for product in data_class._products.keys():
+            with error_handler(
+                    msg_prefix="Error adding product {}:{}".format(driver,product),
+                    continuable=True):
+                product_dict = data_class._products[product]
+                description = product_dict['description']
+                assets = repr(product_dict['assets'])
+                start_date = product_dict.get('startdate')
+                latency = product_dict.get('latency', 0)
+                for band_num,band in enumerate(product_dict['bands']):
+                    band_name = band['name']
+                    units = band['units']
+                    data_variable = {
+                        'driver': driver,
+                        'description': description,
+                        'product': product,
+                        'name': "{}_{}_{}".format(driver, product, band_name),
+                        'asset': assets,
+                        'band_number': band_num,
+                        'band': band_name,
+                        'start_date': start_date,
+                        'units': units,
+                        'latency': latency
+                    }
+
+                    data_variables.append(data_variable)
+    return data_variables
+
+
 def import_repository_class(clsname):
     """ Get clsnameRepository class object """
     mod = import_data_module(clsname)
@@ -289,31 +459,23 @@ def import_data_class(clsname):
 # Geospatial functions
 ##############################################################################
 
-def open_vector(fname, key="", where=''):
+def open_vector(fname, key='', where=''):
     """Open vector or feature, returned as a gippy GeoVector or GeoFeature."""
-    parts = fname.split(':')
-    if len(parts) == 1:
-        vector = GeoVector(fname)
-        vector.SetPrimaryKey(key)
+    # gippy can't handle unicode:
+    afname, akey, awhere = [s.encode('ascii', 'ignore') for s in (fname, key, where)]
+    if not ':' in afname:
+        vector = GeoVector(afname)
     else:
         # or it is a database
-        if parts[0] not in settings().DATABASES.keys():
-            raise Exception("%s is not a valid database" % parts[0])
-        db = settings().DATABASES[parts[0]]
-        filename = ("PG:dbname=%s host=%s port=%s user=%s password=%s" %
-                    (db['NAME'], db['HOST'], db['PORT'], db['USER'], db['PASSWORD']))
-        vector = GeoVector(filename, parts[1])
-        vector.SetPrimaryKey(key)
-    if where != '':
-        # return array of features
-        return vector.where(where)
-    else:
-        return vector
+        db_name, gv_arg = afname.split(':')
+        conn_params = settings().DATABASES[db_name]
+        conn_template = "PG:dbname={NAME} host={HOST} port={PORT} user={USER} password={PASSWORD}"
+        vector = GeoVector(conn_template.format(**conn_params), gv_arg)
 
-from shapely.wkt import loads as wktloads
-from osr import SpatialReference, CoordinateTransformation
-from ogr import CreateGeometryFromWkt
-
+    vector.SetPrimaryKey(akey)
+    if awhere != '':
+        return vector.where(awhere) # return array of features
+    return vector
 
 def transform_shape(shape, ssrs, tsrs):
     """ Transform shape from ssrs to tsrs (all wkt) and return as wkt """
@@ -420,7 +582,7 @@ def vectorize(img, vector, oformat=None):
     return vector
 
 
-def mosaic(images, outfile, vector):
+def mosaic(images, outfile, vector, product_res=None):
     """ Mosaic multiple files together, but do not warp """
     nd = images[0][0].NoDataValue()
     srs = images[0].Projection()
@@ -432,16 +594,28 @@ def mosaic(images, outfile, vector):
         filenames.append(images[f].Filename())
     # transform vector to image projection
     geom = wktloads(transform_shape(vector.WKT(), vector.Projection(), srs))
-
     extent = geom.bounds
-    ullr = "%f %f %f %f" % (extent[0], extent[3], extent[2], extent[1])
-
-    # run merge command
+    # part of the command string
     nodatastr = '-n %s -a_nodata %s -init %s' % (nd, nd, nd)
-    cmd = 'gdal_merge.py -o %s -ul_lr %s %s %s' % (outfile, ullr, nodatastr, " ".join(filenames))
-    result = commands.getstatusoutput(cmd)
-    VerboseOut('%s: %s' % (cmd, result), 4)
-    imgout = gippy.GeoImage(outfile, True)
+    # might reuse the gdal merge command
+    def gdal_merge(x0, y0, x1, y1):
+        ullr = "%f %f %f %f" % (x0, y0, x1, y1)
+        cmd = 'gdal_merge.py -o %s -ul_lr %s %s %s' % (outfile, ullr, nodatastr, " ".join(filenames))
+        result = commands.getstatusoutput(cmd)
+        VerboseOut('%s: %s' % (cmd, result), 4)
+        return result[0] == 0
+
+    merge_ok = gdal_merge(extent[0], extent[3], extent[2], extent[1])
+
+    if merge_ok is False and product_res is not None:
+        # possibly awful solution to the so-called alltouch problem
+        x0, y0, x1, y1 = (extent[0], extent[3], extent[2], extent[1])
+        x1 += product_res[0]
+        y1 += product_res[1]
+        # TODO: catch if this one does not work
+        merge_ok = gdal_merge(x0, y0, x1, y1)
+
+    imgout = gippy.GeoImage(str(outfile), True)
     for b in range(0, images[0].NumBands()):
         imgout[b].CopyMeta(images[0][b])
     imgout.CopyColorTable(images[0])
@@ -507,6 +681,33 @@ def julian_date(date_and_time, variant=None):
 
     return mjd + offsets[variant]
 
+def grouper(iterable, n, fillvalue=None):
+    """Collect data into fixed-length chunks or blocks.
+
+    e.g.:  grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    Taken nearly verbatim from the python itertools docs:
+    https://docs.python.org/2/library/itertools.html"""
+    args = [iter(iterable)] * n
+    return itertools.izip_longest(fillvalue=fillvalue, *args)
+
+def gippy_geoimage(*args):
+    """returns gippy.GeoImage(*args), but filters out unicode."""
+    if not args:
+        return gippy.GeoImage()
+
+    first, rest = args[0], args[1:]
+
+    # all the cases that start with a string:
+    if isinstance(first, unicode):
+        return gippy.GeoImage(first.encode('ascii', 'ignore'), *rest)
+    if isinstance(first, str) or isinstance(first, gippy.GeoImage):
+        return gippy.GeoImage(first, *rest)
+
+    # special case of a pile of strings; type()() preserves the type of the argument
+    if isinstance(first, collections.Sequence):
+        return gippy.GeoImage(type(first)(i.encode('ascii', 'ignore') for i in first))
+    raise ValueError("Unknown combination of arguments: " + repr(args), args)
+
 
 ##############################################################################
 # Error handling and script setup & teardown
@@ -524,12 +725,12 @@ def set_error_handler(handler):
     error_handler = handler
 
 
-def report_error(error, msg_prefix, show_tb=True):
+def report_error(error, msg_prefix):
     """Print an error report on stderr, possibly including a traceback.
 
-    Caller can suppress the traceback with show_tb.  The user can suppress
-    it via the GIPS global verbosity setting."""
-    if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
+    The user can suppress the traceback via the GIPS global verbosity setting.
+    """
+    if gippy.Options.Verbose() >= _traceback_verbosity:
         verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
         traceback.print_exc()
     else:
@@ -542,10 +743,9 @@ def lib_error_handler(msg_prefix='Error', continuable=False):
     try:
         yield
     except Exception as e:
-        if continuable and not _stop_on_error:
-            report_error(e, msg_prefix)
-        else:
-            raise
+        logging.getLogger(_named_logger).exception(msg_prefix) # automatically gets exc_info
+        if _stop_on_error or not continuable:
+            raise # thus may end up logging an exception twice
 
 
 error_handler = lib_error_handler # set this so gips code can use the right error handler
@@ -577,11 +777,22 @@ def cli_error_handler(msg_prefix='Error', continuable=False):
         else:
             gips_exit()
 
+# consider using _lib_mode to control error handling instead of set_error_handler
+_lib_mode = True
 
 def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
-    """Run this at the beginning of a GIPS CLI program to do setup."""
+    """Run this at the beginning of a GIPS CLI program to do setup.
+
+    Returns the data class corresponding `driver_string`, or else None.
+    `stop_on_error` causes the error handler to ignore continuable flags
+    and stop on the first uncaught exception.  If `setup_orm`, configure
+    the ORM & its inventory database. Also sets error handling to CLI
+    mode and sets gips generally to non-lib-mode.
+    """
     global _stop_on_error
     _stop_on_error = stop_on_error
+    global _lib_mode
+    _lib_mode = False
     set_error_handler(cli_error_handler)
     from gips.inventory import orm # avoids a circular import
     with error_handler():
@@ -590,3 +801,15 @@ def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
         if setup_orm:
             orm.setup()
         return data_class
+
+_logging_configured = False
+
+def configure_logging():
+    """Read the setting LOGGING, then pass it in to python's logging."""
+    global _logging_configured
+    if _logging_configured:
+        return
+    logging_config = get_setting('LOGGING', None)
+    if logging_config is not None:
+        logging.config.dictConfig(logging_config)
+    _logging_configured = True

@@ -13,7 +13,7 @@ from shapely.geometry import mapping, Polygon
 from pdb import set_trace
 
 
-STARTDIR = "/titan/data/modis/tiles"
+STARTDIR = "/titan/data/modis6/tiles"
 DATE = '2004001'
 WIDTH = 2400
 OUTPATH = "new/tiles.shp"
@@ -60,8 +60,8 @@ def main():
         coords = [(x0, y0)]
         for direction in ((1, 0), (0, 1), (-1, 0), (0, -1)):
             for step in range(10):
-                x1 = x0 + 240*dx*direction[0]
-                y1 = y0 + 240*dy*direction[1]
+                x1 = x0 + 240.*dx*direction[0]/float(step+1)
+                y1 = y0 + 240.*dy*direction[1]/float(step+1)
                 coords.append((x1, y1))
                 x0, y0 = (x1, y1)
         coords[-1] = (xs, ys)

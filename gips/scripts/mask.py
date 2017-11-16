@@ -47,6 +47,8 @@ def main():
     group.add_argument('--suffix', help=h, default='-masked')
     args = parser.parse_args()
 
+    utils.gips_script_setup(setup_orm=False)
+
     # TODO - check that at least 1 of filemask or pmask is supplied
 
     utils.gips_script_setup(None, args.stop_on_error)

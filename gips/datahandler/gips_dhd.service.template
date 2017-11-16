@@ -1,0 +1,12 @@
+[Unit]
+Description=GIPS datahandler daemon
+
+[Service]
+
+ExecStart=/bin/bash -c 'exec $PYTHON $COMMAND >> /var/log/gips_dhd.log 2>&1'
+PIDFile=/tmp/gips_dhd.pid
+Type=simple
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

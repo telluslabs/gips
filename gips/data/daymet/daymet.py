@@ -57,8 +57,6 @@ PROJ = ''.join([
 
 _daymet_driver_version = '0.1'
 
-# Cyanomap: tmax, tmin, tmean, ppt, solar rad, and vapor pressure
-
 # maximum temperature (C) - tmax.nc *
 # minimum temperature (C) - tmin.nc  *
 # precipitation (mm day-1) - prcp.nc *
@@ -101,6 +99,7 @@ class daymetAsset(Asset):
     _asset_template = '{}_{}_{}_{}.tif' # for generating filenames
     # for validating and parsing filenames - doubling of {} is due to format() -----vv
     _asset_re = r'^(?P<tile>\d{{5}})_(?P<date>\d{{7}})_' + _sensor + r'_(?P<ap_type>{})\.tif$'
+    _doc_url = "https://daymet.ornl.gov/datasupport.html"
 
     _assets = {
         'tmin': {
@@ -108,6 +107,7 @@ class daymetAsset(Asset):
             'pattern': _asset_re.format('tmin'),
             'source': 'tmin.nc',
             'url': _url,
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -116,6 +116,7 @@ class daymetAsset(Asset):
             'pattern': _asset_re.format('tmax'),
             'source': 'tmax.nc',
             'url': _url,
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -124,6 +125,7 @@ class daymetAsset(Asset):
             'pattern': _asset_re.format('prcp'),
             'source': 'prcp.nc',
             'url': _url,
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -132,6 +134,7 @@ class daymetAsset(Asset):
             'pattern': _asset_re.format('srad'),
             'source': 'srad.nc',
             'url': _url,
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -140,6 +143,7 @@ class daymetAsset(Asset):
             'pattern': _asset_re.format('vp'),
             'source': 'vp.nc',
             'url': _url,
+            'documentation': _doc_url,
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -229,14 +233,16 @@ class daymetData(Data):
         'tmin': {
             'description': 'Daily minimum air temperature (C)',
             'assets': ['tmin'],
-            'bands': [{'name': 'tmin', 'units': 'degree Celcius'}],
+            'bands': [{'name': 'tmin', 'units': 'degree Celsius'}],
+            'category': 'Surface weather',
             'startdate': Asset._startdate,
             'latency': Asset._latency,
         },
         'tmax': {
             'description': 'Daily maximum air temperature (C)',
             'assets': ['tmax'],
-            'bands': [{'name': 'tmax', 'units': 'degree Celcius'}],
+            'bands': [{'name': 'tmax', 'units': 'degree Celsius'}],
+            'category': 'Surface weather',
             'startdate': Asset._startdate,
             'latency': Asset._latency,
         },
@@ -244,20 +250,23 @@ class daymetData(Data):
             'description': 'Daily precipitation (mm)',
             'assets': ['prcp'],
             'bands': [{'name': 'prcp', 'units': 'mm'}],
+            'category': 'Surface weather',
             'startdate': Asset._startdate,
             'latency': Asset._latency,
         },
         'srad': {
             'description': 'Daily solar radiation (W m-2)',
             'assets': ['srad'],
-            'bands': [{'name': 'srad', 'units': 'W/m^2'}],
+            'bands': [{'name': 'srad', 'units': 'W m-2'}],
+            'category': 'Surface weather',
             'startdate': Asset._startdate,
             'latency': Asset._latency,
         },
         'vp': {
             'description': 'Daily vapor pressure (Pa)',
             'assets': ['vp'],
-            'bands': [{'name': 'srad', 'units': 'Pa'}],
+            'bands': [{'name': 'vp', 'units': 'Pa'}],
+            'category': 'Surface weather',
             'startdate': Asset._startdate,
             'latency': Asset._latency,
         },

@@ -93,15 +93,22 @@ class Tiles(object):
                 with utils.error_handler("Error mosaicking " + fout, continuable=True):
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
+
                     if self.spatial.rastermask is not None:
                         gridded_mosaic(images, fout, self.spatial.rastermask, interpolation)
                     elif self.spatial.site is not None and res is not None:
                         CookieCutter(
-                            images, self.spatial.site, fout, res[0], res[1],
+                            images, self.spatial.site, str(fout), res[0], res[1],
                             crop, interpolation, {}, alltouch,
                         )
                     else:
-                        mosaic(images, fout, self.spatial.site)
+                        product_res = None
+                        if alltouch:
+                            # get the product res, this will indicate that we want "alltouch"
+                            affine = images[0].Affine()
+                            product_res = (affine[1], affine[5])
+                        mosaic(images, fout, self.spatial.site, product_res=product_res)
+
         t = datetime.now() - start
         VerboseOut('%s: created project files for %s tiles in %s' % (self.date, len(self.tiles), t), 2)
 
