@@ -431,6 +431,16 @@ class landsatAsset(Asset):
                     os.path.join(stage_dir, granules[0]),
                 )
 
+    def get_geometry(self):
+        """Get the geometry of the asset"""
+        tile_num = int(self.tile)
+
+        v = gippy.GeoVector(self.Repository.get_setting("tiles"))
+        v.SetPrimaryKey(self.Repository._tile_attribute)
+        feat = v[tile_num]
+
+        return feat.WKT()
+
 
 def unitless_bands(*bands):
     return [{'name': b, 'units': Data._unitless} for b in bands]
