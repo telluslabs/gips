@@ -310,9 +310,15 @@ class Asset(object):
         respective 'tiles.shp' file as WKT. Needs to be extended for
         untiled assets.
         """
+        # If tileID is a number, drop leading 0
+        try:
+            tile_num = int(self.tile)
+        except:
+            tile_num = self.tile
+
         v = gippy.GeoVector(self.Repository.get_setting("tiles"))
         v.SetPrimaryKey(self.Repository._tile_attribute)
-        feat = v[self.tile]
+        feat = v[tile_num]
 
         return feat.WKT()
 
