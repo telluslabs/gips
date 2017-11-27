@@ -250,6 +250,30 @@ class modisAsset(Asset):
 
         return retrieved_filenames
 
+"""
+Info about bands:
+    https://modis.gsfc.nasa.gov/about/specifications.php#1
+Landsat can be used to roughly map colors to bands:
+    https://landsat.usgs.gov/what-are-band-designations-landsat-satellites
+Example index values for the MCD43A4 refl object which starts with
+QC bands; refl[7:] is modis land bands 1-7:
+    {'blue': 9, 'green': 10, 'swir1': 11, 'swir2': 12}
+"""
+_tillage_product_types = ('ndti', 'crc', 'crcm', 'sti')
+
+_tp_descriptions = {
+    'ndti': 'Normalized Difference Tillage Index',
+    'crc':  'Crop Residue Cover (uses BLUE)',
+    'crcm': 'Crop Residue Cover, Modified (uses GREEN)',
+    'sti':  'Standard Tillage Index',
+}
+
+_tillage_product_dict = {
+    pt: {'bands': [pt], 'description': _tp_descriptions[pt],
+         'assets': ['MCD43A4'], 'sensor': 'MCD',
+         'startdate': datetime.date(2000, 2, 18), 'latency': 15}
+    for pt in _tillage_product_types}
+
 
 class modisData(Data):
     """ A tile of data (all assets and products) """
@@ -257,10 +281,12 @@ class modisData(Data):
     version = '1.0.0'
     Asset = modisAsset
     _productgroups = {
-        "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
+        "Nadir BRDF-Adjusted 16-day":
+            ['indices', 'quality'] + list(_tillage_product_types),
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
         "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
     }
+
     _products = {
         # MCD Products
         'indices': {
@@ -366,6 +392,8 @@ class modisData(Data):
         }
     }
 
+    _products.update(_tillage_product_dict)
+
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
         """Produce requested products."""
@@ -469,6 +497,7 @@ class modisData(Data):
                 else:
                     raise Exception('product version not supported')
 
+                # wherever the value is too small, set it to a minimum of 0
                 redimg[redimg < 0.0] = 0.0
                 nirimg[nirimg < 0.0] = 0.0
                 bluimg[bluimg < 0.0] = 0.0
@@ -476,6 +505,7 @@ class modisData(Data):
                 mirimg[mirimg < 0.0] = 0.0
                 swrimg[swrimg < 0.0] = 0.0
 
+                # wherever the value is too saturated, set it to a max of 1.0
                 redimg[(redimg != missing) & (redimg > 1.0)] = 1.0
                 nirimg[(nirimg != missing) & (nirimg > 1.0)] = 1.0
                 bluimg[(bluimg != missing) & (bluimg > 1.0)] = 1.0
@@ -484,7 +514,10 @@ class modisData(Data):
                 swrimg[(swrimg != missing) & (swrimg > 1.0)] = 1.0
 
                 # red, nir
+                # first setup a blank array with everything set to missing
                 ndvi = missing + np.zeros_like(redimg)
+                # compute the ndvi only where neither input is missing, AND
+                # no divide-by-zero error will occur
                 wg = np.where((redimg != missing) & (nirimg != missing) & (redimg + nirimg != 0.0))
                 ndvi[wg] = (nirimg[wg] - redimg[wg]) / (nirimg[wg] + redimg[wg])
 
@@ -1035,3 +1068,13 @@ class modisData(Data):
             del imgout  # to cover for GDAL's internal problems
             utils.verbose_out(' -> {}: processed in {}'.format(
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
+
+        # TODO try doing index prods separately here, like landsat/sentinel2
+        """
+        if val[0] in _tillage_product_types:
+            meta['VERSION'] = '1.0'
+            if versions[asset] != 6:
+                err_str = '{} requires product version 6, but found {}'
+                raise IOError(err_str.format(val[0], versions[asset]))
+            imgout = process_tillage_index(val[0], allsds, fname)
+        """
