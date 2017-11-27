@@ -5,3 +5,4 @@ psycopg2==2.6
 netCDF4
 matplotlib>=1.5.3
 python-dateutil>=2.5.1
+git+git://github.com/nasa/pyCMR#egg=pyCMR

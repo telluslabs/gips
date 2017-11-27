@@ -35,13 +35,15 @@ import math
 import numpy as np
 import requests
 
+import xml.etree.ElementTree as ET
+
 import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, settings
 from gips import utils
 
-from PyCMR.PyCMR import CMR
+from pyCMR.pyCMR import CMR
 
 
 def binmask(arr, bit):
@@ -49,6 +51,13 @@ def binmask(arr, bit):
         a specified bit position. Input is Numpy array.
     """
     return arr & (1 << (bit - 1)) == (1 << (bit - 1))
+
+
+def get_temporal_string(date):
+    start_date_str = date.strftime("%Y-%m-%dT:00:00:00Z")
+    end_date_str =  date.strftime("%Y-%m-%dT:23:59:58Z")
+    temporal_str = "%s,%s" % (start_date_str, end_date_str)
+    return temporal_str
 
 
 class asterRepository(Repository):
@@ -75,9 +84,11 @@ class asterAsset(Asset):
     _sensors = {
     }
 
-    _asset_re_tail = '\.A.{7}\.h.{2}v.{2}\..{3}\..{13}\.hdf$'
-
     _assets = {
+        'L1T': {
+            'pattern': '\d{4}\.\d{2}\.\d{2}/.{47}.hdf',
+            'url': 'https://e4ftl01.cr.usgs.gov/ASTER_L1T/ASTT/AST_L1T.003/',
+        }
     }
 
     # Should this be specified on a per asset basis? (in which case retrieve from asset)
@@ -88,19 +99,14 @@ class asterAsset(Asset):
         super(asterAsset, self).__init__(filename)
 
         bname = os.path.basename(filename)
-        parts = bname.split('.')
+        parts = bname.split('_')
 
-        self.asset = parts[0]
-        self.tile = parts[2]
-        self.sensor = parts[0][:3]
+        self.asset = parts[1]
 
-        year = parts[1][1:5]
-        doy = parts[1][5:8]
-        self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
-
-        collection = int(parts[3])
-        file_version = int(parts[4])
-        self._version = float('{}.{}'.format(collection, file_version))
+        year = parts[2][7:10]
+        month = parts[2][3:5]
+        dom = parts[2][5:7]
+        self.date = datetime.datetime.strptime(year + month + dom, "%Y%m%d")
 
 
     @classmethod
@@ -112,11 +118,8 @@ class asterAsset(Asset):
 
         Assuming "asset" is WKT (for now)
         """
-        year, month, day = date.timetuple()[:3]
         # Date format is yyyy-MM-ddTHH:mm:ssZ
-        start_date_str = date.strftime("%Y-%m-%dT:00:00:00Z")
-        end_date_str =  date.strftime("%Y-%m-%dT:23:59:58Z")
-        temporal_str = "%s,%s" % (start_date_str, end_date_str)
+        temporal_str = get_temporal_string(date)
 
         # Authenticate with Earthdata login
         # TODO: Don't use this file
@@ -124,7 +127,7 @@ class asterAsset(Asset):
         
         # Create geometry search string
         shape = shapely.wkt.loads(feature)
-        poly_string ""
+        poly_string = ""
         point_array = np.asarray(shape.exterior.coords)
         for pair in point_array:
             poly_string += "%f,%f," % (pair[0], pair[1])
@@ -149,7 +152,7 @@ class asterAsset(Asset):
             if len(results) == 0:
                 return []
         available = []
-        print results
+        print(results)
         
         mainurl = 'http://e4ftl01.cr.usgs.gov/'
         for item in results(): # Should be 1
@@ -169,6 +172,39 @@ class asterAsset(Asset):
         #TODO: Retrieve geometries
 
         return available
+
+
+    def get_geometry(self):
+        """Get the geometry of the asset
+
+        Uses the query service to get the geometry of an asset
+        """
+
+        bname = os.path.basename(self.filename)
+        year = self.date.year
+        month = str(self.date.month).zfill(2)
+        day = str(self.date.day).zfill(2)
+        url = "%s%d.%s.%s/%s.xml" % (
+                self._assets[self.asset]['url'], year, month, day, bname
+        )
+
+        xmlfile = self.Repository.managed_request(url, verbosity=2)
+        data = xmlfile.read()
+        xmlfile.close()
+
+        tree = ET.fromstring(data)
+        points = tree.findall(
+            'GranuleURMetaData/SpatialDomainContainer/HorizontalSpatialDomainContainer/GPolygon/Boundary/Point'
+        )
+
+        wkt = "POLYGON (("
+        for point in points:
+            wkt += "%s %s," % (point[0].text, point[1].text)
+
+        # Repeat for the last point
+        point = points[0]
+        wkt += "%s %s))" % (point[0].text, point[1].text)
+        return wkt
 
 
     @classmethod
