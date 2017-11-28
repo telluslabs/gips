@@ -394,6 +394,36 @@ class modisData(Data):
 
     _products.update(_tillage_product_dict)
 
+    def asset_check(self, prod_type):
+        """Is an asset available for the current scene and product?
+
+        Returns the last found asset, or else None, its version, and the
+        complete lists of missing and available assets.
+        """
+        # return values
+        asset = None
+        version = None
+        missingassets = []
+        availassets = []
+        allsds = []
+
+        for asset in self._products[prod_type]['assets']:
+            # many asset types won't be found for the current scene
+            if asset not in self.assets:
+                missingassets.append(asset)
+                continue
+            try:
+                sds = self.assets[asset].datafiles()
+            except Exception as e:
+                utils.report_error(e, 'Error reading datafiles for ' + asset)
+                missingassets.append(asset)
+            else:
+                availassets.append(asset)
+                allsds.extend(sds)
+                version = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
+
+        return asset, version, missingassets, availassets, allsds
+
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
         """Produce requested products."""
@@ -407,29 +437,8 @@ class modisData(Data):
         # Note that val[0] is the only usage of val in this method.
         for key, val in products.requested.items():
             start = datetime.datetime.now()
-
-            # Check for asset availability
-            assets = self._products[val[0]]['assets']
-            missingassets = []
-            availassets = []
-            allsds = []
-
-            versions = {}
-
-            for asset in assets:
-                # many asset types won't be found for the current date/spatial constraint
-                if asset not in self.assets:
-                    missingassets.append(asset)
-                    continue
-                try:
-                    sds = self.assets[asset].datafiles()
-                except Exception as e:
-                    utils.report_error(e, 'Error reading datafiles for ' + asset)
-                    missingassets.append(asset)
-                else:
-                    availassets.append(asset)
-                    allsds.extend(sds)
-                    versions[asset] = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
+            asset, version, missingassets, availassets, allsds = \
+                self.asset_check(val[0])
 
             if not availassets:
                 # some products aren't available for every day but this is trying every day
@@ -448,24 +457,24 @@ class modisData(Data):
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
-            if val[0] == "refl":
-                # NOTE this code is unreachable (no refl entry in _products)
-                if versions[asset] != 6:
-                    raise Exception('product version not supported')
-                sensor = 'MCD'
-                fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                img = gippy.GeoImage(sds[7:])
-                nodata = img[0].NoDataValue()
-                gain = img[0].Gain()
-                offset = img[0].Offset()
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
-                imgout.SetNoData(nodata)
-                imgout.SetOffset(offset)
-                imgout.SetGain(gain)
-                for i in range(6):
-                    data = img[i].Read()
-                    imgout[i].Write(data)
-                del img
+            # this code is unreachable (no refl entry in _products)
+            # if val[0] == "refl":
+            #     if versions[asset] != 6:
+            #         raise Exception('product version not supported')
+            #     sensor = 'MCD'
+            #     fname = '%s_%s_%s.tif' % (bname, sensor, key)
+            #     img = gippy.GeoImage(sds[7:])
+            #     nodata = img[0].NoDataValue()
+            #     gain = img[0].Gain()
+            #     offset = img[0].Offset()
+            #     imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
+            #     imgout.SetNoData(nodata)
+            #     imgout.SetOffset(offset)
+            #     imgout.SetGain(gain)
+            #     for i in range(6):
+            #         data = img[i].Read()
+            #         imgout[i].Write(data)
+            #     del img
 
             if val[0] == "quality":
                 if versions[asset] != 6:
