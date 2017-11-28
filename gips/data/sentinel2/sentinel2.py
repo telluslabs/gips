@@ -122,7 +122,7 @@ class sentinel2Asset(Asset):
             'indices-bands': ['02', '03', '04', '05', '06', '07', '08', '8A', '11', '12'],
             # similar to landsat's "visbands"
             'indices-colors': ['BLUE', 'GREEN', 'RED', 'REDEDGE1', 'REDEDGE2',
-                 'REDEDGE3', 'NIR', 'REDEDGE4', 'SWIR1', 'SWIR2'],
+                               'REDEDGE3', 'NIR', 'REDEDGE4', 'SWIR1', 'SWIR2'],
             # landsat version: ['COASTAL', 'BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'CIRRUS'],
         },
     }
@@ -839,11 +839,12 @@ class sentinel2Data(Data):
         #      only depends on self & asset_type ('L1C') 
         self._time_report('Starting to build VRT of all Sentinel-2 asset bands')
         src_filenames = [f for f in self.metadata['abs-filenames']
-                         if f[-6:-4] in data_spec['band-strings']]
+                         if f[-6:-4] in data_spec['indices-bands']]
+
         with utils.make_temp_dir() as tmpdir:
             vrt_filename = os.path.join(tmpdir, self.basename + '_ref-toa.vrt')
             cmd_str = (
-                'gdalbuildvrt -resolution highest -separate '
+                'gdalbuildvrt -tr 20 20 -separate '
                 '-srcnodata 0 -vrtnodata 0 {} {}'
             ).format(vrt_filename, ' '.join(src_filenames))
             cmd_args = shlex.split(cmd_str)
