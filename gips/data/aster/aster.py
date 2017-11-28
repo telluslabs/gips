@@ -27,7 +27,7 @@ import os
 import sys
 import re
 import datetime
-
+import shapely
 import urllib
 import urllib2
 
@@ -54,8 +54,8 @@ def binmask(arr, bit):
 
 
 def get_temporal_string(date):
-    start_date_str = date.strftime("%Y-%m-%dT:00:00:00Z")
-    end_date_str =  date.strftime("%Y-%m-%dT:23:59:58Z")
+    start_date_str = date.strftime("%Y-%m-%dT00:00:00Z")
+    end_date_str =  date.strftime("%Y-%m-%dT23:59:58Z")
     temporal_str = "%s,%s" % (start_date_str, end_date_str)
     return temporal_str
 
@@ -116,9 +116,11 @@ class asterAsset(Asset):
         Uses the given (asset, tile, date) tuple as a search key, and
         returns a list of dicts:  {'basename': base-filename, 'url': url}
 
-        Assuming "asset" is WKT (for now)
+        Assuming "feature" is WKT (for now)
+        Date is in format YYYY-MM-DD
         """
         # Date format is yyyy-MM-ddTHH:mm:ssZ
+        date = datetime.datetime.strptime(date, "%Y-%m-%d")
         temporal_str = get_temporal_string(date)
 
         # Authenticate with Earthdata login
@@ -146,16 +148,15 @@ class asterAsset(Asset):
             results = cmr.searchGranule(
                 limit=1000,
                 short_name="AST_L1T",
-                polygon=polystring,
+                polygon=poly_string,
                 temporal=temporal_str
             )
             if len(results) == 0:
                 return []
         available = []
-        print(results)
         
         mainurl = 'http://e4ftl01.cr.usgs.gov/'
-        for item in results(): # Should be 1
+        for item in results: # Should be 1
             # Extract URL and file name from search results
             basename = item['Granule']['DataGranule']['ProducerGranuleId']
             url = ""
@@ -196,6 +197,9 @@ class asterAsset(Asset):
         points = tree.findall(
             'GranuleURMetaData/SpatialDomainContainer/HorizontalSpatialDomainContainer/GPolygon/Boundary/Point'
         )
+
+        # Put in counter-clockwise order
+        points.reverse()
 
         wkt = "POLYGON (("
         for point in points:
