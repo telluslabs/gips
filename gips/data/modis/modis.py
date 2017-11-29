@@ -1072,10 +1072,8 @@ class modisData(Data):
             utils.verbose_out(' -> {}: processed in {}'.format(
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
 
-        # TODO have to dig it out via products.groups['Index'], once I trust it
         # process some index products (not all, see above)
-        requested_ipt = list(
-                set(products.requested.keys()) & set(self._productgroups['Index']))
+        requested_ipt = products.groups()['Index'].keys()
         if requested_ipt:
             model_pt = requested_ipt[0] # all should be similar
             asset, version, _, _, allsds = self.asset_check(model_pt)
