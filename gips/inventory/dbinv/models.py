@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 
-from django.db import models
 from django.core.exceptions import ValidationError
+from django.contrib.gis.db import models
 
 """
 STATUS STRINGS AND WHERE TO FIND THEM:  'remote' isn't used at all, and Products are never
@@ -150,6 +150,16 @@ class Product(models.Model):
             super(Product, self).save(*args, **kwargs)
             change = ProductStatusChange(product=self, status=self.status)
             change.save()
+
+
+class Geometry(models.Model):
+    """Geometries"""
+    name   = models.TextField()
+    driver = models.TextField()
+    wkt    = models.PolygonField()
+
+    class Meta:
+        unique_together = ('driver', 'name')
 
 
 class AssetDependency(models.Model):
