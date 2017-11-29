@@ -276,7 +276,7 @@ class modisData(Data):
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
         "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
-        "Indices": [pt for (pt, _) in _index_products],
+        "Index": [pt for (pt, _) in _index_products],
     }
 
     _products = { # note indices products are added in below
@@ -433,7 +433,7 @@ class modisData(Data):
         for key, val in products.requested.items():
             # TODO replace val[0] below with this more meaningful name
             prod_type = val[0]
-            if prod_type in self._productgroups['Indices']:
+            if prod_type in self._productgroups['Index']:
                 continue # indices handled differently below
             start = datetime.datetime.now()
             asset, version, missingassets, availassets, allsds = \
@@ -465,7 +465,7 @@ class modisData(Data):
             # now with QC layer!
             if val[0] == "indices":
                 depr_msg = ("'indices' is deprecated, and may be removed in"
-                    " the future.  See the Indices product group instead.")
+                    " the future.  See the Index product group instead.")
                 utils.verbose_out(depr_msg, 2, stream=sys.stderr)
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
@@ -1060,10 +1060,10 @@ class modisData(Data):
             utils.verbose_out(' -> {}: processed in {}'.format(
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
 
-        # TODO have to dig it out via products.groups['Indices'], once I trust it
+        # TODO have to dig it out via products.groups['Index'], once I trust it
         # process some index products (not all, see above)
         requested_ipt = list(
-                set(products.requested.keys()) & set(self._productgroups['Indices']))
+                set(products.requested.keys()) & set(self._productgroups['Index']))
         if requested_ipt:
             model_pt = requested_ipt[0] # all should be similar
             asset, version, _, _, allsds = self.asset_check(model_pt)
