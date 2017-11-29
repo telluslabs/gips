@@ -433,12 +433,17 @@ class modisData(Data):
 
         bname = os.path.join(self.path, self.basename)
 
-        # example products.requested: {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
-        # Note that val[0] is the only usage of val in this method.
+        # example products.requested:
+        # {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
+        # key is only used once far below, and val is only used for val[0].
         for key, val in products.requested.items():
+            # TODO replace val[0] below with this more meaningful name
+            prod_type = val[0]
+            if prod_type in _tillage_product_types:
+                continue # tillage indices handled differently below
             start = datetime.datetime.now()
             asset, version, missingassets, availassets, allsds = \
-                self.asset_check(val[0])
+                self.asset_check(prod_type)
 
             if not availassets:
                 # some products aren't available for every day but this is trying every day
@@ -449,7 +454,6 @@ class modisData(Data):
             meta = self.meta_dict()
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
 
-            prod_type = val[0]
             sensor = self._products[prod_type]['sensor']
             fname = self.temp_product_filename(sensor, prod_type) # moved to archive at end of loop
 
@@ -1078,12 +1082,34 @@ class modisData(Data):
             utils.verbose_out(' -> {}: processed in {}'.format(
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
 
-        # TODO try doing index prods separately here, like landsat/sentinel2
-        """
-        if val[0] in _tillage_product_types:
-            meta['VERSION'] = '1.0'
-            if versions[asset] != 6:
-                err_str = '{} requires product version 6, but found {}'
-                raise IOError(err_str.format(val[0], versions[asset]))
-            imgout = process_tillage_index(val[0], allsds, fname)
-        """
+        # process some index products (not all, see above)
+        requested_tillage_pt = list(
+                set(products.requested.keys()) & set(_tillage_product_types))
+        if requested_tillage_pt:
+            model_pt = requested_tillage_pt[0] # all should be similar
+            asset, version, _, _, allsds = self.asset_check(model_pt)
+            if asset is None:
+                raise IOError('Found no assets for {}'.format(
+                    requested_tillage_pt))
+            if version < 6:
+                raise IOError('tillage products require product version 6,'
+                              ' but found {}'.format(version))
+            img = gippy.GeoImage(allsds[7:]) # don't need the QC bands
+
+            # GIPPY uses expected band names to find data
+            img.SetBandName('BLUE', 4)
+            img.SetBandName('GREEN', 5)
+            img.SetBandName('SWIR1', 6)
+            img.SetBandName('SWIR2', 7)
+
+            sensor = self._products[model_pt]['sensor']
+            prod_spec = {pt: self.temp_product_filename(sensor, pt)
+                         for pt in requested_tillage_pt}
+
+            metadata = self.meta_dict()
+            metadata['VERSION'] = '1.0'
+            pt_to_temp_fps = Indices(img, prod_spec, metadata)
+
+            for pt, temp_fp in pt_to_temp_fps.items():
+                archived_fp = self.archive_temp_path(temp_fp)
+                self.AddFile(sensor, pt, archived_fp)
