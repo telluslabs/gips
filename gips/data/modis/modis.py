@@ -251,20 +251,20 @@ class modisAsset(Asset):
 
         return retrieved_filenames
 
-_tillage_product_types = ('ndti', 'crc', 'crcm', 'sti')
 
-_tp_descriptions = {
-    'ndti': 'Normalized Difference Tillage Index',
-    'crc':  'Crop Residue Cover (uses BLUE)',
-    'crcm': 'Crop Residue Cover, Modified (uses GREEN)',
-    'sti':  'Standard Tillage Index',
-}
+# index product types and descriptions
+_index_products = [
+    ('ndti', 'Normalized Difference Tillage Index'),
+    ('crc',  'Crop Residue Cover (uses BLUE)'),
+    ('crcm', 'Crop Residue Cover, Modified (uses GREEN)'),
+    ('sti',  'Standard Tillage Index'),
+]
 
-_tillage_product_dict = {
-    pt: {'bands': [pt], 'description': _tp_descriptions[pt],
+_index_product_entries = {
+    pt: {'bands': [pt], 'description': descr,
          'assets': ['MCD43A4'], 'sensor': 'MCD',
          'startdate': datetime.date(2000, 2, 18), 'latency': 15}
-    for pt in _tillage_product_types}
+    for pt, descr in _index_products}
 
 
 class modisData(Data):
@@ -273,16 +273,17 @@ class modisData(Data):
     version = '1.0.0'
     Asset = modisAsset
     _productgroups = {
-        "Nadir BRDF-Adjusted 16-day":
-            ['indices', 'quality'] + list(_tillage_product_types),
+        "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
         "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
+        "Indices": [pt for (pt, _) in _index_products],
     }
 
-    _products = {
+    _products = { # note indices products are added in below
         # MCD Products
         'indices': {
-            'description': 'Land indices',
+            'description': 'Land indices (deprecated,'
+                           ' see indices product group)',
             'assets': ['MCD43A4'],
             'sensor': 'MCD',
             'bands': ['ndvi', 'lswi', 'vari', 'brgt', 'satvi', 'evi'],
@@ -384,7 +385,7 @@ class modisData(Data):
         }
     }
 
-    _products.update(_tillage_product_dict)
+    _products.update(_index_product_entries)
 
     def asset_check(self, prod_type):
         """Is an asset available for the current scene and product?
@@ -432,8 +433,8 @@ class modisData(Data):
         for key, val in products.requested.items():
             # TODO replace val[0] below with this more meaningful name
             prod_type = val[0]
-            if prod_type in _tillage_product_types:
-                continue # tillage indices handled differently below
+            if prod_type in self._productgroups['Indices']:
+                continue # indices handled differently below
             start = datetime.datetime.now()
             asset, version, missingassets, availassets, allsds = \
                 self.asset_check(prod_type)
@@ -453,25 +454,6 @@ class modisData(Data):
             if val[0] == "landcover":
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
-
-            # this code is unreachable (no refl entry in _products)
-            # if val[0] == "refl":
-            #     if versions[asset] != 6:
-            #         raise Exception('product version not supported')
-            #     sensor = 'MCD'
-            #     fname = '%s_%s_%s.tif' % (bname, sensor, key)
-            #     img = gippy.GeoImage(sds[7:])
-            #     nodata = img[0].NoDataValue()
-            #     gain = img[0].Gain()
-            #     offset = img[0].Offset()
-            #     imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
-            #     imgout.SetNoData(nodata)
-            #     imgout.SetOffset(offset)
-            #     imgout.SetGain(gain)
-            #     for i in range(6):
-            #         data = img[i].Read()
-            #         imgout[i].Write(data)
-            #     del img
 
             if val[0] == "quality":
                 if versions[asset] != 6:
@@ -1075,17 +1057,18 @@ class modisData(Data):
             utils.verbose_out(' -> {}: processed in {}'.format(
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
 
+        # TODO have to dig it out via products.groups['Indices'], once I trust it
         # process some index products (not all, see above)
-        requested_tillage_pt = list(
-                set(products.requested.keys()) & set(_tillage_product_types))
-        if requested_tillage_pt:
-            model_pt = requested_tillage_pt[0] # all should be similar
+        requested_ipt = list(
+                set(products.requested.keys()) & set(self._productgroups['Indices']))
+        if requested_ipt:
+            model_pt = requested_ipt[0] # all should be similar
             asset, version, _, _, allsds = self.asset_check(model_pt)
             if asset is None:
                 raise IOError('Found no assets for {}'.format(
-                    requested_tillage_pt))
+                    requested_ipt))
             if version < 6:
-                raise IOError('tillage products require product version 6,'
+                raise IOError('index products require MCD43A4 version 6,'
                               ' but found {}'.format(version))
             img = gippy.GeoImage(allsds[7:]) # don't need the QC bands
 
@@ -1097,7 +1080,7 @@ class modisData(Data):
 
             sensor = self._products[model_pt]['sensor']
             prod_spec = {pt: self.temp_product_filename(sensor, pt)
-                         for pt in requested_tillage_pt}
+                         for pt in requested_ipt}
 
             metadata = self.meta_dict()
             metadata['VERSION'] = '1.0'
