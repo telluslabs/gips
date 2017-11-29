@@ -1098,10 +1098,10 @@ class modisData(Data):
             img = gippy.GeoImage(allsds[7:]) # don't need the QC bands
 
             # GIPPY uses expected band names to find data
-            img.SetBandName('BLUE', 4)
-            img.SetBandName('GREEN', 5)
-            img.SetBandName('SWIR1', 6)
-            img.SetBandName('SWIR2', 7)
+            img.SetBandName('BLUE', 2) # array index 2 = band number 3
+            img.SetBandName('GREEN', 3)
+            img.SetBandName('SWIR1', 4)
+            img.SetBandName('SWIR2', 5)
 
             sensor = self._products[model_pt]['sensor']
             prod_spec = {pt: self.temp_product_filename(sensor, pt)
