@@ -254,10 +254,22 @@ class modisAsset(Asset):
 
 # index product types and descriptions
 _index_products = [
-    ('ndti', 'Normalized Difference Tillage Index'),
-    ('crc',  'Crop Residue Cover (uses BLUE)'),
-    ('crcm', 'Crop Residue Cover, Modified (uses GREEN)'),
-    ('sti',  'Standard Tillage Index'),
+    # duplicated in sentinel2 and landsat; may be worth it to DRY out
+    ('ndvi',   'Normalized Difference Vegetation Index'),
+    ('evi',    'Enhanced Vegetation Index'),
+    ('lswi',   'Land Surface Water Index'),
+    ('ndsi',   'Normalized Difference Snow Index'),
+    ('bi',     'Brightness Index'),
+    ('satvi',  'Soil-Adjusted Total Vegetation Index'),
+    ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
+    ('vari',   'Visible Atmospherically Resistant Index'),
+    ('brgt',   'VIS and NIR reflectance, weighted by'
+               'solar energy distribution.'),
+    ('ndti',   'Normalized Difference Tillage Index'),
+    ('crc',    'Crop Residue Cover (uses BLUE)'),
+    ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
+    ('isti',   'Inverse Standard Tillage Index'),
+    ('sti',    'Standard Tillage Index'),
 ]
 
 _index_product_entries = {
@@ -1075,11 +1087,23 @@ class modisData(Data):
                               ' but found {}'.format(version))
             img = gippy.GeoImage(allsds[7:]) # don't need the QC bands
 
-            # GIPPY uses expected band names to find data
-            img.SetBandName('BLUE', 2) # array index 2 = band number 3
-            img.SetBandName('GREEN', 3)
-            img.SetBandName('SWIR1', 5)
-            img.SetBandName('SWIR2', 6)
+            # GIPPY uses expected band names to find data:
+            """
+            index (ie img[i])
+            |  band num
+            |   |   wavelength  name
+            0   1   620 - 670   RED
+            1   2   841 - 876   NIR
+            2   3   459 - 479   BLUE
+            3   4   545 - 565   GREEN
+            4   5   1230 - 1250 CIRRUS (not used by gippy)
+            5   6   1628 - 1652 SWIR1
+            6   7   2105 - 2155 SWIR2
+            """
+            # SetBandName goes by band number, not index
+            [img.SetBandName(name, i) for (name, i) in [
+                ('RED',   1), ('NIR',   2), ('BLUE',  3),
+                ('GREEN', 4), ('SWIR1', 6), ('SWIR2', 7)]]
 
             sensor = self._products[model_pt]['sensor']
             prod_spec = {pt: self.temp_product_filename(sensor, pt)
