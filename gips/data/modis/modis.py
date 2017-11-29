@@ -1092,8 +1092,8 @@ class modisData(Data):
             # GIPPY uses expected band names to find data
             img.SetBandName('BLUE', 2) # array index 2 = band number 3
             img.SetBandName('GREEN', 3)
-            img.SetBandName('SWIR1', 4)
-            img.SetBandName('SWIR2', 5)
+            img.SetBandName('SWIR1', 5)
+            img.SetBandName('SWIR2', 6)
 
             sensor = self._products[model_pt]['sensor']
             prod_spec = {pt: self.temp_product_filename(sensor, pt)
