@@ -397,8 +397,9 @@ class modisData(Data):
     def asset_check(self, prod_type):
         """Is an asset available for the current scene and product?
 
-        Returns the last found asset, or else None, its version, and the
-        complete lists of missing and available assets.
+        Returns the last found asset, or else None, its version, the
+        complete lists of missing and available assets, and lastly, an array
+        of pseudo-filepath strings suitable for consumption by gdal/gippy.
         """
         # return values
         asset = None
