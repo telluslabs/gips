@@ -82,6 +82,7 @@ class modisAsset(Asset):
     _asset_re_tail = '\.A.{7}\.h.{2}v.{2}\..{3}\..{13}\.hdf$'
 
     _assets = {
+        #Band info:  https://modis.gsfc.nasa.gov/about/specifications.php
         'MCD43A4': {
             'pattern': '^MCD43A4' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
@@ -250,15 +251,6 @@ class modisAsset(Asset):
 
         return retrieved_filenames
 
-"""
-Info about bands:
-    https://modis.gsfc.nasa.gov/about/specifications.php#1
-Landsat can be used to roughly map colors to bands:
-    https://landsat.usgs.gov/what-are-band-designations-landsat-satellites
-Example index values for the MCD43A4 refl object which starts with
-QC bands; refl[7:] is modis land bands 1-7:
-    {'blue': 9, 'green': 10, 'swir1': 11, 'swir2': 12}
-"""
 _tillage_product_types = ('ndti', 'crc', 'crcm', 'sti')
 
 _tp_descriptions = {
