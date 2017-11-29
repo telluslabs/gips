@@ -456,7 +456,7 @@ class modisData(Data):
                 imgout = gippy.GeoImage(fname)
 
             if val[0] == "quality":
-                if versions[asset] != 6:
+                if version != 6:
                     raise Exception('product version not supported')
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
@@ -464,12 +464,15 @@ class modisData(Data):
             # LAND VEGETATION INDICES PRODUCT
             # now with QC layer!
             if val[0] == "indices":
+                depr_msg = ("'indices' is deprecated, and may be removed in"
+                    " the future.  See the Indices product group instead.")
+                utils.verbose_out(depr_msg, 2, stream=sys.stderr)
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
                 refl = gippy.GeoImage(allsds)
                 missing = 32767
 
-                if versions[asset] == 6:
+                if version == 6:
                     redimg = refl[7].Read()
                     nirimg = refl[8].Read()
                     bluimg = refl[9].Read()
