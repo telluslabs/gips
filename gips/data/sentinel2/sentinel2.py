@@ -989,8 +989,8 @@ class sentinel2Data(Data):
         self._time_report('Computing atmospheric corrections for surface reflectance')
         atm6s = self.assets[asset_type].generate_atmo_corrector()
         scaling_factor = 0.001  # to prevent chunky small ints
-        rad_rev_img = self.load_image('rad-toa')
-        sr_image = gippy.GeoImage(rad_rev_img)
+        rad_toa_image = self.load_image('rad-toa')
+        sr_image = gippy.GeoImage(rad_toa_image)
         # set meta to pass along to indices
         sr_image._aod_source = str(atm6s.aod[0])
         sr_image._aod_value  = str(atm6s.aod[1])
