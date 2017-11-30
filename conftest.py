@@ -1,7 +1,9 @@
 import logging
 import os
 import shutil
+
 import envoy
+import pytest
 from _pytest.assertion.util import _compare_eq_dict, _diff_text
 
 from gips.test.sys.util import GipsProcResult, set_constants
@@ -14,6 +16,13 @@ root_streamer.setFormatter(logging.Formatter(log_format))
 root_logger.addHandler(root_streamer)
 
 _log = logging.getLogger(__name__)
+
+@pytest.fixture
+def orm(db, mocker):
+    """Garauntee use of the orm, regardless of user setting."""
+    # Because tests should be isolated from the environment most of the time.
+    mocker.patch('gips.data.core.orm.use_orm', return_value=True)
+    yield db
 
 # pytest_* functions are hooks automatically detected by pytest
 def pytest_addoption(parser):
