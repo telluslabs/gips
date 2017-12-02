@@ -10,16 +10,16 @@ from gips.data import chirps
 
 @pytest.fixture
 def scene_dir_setup():
-    asset_bn = 'africa-daily-chirps-v2.0.1997.07.01.tif.gz'
-    product_bn = 'africa_1997182_chirps_precip.tif'
-    tile_fp = os.path.join(chirps.chirpsRepository.path('tiles'), 'africa')
+    asset_bn = 'global-daily-chirps-v2.0.1997.07.01.tif.gz'
+    product_bn = 'global_1997182_chirps_precip.tif'
+    tile_fp = os.path.join(chirps.chirpsRepository.path('tiles'), 'global')
     scene_fp = os.path.join(tile_fp, '1997182')
 
     target_asset_fp = os.path.join(scene_fp, asset_bn)
     target_product_fp = os.path.join(scene_fp, product_bn)
     link_target = '/vsigzip/' + target_asset_fp
 
-    # technically a race condition here, but for integration tests, probably close enough
+    # race condition here, but for integration tests, probably close enough
     if os.path.lexists(target_product_fp):
         raise IOError('file obstructing test, aborting: ' + target_product_fp)
 
@@ -47,7 +47,7 @@ def t_chirps_product_symlink(mocker, scene_dir_setup):
     target_product_fp, link_target = scene_dir_setup
 
     date = datetime.date(1997, 7, 1)
-    cd = chirps.chirpsData('africa', date)
+    cd = chirps.chirpsData('global', date)
 
     cd.needed_products = mocker.Mock()
     m_np = cd.needed_products.return_value
