@@ -604,7 +604,10 @@ def process_acolite(asset, aco_proc_dir, products,
             **ACOLITEPATHS
         )
     )
-    verbose_out('acolite processing:  starting acolite: `{}`'.format(cmd), 2)
+
+    if roi is not None:
+        cmd += ' limit=' + ','.join(str(i) for i in roi)
+
     status, output = commands.getstatusoutput(cmd)
     if status != 0:
         raise Exception("Got exit status {} from `{}`".format(status, cmd),
