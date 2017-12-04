@@ -931,8 +931,6 @@ class sentinel2Data(Data):
 
         w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(a_obj.tile)
 
-        import pdb; pdb.set_trace();
-
         prodout = atmosphere.process_acolite(
                 a_obj, aco_tmp_dir, acolite_product_spec,
                 a_obj.style_res['raster-re'].format(tileid=a_obj._tile_re),
