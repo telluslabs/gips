@@ -196,18 +196,12 @@ class landsatAsset(Asset):
 
     # Field ids are retrieved with `api.dataset_fields()` call
     _ee_datasets = {
-        'LANDSAT_8_C1': {
-            'path_field': '20514',
-            'row_field': '20516',
-        },
-        'LANDSAT_ETM_C1': {
-            'path_field': '19884',
-            'row_field': '19887',
-        },
-        'LANDSAT_TM_C1': {
-            'path_field': '19889',
-            'row_field': '19879',
-        },
+        ds: {
+            r['name']: r['fieldId']
+            for r in api.dataset_fields(ds, 'EE')['data']
+            if r['name'] in [u'WRS Path', u'WRS Row']
+        }
+        for ds in ['LANDSAT_8_C1', 'LANDSAT_ETM_C1', 'LANDSAT_TM_C1']
     }
 
     # Set the startdate to the min date of the asset's sensors
@@ -325,8 +319,8 @@ class landsatAsset(Asset):
                 self.Repository.get_setting('password')
             )
             dataset_name = landsatAsset._sensors[self.sensor]['ee_dataset']
-            path_field = landsatAsset._ee_datasets[dataset_name]['path_field']
-            row_field = landsatAsset._ee_datasets[dataset_name]['row_field']
+            path_field = landsatAsset._ee_datasets[dataset_name]['WRS Path']
+            row_field = landsatAsset._ee_datasets[dataset_name]['WRS Row']
             response = api.search(
                 dataset_name, 'EE',
                 where={
@@ -369,8 +363,8 @@ class landsatAsset(Asset):
                 dataset, 'EE',
                 start_date=fdate, end_date=fdate,
                 where={
-                    cls._ee_datasets[dataset]['path_field']: path,
-                    cls._ee_datasets[dataset]['row_field']: row,
+                    cls._ee_datasets[dataset]['WRS Path']: path,
+                    cls._ee_datasets[dataset]['WRS Row']: row,
                 },
                 api_key=api_key
             )['data']
