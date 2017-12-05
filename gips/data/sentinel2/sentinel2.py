@@ -643,6 +643,7 @@ class sentinel2Data(Data):
              'assets': [_asset_type],
              'bands': [{'name': p, 'units': Data._unitless}]}
         ) for p, d in [
+            # duplicated in modis and landsat; may be worth it to DRY out
             ('ndvi',   'Normalized Difference Vegetation Index'),
             ('evi',    'Enhanced Vegetation Index'),
             ('lswi',   'Land Surface Water Index'),

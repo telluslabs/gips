@@ -13,9 +13,8 @@ from gips.inventory import DataInventory, dbinv
 from gips.data.modis.modis import modisData, modisAsset
 from gips.core import SpatialExtent, TemporalExtent
 
-
 @pytest.fixture
-def di_init_mocks(mocker):
+def di_init_mocks(mocker, orm):
     """Appropriate mocks for DataInventory.__init__."""
     modisData.fetch = mocker.Mock() # behavior not super important
     modisData.Asset.archive = mocker.Mock() # has to return list of modisAssets
@@ -24,7 +23,6 @@ def di_init_mocks(mocker):
             mock.patch('gips.inventory.dbinv.add_asset'))
 
 
-@pytest.mark.django_db
 def t_data_inventory_db_save(di_init_mocks):
     """Confirm DataInventory() saves to the inventory DB on fetch."""
     from gips.inventory.dbinv import models
@@ -50,8 +48,7 @@ def t_data_inventory_db_save(di_init_mocks):
     assert expected_assets == actual
 
 
-@pytest.mark.django_db
-def t_data_inventory_load():
+def t_data_inventory_load(orm):
     """Confirm DataInventory() loads assets and products from the inventory DB.
 
     In particular check the resulting hierarchy of objects for correctness."""
