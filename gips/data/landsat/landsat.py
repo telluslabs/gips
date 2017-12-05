@@ -205,7 +205,7 @@ class landsatAsset(Asset):
             'row_field': '19887',
         },
         'LANDSAT_TM_C1': {
-            'path_field': '19873',
+            'path_field': '19889',
             'row_field': '19879',
         },
     }
