@@ -195,14 +195,7 @@ class landsatAsset(Asset):
     }
 
     # Field ids are retrieved with `api.dataset_fields()` call
-    _ee_datasets = {
-        ds: {
-            r['name']: r['fieldId']
-            for r in api.dataset_fields(ds, 'EE')['data']
-            if r['name'] in [u'WRS Path', u'WRS Row']
-        }
-        for ds in ['LANDSAT_8_C1', 'LANDSAT_ETM_C1', 'LANDSAT_TM_C1']
-    }
+    _ee_datasets = None
 
     # Set the startdate to the min date of the asset's sensors
     for asset, asset_info in _assets.iteritems():
@@ -314,10 +307,7 @@ class landsatAsset(Asset):
                     raise ValueError("No match for '{}' found in {}".format(cc_pattern, mtlfilename))
                 scene_cloud_cover = float(cloud_cover.group(1))
         else:
-            api_key = api.login(
-                self.Repository.get_setting('username'),
-                self.Repository.get_setting('password')
-            )
+            api_key = self.ee_login()
             dataset_name = landsatAsset._sensors[self.sensor]['ee_dataset']
             path_field = landsatAsset._ee_datasets[dataset_name]['WRS Path']
             row_field = landsatAsset._ee_datasets[dataset_name]['WRS Row']
@@ -343,6 +333,30 @@ class landsatAsset(Asset):
         return scene_cloud_cover < pclouds
 
     @classmethod
+    def ee_login(cls):
+        if not hasattr(cls, '_ee_key'):
+            username = settings().REPOS['landsat']['username']
+            password = settings().REPOS['landsat']['password']
+            cls._ee_key = api.login(username, password)['data']
+        return cls._ee_key
+
+    @classmethod
+    def load_ee_search_keys(cls):
+        if cls._ee_datasets:
+            print(cls._ee_datasets)
+            return
+        api_key = cls.ee_login()
+        cls._ee_datasets = {
+            ds: {
+                r['name']: r['fieldId']
+                for r in api.dataset_fields(ds, 'EE', api_key)['data']
+                if r['name'] in [u'WRS Path', u'WRS Row']
+            }
+            for ds in ['LANDSAT_8_C1', 'LANDSAT_ETM_C1', 'LANDSAT_TM_C1']
+        }
+
+
+    @classmethod
     def query_service(cls, asset, tile, date, pcover=90.0):
         available = []
 
@@ -353,10 +367,8 @@ class landsatAsset(Asset):
         path = tile[:3]
         row = tile[3:]
         fdate = date.strftime('%Y-%m-%d')
-
-        username = settings().REPOS['landsat']['username']
-        password = settings().REPOS['landsat']['password']
-        api_key = api.login(username, password)['data']
+        cls.load_ee_search_keys()
+        api_key = cls.ee_login()
         available = []
         for dataset in cls._ee_datasets.keys():
             response = api.search(
@@ -406,9 +418,7 @@ class landsatAsset(Asset):
             stage_dir = cls.Repository.path('stage')
             sceneIDs = [str(sceneID)]
 
-            username = settings().REPOS['landsat']['username']
-            password = settings().REPOS['landsat']['password']
-            api_key = api.login(username, password)['data']
+            api_key = cls.ee_login()
             url = api.download(
                 result['dataset'], 'EE', sceneIDs, 'STANDARD', api_key
             )['data'][0]

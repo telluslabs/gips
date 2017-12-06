@@ -95,3 +95,14 @@ t_sentinel2_inv_fetch = {
         'gips-inv-db.sqlite3',
     ]
 }
+
+t_landsat_fetch = {
+    'created': {
+        'landsat/tiles/012030': None,
+        'landsat/tiles/012030/2017213': None,
+        'landsat/tiles/012030/2017213/LC08_L1TP_012030_20170801_20170811_01_T1.tar.gz': 0000000,
+    },
+    'ignored': [
+        'gips-inv-db.sqlite3',
+    ],
+}
