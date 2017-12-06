@@ -111,3 +111,9 @@ def t_sentinel2_inv_fetch(careful_repo_env, expected):
     args = ('sentinel2', '-s', DURHAM_SHP_PATH, '-d', '2017-003', '-v', '4', '--fetch')
     actual = careful_repo_env.run('gips_inventory', *args)
     assert expected.created == actual.created
+
+
+def t_landsat_fetch(careful_repo_env, expected):
+    args = ('landsat', '-t', '012030', '-d', '2017-213', '-v', '4', '--fetch')
+    actual = careful_repo_env.run('gips_inventory', *args)
+    assert expected.created == actual.created

@@ -43,11 +43,31 @@ def setup_landsat_data(pytestconfig):
         logger.error("failed fetch stderr: " + outcome.std_err)
         raise RuntimeError(err_msg)
 
+
 def t_info(repo_env, expected):
     """Test `gips_info modis` and confirm recorded output is given."""
     actual = repo_env.run('gips_info', 'landsat')
     assert expected == actual
 
+
+def t_login():
+    """Test `gips_info modis` and confirm recorded output is given."""
+    from gips.data import landsat
+    assert landsat.landsatAsset._ee_datasets is None
+    assert not hasattr(landsat.landsatAsset, '_ee_key')
+    landsat.landsatAsset.load_ee_search_keys()
+    actual = landsat.landsatAsset._ee_datasets.keys()
+    logger.info('logged in and found are: {}'
+                .format(landsat.landsatAsset._ee_datasets))
+    assert landsat.landsatAsset._ee_datasets is not None
+    assert hasattr(landsat.landsatAsset, '_ee_key')
+
+def t_query_service():
+    from gips.data import landsat
+    from datetime import datetime as dt
+    resp = landsat.landsatAsset.query_service('C1', '012030', dt(2017, 8, 1))
+    logger.debug(str(resp))
+    assert len(resp) == 1
 
 def t_inventory(setup_landsat_data, repo_env, expected):
     """Test `gips_inventory` to confirm it notices the emplaced data file."""
