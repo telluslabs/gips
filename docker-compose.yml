@@ -1,0 +1,44 @@
+# refers to the version of the configuration standard
+version: '2'
+
+services:
+  gipsdev:
+    container_name: gipsdev
+    hostname: gips
+    volumes:
+      #- .:/gips
+      - /home/tolson/src/gips-469/archive:/data
+    build:
+      context: .
+      dockerfile: Dockerfile # ?
+    #tty: true # https://github.com/docker/compose/issues/3633
+    command: /bin/bash
+#  gips:
+#    container_name: gips
+#    hostname: gips
+#    volumes:
+#      - /data:~/src/gips-469/archive
+#    build:
+#      context: .
+#      dockerfile: Dockerfile # was Dockerfile.gipsdeploy
+#    tty: true
+#    command: /bin/bash
+#  postgresql:
+#    container_name: postgres
+#    hostname: postgres
+#    environment:
+#      - POSTGRES_PASSWORD=geokitp4ss
+#    image: 'mdillon/postgis:9.5-alpine'
+#    volumes:
+#      - /data/pgsql:/var/lib/postgresql/data
+#    expose:
+#      - "5432"
+#  gips_dhd:
+#    container_name: gips_dhd
+#    build: .
+#    volumes:
+#      - .:/gips
+#    command: gips_dhd
+#    ports:
+#      - "8001:8001"
+#      - "8002:8002"
