@@ -217,7 +217,7 @@ def add_product(**values):
     return p  # in case the user needs it
 
 
-def update_or_add_asset(driver, asset, tile, date, sensor, name, status='complete'):
+def update_or_add_asset(driver, asset, geoname, date, sensor, name, status='complete'):
     """Update an existing model or create it if it's not found.
 
     Convenience method that wraps update_or_create.  The first four
@@ -227,7 +227,7 @@ def update_or_add_asset(driver, asset, tile, date, sensor, name, status='complet
     query_vals = {
         'driver': driver,
         'asset': asset,
-        'tile': tile,
+        'tile': geoname,
         'date': date,
     }
     update_vals = {
@@ -235,11 +235,15 @@ def update_or_add_asset(driver, asset, tile, date, sensor, name, status='complet
         'name': name,
         'status': status,
     }
+
+    # Update or add geometry
+
+
     (asset, created) = models.Asset.objects.update_or_create(defaults=update_vals, **query_vals)
     return asset  # in case the user needs it
 
 
-def update_or_add_product(driver, product, tile, date, sensor, name, status='complete'):
+def update_or_add_product(driver, product, geoname, date, sensor, name, status='complete'):
     """Update an existing model or create it if it's not found.
 
     Convenience method that wraps update_or_create.  The first four
@@ -249,7 +253,7 @@ def update_or_add_product(driver, product, tile, date, sensor, name, status='com
     query_vals = {
         'driver': driver,
         'product': product,
-        'tile': tile,
+        'tile': geoname,
         'date': date,
     }
     update_vals = {'sensor': sensor, 'name': name, 'status': status}
@@ -275,3 +279,12 @@ def asset_search(status='complete', **criteria):
     """
     from gips.inventory.dbinv import models
     return models.Asset.objects.filter(status=status, **criteria)
+
+
+def update_or_add_geometry(driver, wkt, name=None):
+    """Insert a geometry into the geometry table"""
+    from .models import Geometry
+
+    geo, created = Geometry.objects.get_or_create(name=name, driver=driver)
+    geo.wkt = wkt
+    geo.save()

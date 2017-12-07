@@ -156,7 +156,7 @@ class Geometry(models.Model):
     """Geometries"""
     name   = models.TextField()
     driver = models.TextField()
-    wkt    = models.PolygonField()
+    wkt    = models.PolygonField(null=True)
 
     class Meta:
         unique_together = ('driver', 'name')

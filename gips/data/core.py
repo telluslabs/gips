@@ -316,6 +316,15 @@ class Asset(object):
 
         return feat.WKT()
 
+
+    def get_geometry_name(self):
+        """Get the name of the asset's geometry
+
+        For tiled assets, this will just be the name of the tile. Needs to be
+        extended for untiled assets.
+        """
+        return self.tile
+
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
@@ -1066,7 +1075,7 @@ class Data(object):
         return set(assets)
 
     @classmethod
-    def query_service(cls, products, tiles, textent, update=False, force=False, grouped=False):
+    def query_service(cls, products, spatent, textent, update=False, force=False, grouped=False):
         """
         Returns a list (or dict) of asset files that are available for
         download, given the arguments provided.
@@ -1082,7 +1091,7 @@ class Data(object):
             response  = []
         for p in products:
             assets = cls.products2assets([p])
-            for t in tiles:
+            for t in spatent.tiles:
                 for a in assets:
                     asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                     for d in asset_dates:
@@ -1113,6 +1122,14 @@ class Data(object):
                                         'asset': a,
                                         'date': d
                                     }
+
+                                    # Insert geometry into the database
+                                    dbinv.update_or_add_geometry(
+                                        cls.name.lower(),
+                                        aobj.get_geometry(),
+                                        aobj.get_geometry_name()
+                                    )
+
                                     # useful to datahandler to have this
                                     # grouped by (p,t,d) there is a fair bit of
                                     # duplicated info this way, but oh well
@@ -1126,9 +1143,9 @@ class Data(object):
         return response
 
     @classmethod
-    def fetch(cls, products, tiles, textent, update=False):
+    def fetch(cls, products, spatent, textent, update=False):
         available_assets = cls.query_service(
-            products, tiles, textent, update
+            products, spatent, textent, update
         )
         fetched = []
         for asset_info in available_assets:
