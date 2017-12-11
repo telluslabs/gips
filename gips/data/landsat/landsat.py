@@ -75,6 +75,8 @@ class landsatRepository(Repository):
     description = 'Landsat 5 (TM), 7 (ETM+), 8 (OLI)'
     _tile_attribute = 'PR'
 
+    default_settings = {'source': 'usgs'}
+
     @classmethod
     def feature2tile(cls, feature):
         tile = super(landsatRepository, cls).feature2tile(feature)
