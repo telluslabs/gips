@@ -53,8 +53,7 @@ from gips.utils import RemoveFiles, basename, settings, verbose_out
 from gips import utils
 
 import requests
-from usgs import api
-from homura import download
+import homura
 
 from pdb import set_trace
 
@@ -313,6 +312,7 @@ class landsatAsset(Asset):
             dataset_name = landsatAsset._sensors[self.sensor]['ee_dataset']
             path_field = landsatAsset._ee_datasets[dataset_name]['WRS Path']
             row_field = landsatAsset._ee_datasets[dataset_name]['WRS Row']
+            from usgs import api
             response = api.search(
                 dataset_name, 'EE',
                 where={
@@ -339,6 +339,7 @@ class landsatAsset(Asset):
         if not hasattr(cls, '_ee_key'):
             username = settings().REPOS['landsat']['username']
             password = settings().REPOS['landsat']['password']
+            from usgs import api
             cls._ee_key = api.login(username, password)['data']
         return cls._ee_key
 
@@ -348,6 +349,7 @@ class landsatAsset(Asset):
             print(cls._ee_datasets)
             return
         api_key = cls.ee_login()
+        from usgs import api
         cls._ee_datasets = {
             ds: {
                 r['name']: r['fieldId']
@@ -372,6 +374,7 @@ class landsatAsset(Asset):
         cls.load_ee_search_keys()
         api_key = cls.ee_login()
         available = []
+        from usgs import api
         for dataset in cls._ee_datasets.keys():
             response = api.search(
                 dataset, 'EE',
@@ -421,11 +424,13 @@ class landsatAsset(Asset):
             sceneIDs = [str(sceneID)]
 
             api_key = cls.ee_login()
+            from usgs import api
             url = api.download(
                 result['dataset'], 'EE', sceneIDs, 'STANDARD', api_key
             )['data'][0]
             with utils.make_temp_dir(prefix='dwnld', dir=stage_dir) as dldir:
-                download(url, dldir)
+                homura.download(url, dldir)
+
                 granules = os.listdir(dldir)
                 if len(granules) == 0:
                     raise Exception(
