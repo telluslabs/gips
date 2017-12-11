@@ -88,8 +88,8 @@ class prismAsset(Asset):
     }
     _stab_score = {
         'stable': 3,
-        'early': 2,
-        'provisional': 1,
+        'provisional': 2,
+        'early': 1,
     }
 
     @classmethod
