@@ -163,8 +163,16 @@ class landsatAsset(Asset):
             'description': 'Landsat 8 Surface Reflectance',
             'startdate': datetime(2013, 4, 1),
         }
-
     }
+
+    # filename minus extension so that C1 & C1S3 both use the same pattern
+    # example:  LC08_L1TP_013030_20151225_20170224_01_T1
+    _c1_base_pattern = (
+        r'^L(?P<sensor>\w)(?P<satellite>\d{2})_'
+        r'(?P<correction_level>.{4})_(?P<path>\d{3})(?P<row>\d{3})_'
+        r'(?P<acq_year>\d{4})(?P<acq_month>\d{2})(?P<acq_day>\d{2})_'
+        r'(?P<proc_year>\d{4})(?P<proc_month>\d{2})(?P<proc_day>\d{2})_'
+        r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})')
 
     _assets = {
         'DN': {
@@ -183,14 +191,12 @@ class landsatAsset(Asset):
         },
         'C1': {
             'sensors': ['LT5', 'LE7', 'LC8'],
-            'pattern': (
-                r'^L(?P<sensor>\w)(?P<satellite>\d{2})_'
-                r'(?P<correction_level>.{4})_(?P<path>\d{3})(?P<row>\d{3})_'
-
-                r'(?P<acq_year>\d{4})(?P<acq_month>\d{2})(?P<acq_day>\d{2})_'
-                r'(?P<proc_year>\d{4})(?P<proc_month>\d{2})(?P<proc_day>\d{2})_'
-                r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})\.tar\.gz$'
-            ),
+            'pattern': _c1_base_pattern + r'\.tar\.gz$',
+            'latency': 12,
+        },
+        'C1S3': {
+            'sensors': ['LC8'],
+            'pattern': _c1_base_pattern + r'\.vtr$',
             'latency': 12,
         },
     }
@@ -218,10 +224,12 @@ class landsatAsset(Asset):
         sr_pattern_re = re.compile(self._assets['SR']['pattern'])
         dn_pattern_re = re.compile(self._assets['DN']['pattern'])
         c1_pattern_re = re.compile(self._assets['C1']['pattern'])
+        c1s3_pattern_re = re.compile(self._assets['C1S3']['pattern'])
 
         sr_match = sr_pattern_re.match(fname)
         dn_match = dn_pattern_re.match(fname)
         c1_match = c1_pattern_re.match(fname)
+        c1s3_match = c1s3_pattern_re.match(fname)
 
         if sr_match:
             verbose_out('SR asset', 2)
@@ -241,19 +249,21 @@ class landsatAsset(Asset):
             self.asset = 'DN'
             self.sensor = fname[0:3]
             self.version = int(fname[19:21])
-        elif c1_match:
-            utils.verbose_out('C1 asset', 2)
+        elif c1_match or c1s3_match:
+            self.asset = 'C1' if c1_match else 'C1S3'
+            match = c1_match or c1s3_match
+            utils.verbose_out(self.asset + ' asset', 2)
 
-            self.tile = c1_match.group('path') + c1_match.group('row')
-            year = c1_match.group('acq_year')
-            month = c1_match.group('acq_month')
-            day = c1_match.group('acq_day')
+            self.tile = match.group('path') + match.group('row')
+            year = match.group('acq_year')
+            month = match.group('acq_month')
+            day = match.group('acq_day')
             self.date = datetime.strptime(year + month + day, "%Y%m%d")
 
-            self.asset = 'C1'
-            self.sensor = "L{}{}".format(c1_match.group('sensor'), int(c1_match.group('satellite')))
-            self.collection_number = c1_match.group('coll_num')
-            self.collection_category = c1_match.group('coll_cat')
+            self.sensor = "L{}{}".format(match.group('sensor'),
+                                         int(match.group('satellite')))
+            self.collection_number = match.group('coll_num')
+            self.collection_category = match.group('coll_cat')
             self.version = 1e6 * int(self.collection_number) + \
                     (self.date - datetime(2017, 1, 1)).days + \
                     {'RT': 0, 'T2': 0.5, 'T1': 0.9}[self.collection_category]
@@ -261,7 +271,7 @@ class landsatAsset(Asset):
             msg = "No matching landsat asset type for '{}'".format(fname)
             raise RuntimeError(msg, filename)
 
-        if self.asset in ['DN', 'C1']:
+        if self.asset in ['DN', 'C1', 'C1S3']:
             smeta = self._sensors[self.sensor]
             self.meta = {}
             for i, band in enumerate(smeta['colors']):
