@@ -126,9 +126,19 @@ class prismAsset(Asset):
         Returns a list with one item, the full path to the staged asset.
         """
         utils.verbose_out('%s: fetch tile %s for %s' % (asset, tile, date), 3)
-        with utils.error_handler("Error downloading from " + cls._host, continuable=True):
+        msg = "Error downloading from " + cls._host
+        with utils.error_handler(msg, continuable=True):
             ftp = cls.ftp_connect(asset, date) # starts chdir'd to the right directory
             asset_fn, _ = cls.query_provider(asset, tile, date, ftp)
+            remote_asset = cls(asset_fn)
+            existing_assets = cls.discover(tile, date, asset)
+            is_updated = [exa.updated(remote_asset) for exa in existing_assets]
+            if not any(is_updated):
+                utils.verbose_out("We have the newest version: {}"
+                                  .format(remote_asset.version_text()))
+                ftp.quit()
+                return []
+
             stage_dir_fp = cls.Repository.path('stage')
             stage_fp = os.path.join(stage_dir_fp, asset_fn)
             with utils.make_temp_dir(prefix='fetchtmp', dir=stage_dir_fp) as td_name:
@@ -159,6 +169,9 @@ class prismAsset(Asset):
         self._version = self._stab_score[self.stability] * .01 + int(self.version[1:])
         # only one tile
         self.tile = 'CONUS'
+
+    def version_text(self):
+        return '{v}-{s}'.format(v=self.version, s=self.stability)
 
     def datafiles(self):
         datafiles = super(prismAsset, self).datafiles()
