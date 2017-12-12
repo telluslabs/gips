@@ -21,6 +21,7 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
+from __future__ import print_function
 
 from contextlib import contextmanager
 import os
@@ -369,9 +370,24 @@ class landsatAsset(Asset):
             for ds in ['LANDSAT_8_C1', 'LANDSAT_ETM_C1', 'LANDSAT_TM_C1']
         }
 
+    @classmethod
+    def query_s3(cls, tile, date):
+        print('CALLING FETCH_S3')
+        pass
+
+    @classmethod
+    def fetch_s3(cls, tile, date):
+        filename, keys = cls.query_s3(tile, date)
+        print('CALLING FETCH_S3')
+        pass
 
     @classmethod
     def query_service(cls, asset, tile, date, pcover=90.0):
+        """As superclass with optional argument:
+
+        Finds matching the arguments, where pcover is maximum permitted
+        cloud cover %.
+        """
         available = []
 
         if asset in ['DN', 'SR']:
@@ -420,6 +436,20 @@ class landsatAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
+        # If the user wants to use AWS S3 landsat data, don't fetch
+        # standard C1 assets, which come from conventional USGS data sources.
+        data_src = cls.Repository.get_setting('source')
+        if data_src not in ('s3', 'usgs'):
+            raise ValueError("Data source '{}' is not known"
+                             " (expected 's3' or 'usgs')".format(data_src))
+        print('data_src, asset type = ', data_src, asset)
+        if (data_src, asset) == ('s3', 'C1S3'):
+            cls.fetch_s3(tile, date)
+            return
+        if (data_src, asset) in [('usgs', 'C1S3'), ('s3', 'C1')]:
+            return
+        # else proceed as usual:
+
         fdate = date.strftime('%Y-%m-%d')
         response = cls.query_service(asset, tile, date)
         if len(response) > 0:
