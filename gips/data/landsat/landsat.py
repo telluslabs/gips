@@ -56,11 +56,12 @@ from gips import utils
 import requests
 import homura
 
-from pdb import set_trace
-
 
 requirements = ['Py6S>=1.5.0']
 
+def path_row(tile_id):
+    """Converts the given landsat tile string into (path, row)."""
+    return (tile_id[:3], tile_id[3:])
 
 def binmask(arr, bit):
     """ Return boolean array indicating which elements as binary have a 1 in
@@ -176,6 +177,7 @@ class landsatAsset(Asset):
         r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})')
 
     _assets = {
+        # DN & SR assets are no longer fetchable
         'DN': {
             'sensors': ['LT5', 'LE7', 'LC8'],
             'enddate': datetime(2017, 4, 30),
@@ -190,6 +192,10 @@ class landsatAsset(Asset):
             'sensors': ['LC8SR'],
             'pattern': r'^L.*?-SC.*?\.tar\.gz$',
         },
+
+        # landsat setting 'source' decides which asset type is downloaded:
+        # source == usgs -> fetch C1 assets from USGS
+        # source == s3 -> fetch C1S3 assets from AWS S3
         'C1': {
             'sensors': ['LT5', 'LE7', 'LC8'],
             'pattern': _c1_base_pattern + r'\.tar\.gz$',
@@ -372,14 +378,59 @@ class landsatAsset(Asset):
 
     @classmethod
     def query_s3(cls, tile, date):
-        print('CALLING FETCH_S3')
-        pass
+        """Handles AWS S3 queries for landsat data.
+
+        Returns a filename suitable for naming the constructed asset,
+        and a list of S3 keys suitable for passing to gdalbuildvrt.
+        Returns (None, None) if no asset found for the given scene.
+        """
+        # TODO auth somehow magically?
+        verbose_out("starting query_s3", 6)
+        bucket_name = 'landsat-pds'
+        # for finding assets matching the tile
+        key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
+        # match something like:  'LC08_L1TP_013030_20170402_20170414_01_T1'
+        # filters for date and also tier
+        fname_fragment = r'L..._...._{}_{}_\d{{8}}_.._T1'.format(
+                tile, date.strftime('%Y%m%d'))
+        re_string = key_prefix + fname_fragment
+        filter_re = re.compile(re_string)
+
+        verbose_out("Searching AWS S3 bucket '{}'"
+                    " for key fragment '{}'".format(bucket_name, key_prefix), 4)
+
+        # find the layer and metadata files matching the current scene
+        import boto3
+        s3 = boto3.resource('s3')
+        bucket = s3.Bucket(bucket_name)
+        matches = [o for o in bucket.objects.filter(Prefix=key_prefix)
+                   if filter_re.match(o.key)]
+        suffixes = ('.TIF', 'MTL.txt', 'ANG.txt')
+        asset_objects = [o for o in matches
+                         if any([o.key.endswith(s) for s in suffixes])]
+        obj_cnt = len(asset_objects)
+        if obj_cnt == 14:
+            verbose_out('Found expected number of S3 asset files'
+                        ' for this scene (14)', 4)
+        else:
+            verbose_out('Found no complete S3 asset for this scene', 4)
+            return None, None
+
+        filename = (re.search(fname_fragment, asset_objects[0].key).group(0)
+                    + '_S3.tar.gz')
+        verbose_out("Constructed S3 asset filename:  " + filename, 5)
+        return filename, [o.key for o in asset_objects]
 
     @classmethod
     def fetch_s3(cls, tile, date):
-        filename, keys = cls.query_s3(tile, date)
+        """As fetch, but just for s3 assets; currently only 'C1S3' assets."""
         print('CALLING FETCH_S3')
-        pass
+        filename, s3_keys = cls.query_s3(tile, date)
+        # TODO
+        # actual vsi path (minus filename portion):
+        #/vsis3_streaming/landsat-pds/c1/L8/139/045/LC08_L1TP_139045_20170608_20170616_01_T1/
+        # see also:
+        # http://www.gdal.org/gdal_virtual_file_systems.html#gdal_virtual_file_systems_network
 
     @classmethod
     def query_service(cls, asset, tile, date, pcover=90.0):
@@ -442,7 +493,6 @@ class landsatAsset(Asset):
         if data_src not in ('s3', 'usgs'):
             raise ValueError("Data source '{}' is not known"
                              " (expected 's3' or 'usgs')".format(data_src))
-        print('data_src, asset type = ', data_src, asset)
         if (data_src, asset) == ('s3', 'C1S3'):
             cls.fetch_s3(tile, date)
             return
@@ -522,7 +572,7 @@ class landsatData(Data):
             'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
         'ref': {
-            'assets': ['DN', 'C1'],
+            'assets': ['DN', 'C1', 'C1S3'],
             'description': 'Surface reflectance',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
@@ -676,7 +726,7 @@ class landsatData(Data):
             'bands': unitless_bands('ndsi'),
         },
         'ndvi': {
-            'assets': ['DN', 'C1'],
+            'assets': ['DN', 'C1', 'C1S3'],
             'description': 'Normalized Difference Vegetation Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
