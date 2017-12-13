@@ -400,33 +400,45 @@ class landsatAsset(Asset):
                     " for key fragment '{}'".format(bucket_name, key_prefix), 4)
 
         # find the layer and metadata files matching the current scene
-        import boto3
+        import boto3 # import here so it only breaks if it's actually needed
         s3 = boto3.resource('s3')
         bucket = s3.Bucket(bucket_name)
-        matches = [o for o in bucket.objects.filter(Prefix=key_prefix)
-                   if filter_re.match(o.key)]
-        suffixes = ('.TIF', 'MTL.txt', 'ANG.txt')
-        asset_objects = [o for o in matches
-                         if any([o.key.endswith(s) for s in suffixes])]
-        obj_cnt = len(asset_objects)
-        if obj_cnt == 14:
-            verbose_out('Found expected number of S3 asset files'
-                        ' for this scene (14)', 4)
-        else:
-            verbose_out('Found no complete S3 asset for this scene', 4)
-            return None, None
 
-        filename = (re.search(fname_fragment, asset_objects[0].key).group(0)
-                    + '_S3.tar.gz')
+        # A rare instance of a stupid for-loop being the right choice:
+        _30m_tifs = []
+        _15m_tif = mtl_txt = ang_txt = None
+        for o in bucket.objects.filter(Prefix=key_prefix):
+            key = o.key
+            if not filter_re.match(key):
+                continue
+            if key.endswith('B8.TIF'):
+                _15m_tif = key
+            elif key.endswith('MTL.txt'):
+                mtl_txt = key
+            elif key.endswith('ANG.txt'):
+                ang_txt = key
+            elif key.endswith('.TIF'):
+                _30m_tifs.append(key)
+
+        if len(_30m_tifs) != 11 or None in (_15m_tif, mtl_txt, ang_txt):
+            verbose_out('Found no complete S3 asset for'
+                        ' (C1S3, {}, {})'.format(tile, date), 4)
+            return 5 * (None,)
+
+        verbose_out('Found complete S3 asset for'
+                    ' (C1S3, {}, {})'.format(tile, date), 4)
+        filename = re.search(fname_fragment, _15m_tif).group(0) + '_S3.tar.gz'
         verbose_out("Constructed S3 asset filename:  " + filename, 5)
-        return filename, [o.key for o in asset_objects]
+        return filename, _30m_tifs, _15m_tif, mtl_txt, ang_txt
 
     @classmethod
     def fetch_s3(cls, tile, date):
-        """As fetch, but just for s3 assets; currently only 'C1S3' assets."""
-        print('CALLING FETCH_S3')
-        filename, s3_keys = cls.query_s3(tile, date)
-        # TODO
+        """Fetches AWS S3 assets; currently only 'C1S3' assets.
+
+        Doesn't fetch much; instead it constructs a VRT-based tarball.
+        """
+        (filename, _30m_tifs, _15m_tif, mtl_txt, ang_txt) = cls.query_s3(tile,
+                                                                         date)
         # actual vsi path (minus filename portion):
         #/vsis3_streaming/landsat-pds/c1/L8/139/045/LC08_L1TP_139045_20170608_20170616_01_T1/
         # see also:
