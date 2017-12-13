@@ -31,7 +31,7 @@ import shutil
 import glob
 import traceback
 from copy import deepcopy
-import commands
+import commands # TODO unused?
 import subprocess
 import tempfile
 import tarfile
@@ -376,6 +376,9 @@ class landsatAsset(Asset):
             for ds in ['LANDSAT_8_C1', 'LANDSAT_ETM_C1', 'LANDSAT_TM_C1']
         }
 
+    _bucket_name = 'landsat-pds'
+    _s3_url = 'https://landsat-pds.s3.amazonaws.com/'
+
     @classmethod
     def query_s3(cls, tile, date):
         """Handles AWS S3 queries for landsat data.
@@ -385,8 +388,6 @@ class landsatAsset(Asset):
         Returns (None, None) if no asset found for the given scene.
         """
         # TODO auth somehow magically?
-        verbose_out("starting query_s3", 6)
-        bucket_name = 'landsat-pds'
         # for finding assets matching the tile
         key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
         # match something like:  'LC08_L1TP_013030_20170402_20170414_01_T1'
@@ -396,13 +397,13 @@ class landsatAsset(Asset):
         re_string = key_prefix + fname_fragment
         filter_re = re.compile(re_string)
 
-        verbose_out("Searching AWS S3 bucket '{}'"
-                    " for key fragment '{}'".format(bucket_name, key_prefix), 4)
+        verbose_out("Searching AWS S3 bucket '{}' for key fragment"
+                    " '{}'".format(cls._bucket_name, key_prefix), 4)
 
         # find the layer and metadata files matching the current scene
         import boto3 # import here so it only breaks if it's actually needed
         s3 = boto3.resource('s3')
-        bucket = s3.Bucket(bucket_name)
+        bucket = s3.Bucket(cls._bucket_name)
 
         # A rare instance of a stupid for-loop being the right choice:
         _30m_tifs = []
@@ -439,10 +440,47 @@ class landsatAsset(Asset):
         """
         (filename, _30m_tifs, _15m_tif, mtl_txt, ang_txt) = cls.query_s3(tile,
                                                                          date)
-        # actual vsi path (minus filename portion):
-        #/vsis3_streaming/landsat-pds/c1/L8/139/045/LC08_L1TP_139045_20170608_20170616_01_T1/
-        # see also:
-        # http://www.gdal.org/gdal_virtual_file_systems.html#gdal_virtual_file_systems_network
+
+        # construct VSI paths; sample (split into lines):
+        # /vsis3_streaming/landsat-pds/c1/L8/013/030
+        #   /LC08_L1TP_013030_20171128_20171207_01_T1
+        #   /LC08_L1TP_013030_20171128_20171207_01_T1_B10.TIF
+        # see also:  http://www.gdal.org/gdal_virtual_file_systems.html
+        vsi_prefix = '/vsis3_streaming/{}/'.format(cls._bucket_name)
+        _30m_vsi_paths = [vsi_prefix + t for t in _30m_tifs]
+        _15m_vsi_path = vsi_prefix + _15m_tif
+
+        # file names to be saved in the final asset tarball
+        _30m_vrt_fn = '30m-bands.vrt'
+        _15m_vrt_fn = '15m-band.vrt'
+        txt_fns = []
+
+        with utils.make_temp_dir(prefix='fetch',
+                                 dir=cls.Repository.path('stage')) as tmp_dir:
+            # build VRT files
+            # takes 1m-ish on a local NH workstation; AWS perf unknown
+            cmd = ['gdalbuildvrt', '-separate',
+                   tmp_dir + '/' + _30m_vrt_fn] + _30m_vsi_paths
+            subprocess.check_call(cmd)
+            cmd = ['gdalbuildvrt', '-separate',
+                   tmp_dir + '/' + _15m_vrt_fn, _15m_vsi_path]
+            subprocess.check_call(cmd)
+
+            # fetch metadata & angles file
+            for txt_key in (mtl_txt, ang_txt):
+                url = cls._s3_url + txt_key
+                response = requests.get(url, stream=True)
+                txt_fname = os.path.basename(txt_key)
+                txt_fns.append(txt_fname) # remember to add it to the tarball
+                with open(tmp_dir + '/' + txt_fname, 'wb') as fo:
+                    shutil.copyfileobj(response.raw, fo)
+
+            tmp_fp = tmp_dir + '/' + filename
+            with tarfile.open(tmp_fp, 'w:gz') as tfo:
+                [tfo.add(tmp_dir + '/' + fn, arcname=fn)
+                        for fn in txt_fns + [_30m_vrt_fn, _15m_vrt_fn]]
+            # subprocess.check_call(['ls', '-lh', tmp_dir]) # for debugging
+            shutil.copy(tmp_fp, cls.Repository.path('stage'))
 
     @classmethod
     def query_service(cls, asset, tile, date, pcover=90.0):
