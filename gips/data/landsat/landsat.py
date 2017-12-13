@@ -203,7 +203,7 @@ class landsatAsset(Asset):
         },
         'C1S3': {
             'sensors': ['LC8'],
-            'pattern': _c1_base_pattern + r'\.vtr$',
+            'pattern': _c1_base_pattern + r'_S3\.tar\.gz$',
             'latency': 12,
         },
     }
@@ -426,7 +426,7 @@ class landsatAsset(Asset):
                         ' (C1S3, {}, {})'.format(tile, date), 4)
             return 5 * (None,)
 
-        verbose_out('Found complete S3 asset for'
+        verbose_out('Found complete C1S3 asset for'
                     ' (C1S3, {}, {})'.format(tile, date), 4)
         filename = re.search(fname_fragment, _15m_tif).group(0) + '_S3.tar.gz'
         verbose_out("Constructed S3 asset filename:  " + filename, 5)
