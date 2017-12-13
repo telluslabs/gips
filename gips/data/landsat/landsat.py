@@ -138,6 +138,8 @@ class landsatAsset(Asset):
             'description': 'Landsat 8',
             'ee_dataset': 'LANDSAT_8_C1',
             'startdate': datetime(2013, 4, 1),
+            # as normal for Landsat 8 but with panchromatic band left out, CF:
+            # https://landsat.usgs.gov/what-are-band-designations-landsat-satellites
             'bands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
             'oldbands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
             'colors': ["COASTAL", "BLUE", "GREEN", "RED", "NIR",
@@ -226,7 +228,7 @@ class landsatAsset(Asset):
 
         fname = os.path.basename(filename)
 
-        verbose_out(("fname", fname), 2)
+        verbose_out("Attempting to load " + fname, 2)
 
         sr_pattern_re = re.compile(self._assets['SR']['pattern'])
         dn_pattern_re = re.compile(self._assets['DN']['pattern'])
@@ -392,6 +394,7 @@ class landsatAsset(Asset):
         key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
         # match something like:  'LC08_L1TP_013030_20170402_20170414_01_T1'
         # filters for date and also tier
+        # TODO all things not just T1 ----------------vv
         fname_fragment = r'L..._...._{}_{}_\d{{8}}_.._T1'.format(
                 tile, date.strftime('%Y%m%d'))
         re_string = key_prefix + fname_fragment
@@ -428,6 +431,13 @@ class landsatAsset(Asset):
 
         verbose_out('Found complete C1S3 asset for'
                     ' (C1S3, {}, {})'.format(tile, date), 4)
+
+        # have to custom sort thanks to 'B1.TIF' instead of 'B01.TIF':
+        def sort_key_f(key):
+            match = re.search(r'B(\d+).TIF$', key)
+            return int(match.group(1)) if match else 99 # BQA.TIF goes last
+        _30m_tifs.sort(key=sort_key_f)
+
         filename = re.search(fname_fragment, _15m_tif).group(0) + '_S3.tar.gz'
         verbose_out("Constructed S3 asset filename:  " + filename, 5)
         return filename, _30m_tifs, _15m_tif, mtl_txt, ang_txt
@@ -1009,7 +1019,7 @@ class landsatData(Data):
                 archive_fp = self.archive_temp_path(fname)
                 self.AddFile(sensor, key, archive_fp)
 
-        elif asset == 'DN' or asset == 'C1':
+        elif asset in ('DN', 'C1', 'C1S3'):
 
             # This block contains everything that existed in the first generation Landsat driver
 
@@ -1550,15 +1560,21 @@ class landsatData(Data):
 
         self.meta(asset_type)
 
-        if settings().REPOS[self.Repository.name.lower()]['extract']:
-            # Extract all files
-            datafiles = asset_obj.extract(self.metadata['filenames'])
+        data_src = self.Repository.get_setting('source')
+        s3_mode = (data_src, asset_type) == ('s3', 'C1S3')
+        if s3_mode:
+            vrt_path = '/vsitar/' + asset_obj.filename + '/30m-bands.vrt'
+            image = gippy.GeoImage(vrt_path)
         else:
-            # Use tar.gz directly using GDAL's virtual filesystem
-            datafiles = [os.path.join('/vsitar/' + asset_obj.filename, f)
-                    for f in self.metadata['filenames']]
+            if settings().REPOS[self.Repository.name.lower()]['extract']:
+                # Extract all files
+                datafiles = asset_obj.extract(self.metadata['filenames'])
+            else:
+                # Use tar.gz directly using GDAL's virtual filesystem
+                datafiles = [os.path.join('/vsitar/' + asset_obj.filename, f)
+                        for f in self.metadata['filenames']]
+            image = gippy.GeoImage(datafiles)
 
-        image = gippy.GeoImage(datafiles)
         image.SetNoData(0)
 
         # TODO - set appropriate metadata
