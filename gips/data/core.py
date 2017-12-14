@@ -116,16 +116,16 @@ class Repository(object):
 
         If the key isn't found, it attempts to load a default from
         cls.default_settings, a dict of such things.  If still not found,
-        resorts magic for 'driver' and 'tiles', ValueError otherwise.
+        resorts to magic for 'driver' and 'tiles', ValueError otherwise.
         """
-        dataclass = cls.__name__[:-10] # not actually a class; names the driver
+        dataclass = cls.__name__[:-10] # name of a class, not the class object
         r = settings().REPOS[dataclass]
         if key in r:
             return r[key]
         if key in cls.default_settings:
             return cls.default_settings[key]
 
-        # not in settings file, use defaults
+        # not in settings file nor default, so resort to magic
         exec('import gips.data.%s as clsname' % dataclass)
         driverpath = os.path.dirname(clsname.__file__)
         if key == 'driver':
@@ -133,7 +133,7 @@ class Repository(object):
         if key == 'tiles':
             return os.path.join(driverpath, 'tiles.shp')
         raise ValueError("'{}' is not a valid setting for"
-                         " driver '{}'".format(key, dataclass))
+                         " {} driver".format(key, cls.name))
 
     @classmethod
     def managed_request(cls, url, verbosity=1, debuglevel=0):

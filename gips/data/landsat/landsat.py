@@ -496,8 +496,8 @@ class landsatAsset(Asset):
     def query_service(cls, asset, tile, date, pcover=90.0):
         """As superclass with optional argument:
 
-        Finds matching the arguments, where pcover is maximum permitted
-        cloud cover %.
+        Finds assets matching the arguments, where pcover is maximum
+        permitted cloud cover %.
         """
         available = []
 
