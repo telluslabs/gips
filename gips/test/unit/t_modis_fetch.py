@@ -69,7 +69,7 @@ def t_managed_request_returns_none(fetch_mocks, call, expected):
 
     # assertions
     assert expected in managed_request.call_args[0]
-    managed_request.assert_called_once()
+    assert 1 == managed_request.call_count # assert_called_once() quit working
     # It should skip the I/O code except for fetching the directory listing
     [f.assert_not_called() for f in (open, file.write)]
 
