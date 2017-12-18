@@ -1,9 +1,12 @@
+from __future__ import print_function
+
 import logging
 from datetime import datetime
 
 import pytest
 import envoy
 
+import util
 from .util import *
 
 logger = logging.getLogger(__name__)
@@ -42,13 +45,55 @@ def t_inventory(setup_modis_data, repo_env, expected):
     actual = repo_env.run('gips_inventory', *STD_ARGS)
     assert expected == actual
 
+from .expected import modis as expectations
 
-def t_process(setup_modis_data, repo_env, expected):
+@pytest.mark.parametrize("product", expectations.t_process.keys())
+def t_process(setup_modis_data, product):
     """Test gips_process on modis data."""
-    # TODO add landcover test; relevant invocation:
-    # gips_process modis -t h12v04 -p landcover -d 2012-01-01 -v6 --fetch
-    actual = repo_env.run('gips_process', *STD_ARGS)
-    assert expected == actual
+    dut = util.DATA_REPO_ROOT # directory under test
+    record_path = pytest.config.getoption('--record')
+    recording_mode = record_path is not None
+
+    if recording_mode:
+        initial_files = util.find_files(dut)
+    else:
+        expectation = expectations.t_process[product]
+        expected_filenames = [e[0] for e in expectation]
+        interlopers = [fn for fn in expected_filenames if os.path.exists(fn)]
+        if interlopers:
+            raise IOError('Files in the way of the test: {}'.format(interlopers))
+
+    # run
+    import sh
+    args = ('modis', '-s', NH_SHP_PATH, '-d', '2012-12-01,2012-12-03',
+            '-v', '4', '-p', product)
+    print("command line: `gips_process {}`".format(' '.join(args)))
+    outcome = sh.gips_process(*args)
+
+    if recording_mode:
+        final_files = find_files(dut)
+        created_files = set(final_files) - set(initial_files)
+
+        # when recording the path, do '<record_dir>/foo/bar/baz/file.tif'
+        relpath_start = os.path.dirname(dut)
+        rel_cf = [os.path.relpath(fp, relpath_start) for fp in created_files]
+
+        cf_expectations = [util.generate_expectation(fn, dut) for fn in rel_cf]
+        print("Recording {} outcome to {}.".format(product, record_path))
+        import pprint
+        with open(record_path, 'a') as rfo:
+            print('\n# {}[{}] recording:'.format(t_process.__name__, product),
+                    file=rfo)
+            print("'{}':".format(product), file=rfo)
+            pretty_hashes = pprint.pformat(cf_expectations)
+            print('    ', end='', file=rfo)
+            print('\n    '.join(pretty_hashes.split('\n')), end='', file=rfo)
+            print(',', file=rfo)
+    else:
+        # actual test: assemble data to compare to expectation
+        files = [util.generate_expectation(fn, dut)
+                    for fn in expected_filenames]
+        assert outcome.exit_code == 0 and expectation == files
 
 
 def t_info(repo_env, expected):

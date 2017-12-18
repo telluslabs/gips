@@ -1,9 +1,12 @@
+from __future__ import print_function
+
 import logging, os, shutil, re
 import importlib
+import hashlib
 from pprint import pformat
 
 import pytest
-from scripttest import TestFileEnvironment, ProcResult, FoundFile, FoundDir
+import scripttest
 import envoy
 
 from gips.inventory import orm # believed to be safe even though it's the code under test
@@ -44,9 +47,16 @@ def extract_timestamps(files):
     return {k: getattr(v, 'hash', None) for k, v in files.items()}
 
 
-class GipsTestFileEnv(TestFileEnvironment):
+class GipsTestFileEnv(scripttest.TestFileEnvironment):
     """As superclass but customized for GIPS use case.
 
+    Captured values from the process under test:
+        standard output
+        standard error
+        Created files & checksums (for a configured directory-under-test)
+        Updated files & checksums (for a configured directory-under-test)
+        Deleted files & checksums(?) (for a configured directory-under-test)
+        exit status
     Saves ProcResult objects in self.proc_result."""
     proc_result = None
 
@@ -90,10 +100,10 @@ class GipsTestFileEnv(TestFileEnvironment):
 
         created = self.proc_result.files_created
         # first remove all the files
-        fn = [n for (n, t) in created.items() if isinstance(t, FoundFile)]
+        fn = [n for (n, t) in created.items() if isinstance(t, scripttest.FoundFile)]
         [os.remove(os.path.join(DATA_REPO_ROOT, n)) for n in fn]
         # then remove all the directories (which should now be empty)
-        dn = [n for (n, t) in created.items() if isinstance(t, FoundDir)]
+        dn = [n for (n, t) in created.items() if isinstance(t, scripttest.FoundDir)]
         for n in dn:
             # dirs are complex because they can exist inside eachother
             full_n = os.path.join(DATA_REPO_ROOT, n)
@@ -206,6 +216,51 @@ def rectify(driver):
         raise RuntimeError("failed: " + rectify_cmd,
                            outcome.std_out, outcome.std_err, outcome)
 
+def find_files(path):
+    """Finds all non-directory files under the given path.
+
+    A lot like running find(1) with no arguments.  Doesn't follow symlinks.
+    Doesn't report errors (see os.walk docs for details).
+    """
+    return [os.path.join(subpath, f)
+            for subpath, _, filenames in os.walk(path) for f in filenames]
+
+def generate_expectation(filename, base_path):
+    """Return an expectation of the file's content, based on its file type.
+
+    Expectation formats:
+        Symlink:  (filename, 'symlink', prefix_string, suffix_string)
+            With symlinks one often can't use the whole link target
+            because parts differ across environments (eg /home/usr/etc).
+             So just use the bits before and after the base_path.
+        Hash:  (filename, 'hash, 'sha256', <hex digest string>).
+            Used as a fallback if nothing else matches the file type.
+        Finally, if the file is absent:  (filename, 'absent')
+    """
+    # have to use lexists to cover for foolish abuse of symlinks by GDAL et al
+    if not os.path.lexists(filename):
+        return (filename, 'absent')
+    if os.path.islink(filename):
+        #                    vvvvvvvvvvvvvvvvvvvvvv--- have to rmeove this bit
+        # HDF4_EOS:EOS_GRID:"/home/tolson/src/gips/data-root/modis/tiles/h12v04/2012337
+        #   /MCD43A2.A2012337.h12v04.006.2016112013509.hdf":MOD_Grid_BRDF:Snow_BRDF_Albedo
+        # when recording the path, do '<record_dir>/foo/bar/baz/file.tif'
+        link_target = os.readlink(filename)
+        separator = os.path.dirname(base_path)
+        prefix, suffix = link_target.split(separator)
+        return (filename, 'symlink', prefix, suffix)
+    return (filename, 'hash', 'sha256', generate_file_hash(filename))
+
+def generate_file_hash(filename, blocksize=2**20):
+    # stolen from SO: https://stackoverflow.com/questions/1131220/get-md5-hash-of-big-files-in-python
+    m = hashlib.sha256()
+    with open(filename, 'rb' ) as f:
+        while True:
+            buf = f.read(blocksize)
+            if not buf:
+                break
+            m.update(buf)
+    return m.hexdigest()
 
 @pytest.yield_fixture
 def repo_env(request):
@@ -236,7 +291,7 @@ def clean_repo_env(request):
     _log.debug("Generating file env: {}".format(file_env))
     yield file_env
     after = file_env._find_files()
-    file_env.proc_result = ProcResult(file_env, ['N/A'], '', '', '', 0, before, after)
+    file_env.proc_result = scripttest.ProcResult(file_env, ['N/A'], '', '', '', 0, before, after)
     file_env.remove_created()
     rectify(request.module.driver)
     _log.debug("Finalized file env: {}".format(file_env))

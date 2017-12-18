@@ -73,6 +73,9 @@ def pytest_addoption(parser):
     parser.addoption(
         "--expectation-format", action="store_true", help=help_str)
 
+    parser.addoption('--record', action='store', default=None,
+                     help="Pass in a filename for expecations"
+                          " to be written to that filename.")
 
 def pytest_configure(config):
     """Process user config & command-line options."""
@@ -80,6 +83,9 @@ def pytest_configure(config):
     level = ('warning' if raw_level is None else raw_level).upper()
     root_logger.setLevel(level)
 
+    # TODO complain here if --record or --record-dir are wrong:
+    #   * --record file should not exist
+    #   * --record-dir should exist
     dr = str(config.getini('data-repo'))
     if not dr:
         raise ValueError("No value specified for 'data-repo' in pytest.ini")
