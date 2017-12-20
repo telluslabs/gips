@@ -43,13 +43,17 @@ def t_inventory(setup_fixture, repo_env, expected):
     actual = repo_env.run('gips_inventory', *STD_ARGS)
     assert expected == actual
 
+from .expected import merra as expectations
 
-def t_process(setup_fixture, repo_env, expected):
-    """Test gips_process on {} data.""".format(driver)
-    process_actual = repo_env.run('gips_process', *STD_ARGS)
-    inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
-    assert expected == process_actual
-    assert inventory_actual.std_out == expected._inv_stdout
+@pytest.mark.parametrize("product", expectations.t_process.keys())
+def t_process(setup_fixture, record_path, product):
+    """Test gips_process on merra data."""
+    dut = util.DATA_REPO_ROOT # directory under test
+
+    #process_actual = repo_env.run('gips_process', *STD_ARGS)
+    #inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
+    #assert expected == process_actual
+    #assert inventory_actual.std_out == expected._inv_stdout
 
 
 def t_info(repo_env, expected):

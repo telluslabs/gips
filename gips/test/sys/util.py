@@ -263,6 +263,11 @@ def generate_file_hash(filename, blocksize=2**20):
     return m.hexdigest()
 
 @pytest.yield_fixture
+def record_path(request):
+    path = pytest.config.getoption('--record')
+    return False if path in (None, '') else path
+
+@pytest.yield_fixture
 def repo_env(request):
     """Provide means to test files created by run & clean them up after."""
     if not orm.use_orm():

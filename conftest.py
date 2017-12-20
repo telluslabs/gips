@@ -76,6 +76,10 @@ def pytest_addoption(parser):
     parser.addoption('--record', action='store', default=None,
                      help="Pass in a filename for expecations"
                           " to be written to that filename.")
+    # TODO cleanup may not need to be implemented at all
+    #parser.addoption('--cleanup-on-failure', action='store_true',
+    #        help="Normally cleanup is skipped on failure so you can examine"
+    #             " files; pass this option to cleanup even on failure.")
 
 def pytest_configure(config):
     """Process user config & command-line options."""

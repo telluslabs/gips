@@ -40,45 +40,17 @@ SENSORS\x1b[0m
 """
 }
 
-
 t_process = {
-    'updated': {
-        'merra/stage': None,
-        'merra/tiles/h01v01/2015135': None,
-    },
-    'created': {
-        'merra/tiles/h01v01/2015135/h01v01_2015135_merra_patm.tif': -832862627,
-        'merra/tiles/h01v01/2015135/h01v01_2015135_merra_prcp.tif': -1814551991,
-        'merra/tiles/h01v01/2015135/h01v01_2015135_merra_rhum.tif': 1203124684,
-        'merra/tiles/h01v01/2015135/h01v01_2015135_merra_shum.tif': -97846975,
-        'merra/tiles/h01v01/2015135/h01v01_2015135_merra_srad.tif': -1745572576,
-        'merra/tiles/h01v01/2015135/h01v01_2015135_merra_tave.tif': 165650774,
-        'merra/tiles/h01v01/2015135/h01v01_2015135_merra_tmax.tif': 463728356,
-        'merra/tiles/h01v01/2015135/h01v01_2015135_merra_tmin.tif': -1469140067,
-        'merra/tiles/h01v01/2015135/h01v01_2015135_merra_wind.tif': 1771906367,
-    },
-    'ignored': [
-        'gips-inv-db.sqlite3',
-    ],
-    '_inv_stdout': """\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
-Retrieving inventory for site NHseacoast-0
-
-\x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
-\x1b[1m
-Tile Coverage
-\x1b[4m  Tile      % Coverage   % Tile Used\x1b[0m
-  h01v01      100.0%        0.0%
-
-\x1b[1m\x1b[4m    DATE       ASM       FLX       RAD       SLV     Product  \x1b[0m
-\x1b[1m2015        
-\x1b[0m    135                 100.0%     100.0%     100.0%     \x1b[35mpatm\x1b[0m  \x1b[35mprcp\x1b[0m  \x1b[35mrhum\x1b[0m  \x1b[35mshum\x1b[0m  \x1b[35msrad\x1b[0m  \x1b[35mtave\x1b[0m  \x1b[35mtmax\x1b[0m  \x1b[35mtmin\x1b[0m  \x1b[35mwind\x1b[0m
-
-
-1 files on 1 dates
-\x1b[1m
-SENSORS\x1b[0m
-\x1b[35mmerra: Modern Era Retrospective-analysis for Research and Applications\x1b[0m
-""",
+    # test this too?  'frland': [],
+    'patm': [],
+    'prcp': [],
+    'rhum': [],
+    'shum': [],
+    'srad': [],
+    'tave': [],
+    'tmax': [],
+    'tmin': [],
+    'wind': [],
 }
 
 t_project = {

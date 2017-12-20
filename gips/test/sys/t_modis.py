@@ -48,13 +48,10 @@ def t_inventory(setup_modis_data, repo_env, expected):
 from .expected import modis as expectations
 
 @pytest.mark.parametrize("product", expectations.t_process.keys())
-def t_process(setup_modis_data, product):
+def t_process(setup_modis_data, record_path, product):
     """Test gips_process on modis data."""
     dut = util.DATA_REPO_ROOT # directory under test
-    record_path = pytest.config.getoption('--record')
-    recording_mode = record_path is not None
-
-    if recording_mode:
+    if record_path:
         initial_files = util.find_files(dut)
     else:
         expectation = expectations.t_process[product]
@@ -70,7 +67,7 @@ def t_process(setup_modis_data, product):
     print("command line: `gips_process {}`".format(' '.join(args)))
     outcome = sh.gips_process(*args)
 
-    if recording_mode:
+    if record_path:
         final_files = find_files(dut)
         created_files = set(final_files) - set(initial_files)
 
