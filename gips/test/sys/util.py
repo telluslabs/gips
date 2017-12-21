@@ -262,10 +262,53 @@ def generate_file_hash(filename, blocksize=2**20):
             m.update(buf)
     return m.hexdigest()
 
-@pytest.yield_fixture
-def record_path(request):
+def record_path():
     path = pytest.config.getoption('--record')
     return False if path in (None, '') else path
+
+@pytest.yield_fixture
+def repo_wrapper(request):
+    # DATA_REPO_ROOT is the directory under test
+    rp = record_path()
+
+    expectation, expected_filenames = None, None
+
+    # TODO use request.module to deduce expectation
+    from .expected import modis as expectations
+    product = request.getfixturevalue('product')
+
+    if rp:
+        initial_files = find_files(DATA_REPO_ROOT)
+    else:
+        expectation = expectations.t_process[product]
+        expected_filenames = [e[0] for e in expectation]
+        interlopers = [fn for fn in expected_filenames if os.path.exists(fn)]
+        if interlopers:
+            raise IOError('Files in the way of the test: {}'.format(interlopers))
+
+    yield DATA_REPO_ROOT, rp, expectation, expected_filenames
+
+    if rp:
+        final_files = find_files(DATA_REPO_ROOT)
+        created_files = set(final_files) - set(initial_files)
+
+        # when recording the path, do '<record_dir>/foo/bar/baz/file.tif'
+        relpath_start = os.path.dirname(DATA_REPO_ROOT)
+        rel_cf = [os.path.relpath(fp, relpath_start) for fp in created_files]
+
+        cf_expectations = [generate_expectation(fn, DATA_REPO_ROOT) for fn in rel_cf]
+        print("Recording {} outcome to {}.".format(product, rp))
+        import pprint
+        with open(rp, 'a') as rfo:
+            import pdb; pdb.set_trace()
+            print('\n# {}[{}] recording:'.format(request.function.__name__, product),
+                  file=rfo)
+            print("'{}':".format(product), file=rfo)
+            pretty_hashes = pprint.pformat(cf_expectations)
+            print('    ', end='', file=rfo)
+            print('\n    '.join(pretty_hashes.split('\n')), end='', file=rfo)
+            print(',', file=rfo)
+
 
 @pytest.yield_fixture
 def repo_env(request):
