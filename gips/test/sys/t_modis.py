@@ -51,19 +51,12 @@ from .expected import modis as expectations
 @pytest.mark.parametrize("product", expectations.t_process.keys())
 def t_process(setup_modis_data, repo_wrapper, product):
     """Test gips_process on modis data."""
-    (dut, record_path, expectation, expected_filenames
-     ) = repo_wrapper
-
-    args = ('modis', '-s', NH_SHP_PATH, '-d', '2012-12-01,2012-12-03',
-            '-v', '4', '-p', product)
-    print("command line: `gips_process {}`".format(' '.join(args)))
-    outcome = sh.gips_process(*args)
-
-    if not record_path:
-        # actual test: assemble data to compare to expectation
-        files = [util.generate_expectation(fn, dut)
-                    for fn in expected_filenames]
-        assert outcome.exit_code == 0 and expectation == files
+    record_mode, expected, runner = repo_wrapper
+    outcome, actual = runner('gips_process', 'modis', '-s', NH_SHP_PATH,
+                             '-d', '2012-12-01,2012-12-03', '-v', '4', '-p',
+                             product)
+    if not record_mode: # don't evaluate assertions when in record-mode
+        assert outcome.exit_code == 0 and expected == actual
 
 def t_info(repo_env, expected):
     """Test `gips_info modis` and confirm recorded output is given."""

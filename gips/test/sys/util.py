@@ -3,11 +3,12 @@ from __future__ import print_function
 import logging, os, shutil, re
 import importlib
 import hashlib
-from pprint import pformat
+import pprint
 
 import pytest
 import scripttest
-import envoy
+import envoy # deprecated
+import sh
 
 from gips.inventory import orm # believed to be safe even though it's the code under test
 
@@ -66,7 +67,7 @@ class GipsTestFileEnv(scripttest.TestFileEnvironment):
 
         Logs in a format suitable for updating known good values when tests
         need to be updated to match code changes."""
-        _log.debug("{}: {}".format(description, pformat(files)))
+        _log.debug("{}: {}".format(description, pprint.pformat(files)))
 
     def run(self, *args, **kwargs):
         """As super().run but store result & prevent premature exits."""
@@ -270,23 +271,25 @@ def record_path():
 def repo_wrapper(request):
     # DATA_REPO_ROOT is the directory under test
     rp = record_path()
-
-    expectation, expected_filenames = None, None
-
-    # TODO use request.module to deduce expectation
-    from .expected import modis as expectations
     product = request.getfixturevalue('product')
+    expectations = load_expectation_module(request.module.__name__)
+    expected = expectations.t_process[product]
+    expected_filenames = [e[0] for e in expected]
 
     if rp:
         initial_files = find_files(DATA_REPO_ROOT)
     else:
-        expectation = expectations.t_process[product]
-        expected_filenames = [e[0] for e in expectation]
         interlopers = [fn for fn in expected_filenames if os.path.exists(fn)]
         if interlopers:
             raise IOError('Files in the way of the test: {}'.format(interlopers))
 
-    yield DATA_REPO_ROOT, rp, expectation, expected_filenames
+    def wrapped_runner(cmd_string, *args):
+        print("command line: `{} {}`".format(cmd_string, ' '.join(args)))
+        outcome = sh.Command(cmd_string)(*args)
+        return outcome, [generate_expectation(fn, DATA_REPO_ROOT)
+                                for fn in expected_filenames]
+
+    yield bool(rp), expected, wrapped_runner
 
     if rp:
         final_files = find_files(DATA_REPO_ROOT)
@@ -298,9 +301,7 @@ def repo_wrapper(request):
 
         cf_expectations = [generate_expectation(fn, DATA_REPO_ROOT) for fn in rel_cf]
         print("Recording {} outcome to {}.".format(product, rp))
-        import pprint
         with open(rp, 'a') as rfo:
-            import pdb; pdb.set_trace()
             print('\n# {}[{}] recording:'.format(request.function.__name__, product),
                   file=rfo)
             print("'{}':".format(product), file=rfo)
@@ -351,32 +352,27 @@ def output_tfe():
     gtfe = GipsTestFileEnv(OUTPUT_DIR)
     return gtfe
 
-
-@pytest.fixture
-def expected(request):
+def load_expectation_module(name):
     """Use introspection to find known-good values for test assertions.
 
-    For example, assume this test is in t_modis.py:
-
-        def t_process(setup_modis_data, repo_env, expected):
-            '''Test gips_process on modis data.'''
-            actual = repo_env.run('gips_process', *STD_ARGS)
-            assert expected == actual
-
-    Then expected() will end up looking in expected/modis.py for `t_process`:
-
-            t_process = {
-                'updated': {...},
-                'created': {...},
-            }
+    Loads the model given by a part of `name`.  For instance, pass in
+    'foo.bar.baz.t_qux' to locate and load the module `..expected.qux`.
     """
-    # construct expectation module name from test module name:
-    # e.g.:  'foo.bar.t_baz_qux' -> 'baz_qux'
-    mod_name = request.module.__name__.split('.')[-1].split('_', 1)[1]
+    _, mod_name = name.split('.')[-1].split('_', 1)
     relative_mod_name = '..expected.' + mod_name
     try:
-        module = importlib.import_module(relative_mod_name, __name__)
+        return importlib.import_module(relative_mod_name, __name__)
     except ImportError as ie:
         msg = "Eror importing expectations from {}.".format(relative_mod_name)
         raise ImportError(msg, ie.args)
+
+@pytest.fixture
+def expected(request):
+    """Load the expectations for the running test.
+
+    For example, assume a test named 't_process' in t_modis.py.
+    expected() will then load a result object with values from
+    expected.modis.t_process.
+    """
+    module = load_expectation_module(request.module.__name__)
     return GipsProcResult(**getattr(module, request.function.func_name))
