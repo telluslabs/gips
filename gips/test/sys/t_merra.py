@@ -1,7 +1,8 @@
 import logging
 
 import pytest
-import envoy
+import envoy # deprecated
+import sh
 
 from .util import *
 
@@ -46,15 +47,12 @@ def t_inventory(setup_fixture, repo_env, expected):
 from .expected import merra as expectations
 
 @pytest.mark.parametrize("product", expectations.t_process.keys())
-def t_process(setup_fixture, record_path, product):
+def t_process(setup_fixture, repo_wrapper, product):
     """Test gips_process on merra data."""
-    dut = util.DATA_REPO_ROOT # directory under test
-
-    #process_actual = repo_env.run('gips_process', *STD_ARGS)
-    #inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
-    #assert expected == process_actual
-    #assert inventory_actual.std_out == expected._inv_stdout
-
+    record_mode, expected, runner = repo_wrapper
+    outcome, actual = runner('gips_process', *(STD_ARGS + ('-p', product)))
+    if not record_mode: # don't evaluate assertions when in record-mode
+        assert outcome.exit_code == 0 and expected == actual
 
 def t_info(repo_env, expected):
     """Test `gips_info {driver}` and confirm recorded output is given."""
