@@ -202,15 +202,66 @@ t_tiles_copy = {
 }
 
 t_stats = {
-    'created': {
-        'patm_stats.txt': 1367728250,
-        'prcp_stats.txt': 1367728250,
-        'rhum_stats.txt': 1367728250,
-        'shum_stats.txt': 1367728250,
-        'srad_stats.txt': 1367728250,
-        'tave_stats.txt': 1367728250,
-        'tmax_stats.txt': 1367728250,
-        'tmin_stats.txt': 1367728250,
-        'wind_stats.txt': 1367728250,
-    }
+    # t_stats[srad] recording:
+    'srad':
+        [('output/srad_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
+
+    # t_stats[tave] recording:
+    'tave':
+        [('output/tave_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
+
+    # t_stats[shum] recording:
+    'shum':
+        [('output/shum_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
+
+    # t_stats[rhum] recording:
+    'rhum':
+        [('output/rhum_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
+
+    # t_stats[tmin] recording:
+    'tmin':
+        [('output/tmin_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
+
+    # t_stats[tmax] recording:
+    'tmax':
+        [('output/tmax_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
+
+    # t_stats[prcp] recording:
+    'prcp':
+        [('output/prcp_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
+
+    # t_stats[patm] recording:
+    'patm':
+        [('output/patm_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
+
+    # t_stats[wind] recording:
+    'wind':
+        [('output/wind_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 }
