@@ -99,18 +99,69 @@ t_process = {
 }
 
 t_project = {
-    'created': {
-        '0': None,
-        '0/2015135_merra_patm.tif': 147353283,
-        '0/2015135_merra_prcp.tif': 1755012780,
-        '0/2015135_merra_rhum.tif': -157842459,
-        '0/2015135_merra_shum.tif': -1248597053,
-        '0/2015135_merra_srad.tif': 335947606,
-        '0/2015135_merra_tave.tif': 362688260,
-        '0/2015135_merra_tmax.tif': -711449232,
-        '0/2015135_merra_tmin.tif': 1704871784,
-        '0/2015135_merra_wind.tif': 1730702417,
-    }
+
+    # t_project[srad] recording:
+    'srad':
+        [('output/0/2015135_merra_srad.tif',
+          'hash',
+          'sha256',
+          'bfc0b906f7299ff8e6fcbbe474de0fb7b877d36f2e619e2e6ac10bd84ac5b55d')],
+
+    # t_project[tave] recording:
+    'tave':
+        [('output/0/2015135_merra_tave.tif',
+          'hash',
+          'sha256',
+          'c96d89ebf5d7ec90193c8a113609bfc39473d72041b6145a8cd41ee49e4f6a4d')],
+
+    # t_project[prcp] recording:
+    'prcp':
+        [('output/0/2015135_merra_prcp.tif',
+          'hash',
+          'sha256',
+          'b7e68237ee3557c421856203cc22807f1ce74790ea2948f8d095cbf8a7f18a53')],
+
+    # t_project[rhum] recording:
+    'rhum':
+        [('output/0/2015135_merra_rhum.tif',
+          'hash',
+          'sha256',
+          '3b45ba1cd87d4781ff95b08562a00189506c76add24156f8e3719ff8872c3d3a')],
+
+    # t_project[tmin] recording:
+    'tmin':
+        [('output/0/2015135_merra_tmin.tif',
+          'hash',
+          'sha256',
+          '253e37e9b2c03a77a0a4fdfe5aaa0e3ff025471f64fd28d6ffb33dd8ecdd68a9')],
+
+    # t_project[tmax] recording:
+    'tmax':
+        [('output/0/2015135_merra_tmax.tif',
+          'hash',
+          'sha256',
+          '8371d473f0e506e6ab0fe872542b8cd0d65bc2ed2b37bbeb747c966c41e9c232')],
+
+    # t_project[shum] recording:
+    'shum':
+        [('output/0/2015135_merra_shum.tif',
+          'hash',
+          'sha256',
+          '208465fbf10da2e935807e00991fa6375c3c6b67d9950362a9ffe502d7690fd6')],
+
+    # t_project[patm] recording:
+    'patm':
+        [('output/0/2015135_merra_patm.tif',
+          'hash',
+          'sha256',
+          '5778a4d89b22ea76dc25654c8092a61bbb09634f06f66b578460a93444e513a7')],
+
+    # t_project[wind] recording:
+    'wind':
+        [('output/0/2015135_merra_wind.tif',
+          'hash',
+          'sha256',
+          '88029a425fbeb59149a29be793087b51ea46583bb89e62c1baca629ccfc3a36a')],
 }
 
 t_project_no_warp = {
