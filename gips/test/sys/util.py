@@ -234,13 +234,19 @@ def generate_expectation(filename, base_path):
             With symlinks one often can't use the whole link target
             because parts differ across environments (eg /home/usr/etc).
              So just use the bits before and after the base_path.
-        Hash:  (filename, 'hash, 'sha256', <hex digest string>).
+        Hash:  (filename, 'hash', 'sha256', <hex digest string>).
             Used as a fallback if nothing else matches the file type.
+        Text-full:  (filename, 'text-full', list(<lines-in-file>))
         Finally, if the file is absent:  (filename, 'absent')
     """
+    # may want to try python-magic at some point:  https://github.com/ahupp/python-magic
+    # but for now going by file extension seems to be sufficient.
+
     # have to use lexists to cover for foolish abuse of symlinks by GDAL et al
     if not os.path.lexists(filename):
         return (filename, 'absent')
+
+    # symlinks
     if os.path.islink(filename):
         #                    vvvvvvvvvvvvvvvvvvvvvv--- have to rmeove this bit
         # HDF4_EOS:EOS_GRID:"/home/tolson/src/gips/data-root/modis/tiles/h12v04/2012337
@@ -250,6 +256,24 @@ def generate_expectation(filename, base_path):
         separator = os.path.dirname(base_path)
         prefix, suffix = link_target.split(separator)
         return (filename, 'symlink', prefix, suffix)
+
+    # text files
+    size_threshold = 80 * 25 # about one terminal-screen
+    if filename.endswith('.txt'):
+        f_size = os.stat(filename).st_size
+        if f_size <= size_threshold: # give up if there's too much text
+            with open(filename) as fo:
+                lines = fo.readlines()
+            return (filename, 'text-full', lines)
+        print('{} ({} bytes) exceeds max supported size for text diffs'
+              ' ({} bytes); defaulting to checksum'.format(
+                    filename, f_size, size_threshold))
+
+    # product TIFFs
+    if filename.endswith('.tif'):
+        pass # TODO https://github.com/Applied-GeoSolutions/gips/issues/463
+
+    # use a hash as a fallback
     return (filename, 'hash', 'sha256', generate_file_hash(filename))
 
 def generate_file_hash(filename, blocksize=2**20):
