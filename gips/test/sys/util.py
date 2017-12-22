@@ -298,22 +298,23 @@ def sys_test_wrapper(request, path):
     that is calling this function. Yields to let some process work, then
     reports on files created in the path during the wait.
     """
-    # DATA_REPO_ROOT is the directory under test
     rp = record_path()
     product = request.getfixturevalue('product')
     expectations = load_expectation_module(request.module.__name__)
     expected = getattr(expectations, request.function.__name__)[product]
     expected_filenames = [e[0] for e in expected]
 
-    if rp:
-        initial_files = find_files(path)
-    else:
+    if not rp:
         interlopers = [fn for fn in expected_filenames if os.path.exists(fn)]
         if interlopers:
             raise IOError('Files in the way of the test: {}'.format(interlopers))
 
+    initial_files = [] # getting around a scoping problem with python
+
     def wrapped_runner(cmd_string, *args):
         print("command line: `{} {}`".format(cmd_string, ' '.join(args)))
+        if rp:
+            initial_files.extend(find_files(path))
         outcome = sh.Command(cmd_string)(*args)
         return outcome, [generate_expectation(fn, path)
                          for fn in expected_filenames]

@@ -97,22 +97,22 @@ def t_tiles_copy(setup_modis_data, clean_repo_env, output_tfe, expected):
     actual = output_tfe.run('gips_tiles', *args)
     assert expected == actual
 
-
-def t_stats(setup_modis_data, clean_repo_env, output_tfe, expected):
+@pytest.mark.parametrize("product", expectations.t_stats.keys())
+def t_stats(setup_modis_data, export_wrapper, product):
     """Test gips_stats on projected files."""
+    record_mode, expected, runner = export_wrapper
+
     # generate data needed for stats computation
-    args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
-    prep_run = output_tfe.run('gips_project', *args)
-    assert prep_run.exit_status == 0 # confirm it worked; not really in the test
+    args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR,
+                       '--notld', '-p', product)
+    outcome = sh.gips_project(*args)
+    assert outcome.exit_code == 0 # sanity check
 
-    # compute stats
-    gtfe = GipsTestFileEnv(OUTPUT_DIR, start_clear=False)
-    actual = gtfe.run('gips_stats', OUTPUT_DIR)
+    # compute & confirm stats
+    outcome, actual = runner('gips_stats', OUTPUT_DIR)
+    if not record_mode:
+        assert outcome.exit_code == 0 and expected == actual
 
-    # check for correct stats content
-    assert expected == actual
-    
-    
 def t_gridded_export(setup_modis_data, clean_repo_env, output_tfe, expected):
     """Test gips_project using rastermask spatial spec"""
     rastermask = os.path.join(TEST_DATA_DIR, 'site_mask.tif')
