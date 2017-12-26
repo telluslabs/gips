@@ -50,18 +50,6 @@ def t_info(repo_env, expected):
     actual = repo_env.run('gips_info', driver)
     assert expected == actual
 
-from .expected import merra as expectations
-
-@pytest.mark.parametrize("product", expectations.t_process.keys()) # TODO <--
-def t_project(setup_fixture, export_wrapper, product):
-    """Test gips_project merra with warping."""
-    record_mode, expected, runner = export_wrapper
-    args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR,
-                       '--notld', '-p', product)
-    outcome, actual = runner('gips_project', *args)
-    if not record_mode: # don't evaluate assertions when in record-mode
-        assert outcome.exit_code == 0 and expected == actual
-
 # TODO revive this test?
 '''
 def t_project_no_warp(setup_fixture, clean_repo_env, output_tfe, expected):
@@ -87,6 +75,8 @@ def t_tiles_copy(setup_fixture, clean_repo_env, output_tfe, expected):
             '--outdir', OUTPUT_DIR, '--notld')
     actual = output_tfe.run('gips_tiles', *args)
     assert expected == actual
+
+from .expected import merra as expectations
 
 @pytest.mark.parametrize("product", expectations.t_stats.keys())
 def t_stats(setup_fixture, export_wrapper, product):
