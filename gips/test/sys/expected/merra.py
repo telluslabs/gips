@@ -40,64 +40,6 @@ SENSORS\x1b[0m
 """
 }
 
-t_process = {
-    # test this too?  'frland': [],
-    # t_process[srad] recording:
-    'srad':
-        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_srad.tif',
-          'hash',
-          'sha256',
-          '882a44af70e337bf905c8695936f101792a518507a4304b23781a2f30aaabab4')],
-    # t_process[tave] recording:
-    'tave':
-        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_tave.tif',
-          'hash',
-          'sha256',
-          '5185aebd7cda54157cad2ddbde9f6fec4871c1b85fe78d0738634ba0211f2c9b')],
-    # t_process[shum] recording:
-    'shum':
-        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_shum.tif',
-          'hash',
-          'sha256',
-          '558f567c1e931891553d396f81b2b90929ad48a0ae88fa95d3894eae23ab3eba')],
-    # t_process[rhum] recording:
-    'rhum':
-        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_rhum.tif',
-          'hash',
-          'sha256',
-          '058161eb8488f1fb3df7f5c8719833c9d68c56aa082d4605938f62c2ee0035f6')],
-    # t_process[tmin] recording:
-    'tmin':
-        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_tmin.tif',
-          'hash',
-          'sha256',
-          '35a850769a3bb8f5209574ea4835bf417d8f99024567f4af9cdee9e623d0c567')],
-    # t_process[tmax] recording:
-    'tmax':
-        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_tmax.tif',
-          'hash',
-          'sha256',
-          '5963fcf346f388fc347355153996a078f1eb5ecbbc094394b72be382ba491865')],
-    # t_process[prcp] recording:
-    'prcp':
-        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_prcp.tif',
-          'hash',
-          'sha256',
-          '348fd7072ef0a8625f5268e29acbf3a69a959a412327102ef6558c992e62bc9f')],
-    # t_process[patm] recording:
-    'patm':
-        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_patm.tif',
-          'hash',
-          'sha256',
-          '7d9deca613973cb8ffb8f15a3dfa2013e6783556b520915e89b97fe41de638e3')],
-    # t_process[wind] recording:
-    'wind':
-        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_wind.tif',
-          'hash',
-          'sha256',
-          'a90c1d87fdb1c0926bd5b3004408a1f9d42ef08c38deb9d0572bc7536dbbf08a')],
-}
-
 t_project = {
 
     # t_project[srad] recording:

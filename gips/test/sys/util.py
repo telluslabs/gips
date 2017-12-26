@@ -297,11 +297,15 @@ def sys_test_wrapper(request, path):
     `request` is a pytest request object probably passed in to a fixture
     that is calling this function. Yields to let some process work, then
     reports on files created in the path during the wait.
+
+    Presently depends on the module of the test having an expectations name
+    that is a dict of dicts, and the test getting a 'driver' and 'product'
+    param.
     """
     rp = record_path()
     product = request.getfixturevalue('product')
-    expectations = load_expectation_module(request.module.__name__)
-    expected = getattr(expectations, request.function.__name__)[product]
+    p = request.node.callspec.params
+    expected = request.module.expectations[p['driver']][p['product']]
     expected_filenames = [e[0] for e in expected]
 
     if not rp:
@@ -319,7 +323,7 @@ def sys_test_wrapper(request, path):
         return outcome, [generate_expectation(fn, path)
                          for fn in expected_filenames]
 
-    yield bool(rp), expected, wrapped_runner
+    yield bool(rp), wrapped_runner
 
     if rp:
         final_files = find_files(path)

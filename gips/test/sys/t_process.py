@@ -5,26 +5,12 @@ from util import repo_wrapper
 import driver_setup
 from .expected import modis as expectations
 
-params = [] # (driver, product)
+params = [] # (driver, product),...
+expectations = {} #  'driver': {'product': [ (path, type, data...),...]...}
 
-params += [('modis', p) for p in (
-    'ndvi8', 'temp8td', 'temp8tn', #Terra 8-day Products
-    'quality', #Nadir BRDF-Adjusted 16-day Products'
-    'clouds', #Standard Products'
-    'fsnow', 'obstime', 'snow', 'temp', #Terra/Aqua Daily Products'
-    #Index Products'
-    'bi', 'brgt', 'crc', 'crcm', 'evi', 'isti', 'lswi',
-    'msavi2', 'ndsi', 'ndti', 'ndvi', 'satvi', 'sti', 'vari',
-    #'indices', deprecated; not testing as a result
-    #'landcover', is annual, not available for the scene under test
-)]
-
-#params += [('modis', p) for p in (
-#)]
-
-expectations = {
-  'modis': {
+expectations['modis'] = {
     # 'landcover' [], # is annual, not available for the scene under test
+    # 'indices', deprecated; not testing as a result
     # weird symlink products:
     # t_process[quality] recording:
     'quality':
@@ -347,13 +333,73 @@ expectations = {
           'hash',
           'sha256',
           '942efeeee2b020123be6d7334bbb3ef5995c93d2fd0247cb79948836865c8067')],
-  },
 }
+
+expectations['merra'] = {
+    # test this too?  'frland': [],
+    # t_process[srad] recording:
+    'srad':
+        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_srad.tif',
+          'hash',
+          'sha256',
+          '882a44af70e337bf905c8695936f101792a518507a4304b23781a2f30aaabab4')],
+    # t_process[tave] recording:
+    'tave':
+        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_tave.tif',
+          'hash',
+          'sha256',
+          '5185aebd7cda54157cad2ddbde9f6fec4871c1b85fe78d0738634ba0211f2c9b')],
+    # t_process[shum] recording:
+    'shum':
+        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_shum.tif',
+          'hash',
+          'sha256',
+          '558f567c1e931891553d396f81b2b90929ad48a0ae88fa95d3894eae23ab3eba')],
+    # t_process[rhum] recording:
+    'rhum':
+        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_rhum.tif',
+          'hash',
+          'sha256',
+          '058161eb8488f1fb3df7f5c8719833c9d68c56aa082d4605938f62c2ee0035f6')],
+    # t_process[tmin] recording:
+    'tmin':
+        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_tmin.tif',
+          'hash',
+          'sha256',
+          '35a850769a3bb8f5209574ea4835bf417d8f99024567f4af9cdee9e623d0c567')],
+    # t_process[tmax] recording:
+    'tmax':
+        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_tmax.tif',
+          'hash',
+          'sha256',
+          '5963fcf346f388fc347355153996a078f1eb5ecbbc094394b72be382ba491865')],
+    # t_process[prcp] recording:
+    'prcp':
+        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_prcp.tif',
+          'hash',
+          'sha256',
+          '348fd7072ef0a8625f5268e29acbf3a69a959a412327102ef6558c992e62bc9f')],
+    # t_process[patm] recording:
+    'patm':
+        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_patm.tif',
+          'hash',
+          'sha256',
+          '7d9deca613973cb8ffb8f15a3dfa2013e6783556b520915e89b97fe41de638e3')],
+    # t_process[wind] recording:
+    'wind':
+        [('data-root/merra/tiles/h01v01/2015135/h01v01_2015135_merra_wind.tif',
+          'hash',
+          'sha256',
+          'a90c1d87fdb1c0926bd5b3004408a1f9d42ef08c38deb9d0572bc7536dbbf08a')],
+}
+
+params += [('modis', p) for p in expectations['modis'].keys()]
+params += [('merra', p) for p in expectations['merra'].keys()]
 
 @pytest.mark.parametrize("driver, product", params)
 def t_process(repo_wrapper, driver, product):
     """Test gips_process output."""
-    record_mode, _, runner = repo_wrapper
+    record_mode, runner = repo_wrapper
     driver_setup.setup_repo_data(driver)
     args = ('gips_process',) + driver_setup.STD_ARGS[driver] + ('-p', product)
     outcome, actual = runner(*args)

@@ -40,28 +40,17 @@ def setup_modis_data(pytestconfig):
         raise RuntimeError("MODIS data setup via `gips_inventory` failed",
                            outcome.std_out, outcome.std_err, outcome)
 
-
 def t_inventory(setup_modis_data, repo_env, expected):
     """Test `gips_inventory modis` and confirm recorded output is given."""
     actual = repo_env.run('gips_inventory', *STD_ARGS)
     assert expected == actual
 
-from .expected import modis as expectations
-
-@pytest.mark.parametrize("product", expectations.t_process.keys())
-def t_process(setup_modis_data, repo_wrapper, product):
-    """Test gips_process on modis data."""
-    record_mode, expected, runner = repo_wrapper
-    outcome, actual = runner('gips_process', 'modis', '-s', NH_SHP_PATH,
-                             '-d', '2012-12-01,2012-12-03', '-v', '4', '-p',
-                             product)
-    if not record_mode: # don't evaluate assertions when in record-mode
-        assert outcome.exit_code == 0 and expected == actual
-
 def t_info(repo_env, expected):
     """Test `gips_info modis` and confirm recorded output is given."""
     actual = repo_env.run('gips_info', 'modis')
     assert expected == actual
+
+from .expected import modis as expectations
 
 @pytest.mark.parametrize("product", expectations.t_project.keys())
 def t_project(setup_modis_data, export_wrapper, product):

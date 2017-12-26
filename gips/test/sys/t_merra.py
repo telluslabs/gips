@@ -44,20 +44,13 @@ def t_inventory(setup_fixture, repo_env, expected):
     actual = repo_env.run('gips_inventory', *STD_ARGS)
     assert expected == actual
 
-from .expected import merra as expectations
-
-@pytest.mark.parametrize("product", expectations.t_process.keys())
-def t_process(setup_fixture, repo_wrapper, product):
-    """Test gips_process on merra data."""
-    record_mode, expected, runner = repo_wrapper
-    outcome, actual = runner('gips_process', *(STD_ARGS + ('-p', product)))
-    if not record_mode: # don't evaluate assertions when in record-mode
-        assert outcome.exit_code == 0 and expected == actual
 
 def t_info(repo_env, expected):
     """Test `gips_info {driver}` and confirm recorded output is given."""
     actual = repo_env.run('gips_info', driver)
     assert expected == actual
+
+from .expected import merra as expectations
 
 @pytest.mark.parametrize("product", expectations.t_process.keys()) # TODO <--
 def t_project(setup_fixture, export_wrapper, product):
