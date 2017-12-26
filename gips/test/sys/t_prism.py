@@ -35,15 +35,6 @@ setup_fixture = setup_prism_data
 
 # ###   SHOULD BE STANDARD BELOW HERE #####
 
-
-def t_inventory(setup_fixture, repo_env, expected):
-    """
-    Test `gips_inventory` for {} and confirm recorded output is given.
-    """.format(driver)
-    actual = repo_env.run('gips_inventory', *STD_ARGS)
-    assert expected == actual
-
-
 def t_process(setup_fixture, repo_env, expected):
     """Test gips_process on {} data.""".format(driver)
     process_actual = repo_env.run('gips_process', *STD_ARGS)
@@ -74,13 +65,6 @@ def t_process(setup_fixture, repo_env, expected):
 #     process_run2 = repo_env.run('gips_process', *args)
 #     assert expected == process_run2
 #     assert process_run1.timestamps != process_run2.timestamps
-
-
-def t_info(repo_env, expected):
-    """Test `gips_info {driver}` and confirm recorded output is given."""
-    actual = repo_env.run('gips_info', driver)
-    assert expected == actual
-
 
 def t_project(setup_fixture, clean_repo_env, output_tfe, expected):
     """Test gips_project {} with warping.""".format(driver)

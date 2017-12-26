@@ -39,13 +39,6 @@ def setup_fixture(pytestconfig):
         raise RuntimeError("Data setup via `gips_inventory` failed",
                            outcome.std_out, outcome.std_err, outcome)
 
-
-def t_inventory(setup_fixture, repo_env, expected):
-    """Test `gips_inventory` and confirm recorded output is given."""
-    actual = repo_env.run('gips_inventory', *STD_ARGS)
-    assert expected == actual
-
-
 @slow
 def t_process(setup_fixture, repo_env, expected):
     """Test `gips_process`, confirming products are created."""
@@ -53,13 +46,6 @@ def t_process(setup_fixture, repo_env, expected):
     inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
     assert (expected == process_actual
             and expected._inv_stdout == inventory_actual.std_out)
-
-
-def t_info(repo_env, expected):
-    """Test `gips_info` and confirm recorded output is given."""
-    actual = repo_env.run('gips_info', driver)
-    assert expected == actual
-
 
 def t_project(setup_fixture, clean_repo_env, output_tfe, expected):
     """Test gips_project with warping."""

@@ -39,25 +39,11 @@ setup_fixture = setup_driver_data
 # ###   SHOULD BE STANDARD BELOW HERE #####
 
 
-def t_inventory(setup_fixture, repo_env, expected):
-    """
-    Test `gips_inventory` for {} and confirm recorded output is given.
-    """.format(driver)
-    actual = repo_env.run('gips_inventory', *STD_ARGS)
-    assert expected == actual
-
-
 def t_process(setup_fixture, repo_env, expected):
     """Test gips_process on {} data.""".format(driver)
     process_actual = repo_env.run('gips_process', *STD_ARGS)
     inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
     assert expected == process_actual and inventory_actual.std_out == expected._inv_stdout
-
-
-def t_info(repo_env, expected):
-    """Test `gips_info {driver}` and confirm recorded output is given."""
-    actual = repo_env.run('gips_info', driver)
-    assert expected == actual
 
 
 def t_project(setup_fixture, clean_repo_env, output_tfe, expected):

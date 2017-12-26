@@ -1,45 +1,5 @@
 """Known-good outcomes for tests, mostly stdout and created files."""
 
-t_info = { 'stdout':  u"""\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
-\x1b[1m
-PRISM Products v0.1.1\x1b[0m
-  Optional qualifiers listed below each product.
-  Specify by appending '-option' to product (e.g., ref-toa)
-\x1b[1m
-Standard Products
-\x1b[0m   ppt         Precipitate                             
-   pptsum      Cumulative Precipitate                  
-                 days: temporal window width (default: 3 days) .
-   tmax        Daily Maximum Temperature               
-   tmin        Daily Minimum Temperature               
-""" }
-
-
-t_inventory = {
-    'stdout': u"""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
-Retrieving inventory for site NHseacoast-0
-
-\x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
-\x1b[1m
-Tile Coverage
-\x1b[4m  Tile      % Coverage   % Tile Used\x1b[0m
-   CONUS       99.2%        0.0%
-
-\x1b[1m\x1b[4m    DATE       _ppt     _tmax     _tmin    Product  \x1b[0m
-\x1b[1m1982        
-\x1b[0m    335       99.2%     99.2%     99.2%   
-    336       99.2%     99.2%     99.2%   
-    337       99.2%     99.2%     99.2%   
-
-
-3 files on 3 dates
-\x1b[1m
-SENSORS\x1b[0m
-\x1b[35mprism: Daily Gridded Climate Data\x1b[0m
-""",
-}
-
-
 t_process = {
     'updated': {
         'prism/stage': None,

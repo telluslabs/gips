@@ -44,12 +44,6 @@ def setup_landsat_data(pytestconfig):
         raise RuntimeError(err_msg)
 
 
-def t_info(repo_env, expected):
-    """Test `gips_info modis` and confirm recorded output is given."""
-    actual = repo_env.run('gips_info', 'landsat')
-    assert expected == actual
-
-
 def t_login():
     """Test `gips_info modis` and confirm recorded output is given."""
     from gips.data import landsat
@@ -68,11 +62,6 @@ def t_query_service():
     resp = landsat.landsatAsset.query_service('C1', '012030', dt(2017, 8, 1))
     logger.debug(str(resp))
     assert len(resp) == 1
-
-def t_inventory(setup_landsat_data, repo_env, expected):
-    """Test `gips_inventory` to confirm it notices the emplaced data file."""
-    actual = repo_env.run('gips_inventory', *STD_ARGS)
-    assert expected == actual
 
 @slow
 def t_process(setup_landsat_data, repo_env, expected):

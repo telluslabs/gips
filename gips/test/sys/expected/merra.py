@@ -1,45 +1,5 @@
 """Known-good outcomes for tests, mostly stdout and created files."""
 
-t_info = { 'stdout':  u"""\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
-\x1b[1m
-merra Products v1.0.0\x1b[0m
-\x1b[1m
-Standard Products
-\x1b[0m   frland      Fraction of land (fraction)             
-   patm        Surface atmospheric pressure (mb)       
-   prcp        Daily total precipitation (mm day-1)    
-   rhum        Relative humidity (%)                   
-   shum        Relative humidity (kg kg-1)             
-   srad        Incident solar radiation (W m-2)        
-   tave        Ave daily air temperature data (K)      
-   tmax        Max daily air temperature data          
-   tmin        Min daily air temperature data          
-   wind        Daily mean wind speed (m s-1)           
-""" }
-
-
-t_inventory = {
-    'stdout': u"""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
-Retrieving inventory for site NHseacoast-0
-
-\x1b[1mAsset Coverage for site NHseacoast-0\x1b[0m
-\x1b[1m
-Tile Coverage
-\x1b[4m  Tile      % Coverage   % Tile Used\x1b[0m
-  h01v01      100.0%        0.0%
-
-\x1b[1m\x1b[4m    DATE       ASM       FLX       RAD       SLV     Product  \x1b[0m
-\x1b[1m2015        
-\x1b[0m    135                 100.0%     100.0%     100.0%   
-
-
-1 files on 1 dates
-\x1b[1m
-SENSORS\x1b[0m
-\x1b[35mmerra: Modern Era Retrospective-analysis for Research and Applications\x1b[0m
-"""
-}
-
 t_project_no_warp = {
     'created': {
         '0': None,
