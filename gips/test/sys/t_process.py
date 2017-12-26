@@ -3,10 +3,20 @@ import pytest
 import util
 from util import repo_wrapper
 import driver_setup
-from .expected import modis as expectations
 
 params = [] # (driver, product),...
 expectations = {} #  'driver': {'product': [ (path, type, data...),...]...}
+
+@pytest.mark.parametrize("driver, product", params)
+def t_process(repo_wrapper, driver, product):
+    """Test gips_process output."""
+    record_mode, runner = repo_wrapper
+    driver_setup.setup_repo_data(driver)
+    args = ('gips_process',) + driver_setup.STD_ARGS[driver] + ('-p', product)
+    outcome, actual = runner(*args)
+    if not record_mode: # don't evaluate assertions when in record-mode
+        assert (outcome.exit_code == 0
+                and expectations[driver][product] == actual)
 
 expectations['modis'] = {
     # 'landcover' [], # is annual, not available for the scene under test
@@ -395,14 +405,3 @@ expectations['merra'] = {
 
 params += [('modis', p) for p in expectations['modis'].keys()]
 params += [('merra', p) for p in expectations['merra'].keys()]
-
-@pytest.mark.parametrize("driver, product", params)
-def t_process(repo_wrapper, driver, product):
-    """Test gips_process output."""
-    record_mode, runner = repo_wrapper
-    driver_setup.setup_repo_data(driver)
-    args = ('gips_process',) + driver_setup.STD_ARGS[driver] + ('-p', product)
-    outcome, actual = runner(*args)
-    if not record_mode: # don't evaluate assertions when in record-mode
-        assert (outcome.exit_code == 0
-                and expectations[driver][product] == actual)

@@ -51,8 +51,6 @@ Standard Products
    landcover   MCD Annual Land Cover                   
 """}
 
-t_project_two_runs = t_project
-
 t_project_no_warp = { 'created': {
     '0': None, # directory
     '0/2012336_MCD_fsnow.tif': -232655043,

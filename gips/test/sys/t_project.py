@@ -3,10 +3,21 @@ import pytest
 import util
 from util import export_wrapper
 import driver_setup
-from .expected import modis as expectations
 
 params = [] # (driver, product),...
 expectations = {} #  'driver': {'product': [ (path, type, data...),...]...}
+
+@pytest.mark.parametrize("driver, product", params)
+def t_project(export_wrapper, driver, product):
+    """Test gips_project with warping."""
+    record_mode, runner = export_wrapper
+    args = ('gips_project',) + driver_setup.STD_ARGS[driver] + (
+        '--res', '100', '100', '--outdir', util.OUTPUT_DIR, '--notld',
+        '-p', product)
+    outcome, actual = runner(*args)
+    if not record_mode: # don't evaluate assertions when in record-mode
+        assert (outcome.exit_code == 0
+                and expectations[driver][product] == actual)
 
 expectations['modis'] = {
     # t_project[satvi] recording:
@@ -400,14 +411,3 @@ expectations['merra'] = {
 params += [('modis', p) for p in expectations['modis'].keys()]
 params += [('merra', p) for p in expectations['merra'].keys()]
 
-@pytest.mark.parametrize("driver, product", params)
-def t_project(export_wrapper, driver, product):
-    """Test gips_project with warping."""
-    record_mode, runner = export_wrapper
-    args = ('gips_project',) + driver_setup.STD_ARGS[driver] + (
-        '--res', '100', '100', '--outdir', util.OUTPUT_DIR, '--notld',
-        '-p', product)
-    outcome, actual = runner(*args)
-    if not record_mode: # don't evaluate assertions when in record-mode
-        assert (outcome.exit_code == 0
-                and expectations[driver][product] == actual)
