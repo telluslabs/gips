@@ -39,13 +39,6 @@ setup_fixture = setup_driver_data
 # ###   SHOULD BE STANDARD BELOW HERE #####
 
 
-def t_process(setup_fixture, repo_env, expected):
-    """Test gips_process on {} data.""".format(driver)
-    process_actual = repo_env.run('gips_process', *STD_ARGS)
-    inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
-    assert expected == process_actual and inventory_actual.std_out == expected._inv_stdout
-
-
 def t_project(setup_fixture, clean_repo_env, output_tfe, expected):
     """Test gips_project {} with warping.""".format(driver)
     args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
