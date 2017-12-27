@@ -11,9 +11,9 @@ from expected.std_project import expectations
                          util.params_from_expectations(expectations))
 def t_project(export_wrapper, driver, product):
     """Test gips_project with warping."""
-    record_mode, runner = export_wrapper
+    record_mode, runner, working_dir = export_wrapper
     args = ('gips_project',) + driver_setup.STD_ARGS[driver] + (
-        '--res', '100', '100', '--outdir', util.OUTPUT_DIR, '--notld',
+        '--res', '100', '100', '--outdir', working_dir, '--notld',
         '-p', product)
     outcome, actual = runner(*args)
     if not record_mode: # don't evaluate assertions when in record-mode

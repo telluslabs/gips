@@ -310,9 +310,9 @@ def sys_test_wrapper(request, path):
     param.
     """
     rp = record_path() # does the user want record mode?  If so, save it where?
-    product = request.getfixturevalue('product')
-    p = request.node.callspec.params
-    expected = request.module.expectations[p['driver']][p['product']]
+    driver = request.node.callspec.params['driver']
+    product = request.node.callspec.params['product']
+    expected = request.module.expectations[driver][product]
     expected_filenames = [e[0] for e in expected]
 
     if not rp:
@@ -357,8 +357,12 @@ def repo_wrapper(request):
 
 @pytest.yield_fixture
 def export_wrapper(request):
-    for rv in sys_test_wrapper(request, OUTPUT_DIR):
-        yield rv
+    driver = request.node.callspec.params['driver']
+    product = request.node.callspec.params['product']
+    working_dir = os.path.join(OUTPUT_DIR, '{}-{}'.format(driver, product))
+    os.makedirs(working_dir) # raises if leaf dir exists; this is desired
+    for rv in sys_test_wrapper(request, working_dir):
+        yield rv + (working_dir,)
 
 @pytest.yield_fixture
 def repo_env(request):
