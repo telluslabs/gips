@@ -1,16 +1,5 @@
 """Known-good outcomes for tests, mostly stdout and created files."""
 
-t_project = {
-    'compare_stdout': False,
-    'compare_stderr': False,
-    'created': {
-        '0': None,
-        '0/2017004_MOD_aod.tif': -766418958,
-        '0/2017005_MOD_aod.tif': 1283286056,
-        '0/2017006_MOD_aod.tif': -2004417139,
-    }
-}
-
 t_project_no_warp = {
     'compare_stdout': False,
     'created': {
