@@ -28,7 +28,7 @@ def t_stats(export_wrapper, driver, product):
 expectations['modis'] = {
     # t_stats[satvi] recording:
     'satvi':
-        [('output/satvi_stats.txt',
+        [('satvi_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -0.1199 0.2757 0.188845 0.0394886 -2.85581 221002.0 \n',
@@ -37,7 +37,7 @@ expectations['modis'] = {
 
     # t_stats[ndti] recording:
     'ndti':
-        [('output/ndti_stats.txt',
+        [('ndti_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -1.0048 0.8895 0.31602 0.0595381 -2.46398 221002.0 \n',
@@ -46,7 +46,7 @@ expectations['modis'] = {
 
     # t_stats[ndvi] recording:
     'ndvi':
-        [('output/ndvi_stats.txt',
+        [('ndvi_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -0.8893 0.8144 0.598198 0.130008 -4.50499 221002.0 \n',
@@ -55,7 +55,7 @@ expectations['modis'] = {
 
     # t_stats[quality] recording:
     'quality':
-        [('output/quality_stats.txt',
+        [('quality_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 0.0 0.0 0.0 0.0 nan 221002.0 \n',
@@ -64,7 +64,7 @@ expectations['modis'] = {
 
     # t_stats[isti] recording:
     'isti':
-        [('output/isti_stats.txt',
+        [('isti_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 0.0583 3.2766 0.522676 0.0837755 13.2684 220980.0 \n',
@@ -73,14 +73,14 @@ expectations['modis'] = {
 
     # t_stats[ndvi8] recording:
     'ndvi8':
-        [('output/ndvi8_stats.txt',
+        [('ndvi8_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-337 -1.9475 3.2766 0.612297 0.162128 -3.72226 220758.0 \n'])],
 
     # t_stats[snow] recording:
     'snow':
-        [('output/snow_stats.txt',
+        [('snow_stats.txt',
           'text-full',
           ['date Snow Cover-min Snow Cover-max Snow Cover-mean Snow Cover-sd Snow Cover-skew Snow Cover-count Fractional Snow Cover-min Fractional Snow Cover-max Fractional Snow Cover-mean Fractional Snow Cover-sd Fractional Snow Cover-skew Fractional Snow Cover-count \n',
            '2012-336 0.0 100.0 66.0782 43.1646 -0.66934 2379.0  0.0 70.0 44.8928 24.6763 -0.938924 2379.0 \n',
@@ -89,7 +89,7 @@ expectations['modis'] = {
 
     # t_stats[fsnow] recording:
     'fsnow':
-        [('output/fsnow_stats.txt',
+        [('fsnow_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 0.0 70.0 36.4813 30.8325 -0.322887 2379.0 \n',
@@ -98,7 +98,7 @@ expectations['modis'] = {
 
     # t_stats[crcm] recording:
     'crcm':
-        [('output/crcm_stats.txt',
+        [('crcm_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -0.8857 1.6238 0.960025 0.21929 -3.32392 221002.0 \n',
@@ -107,7 +107,7 @@ expectations['modis'] = {
 
     # t_stats[ndsi] recording:
     'ndsi':
-        [('output/ndsi_stats.txt',
+        [('ndsi_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -0.7313 1.0045 -0.58418 0.123674 6.27293 221002.0 \n',
@@ -116,7 +116,7 @@ expectations['modis'] = {
 
     # t_stats[brgt] recording:
     'brgt':
-        [('output/brgt_stats.txt',
+        [('brgt_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 0.0062 0.1361 0.0467873 0.0103586 0.699293 221002.0 \n',
@@ -125,7 +125,7 @@ expectations['modis'] = {
 
     # t_stats[msavi2] recording:
     'msavi2':
-        [('output/msavi2_stats.txt',
+        [('msavi2_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 0.014 0.6976 0.503178 0.0608721 -2.7989 219182.0 \n',
@@ -134,7 +134,7 @@ expectations['modis'] = {
 
     # t_stats[bi] recording:
     'bi':
-        [('output/bi_stats.txt',
+        [('bi_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 0.0033 0.1717 0.0948656 0.0173088 -1.23546 221002.0 \n',
@@ -143,7 +143,7 @@ expectations['modis'] = {
 
     # t_stats[obstime] recording:
     'obstime':
-        [('output/obstime_stats.txt',
+        [('obstime_stats.txt',
           'text-full',
           ['date Observation Time Daytime Terra-min Observation Time Daytime Terra-max Observation Time Daytime Terra-mean Observation Time Daytime Terra-sd Observation Time Daytime Terra-skew Observation Time Daytime Terra-count Observation Time Nighttime Terra-min Observation Time Nighttime Terra-max Observation Time Nighttime Terra-mean Observation Time Nighttime Terra-sd Observation Time Nighttime Terra-skew Observation Time Nighttime Terra-count Observation Time Daytime Aqua-min Observation Time Daytime Aqua-max Observation Time Daytime Aqua-mean Observation Time Daytime Aqua-sd Observation Time Daytime Aqua-skew Observation Time Daytime Aqua-count Observation Time Nighttime Aqua-min Observation Time Nighttime Aqua-max Observation Time Nighttime Aqua-mean Observation Time Nighttime Aqua-sd Observation Time Nighttime Aqua-skew Observation Time Nighttime Aqua-count \n',
            '2012-336 10.8 10.8 10.8 1.90735e-07 -0.999996 716.0  255.0 0.0 nan nan nan 0.0  255.0 0.0 nan nan nan 0.0  1.4 1.4 1.4 2.38419e-08 inf 6685.0 \n',
@@ -152,7 +152,7 @@ expectations['modis'] = {
 
     # t_stats[lswi] recording:
     'lswi':
-        [('output/lswi_stats.txt',
+        [('lswi_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -0.9413 1.004 0.0704005 0.0795676 -0.897423 221002.0 \n',
@@ -161,7 +161,7 @@ expectations['modis'] = {
 
     # t_stats[vari] recording:
     'vari':
-        [('output/vari_stats.txt',
+        [('vari_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -0.2931 3.2766 -0.0579385 0.0896767 11.2112 221002.0 \n',
@@ -170,7 +170,7 @@ expectations['modis'] = {
 
     # t_stats[evi] recording:
     'evi':
-        [('output/evi_stats.txt',
+        [('evi_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -0.0689 0.4391 0.251258 0.0534915 -2.19097 221002.0 \n',
@@ -179,14 +179,14 @@ expectations['modis'] = {
 
     # t_stats[temp8tn] recording:
     'temp8tn':
-        [('output/temp8tn_stats.txt',
+        [('temp8tn_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-337 267.02 280.38 273.055 1.35905 0.334532 212758.0 \n'])],
 
     # t_stats[clouds] recording:
     'clouds':
-        [('output/clouds_stats.txt',
+        [('clouds_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 0.0 1.0 0.990964 0.094628 -10.3767 221002.0 \n',
@@ -195,7 +195,7 @@ expectations['modis'] = {
 
     # t_stats[temp] recording:
     'temp':
-        [('output/temp_stats.txt',
+        [('temp_stats.txt',
           'text-full',
           ['date Temperature Daytime Terra-min Temperature Daytime Terra-max Temperature Daytime Terra-mean Temperature Daytime Terra-sd Temperature Daytime Terra-skew Temperature Daytime Terra-count Temperature Nighttime Terra-min Temperature Nighttime Terra-max Temperature Nighttime Terra-mean Temperature Nighttime Terra-sd Temperature Nighttime Terra-skew Temperature Nighttime Terra-count Temperature Daytime Aqua-min Temperature Daytime Aqua-max Temperature Daytime Aqua-mean Temperature Daytime Aqua-sd Temperature Daytime Aqua-skew Temperature Daytime Aqua-count Temperature Nighttime Aqua-min Temperature Nighttime Aqua-max Temperature Nighttime Aqua-mean Temperature Nighttime Aqua-sd Temperature Nighttime Aqua-skew Temperature Nighttime Aqua-count Temperature Best Quality-min Temperature Best Quality-max Temperature Best Quality-mean Temperature Best Quality-sd Temperature Best Quality-skew Temperature Best Quality-count \n',
            '2012-336 267.44 267.9 267.67 0.140381 -0.244244 716.0  65535.0 0.0 nan nan nan 0.0  65535.0 0.0 nan nan nan 0.0  258.94 263.7 261.912 1.39539 -0.717615 6685.0  0.0 0.0 0.0 0.0 nan 221255.0 \n',
@@ -204,14 +204,14 @@ expectations['modis'] = {
 
     # t_stats[temp8td] recording:
     'temp8td':
-        [('output/temp8td_stats.txt',
+        [('temp8td_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-337 273.32 283.76 279.933 1.98691 -1.00057 218113.0 \n'])],
 
     # t_stats[sti] recording:
     'sti':
-        [('output/sti_stats.txt',
+        [('sti_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -0.0024 3.2766 1.94182 0.235117 0.707709 221002.0 \n',
@@ -220,7 +220,7 @@ expectations['modis'] = {
 
     # t_stats[crc] recording:
     'crc':
-        [('output/crc_stats.txt',
+        [('crc_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2012-336 -0.8526 2.1525 1.29852 0.263609 -2.37667 221002.0 \n',
@@ -231,63 +231,63 @@ expectations['modis'] = {
 expectations['merra'] = {
     # t_stats[srad] recording:
     'srad':
-        [('output/srad_stats.txt',
+        [('srad_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 
     # t_stats[tave] recording:
     'tave':
-        [('output/tave_stats.txt',
+        [('tave_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 
     # t_stats[shum] recording:
     'shum':
-        [('output/shum_stats.txt',
+        [('shum_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 
     # t_stats[rhum] recording:
     'rhum':
-        [('output/rhum_stats.txt',
+        [('rhum_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 
     # t_stats[tmin] recording:
     'tmin':
-        [('output/tmin_stats.txt',
+        [('tmin_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 
     # t_stats[tmax] recording:
     'tmax':
-        [('output/tmax_stats.txt',
+        [('tmax_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 
     # t_stats[prcp] recording:
     'prcp':
-        [('output/prcp_stats.txt',
+        [('prcp_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 
     # t_stats[patm] recording:
     'patm':
-        [('output/patm_stats.txt',
+        [('patm_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 
     # t_stats[wind] recording:
     'wind':
-        [('output/wind_stats.txt',
+        [('wind_stats.txt',
           'text-full',
           ['date min max mean sd skew count\n',
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
