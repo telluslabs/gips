@@ -58,18 +58,3 @@ def t_tiles_copy(setup_fixture, clean_repo_env, output_tfe, expected):
             '--outdir', OUTPUT_DIR, '--notld')
     actual = output_tfe.run('gips_tiles', *args)
     assert expected == actual
-
-
-def t_stats(setup_fixture, clean_repo_env, output_tfe, expected):
-    """Test gips_stats on projected files."""
-    # generate data needed for stats computation
-    args = STD_ARGS + ('--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld')
-    prep_run = output_tfe.run('gips_project', *args)
-    assert prep_run.exit_status == 0  # confirm it worked; not really in the test
-
-    # compute stats
-    gtfe = GipsTestFileEnv(OUTPUT_DIR, start_clear=False)
-    actual = gtfe.run('gips_stats', OUTPUT_DIR)
-
-    # check for correct stats content
-    assert expected == actual
