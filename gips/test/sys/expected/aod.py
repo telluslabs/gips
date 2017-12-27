@@ -26,14 +26,3 @@ t_tiles_copy = {
     }
 }
 
-t_stats = {
-    'stdout': u"""\x1b[1mGIPS Image Statistics (v0.1.0)\x1b[0m
-Stats for Project directory: /tmp/test-output
-Calculating statistics for 2017-01-04
-Calculating statistics for 2017-01-05
-Calculating statistics for 2017-01-06
-""",
-    'created': {
-        'aod_stats.txt': -769515142
-    }
-}

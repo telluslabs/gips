@@ -293,5 +293,16 @@ expectations['merra'] = {
            '2015-135 3.4e+38 -3.4e+38 nan nan nan 0.0 \n'])],
 }
 
-params += [('modis', p) for p in expectations['modis'].keys()]
-params += [('merra', p) for p in expectations['merra'].keys()]
+expectations['aod'] = {
+    # t_stats[aod] recording:
+    'aod':
+        [('aod_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2017-004 45.0 107.0 68.2053 27.2408 0.683439 2.70847e+06 \n',
+           '2017-005 34.0 130.0 68.7497 33.5872 0.965031 4.54937e+06 \n',
+           '2017-006 176.0 176.0 176.0 0.0 nan 927590.0 \n'])],
+}
+
+for driver, prod_expectations in expectations.items():
+    params += [(driver, product) for product in prod_expectations.keys()]
