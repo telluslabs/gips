@@ -76,7 +76,7 @@ def pytest_addoption(parser):
     parser.addoption('--record', action='store', default=None,
                      help="Pass in a filename for expecations"
                           " to be written to that filename.")
-    # TODO cleanup may not need to be implemented at all
+    # cleanup may not need to be implemented at all
     #parser.addoption('--cleanup-on-failure', action='store_true',
     #        help="Normally cleanup is skipped on failure so you can examine"
     #             " files; pass this option to cleanup even on failure.")
@@ -87,9 +87,10 @@ def pytest_configure(config):
     level = ('warning' if raw_level is None else raw_level).upper()
     root_logger.setLevel(level)
 
-    # TODO complain here if --record or --record-dir are wrong:
-    #   * --record file should not exist
-    #   * --record-dir should exist
+    record_path = config.getoption('record')
+    if os.path.lexists(record_path):
+        raise IOError("Record file already exists at {}".format(record_path))
+
     dr = str(config.getini('data-repo'))
     if not dr:
         raise ValueError("No value specified for 'data-repo' in pytest.ini")
