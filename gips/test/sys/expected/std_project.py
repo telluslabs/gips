@@ -404,3 +404,57 @@ expectations['aod'] = {
           'sha256',
           'ed9fc349c037f39eca87f2e7495024eeaf7fd0e99165ecb0f52cc7927e985977')],
 }
+
+expectations['prism'] = {
+    # t_project[tmax] recording:
+    'tmax':
+        [('0/1982337_prism_tmax.tif',
+          'hash',
+          'sha256',
+          '34354af37f2f9802c3c2a6e49437b14b1a61ddf3c378d2306df21dbcd8068abe'),
+         ('0/1982336_prism_tmax.tif',
+          'hash',
+          'sha256',
+          'ac083002cacf2fa456514c609e07256b08ac3fdcb8c870485145b34a113f65e0'),
+         ('0/1982335_prism_tmax.tif',
+          'hash',
+          'sha256',
+          '6e9b399a305ea1449d2c57752a7e013109b383de7414145017089858f1533dd3')],
+
+    # t_project[pptsum] recording:
+    'pptsum':
+        [('0/1982337_prism_pptsum.tif',
+          'hash',
+          'sha256',
+          '661586ac559c12a329375583f3ecee7c2837de6f276f9ee91e9b2c93b108f3ea')],
+
+    # t_project[tmin] recording:
+    'tmin':
+        [('0/1982337_prism_tmin.tif',
+          'hash',
+          'sha256',
+          'e60f8950f9a1ab4a1d192aab7bf4ccf577983d591cf3f2a488de10ce44568667'),
+         ('0/1982336_prism_tmin.tif',
+          'hash',
+          'sha256',
+          'a415b4b5df69bfc2ece115784f29151d6be95d8f2cc478d8c8c42e317c394129'),
+         ('0/1982335_prism_tmin.tif',
+          'hash',
+          'sha256',
+          'cc22853f539a0f4049d97f3e70f1af2d6aec7254504d42b11f9f41ce12bd1a68')],
+
+    # t_project[ppt] recording:
+    'ppt':
+        [('0/1982336_prism_ppt.tif',
+          'hash',
+          'sha256',
+          '452953fa26769ed0c3de1c698972baeede2749d6599408a4d2b67ae9bea3ca11'),
+         ('0/1982337_prism_ppt.tif',
+          'hash',
+          'sha256',
+          'f083e20b518336c4432c397d9ca35cf0d6a7da618cae230615580902fd70bca6'),
+         ('0/1982335_prism_ppt.tif',
+          'hash',
+          'sha256',
+          '46e0db478d2c9f9cb6ecd3d321c2ac9b69d30c6a5d2eb964ac6195d398fed661')],
+}

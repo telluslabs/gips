@@ -278,3 +278,39 @@ expectations['aod'] = {
            '2017-005 34.0 130.0 68.7497 33.5872 0.965031 4.54937e+06 \n',
            '2017-006 176.0 176.0 176.0 0.0 nan 927590.0 \n'])],
 }
+
+expectations['prism'] = {
+    # t_stats[tmax] recording:
+    'tmax':
+        [('tmax_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '1982-335 6.68 10.74 9.45062 0.989373 -1.16521 221810.0 \n',
+           '1982-336 7.63 11.52 10.2559 0.957033 -1.03102 221810.0 \n',
+           '1982-337 12.97 15.32 14.5481 0.598565 -0.984863 221810.0 \n'])],
+
+    # t_stats[pptsum] recording:
+    'pptsum':
+        [('pptsum_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '1982-337 0.0 0.29 0.00668477 0.0376131 6.09544 221810.0 \n'])],
+
+    # t_stats[tmin] recording:
+    'tmin':
+        [('tmin_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '1982-335 2.57 3.83 3.04506 0.268788 0.766181 221810.0 \n',
+           '1982-336 -0.02 3.38 1.64335 0.757131 0.14854 221810.0 \n',
+           '1982-337 1.11 3.17 2.11856 0.465469 0.147961 221810.0 \n'])],
+
+    # t_stats[ppt] recording:
+    'ppt':
+        [('ppt_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '1982-335 0.0 0.0 0.0 0.0 nan 221810.0 \n',
+           '1982-336 0.0 0.0 0.0 0.0 nan 221810.0 \n',
+           '1982-337 0.0 0.29 0.00668477 0.0376131 6.09544 221810.0 \n'])],
+}

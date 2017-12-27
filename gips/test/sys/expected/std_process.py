@@ -386,3 +386,59 @@ expectations['merra'] = {
           'a90c1d87fdb1c0926bd5b3004408a1f9d42ef08c38deb9d0572bc7536dbbf08a')],
 }
 
+expectations['prism'] = {
+    # t_process[tmin] recording:
+    'tmin':
+        [('prism/tiles/CONUS/19821201/CONUS_19821201_prism_tmin.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821201/PRISM_tmin_stable_4kmD1_19821201_bil.zip/PRISM_tmin_stable_4kmD1_19821201_bil.bil'),
+         ('prism/tiles/CONUS/19821202/CONUS_19821202_prism_tmin.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821202/PRISM_tmin_stable_4kmD1_19821202_bil.zip/PRISM_tmin_stable_4kmD1_19821202_bil.bil'),
+         ('prism/tiles/CONUS/19821203/CONUS_19821203_prism_tmin.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821203/PRISM_tmin_stable_4kmD1_19821203_bil.zip/PRISM_tmin_stable_4kmD1_19821203_bil.bil')],
+
+    # t_process[tmax] recording:
+    'tmax':
+        [('prism/tiles/CONUS/19821203/CONUS_19821203_prism_tmax.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821203/PRISM_tmax_stable_4kmD1_19821203_bil.zip/PRISM_tmax_stable_4kmD1_19821203_bil.bil'),
+         ('prism/tiles/CONUS/19821201/CONUS_19821201_prism_tmax.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821201/PRISM_tmax_stable_4kmD1_19821201_bil.zip/PRISM_tmax_stable_4kmD1_19821201_bil.bil'),
+         ('prism/tiles/CONUS/19821202/CONUS_19821202_prism_tmax.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821202/PRISM_tmax_stable_4kmD1_19821202_bil.zip/PRISM_tmax_stable_4kmD1_19821202_bil.bil')],
+
+    # IMPORTANT NOTE pptsum seems to generate ppt products as part of
+    # its function; as a result ppt products may exist already if pptsum
+    # goes first.
+    # t_process[ppt] recording:
+    'ppt':
+        [('prism/tiles/CONUS/19821203/CONUS_19821203_prism_ppt.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821203/PRISM_ppt_stable_4kmD2_19821203_bil.zip/PRISM_ppt_stable_4kmD2_19821203_bil.bil'),
+         ('prism/tiles/CONUS/19821201/CONUS_19821201_prism_ppt.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821201/PRISM_ppt_stable_4kmD2_19821201_bil.zip/PRISM_ppt_stable_4kmD2_19821201_bil.bil'),
+         ('prism/tiles/CONUS/19821202/CONUS_19821202_prism_ppt.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821202/PRISM_ppt_stable_4kmD2_19821202_bil.zip/PRISM_ppt_stable_4kmD2_19821202_bil.bil')],
+
+    # t_process[pptsum] recording:
+    'pptsum':
+        [('prism/tiles/CONUS/19821203/CONUS_19821203_prism_pptsum-3.tif',
+          'hash',
+          'sha256',
+          'd9772d10372ad86550dacae3d5645837cd9a10228db70f4e2bc7149b836495d9')],
+}
