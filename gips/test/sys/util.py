@@ -241,40 +241,41 @@ def generate_expectation(filename, base_path):
     """
     # may want to try python-magic at some point:  https://github.com/ahupp/python-magic
     # but for now going by file extension seems to be sufficient.
+    full_path = os.path.join(base_path, filename)
 
     # have to use lexists to cover for foolish abuse of symlinks by GDAL et al
-    if not os.path.lexists(filename):
+    if not os.path.lexists(full_path):
         return (filename, 'absent')
 
     # symlinks
-    if os.path.islink(filename):
-        #                    vvvvvvvvvvvvvvvvvvvvvv--- have to rmeove this bit
+    if os.path.islink(full_path):
+        #                  have to rmeove this non-generic bit
+        #                     vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
         # HDF4_EOS:EOS_GRID:"/home/tolson/src/gips/data-root/modis/tiles/h12v04/2012337
         #   /MCD43A2.A2012337.h12v04.006.2016112013509.hdf":MOD_Grid_BRDF:Snow_BRDF_Albedo
         # when recording the path, do '<record_dir>/foo/bar/baz/file.tif'
-        link_target = os.readlink(filename)
-        separator = os.path.dirname(base_path)
-        prefix, suffix = link_target.split(separator)
+        link_target = os.readlink(full_path)
+        prefix, suffix = link_target.split(base_path)
         return (filename, 'symlink', prefix, suffix)
 
     # text files
-    size_threshold = 80 * 25 # about one terminal-screen
     if filename.endswith('.txt'):
-        f_size = os.stat(filename).st_size
+        size_threshold = 80 * 25 # about one terminal-screen
+        f_size = os.stat(full_path).st_size
         if f_size <= size_threshold: # give up if there's too much text
-            with open(filename) as fo:
+            with open(full_path) as fo:
                 lines = fo.readlines()
             return (filename, 'text-full', lines)
         print('{} ({} bytes) exceeds max supported size for text diffs'
               ' ({} bytes); defaulting to checksum'.format(
-                    filename, f_size, size_threshold))
+                    full_path, f_size, size_threshold))
 
     # product TIFFs
     if filename.endswith('.tif'):
         pass # TODO https://github.com/Applied-GeoSolutions/gips/issues/463
 
     # use a hash as a fallback
-    return (filename, 'hash', 'sha256', generate_file_hash(filename))
+    return (filename, 'hash', 'sha256', generate_file_hash(full_path))
 
 def generate_file_hash(filename, blocksize=2**20):
     # stolen from SO: https://stackoverflow.com/questions/1131220/get-md5-hash-of-big-files-in-python
@@ -302,14 +303,15 @@ def sys_test_wrapper(request, path):
     that is a dict of dicts, and the test getting a 'driver' and 'product'
     param.
     """
-    rp = record_path()
+    rp = record_path() # does the user want record mode?  If so, save it where?
     product = request.getfixturevalue('product')
     p = request.node.callspec.params
     expected = request.module.expectations[p['driver']][p['product']]
     expected_filenames = [e[0] for e in expected]
 
     if not rp:
-        interlopers = [fn for fn in expected_filenames if os.path.exists(fn)]
+        interlopers = [fn for fn in expected_filenames
+                       if os.path.exists(os.path.join(path, fn))]
         if interlopers:
             raise IOError('Files in the way of the test: {}'.format(interlopers))
 
@@ -328,10 +330,8 @@ def sys_test_wrapper(request, path):
     if rp:
         final_files = find_files(path)
         created_files = set(final_files) - set(initial_files)
-
-        # when recording the path, do '<record_dir>/foo/bar/baz/file.tif'
-        relpath_start = os.path.dirname(path)
-        rel_cf = [os.path.relpath(fp, relpath_start) for fp in created_files]
+        # when recording the path, don't capture the directory of interest
+        rel_cf = [os.path.relpath(fp, path) for fp in created_files]
 
         cf_expectations = [generate_expectation(fn, path) for fn in rel_cf]
         print("Recording {} outcome to {}.".format(product, rp))
