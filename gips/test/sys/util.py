@@ -288,6 +288,12 @@ def generate_file_hash(filename, blocksize=2**20):
             m.update(buf)
     return m.hexdigest()
 
+def params_from_expectations(expectations):
+    """Generates a standard system test (driver, product) parameter list."""
+    return [(driver, product)
+                for driver, prod_expectations in expectations.items()
+                for product in prod_expectations]
+
 def record_path():
     path = pytest.config.getoption('--record')
     return False if path in (None, '') else path

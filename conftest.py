@@ -88,7 +88,7 @@ def pytest_configure(config):
     root_logger.setLevel(level)
 
     record_path = config.getoption('record')
-    if os.path.lexists(record_path):
+    if record_path and os.path.lexists(record_path):
         raise IOError("Record file already exists at {}".format(record_path))
 
     dr = str(config.getini('data-repo'))
