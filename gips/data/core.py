@@ -274,6 +274,16 @@ class Asset(object):
                 self._version < newasset._version)
 
 
+    def version_text(self):
+        """string representation of the asset version.
+
+        Example overrides include:
+            prism: D1-early D2-early D2-provisional D2-stable
+            landsat: T1-YYYYMMDD
+        """
+        return str(self._version)
+
+
     def get_geometry(self):
         """Get the geometry of the asset
 
@@ -404,7 +414,24 @@ class Asset(object):
             files = utils.find_files(cls._assets[a]['pattern'], tpath)
             # more than 1 asset??
             if len(files) > 1:
-                raise Exception("Duplicate(?) assets found: {}".format(files))
+                fv = sorted(
+                    [(f, cls(f)._version) for f in files],
+                    key=lambda x: -x[1]
+                )
+                if fv[0][1] not in zip(*fv[1:])[1]:
+                   # greatest version is not duplicated
+                    # remove lesser versions
+                    utils.verbose_out('fn,                                version')
+                    for fn, ver in fv:
+                        utils.verbose_out('{},{}'.format(fn, ver))
+                    keep = fv[0][0]
+                    rm = zip(*fv[1:])[0]
+                    RemoveFiles(rm)
+                    files = keep
+                else:
+                    # greatest version has duplicates
+                    raise Exception("Duplicate(?) assets found: {}".format(files))
+
             if len(files) == 1:
                 found.append(cls(files[0]))
         return found
