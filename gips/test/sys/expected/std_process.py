@@ -1,4 +1,6 @@
 
+import collections
+
 from .. import util
 
 expectations = {}
@@ -448,11 +450,65 @@ expectations['prism'] = {
 
 mark_spec['sentinel2'] = util.slow
 
-expectations['sentinel2'] = {
-    'ndvi-toa': [
-        ('sentinel2/tiles/19TCH/2017010/19TCH_2017010_S2A_ndvi-toa.tif',
-         'hash',
-         'sha256',
-         '3d1decf61c3f469e342c343626d2c6e354bba48dc64da731fc774682be8752ca'),
-    ],
-}
+expectations['sentinel2'] = collections.OrderedDict([
+    # TODO acolite products; should use --acolite flag
+    # acoflags    0 = water 1 = no data 2 = land
+    # fai         Floating Algae Index
+    # oc2chl      Blue-Green Ratio Chlorophyll Algorithm using bands 483 & 561
+    # oc3chl      Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561
+    # rhow        Water-Leaving Radiance-Reflectance
+    # spm655      Suspended Sediment Concentration 655nm
+    # turbidity   Blended Turbidity
+    ('ref-toa',
+     [('sentinel2/tiles/19TCH/2017010/19TCH_2017010_S2A_ref-toa.tif',
+       'hash',
+       'sha256',
+       '59521f38170ff8d5d001292dc9424fe23ce0c7226f6dcc79801d7b78eb8faacd')],
+    ),
+    ('rad-toa',
+     [('sentinel2/tiles/19TCH/2017010/19TCH_2017010_S2A_rad-toa.tif',
+       'hash',
+       'sha256',
+       'fa8a2cb6917d68d77931fb52c4a1dadd93501a7431f966e2641179ed570f7d3e')],
+    ),
+    ('rad',
+     [('sentinel2/tiles/19TCH/2017010/19TCH_2017010_S2A_rad.tif',
+      'hash',
+      'sha256',
+      '7017fdee077e01f592c80465a82a7f6b9904ed60d6fdfc941f26c2d94299438c')],
+    ),
+    ('ref',
+     [('sentinel2/tiles/19TCH/2017010/19TCH_2017010_S2A_ref.tif',
+       'hash',
+       'sha256',
+       '34e1f63f0680e05172dd763f78d55254c0f44c9b730f00c01646acc7b4ad452b')],
+    ),
+    ('cfmask',
+     [('sentinel2/tiles/19TCH/2017010/19TCH_2017010_S2A_cfmask.tif',
+       'hash',
+       'sha256',
+       'd4438cc066e2e4cc26891635cbcaf46c00c46e240a29d5e7397344538bba7346')],
+    ),
+
+    # all the index products are made by the same gippy call so given
+    # how slow sentinel2 is, just do a few for now; it probably
+    # exercises the code well enough.  How to know if you're exercising
+    # the bands:
+    # https://github.com/gipit/gippy/blob/6d201870e55a7855814b3bdd3d30b05a889c24ed/GIP/GeoAlgorithms.cpp#L458
+    # other indices if desired:
+    # 'lswi', 'bi', 'brgt', 'crc', 'isti', 'msavi2',
+    # 'ndti', 'satvi', 'sti', 'vari',
+    ('evi-toa', # nir, red, blue, TOA version
+     [('sentinel2/tiles/19TCH/2017010/19TCH_2017010_S2A_evi-toa.tif',
+       'hash',
+       'sha256',
+       '0d68b587a7a84c4287c5aa8621c82aa0d8be237a1b1e80f7ac4855dfdd4fe9ec')],
+    ),
+    # t_process[crcm] recording:
+    ('crcm', # swir1, swir2, green, surface version
+     [('sentinel2/tiles/19TCH/2017010/19TCH_2017010_S2A_crcm.tif',
+       'hash',
+       'sha256',
+       '5cc5d30a22fc2e24f636f1c6dc722160cb0c5eb502ed803e4ff94290ecee1109')],
+    ),
+])

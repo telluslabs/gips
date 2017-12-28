@@ -1,3 +1,8 @@
+import collections
+
+from .. import util
+
+mark_spec = {}
 expectations = {}
 
 expectations['modis'] = {
@@ -458,3 +463,62 @@ expectations['prism'] = {
           'sha256',
           '46e0db478d2c9f9cb6ecd3d321c2ac9b69d30c6a5d2eb964ac6195d398fed661')],
 }
+
+# projection itself isn't terribly slow; possibly waiting on processing may
+# be slow though
+mark_spec['sentinel2'] = util.slow
+
+expectations['sentinel2'] = collections.OrderedDict([
+    # TODO acolite products; should use --acolite flag
+    # acoflags fai oc2chl oc3chl rhow spm655 turbidity
+
+    # t_project[ref-toa] recording,
+    ('ref-toa',
+     [('0/2017010_S2A_ref-toa.tif',
+       'hash',
+       'sha256',
+       '36effec15edef46d27f534113dc35e9fed7b44fc33706cebcac8f14ba29fdc50')],
+     ),
+    # t_project[rad-toa] recording,
+    ('rad-toa',
+     [('0/2017010_S2A_rad-toa.tif',
+       'hash',
+       'sha256',
+       '47b14e37f7ada44b978c7bbf3d6fcc51da3ccdcbdd05b01969fe1c548fb8503d')],
+     ),
+    # t_project[rad] recording,
+    ('rad',
+     [('0/2017010_S2A_rad.tif',
+       'hash',
+       'sha256',
+       '3245e591f60bc8723264a3ed960ab6c46ecfa55db881c52feda0caafb2338429')],
+     ),
+    # t_project[ref] recording,
+    ('ref',
+     [('0/2017010_S2A_ref.tif',
+       'hash',
+       'sha256',
+       'aeb96c9c7fb857864aa71ec49d4b90798846b160f7bdfe16bc507bd2953d7bc9')],
+     ),
+    # t_project[cfmask] recording,
+    ('cfmask',
+     [('0/2017010_S2A_cfmask.tif',
+       'hash',
+       'sha256',
+       'dfd06798ff067a6139a6bf6f38234920d643693b95e5c7f319cb1de9ff161292')],
+     ),
+    # t_project[evi-toa] recording,
+    ('evi-toa', # nir, red, blue, TOA version
+     [('0/2017010_S2A_evi-toa.tif',
+       'hash',
+       'sha256',
+       '3d4caaf7f9550c95f4e85ad87ed888f8d5bdd0e6be4d4da5a3d2868cf4f1b589')],
+     ),
+    # t_project[crcm] recording,
+    ('crcm', # swir1, swir2, green, surface version
+     [('0/2017010_S2A_crcm.tif',
+       'hash',
+       'sha256',
+       '84fc07d6d0f6df0ec3e65300d51e09cf11363cb0ab1cffe26e034ca154e3aa41')],
+     ),
+])
