@@ -1,5 +1,8 @@
 
+from .. import util
+
 expectations = {}
+mark_spec = {}
 
 expectations['modis'] = {
     # 'landcover' [], # is annual, not available for the scene under test
@@ -441,4 +444,15 @@ expectations['prism'] = {
           'hash',
           'sha256',
           'd9772d10372ad86550dacae3d5645837cd9a10228db70f4e2bc7149b836495d9')],
+}
+
+mark_spec['sentinel2'] = util.slow
+
+expectations['sentinel2'] = {
+    'ndvi-toa': [
+        ('sentinel2/tiles/19TCH/2017010/19TCH_2017010_S2A_ndvi-toa.tif',
+         'hash',
+         'sha256',
+         '3d1decf61c3f469e342c343626d2c6e354bba48dc64da731fc774682be8752ca'),
+    ],
 }

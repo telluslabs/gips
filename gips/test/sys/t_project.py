@@ -4,6 +4,8 @@ import util
 from util import export_wrapper
 import driver_setup
 
+pytestmark = util.sys # skip everything unless --sys
+
 # 'driver': {'product': [ (path, type, data...),...]...}
 from expected.std_project import expectations
 

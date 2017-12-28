@@ -5,10 +5,13 @@ from util import repo_wrapper
 import driver_setup
 
 # 'driver': {'product': [ (path, type, data...),...]...}
-from expected.std_process import expectations
+from expected.std_process import expectations, mark_spec
 
-@pytest.mark.parametrize("driver, product",
-                         util.params_from_expectations(expectations))
+pytestmark = util.sys # skip everything unless --sys
+
+params = util.params_from_expectations(expectations, mark_spec)
+
+@pytest.mark.parametrize("driver, product", params)
 def t_process(repo_wrapper, driver, product):
     """Test gips_process output."""
     record_mode, runner = repo_wrapper

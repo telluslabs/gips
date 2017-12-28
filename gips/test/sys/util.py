@@ -288,11 +288,27 @@ def generate_file_hash(filename, blocksize=2**20):
             m.update(buf)
     return m.hexdigest()
 
-def params_from_expectations(expectations):
-    """Generates a standard system test (driver, product) parameter list."""
-    return [(driver, product)
-                for driver, prod_expectations in expectations.items()
-                for product in prod_expectations]
+
+def params_from_expectations(expectations, mark_spec=None):
+    """Generates a standard system test (driver, product) parameter list.
+
+    Pass in a dict for mark_spec and any marks matching the given driver
+    or (driver, product) will be applied accordingly.  These marks can be
+    singular or in iterables."""
+    mark_spec = {} if mark_spec is None else mark_spec
+    params = []
+
+    def get_mark_spec(i):
+        msi = mark_spec.get(i, [])
+        is_mark = isinstance(msi, pytest.mark.MarkDecorator.__class__)
+        return [msi] if is_mark else list(msi) # handle case of multiple marks
+
+    for driver, prod_expectations in expectations.items():
+        dm = get_mark_spec(driver) # get driver-scoped marks
+        for product in prod_expectations:
+            dpm = get_mark_spec((driver, product)) # get product-scoped marks
+            params.append(pytest.param(driver, product, marks=(dm + dpm)))
+    return params
 
 def record_path():
     path = pytest.config.getoption('--record')
