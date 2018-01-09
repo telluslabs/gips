@@ -10,10 +10,10 @@ import driver_setup
 pytestmark = util.sys # skip everything unless --sys
 
 # 'driver': {'product': [ (path, type, data...),...]...}
-from expected.std_stats import expectations
+from expected.std_stats import expectations, mark_spec
 
 @pytest.mark.parametrize("driver, product",
-                         util.params_from_expectations(expectations))
+                         util.params_from_expectations(expectations, mark_spec))
 def t_stats(export_wrapper, driver, product):
     """Test gips_stats on projected files."""
     record_mode, runner, working_dir = export_wrapper

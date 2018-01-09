@@ -512,3 +512,42 @@ expectations['sentinel2'] = collections.OrderedDict([
        '5cc5d30a22fc2e24f636f1c6dc722160cb0c5eb502ed803e4ff94290ecee1109')],
     ),
 ])
+
+mark_spec['landsat'] = util.slow
+
+expectations['landsat'] = {
+    # t_process[bqashadow] recording:
+    'bqashadow':
+        [('landsat/tiles/012030/2017213/012030_2017213_LC8_bqashadow.tif',
+          'hash',
+          'sha256',
+          '1c8c8e252afe94deb0684c56c71149d3585b997abae72a1671217aa4b74faacb')],
+
+    # t_process[ndvi-toa] recording:
+    'ndvi-toa':
+        [('landsat/tiles/012030/2017213/012030_2017213_LC8_ndvi-toa.tif',
+          'hash',
+          'sha256',
+          '5d2273f5eafa9fcfff1a068fba21c686b574345d1c090397a05942bb5017a715')],
+
+    # t_process[acca] recording:
+    'acca':
+        [('landsat/tiles/012030/2017213/012030_2017213_LC8_acca.tif',
+          'hash',
+          'sha256',
+          'd4412cd13adad9cde0c7668fb44f728fc7a2e5bda6ddaa062fc65d5de9546765')],
+
+    # t_process[rad-toa] recording:
+    'rad-toa':
+        [('landsat/tiles/012030/2017213/012030_2017213_LC8_rad-toa.tif',
+          'hash',
+          'sha256',
+          '2e4923033454e9021b31def954b0e8b3c4247ed0856414995e148f672207ca46')],
+
+    # t_process[ref-toa] recording:
+    'ref-toa':
+        [('landsat/tiles/012030/2017213/012030_2017213_LC8_ref-toa.tif',
+          'hash',
+          'sha256',
+          'a10ba27cd930bb6bd32c4649cd2ce7d7274e82fef043cf4a2a79c212cc4754ea')],
+}

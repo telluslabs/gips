@@ -522,3 +522,41 @@ expectations['sentinel2'] = collections.OrderedDict([
        '84fc07d6d0f6df0ec3e65300d51e09cf11363cb0ab1cffe26e034ca154e3aa41')],
      ),
 ])
+
+mark_spec['landsat'] = util.slow
+expectations['landsat'] = {
+    # t_project[bqashadow] recording:
+    'bqashadow':
+        [('0/2017213_LC8_bqashadow.tif',
+          'hash',
+          'sha256',
+          '0f4a69505d0d37a32a086848273704ce0d0d6bf5c84d0d72758e107fda55bf36')],
+
+    # t_project[ndvi-toa] recording:
+    'ndvi-toa':
+        [('0/2017213_LC8_ndvi-toa.tif',
+          'hash',
+          'sha256',
+          '21f2379aaf304fb26dc942c62f05a98bc14756ee89738d28bd8e373bb3cc10ac')],
+
+    # t_project[acca] recording:
+    'acca':
+        [('0/2017213_LC8_acca.tif',
+          'hash',
+          'sha256',
+          '056f1d96e76ebc147b341046e6021a2f2359361c8e88fafdbe255199242b9e4e')],
+
+    # t_project[rad-toa] recording:
+    'rad-toa':
+        [('0/2017213_LC8_rad-toa.tif',
+          'hash',
+          'sha256',
+          'b7ac9b05da84806de1b32de0cea35aca1dd6723fa6d5b687a3f607db95395aeb')],
+
+    # t_project[ref-toa] recording:
+    'ref-toa':
+        [('0/2017213_LC8_ref-toa.tif',
+          'hash',
+          'sha256',
+          '22f17fce8c02354a7180fd2739d1e9c6a5c0cd83c9991b6a1017bb2decc9736c')],
+}

@@ -1,25 +1,5 @@
 """Known-good outcomes for tests, mostly stdout and created files."""
 
-t_process = {
-    'compare_stderr': False,
-    'updated': {
-        'landsat/stage': None,
-        'landsat/tiles/012030/2015352': None
-    },
-    'created': {
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_acca.tif': -531492048,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_bqashadow.tif': -1819149482,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_ndvi-toa.tif': 329107382,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_rad-toa.tif': -1222249885,
-        'landsat/tiles/012030/2015352/012030_2015352_LC8_ref-toa.tif': -871936054,
-        'landsat/tiles/012030/2015352/LC08_L1GT_012030_20151218_20170224_01_T2.tar.gz.index': -394988487,
-        'landsat/tiles/012030/2015352/LC08_L1GT_012030_20151218_20170224_01_T2_MTL.txt': -1453474890,
-    },
-    'ignored': [
-        'gips-inv-db.sqlite3',
-    ]
-}
-
 t_process_acolite = {
     'created': {
         'landsat/tiles/012030/2017213/012030_2017213_LC8_acoflags.tif': -514981863,
@@ -37,18 +17,6 @@ t_process_acolite = {
     'ignored': [
         'gips-inv-db.sqlite3',
     ],
-}
-
-t_project = {
-    'compare_stderr': False,
-    'created': {
-        '0': None,
-        '0/2015352_LC8_acca.tif': 402348046,
-        '0/2015352_LC8_bqashadow.tif': 923940030,
-        '0/2015352_LC8_ndvi-toa.tif': 728893178,
-        '0/2015352_LC8_rad-toa.tif': -1053542955,
-        '0/2015352_LC8_ref-toa.tif': -1149010214,
-    }
 }
 
 t_project_no_warp = {
@@ -78,11 +46,3 @@ t_tiles_copy = {
         '012030/012030_2015352_LC8_ref-toa.tif': -1797834447,
     }
 }
-
-t_stats = { 'created': {
-    'acca_stats.txt': -174967201,
-    'bqashadow_stats.txt': 1868908586,
-    'ndvi-toa_stats.txt': -1084861813,
-    'rad-toa_stats.txt': -545320378,
-    'ref-toa_stats.txt': -1132928652,
-}}

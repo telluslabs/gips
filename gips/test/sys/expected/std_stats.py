@@ -1,4 +1,7 @@
+from .. import util
+
 expectations = {}
+mark_spec = {}
 
 expectations['modis'] = {
     # t_stats[satvi] recording:
@@ -313,4 +316,42 @@ expectations['prism'] = {
            '1982-335 0.0 0.0 0.0 0.0 nan 221810.0 \n',
            '1982-336 0.0 0.0 0.0 0.0 nan 221810.0 \n',
            '1982-337 0.0 0.29 0.00668477 0.0376131 6.09544 221810.0 \n'])],
+}
+
+mark_spec['landsat'] = util.slow
+expectations['landsat'] = {
+    # t_stats[bqashadow] recording:
+    'bqashadow':
+        [('bqashadow_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2017-213 1.0 1.0 1.0 0.0 nan 220848.0 \n'])],
+
+    # t_stats[ndvi-toa] recording:
+    'ndvi-toa':
+        [('ndvi-toa_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2017-213 -0.4883 0.8611 0.640444 0.223033 -2.00842 220848.0 \n'])],
+
+    # t_stats[acca] recording:
+    'acca':
+        [('acca_stats.txt',
+          'text-full',
+          ['date finalmask-min finalmask-max finalmask-mean finalmask-sd finalmask-skew finalmask-count cloudmask-min cloudmask-max cloudmask-mean cloudmask-sd cloudmask-skew cloudmask-count ambclouds-min ambclouds-max ambclouds-mean ambclouds-sd ambclouds-skew ambclouds-count pass1-min pass1-max pass1-mean pass1-sd pass1-skew pass1-count \n',
+           '2017-213 1.0 1.0 1.0 0.0 nan 199899.0  1.0 1.0 1.0 0.0 nan 20949.0  1.0 1.0 1.0 0.0 nan 15396.0  1.0 1.0 1.0 0.0 nan 4642.0 \n'])],
+
+    # t_stats[rad-toa] recording:
+    'rad-toa':
+        [('rad-toa_stats.txt',
+          'text-full',
+          ['date COASTAL-min COASTAL-max COASTAL-mean COASTAL-sd COASTAL-skew COASTAL-count BLUE-min BLUE-max BLUE-mean BLUE-sd BLUE-skew BLUE-count GREEN-min GREEN-max GREEN-mean GREEN-sd GREEN-skew GREEN-count RED-min RED-max RED-mean RED-sd RED-skew RED-count NIR-min NIR-max NIR-mean NIR-sd NIR-skew NIR-count SWIR1-min SWIR1-max SWIR1-mean SWIR1-sd SWIR1-skew SWIR1-count SWIR2-min SWIR2-max SWIR2-mean SWIR2-sd SWIR2-skew SWIR2-count CIRRUS-min CIRRUS-max CIRRUS-mean CIRRUS-sd CIRRUS-skew CIRRUS-count \n',
+           '2017-213 56.1 409.4 72.4368 28.7988 4.58855 220848.0  43.6 445.1 61.8659 32.3072 4.54671 220848.0  25.6 408.0 48.7223 31.1024 4.42216 220848.0  12.7 378.6 30.9724 30.2874 4.26369 220848.0  4.7 339.8 89.4949 28.9755 -0.796908 220848.0  0.0 54.9 10.4936 5.32891 1.61942 220848.0  -0.1 14.2 1.62182 1.50423 3.07054 220848.0  -0.1 1.4 0.0702492 0.0691392 3.70532 220848.0 \n'])],
+
+    # t_stats[ref-toa] recording:
+    'ref-toa':
+        [('ref-toa_stats.txt',
+          'text-full',
+          ['date COASTAL-min COASTAL-max COASTAL-mean COASTAL-sd COASTAL-skew COASTAL-count BLUE-min BLUE-max BLUE-mean BLUE-sd BLUE-skew BLUE-count GREEN-min GREEN-max GREEN-mean GREEN-sd GREEN-skew GREEN-count RED-min RED-max RED-mean RED-sd RED-skew RED-count NIR-min NIR-max NIR-mean NIR-sd NIR-skew NIR-count SWIR1-min SWIR1-max SWIR1-mean SWIR1-sd SWIR1-skew SWIR1-count SWIR2-min SWIR2-max SWIR2-mean SWIR2-sd SWIR2-skew SWIR2-count CIRRUS-min CIRRUS-max CIRRUS-mean CIRRUS-sd CIRRUS-skew CIRRUS-count \n',
+           '2017-213 0.0802 0.5848 0.103512 0.0411366 4.58853 220848.0  0.0809 0.8259 0.114876 0.0599464 4.5467 220848.0  0.053 0.8445 0.100936 0.0643648 4.42221 220848.0  0.0231 0.6875 0.0563213 0.0549959 4.26371 220848.0  0.0142 1.0063 0.26515 0.0857833 -0.796907 220848.0  0.001 0.8389 0.161572 0.0813276 1.61928 220848.0  0.0003 0.596 0.071522 0.0625481 3.07293 220848.0  0.0002 0.0152 0.00160228 0.000582327 7.07733 220848.0 \n'])],
 }
