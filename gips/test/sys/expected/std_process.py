@@ -551,3 +551,21 @@ expectations['landsat'] = {
           'sha256',
           'a10ba27cd930bb6bd32c4649cd2ce7d7274e82fef043cf4a2a79c212cc4754ea')],
 }
+
+# TODO restore sar process test:
+#expectations['sar'] = {
+#    'sign': [],
+#    'mask': [], # not part of the original expectation, hmm
+#    'linci': [],
+#    'date': [],
+#}
+# sar fetch currently doesn't work:
+# gips_inventory sar -t N07E099 N19E100 N00E099 -d 2009,2015 -v 4 --fetch # fails
+# ftp download from volga is busted too:
+#ftp://anonymous:tolson@volga.ags.io/files/sar/KC_999-C019DRN07E099WBDORSA1.tar.gz
+#ftp://anonymous:tolson@volga.ags.io/files/sar/KC_017-C25N00E099WB1ORSA1.tar.gz
+#ftp://anonymous:tolson@volga.ags.io/files/sar/KC_017-Y10N19E100FBDORSA1.tar.gz
+# original ftp code:
+#   0) cd stage_dir_for_sar_driver
+#   1) wget ftp_url
+#   2) gips_archive sar
