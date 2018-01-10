@@ -552,20 +552,64 @@ expectations['landsat'] = {
           'a10ba27cd930bb6bd32c4649cd2ce7d7274e82fef043cf4a2a79c212cc4754ea')],
 }
 
-# TODO restore sar process test:
-#expectations['sar'] = {
-#    'sign': [],
-#    'mask': [], # not part of the original expectation, hmm
-#    'linci': [],
-#    'date': [],
-#}
-# sar fetch currently doesn't work:
-# gips_inventory sar -t N07E099 N19E100 N00E099 -d 2009,2015 -v 4 --fetch # fails
-# ftp download from volga is busted too:
-#ftp://anonymous:tolson@volga.ags.io/files/sar/KC_999-C019DRN07E099WBDORSA1.tar.gz
-#ftp://anonymous:tolson@volga.ags.io/files/sar/KC_017-C25N00E099WB1ORSA1.tar.gz
-#ftp://anonymous:tolson@volga.ags.io/files/sar/KC_017-Y10N19E100FBDORSA1.tar.gz
-# original ftp code:
-#   0) cd stage_dir_for_sar_driver
-#   1) wget ftp_url
-#   2) gips_archive sar
+expectations['sar'] = {
+    # t_process[date] recording:
+    'date':
+        [('sar/tiles/N07E099/2015101/N07E099_2015101_AWBD_date.tif',
+          'hash',
+          'sha256',
+          'c29663846c6ec54f570e925e0e27bbf6fcf92824ff68c11531f266ffc073331a'),
+         ('sar/tiles/N19E100/2010182/N19E100_2010182_AFBD_date.tif',
+          'hash',
+          'sha256',
+          '8b6a0d270e53ca91c6cbaeaa5c9a5290ad11970e36a5b49e9b75f5e5dd272adc'),
+         ('sar/tiles/N00E099/2009041/N00E099_2009041_AWB1_date.tif',
+          'hash',
+          'sha256',
+          '13bdb0c9bb93a31491c8843d0c7b24ad75dfb8a33bc2d37460d09592d01a04ce')],
+
+    # t_process[linci] recording:
+    'linci':
+        [('sar/tiles/N07E099/2015101/N07E099_2015101_AWBD_linci.tif',
+          'hash',
+          'sha256',
+          'ac5082457c7b7ff7c5361534a2f691469b18cf636b8c5c136694310ac6693c33'),
+         ('sar/tiles/N19E100/2010182/N19E100_2010182_AFBD_linci.tif',
+          'hash',
+          'sha256',
+          'd18394c725a5f8c62b18ff8ab7fc7357a3bfb1a263e3c3dbc2eb0aed09a0f0c8'),
+         ('sar/tiles/N00E099/2009041/N00E099_2009041_AWB1_linci.tif',
+          'hash',
+          'sha256',
+          'b76a9e585762f060b653d012bfeff760c5250076c174348446dc8f31d0fb4fe2')],
+
+    # t_process[mask] recording:
+    'mask':
+        [('sar/tiles/N00E099/2009041/N00E099_2009041_AWB1_mask.tif',
+          'hash',
+          'sha256',
+          '72311122b6b88f80dd85e76380e092bd70c33c4f26461316b4829962c1ecc1fc'),
+         ('sar/tiles/N07E099/2015101/N07E099_2015101_AWBD_mask.tif',
+          'hash',
+          'sha256',
+          '5e463c8174e0acb64db0d7067a6414791a795d237221af30944adaa155fec622'),
+         ('sar/tiles/N19E100/2010182/N19E100_2010182_AFBD_mask.tif',
+          'hash',
+          'sha256',
+          'e3896c79e5b5ed6380bf821a2cddd65014cc35278933cb1c2c15620e27615afc')],
+
+    # t_process[sign] recording:
+    'sign':
+        [('sar/tiles/N07E099/2015101/N07E099_2015101_AWBD_sign.tif',
+          'hash',
+          'sha256',
+          'a47201adaca8f0cbd9ffa64f6953d3b75a502860f48196169449db69b766aef3'),
+         ('sar/tiles/N00E099/2009041/N00E099_2009041_AWB1_sign.tif',
+          'hash',
+          'sha256',
+          'f871ea0bfe899438ed7d233ed4e7f72db1d989d1af9d6c55362fac87dce74b31'),
+         ('sar/tiles/N19E100/2010182/N19E100_2010182_AFBD_sign.tif',
+          'hash',
+          'sha256',
+          '49e9ded5ee3a169eddaa5e50aa34b6a0c91dc1f37b345be6f2cf2aea25dfd6ce')],
+}
