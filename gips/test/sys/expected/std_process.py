@@ -12,9 +12,9 @@ mark_spec = {}
 expectations['modis'] = modis_process.expectations
 expectations['merra'] = merra_process.expectations
 
-expectations['prism'] = {
+expectations['prism'] = collections.OrderedDict([
     # t_process[tmin] recording:
-    'tmin':
+    ('tmin',
         [('prism/tiles/CONUS/19821201/CONUS_19821201_prism_tmin.tif',
           'symlink',
           '/vsizip/',
@@ -26,28 +26,28 @@ expectations['prism'] = {
          ('prism/tiles/CONUS/19821203/CONUS_19821203_prism_tmin.tif',
           'symlink',
           '/vsizip/',
-          '/prism/tiles/CONUS/19821203/PRISM_tmin_stable_4kmD1_19821203_bil.zip/PRISM_tmin_stable_4kmD1_19821203_bil.bil')],
+          '/prism/tiles/CONUS/19821203/PRISM_tmin_stable_4kmD1_19821203_bil.zip/PRISM_tmin_stable_4kmD1_19821203_bil.bil')]),
 
     # t_process[tmax] recording:
-    'tmax':
-        [('prism/tiles/CONUS/19821203/CONUS_19821203_prism_tmax.tif',
+    ('tmax',
+        [('prism/tiles/CONUS/19821202/CONUS_19821202_prism_tmax.tif',
+          'symlink',
+          '/vsizip/',
+          '/prism/tiles/CONUS/19821202/PRISM_tmax_stable_4kmD1_19821202_bil.zip/PRISM_tmax_stable_4kmD1_19821202_bil.bil'),
+         ('prism/tiles/CONUS/19821203/CONUS_19821203_prism_tmax.tif',
           'symlink',
           '/vsizip/',
           '/prism/tiles/CONUS/19821203/PRISM_tmax_stable_4kmD1_19821203_bil.zip/PRISM_tmax_stable_4kmD1_19821203_bil.bil'),
          ('prism/tiles/CONUS/19821201/CONUS_19821201_prism_tmax.tif',
           'symlink',
           '/vsizip/',
-          '/prism/tiles/CONUS/19821201/PRISM_tmax_stable_4kmD1_19821201_bil.zip/PRISM_tmax_stable_4kmD1_19821201_bil.bil'),
-         ('prism/tiles/CONUS/19821202/CONUS_19821202_prism_tmax.tif',
-          'symlink',
-          '/vsizip/',
-          '/prism/tiles/CONUS/19821202/PRISM_tmax_stable_4kmD1_19821202_bil.zip/PRISM_tmax_stable_4kmD1_19821202_bil.bil')],
+          '/prism/tiles/CONUS/19821201/PRISM_tmax_stable_4kmD1_19821201_bil.zip/PRISM_tmax_stable_4kmD1_19821201_bil.bil')]),
 
     # IMPORTANT NOTE pptsum seems to generate ppt products as part of
     # its function; as a result ppt products may exist already if pptsum
     # goes first.
     # t_process[ppt] recording:
-    'ppt':
+    ('ppt',
         [('prism/tiles/CONUS/19821203/CONUS_19821203_prism_ppt.tif',
           'symlink',
           '/vsizip/',
@@ -59,15 +59,46 @@ expectations['prism'] = {
          ('prism/tiles/CONUS/19821202/CONUS_19821202_prism_ppt.tif',
           'symlink',
           '/vsizip/',
-          '/prism/tiles/CONUS/19821202/PRISM_ppt_stable_4kmD2_19821202_bil.zip/PRISM_ppt_stable_4kmD2_19821202_bil.bil')],
+          '/prism/tiles/CONUS/19821202/PRISM_ppt_stable_4kmD2_19821202_bil.zip/PRISM_ppt_stable_4kmD2_19821202_bil.bil')]),
 
     # t_process[pptsum] recording:
-    'pptsum':
+    ('pptsum',
         [('prism/tiles/CONUS/19821203/CONUS_19821203_prism_pptsum-3.tif',
-          'hash',
-          'sha256',
-          'd9772d10372ad86550dacae3d5645837cd9a10228db70f4e2bc7149b836495d9')],
-}
+          'raster',
+          'gdalinfo-stats',
+          ['Driver: GTiff/GeoTIFF',
+           'Size is 1405, 621',
+           'Coordinate System is:',
+           'GEOGCS["NAD83",',
+           '    DATUM["North_American_Datum_1983",',
+           '        SPHEROID["GRS 1980",6378137,298.2572221010042,',
+           '            AUTHORITY["EPSG","7019"]],',
+           '        AUTHORITY["EPSG","6269"]],',
+           '    PRIMEM["Greenwich",0],',
+           '    UNIT["degree",0.0174532925199433],',
+           '    AUTHORITY["EPSG","4269"]]',
+           'Origin = (-125.020833333333329,49.937500000002032)',
+           'Pixel Size = (0.041666666666670,-0.041666666666670)',
+           'Metadata:',
+           '  AREA_OR_POINT=Area',
+           'Image Structure Metadata:',
+           '  INTERLEAVE=BAND',
+           'Corner Coordinates:',
+           'Upper Left  (-125.0208333,  49.9375000) (125d 1\'15.00"W, 49d56\'15.00"N)',
+           'Lower Left  (-125.0208333,  24.0625000) (125d 1\'15.00"W, 24d 3\'45.00"N)',
+           'Upper Right ( -66.4791667,  49.9375000) ( 66d28\'45.00"W, 49d56\'15.00"N)',
+           'Lower Right ( -66.4791667,  24.0625000) ( 66d28\'45.00"W, 24d 3\'45.00"N)',
+           'Center      ( -95.7500000,  37.0000000) ( 95d45\' 0.00"W, 37d 0\' 0.00"N)',
+           'Band 1 Block=1405x1 Type=Float32, ColorInterp=Gray',
+           '  Description = Cumulative Precipitate(3 day window)',
+           '  Minimum=-29997.000, Maximum=332.600, Mean=-13428.782, StdDev=14925.792',
+           '  NoData Value=-9999',
+           '  Metadata:',
+           '    STATISTICS_MAXIMUM=332.60000610352',
+           '    STATISTICS_MEAN=-13428.782340994',
+           '    STATISTICS_MINIMUM=-29997',
+           '    STATISTICS_STDDEV=14925.791999964'])]),
+])
 
 mark_spec['sentinel2'] = util.slow
 
