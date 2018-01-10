@@ -226,8 +226,11 @@ def find_files(path):
     return [os.path.join(subpath, f)
             for subpath, _, filenames in os.walk(path) for f in filenames]
 
-def generate_expectation(filename, base_path):
+def generate_expectation(filename, base_path, e_type=None):
     """Return an expectation of the file's content, based on its file type.
+
+    Pass in e_type to coerce the file into the given format, instead of
+    letting the function choose for itself.  Absent files can't be coerced.
 
     Expectation formats:
         Symlink:  (filename, 'symlink', prefix_string, suffix_string)
@@ -237,6 +240,7 @@ def generate_expectation(filename, base_path):
         Hash:  (filename, 'hash', 'sha256', <hex digest string>).
             Used as a fallback if nothing else matches the file type.
         Text-full:  (filename, 'text-full', list(<lines-in-file>))
+        Raster:  (filename, 'raster', 'gdalinfo-stats', list(<lines-in-output>)
         Finally, if the file is absent:  (filename, 'absent')
     """
     # may want to try python-magic at some point:  https://github.com/ahupp/python-magic
@@ -247,8 +251,13 @@ def generate_expectation(filename, base_path):
     if not os.path.lexists(full_path):
         return (filename, 'absent')
 
+    if e_type is None:
+        e_type = ('symlink'   if os.path.islink(full_path) else
+                  'text-full' if filename.endswith('.txt') else
+                  'raster'    if filename.endswith('.tif') else 'hash')
+
     # symlinks
-    if os.path.islink(full_path):
+    if e_type == 'symlink':
         #                  have to rmeove this non-generic bit
         #                     vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
         # HDF4_EOS:EOS_GRID:"/home/tolson/src/gips/data-root/modis/tiles/h12v04/2012337
@@ -256,26 +265,28 @@ def generate_expectation(filename, base_path):
         # when recording the path, do '<record_dir>/foo/bar/baz/file.tif'
         link_target = os.readlink(full_path)
         prefix, suffix = link_target.split(base_path)
-        return (filename, 'symlink', prefix, suffix)
+        return (filename, e_type, prefix, suffix)
 
     # text files
-    if filename.endswith('.txt'):
+    if e_type == 'text-full':
         size_threshold = 80 * 25 # about one terminal-screen
         f_size = os.stat(full_path).st_size
         if f_size <= size_threshold: # give up if there's too much text
             with open(full_path) as fo:
                 lines = fo.readlines()
-            return (filename, 'text-full', lines)
+            return (filename, e_type, lines)
         print('{} ({} bytes) exceeds max supported size for text diffs'
               ' ({} bytes); defaulting to checksum'.format(
                     full_path, f_size, size_threshold))
+        e_type = 'hash'
 
     # product TIFFs
-    if filename.endswith('.tif'):
-        pass # TODO https://github.com/Applied-GeoSolutions/gips/issues/463
+    if e_type == 'raster':
+        return (filename, e_type, 'gdalinfo-stats',
+                generate_gdalinfo_stats_expectation(full_path))
 
     # use a hash as a fallback
-    return (filename, 'hash', 'sha256', generate_file_hash(full_path))
+    return (filename, e_type, 'sha256', generate_file_hash(full_path))
 
 def generate_file_hash(filename, blocksize=2**20):
     # stolen from SO: https://stackoverflow.com/questions/1131220/get-md5-hash-of-big-files-in-python
@@ -288,6 +299,28 @@ def generate_file_hash(filename, blocksize=2**20):
             m.update(buf)
     return m.hexdigest()
 
+def generate_gdalinfo_stats_expectation(filename):
+    """Use `gdalinfo -stats <filename>` to generate an expectation object."""
+    # Sooooo gdal generates these 'sidecar' files, ending in .aux.xml.
+    # It can be told not to do that, but can't be told to ignore them
+    # when they already exist.  Whether or not they exist changes the
+    # output of gdalinfo -stats (reason unkonwn).  This can't be worked
+    # around in any way, so we're obliged to delete them beforehand.
+    sidecar = filename + '.aux.xml'
+    os.path.exists(sidecar) and os.remove(sidecar) # RACE CONDITION LOL
+    os.environ['GDAL_PAM_ENABLED'] = 'NO'
+    # TODO look at -json
+    outcome = sh.gdalinfo('-stats', filename)
+    # The output includes unpredictable file paths, so filter them out:
+    lines = []
+    in_files_block = False
+    for l in outcome.stdout.splitlines():
+        # first detect whether we're in a 'Files:' block
+        in_files_block = (l.startswith('Files: ')
+                          or (in_files_block and l.startswith(' ')))
+        if not in_files_block:
+            lines.append(l)
+    return lines
 
 def params_from_expectations(expectations, mark_spec=None):
     """Generates a standard system test (driver, product) parameter list.
@@ -328,6 +361,7 @@ def sys_test_wrapper(request, path):
     rp = record_path() # does the user want record mode?  If so, save it where?
     driver = request.node.callspec.params['driver']
     product = request.node.callspec.params['product']
+    # expected is an array of tuples:  (filename, type, data, data, data . . .)
     expected = request.module.expectations[driver][product]
     expected_filenames = [e[0] for e in expected]
 
@@ -344,8 +378,8 @@ def sys_test_wrapper(request, path):
         if rp:
             initial_files.extend(find_files(path))
         outcome = sh.Command(cmd_string)(*args)
-        return outcome, [generate_expectation(fn, path)
-                         for fn in expected_filenames]
+        return outcome, [generate_expectation(e[0], path, e[1])
+                         for e in expected]
 
     yield bool(rp), wrapped_runner
 
