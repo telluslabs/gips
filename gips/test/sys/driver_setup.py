@@ -79,7 +79,4 @@ def setup_repo_data(driver):
     print('Downloading', driver, 'data . . .')
     args = STD_ARGS[driver] + ('--fetch',)
     outcome = sh.Command('gips_inventory')(*args)
-    if outcome.exit_code != 0:
-        raise RuntimeError(driver + " data setup via `gips_inventory` failed",
-                           outcome)
     print(driver, "data download complete.")

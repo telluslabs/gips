@@ -22,7 +22,6 @@ def t_stats(export_wrapper, driver, product):
     args = driver_setup.STD_ARGS[driver] + ('--res', '100', '100', '--notld',
                             '--outdir', working_dir, '-p', product)
     outcome = sh.gips_project(*args)
-    assert outcome.exit_code == 0 # sanity check
 
     # compute & confirm stats
     outcome, actual = runner('gips_stats', working_dir, '-p', product)

@@ -402,15 +402,23 @@ def sys_test_wrapper(request, path):
 
 @pytest.yield_fixture
 def repo_wrapper(request):
+    """Fixture for tests that operate mostly on the data repo."""
+    # This is how you wrap a generator in python:
+    # https://stackoverflow.com/questions/11197186/
     for rv in sys_test_wrapper(request, DATA_REPO_ROOT):
         yield rv
 
 @pytest.yield_fixture
 def export_wrapper(request):
+    """Fixture for tests that operate on an output directory.
+
+    Makes a working directory that nests inside the OUTPUT_DIR."""
     driver = request.node.callspec.params['driver']
     product = request.node.callspec.params['product']
     working_dir = os.path.join(OUTPUT_DIR, '{}-{}'.format(driver, product))
     os.makedirs(working_dir) # raises if leaf dir exists; this is desired
+    # This is how you wrap a generator in python:
+    # https://stackoverflow.com/questions/11197186/
     for rv in sys_test_wrapper(request, working_dir):
         yield rv + (working_dir,)
 
