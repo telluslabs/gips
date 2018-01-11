@@ -17,18 +17,25 @@ norecursedirs = .venv data-root
 data-repo = /home/your-user-name-here/src/gips/data-repo
 # a directory of your choice, used for output from, e.g., gips_project
 output-dir = /home/your-user-name-here/src/gips/testout
+
 # These should remain as they are (placing them in a committed file is a TODO):
 python_functions =  t_
 python_classes =    T_
 python_files =      t_*.py
 DJANGO_SETTINGS_MODULE=gips.inventory.orm.settings
+
+# config for artifact store
+artifact-store-user     = ask
+artifact-store-password = for
+artifact-store-host     = these
+artifact-store-path     = values
 ```
 
 Library Dependencies
 --------------------
 GIPS automated testing uses a few libraries, mainly pytest and mock, and a
 library for gluing them together (pytest-mock).  These are installed by
-`install.sh`.  Further reading:
+the gips installation process.  Further reading:
 
 * Pytest:  http://docs.pytest.org/en/latest/index.html
 * Mock:  http://www.voidspace.org.uk/python/mock/
@@ -39,8 +46,16 @@ Test selection
 --------------
 Running unit tests is straightforward, as is selecting specific tests:
 
+https://pytest.org/latest/usage.html#specifying-tests-selecting-tests
+
+You can also select tests based on mark (marks are tags for tests):
+
+https://pytest.org/latest/example/markers.html
+
+Examples:
+
 ```
-py.test                 # only runs fast tests; all unit tests at the moment
+py.test                 # only runs non-system tests (should be fast)
 py.test -k inventory    # use py.test's -k to select tests conveniently:
 ========================= test session starts =========================
 platform linux2 -- Python 2.7.11+, pytest-2.9.2, py-1.4.31, pluggy-0.3.1
@@ -60,19 +75,6 @@ gips/test/unit/t_inventory_settings.py ..
 ======== 4 passed, 4 skipped, 104 deselected in 0.51 seconds ==========
 ```
 
-Select specific tests per usual for pytest:
-
-https://pytest.org/latest/usage.html#specifying-tests-selecting-tests
-
-You can also select tests based on mark (marks are tags for tests):
-
-https://pytest.org/latest/example/markers.html
-
-And reading about fixtures is especially recommended as the GIPS test suite
-uses them substantially:
-
-http://pytest.org/latest/fixture.html
-
 **Important caveat:** If you specify the same test file multiple times on the
 command line (say, to specify multiple tests in that file), any module-scoped
 test fixtures will run once for each time the file is listed, which may not be
@@ -82,6 +84,11 @@ mulitple times.  Instead, avoid the problem by using `-k` to specify tests.
 
 Writing Unit Tests with Mocking
 ===============================
+First, reading about fixtures is especially recommended as the GIPS test suite
+uses them substantially:
+
+http://pytest.org/latest/fixture.html
+
 Automated testing can be difficult due to the code's interaction with the
 outside.  Some interactions may be undesirable for testing purposes, such as
 access to an RNG or the network.  Others may be important to observe for
@@ -122,19 +129,16 @@ https://pytest-django.readthedocs.io/en/latest/
 Running System Tests
 ====================
 Each test runs `gips_something` commands, usually just one, as subprocesses.
-The test harness captures the command's exit status, standard output, and
-standard error.  In addition, the filesystem is observed before and after the
-test, and any created, deleted, or updated files are noted.  These observations
-are then compared with known correct values to see if the test ought to pass.
-Finally any cleanup actions occur, which may include removing created files to
-leave the filesystem in a pristine state.
+The test harness observes the filesystem before and after the test, and any
+created files are observed.  These observations are then compared with known
+correct values to see if the test ought to pass.
 
-System tests require a little setup, unfortunately:  Edit `settings.py` and set
-`OVERRIDE_VERSION` to the version the system tests expect.  You can check this
-by looking in `gips/test/sys/expected/modis.py` and checking on the version
-that is expected to be output.  You should also have a correct `pytest.ini`
-file (see the top-level README.md).  Back up any data files you want to retain
-in your data repo directory; some system tests need to operate destructively on
+System tests require a little setup, unfortunately:  Edit `settings.py` and
+set `OVERRIDE_VERSION` to the version the system tests expect.  You can check
+this by looking in `gips/test/sys/expected/modis.py` and checking on the
+version that is expected to be output.  You should also have a correct
+`pytest.ini` file (see above).  Back up any data files you want to retain in
+your data repo directory; some system tests need to operate destructively on
 it.
 
 It's not normal to retain state in between test runs, but the pattern of GIPS
@@ -154,6 +158,9 @@ py.test --sys --clear-repo # delete the entire repo, then fetch data files,
 py.test --ll debug -s -x -vv --sys --setup-repo -k prism
 ```
 
+Note that specifying the log level with `--ll` and `--log-level` is supported
+for some tests, but may be deprecated for new tests.
+
 Also some specially-marked tests are skipped unless command-line options are
 given; this is for performance and safety reasons.  The repo-altering tests,
 mostly tests of `gips_inventory --fetch`, will always be skipped without the
@@ -163,78 +170,88 @@ that requires `--setup-repo` or `--clear-repo` for the other tests to pass.
 
 Writing System Tests:  Testing a New Driver
 ===========================================
-Each driver's tests are split in half; here are the files for modis:
+A new driver should have system tests for `gips_process`, `gips_project`, and
+`gips_stats`, though in the future minimum test coverage standards may evolve
+further.
 
-* `gips/test/sys/t_modis.py`:  The tests themselves
-* `gips/test/sys/expected/modis.py`:  A file of known good outcomes, one per
-  test.
+Thanks to pytest's parametrization, one test function can support many
+combinations of drivers and products.  See docs for details:
 
-As a quick demonstration, edit a new test file, `gips/test/sys/t_$DRIVER.py`,
-and add a test to it:
+https://docs.pytest.org/en/latest/parametrize.html
+
+In particular, the three tests live here, but shouldn't need to be modified
+to establish system testing for a new driver:
+
+* `gips/test/sys/t_process.py`
+* `gips/test/sys/t_project.py`
+* `gips/test/sys/t_stats.py`
+
+Instead, these files should be modified:
+
+* `gips/test/sys/expected/*_process.py`:  Known-good outcomes for `t_process`
+* `gips/test/sys/expected/*_project.py`:  Known-good outcomes for `t_project`
+* `gips/test/sys/expected/std_stats.py`:  Known-good outcomes for `t_stats`
+* `gips/test/sys/driver_setup.py`:  Configuration & any special code the
+  driver may need.
+
+Be aware that an older infrastructure may exist in the gips system test suite,
+that exists alongside this one.  They interact minimally or not at all.
+
+Recipe for Testing a New Driver
+-------------------------------
+Say we're testing the new `granitesat` driver, which has the products `snow`
+and `ice`.  Open the file `gips/test/sys/driver_setup.py`, and add a line to
+`STD_ARGS` to tell the test suite what scene(s) to operate on:
 
 ```
-from .util import *
-def t_example(repo_env, expected):
-    actual = repo_env.run('echo "hello world!"')
-    assert expected == actual
+STD_ARGS = {
+    # . . . various drivers listed here already . . .
+    'granitesat': ('granitesat', '-s', nh_shp, '-d', '2018-001,2018-005', '-v4'),
+}
 ```
 
-And an output expectation to a new expectations file,
-`gips/test/sys/expected/$DRIVER.py`:
+Then open the file `gips/test/sys/expected/std_process.py` and add these
+lines; this tells the test suite what products to test:
 
 ```
-t_example = { 'stdout': """hello world!\n""" }
+expectations['granitesat'] = {
+    'snow': [], # the expectation list is intentionally empty for now . . .
+    'ice': [],
+}
 ```
 
-Now run the test (and only this test, to save time), and you should observe it
-pass:
+Now record expectations for the new driver's process testing:
 
 ```
-$ py.test -k t_example
-============================= test session starts ==============================
-platform linux2 -- Python 2.7.11+, pytest-2.9.2, py-1.4.31, pluggy-0.3.1
-rootdir: /home/tolson/src/gips, inifile: pytest.ini
-plugins: mock-1.1, cov-2.2.1, timeout-1.0.0
-collected 23 items
-
-gips/test/sys/t_$DRIVER.py .
-
-===================== 22 tests deselected by '-kt_example' =====================
-=================== 1 passed, 22 deselected in 0.42 seconds ====================
+$ pytest -s -vv gips/test/sys/t_process.py --sys -k granitesat --record=rec.py
 ```
 
-In practice, copying the patterns in `t_modis.py` for testing a new driver can
-be considered adequate.  Also examine any deprecated shell script in
-`gips/test`, as these are organized by driver and can supply needed test cases.
-For a driver's source-altering tests, edit a single pair of files regardless of
-driver:
+You should observe your `snow` and `ice` tests passing; in this case it means
+a recording was made successfully for each product.  These recordings are
+saved to `rec.py`; open it and see what files were created during the
+recording.  Confirm that the right files were created, and remove any entries
+that aren't important to the test (such as `.index` files).  Then copy the
+contents of `rec.py` to `gips/test/sys/expected/std_process.py`, replacing the
+content of `expectations['granitesat']`.  Then re-run process testing and
+observe that the tests pass:
 
-* `sys/t_repo_src_alteration.py`: For the tests
-* `sys/expected/repo_src_alteration.py`: For the expectations.
+```
+$ # Test runs presently don't clean up after themselves, so we have to do it:
+$ find your-data-repo/granitesat/ -name '*.tif' -delete # vary as needed
+$ # note no --record=rec.py this time:
+$ pytest -s -vv gips/test/sys/t_process.py --sys -k granitesat
+```
 
-Working with Environment Fixtures and the Expectations File
------------------------------------------------------------
-For GIPS, system tests means observing command-line processes as they execute
-and comparing their output to known-good values.  These outputs only take two
-forms:  Standard streams and altering files in the filesystem (including
-creating and deleting files).  Some tests are expected to modify the data repo,
-while others will modify a project directory.  Choose an appropriate pytest
-fixture accordingly, using existing driver tests as a guide.  Pytest fixtures
-are available to make this easier; see `gips/test/sys/util.py` for details.
+The process can be repeated for `t_project` and `t_stats`.  Again, the test
+suite doesn't perform cleanup, so remove your `OUTPUT_DIR` between test runs.
 
-The `expected` fixture is somewhat special:  It provides a convenient way to
-store bulky data needed for tests in a separate file, without needing to
-explicitly access the file itself nor configure anything.  See
-`gips/test/sys/expected/modis.py` for the way this works in practice:  The
-`expected` fixture looks for an object with the same name as the currently
-running test.  It then loads that dictionary into a `GipsProcResult` object,
-which is convenient for making assertions in these system tests.
+If your new driver has many products, follow the pattern of `modis` and place
+your expectations in a separate file, and import its content into eg
+`std_process.py`.
 
-The known-good values stored in `expected/` are usually captured from initial
-test runs.  For convenience, newly developed tests may be run with
-`py.test -s --log-level debug --expectation-format`; parts of the output can
-be cutpasted into an `expected/` file to establish these needed known-good
-values.
+If your driver needs additional system tests that don't follow the standard
+parttern, you can place these in their own test file, eg:
+`gips/test/sys/t_granitesat.py`
 
 Caveats & Tips
 ==============
