@@ -389,7 +389,6 @@ class landsatAsset(Asset):
         and a list of S3 keys suitable for passing to gdalbuildvrt.
         Returns (None, None) if no asset found for the given scene.
         """
-        # TODO auth somehow magically?
         # for finding assets matching the tile
         key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
         # match something like:  'LC08_L1TP_013030_20170402_20170414_01_T1'
@@ -448,9 +447,10 @@ class landsatAsset(Asset):
 
         Doesn't fetch much; instead it constructs a VRT-based tarball.
         """
-        (filename, _30m_tifs, _15m_tif, mtl_txt, ang_txt) = cls.query_s3(tile,
-                                                                         date)
-
+        query_results = cls.query_s3(tile, date)
+        if query_results == (5 * (None,)):
+            return
+        (filename, _30m_tifs, _15m_tif, mtl_txt, ang_txt) = query_results
         # construct VSI paths; sample (split into lines):
         # /vsis3_streaming/landsat-pds/c1/L8/013/030
         #   /LC08_L1TP_013030_20171128_20171207_01_T1
