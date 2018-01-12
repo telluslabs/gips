@@ -399,6 +399,13 @@ class landsatAsset(Asset):
         re_string = key_prefix + fname_fragment
         filter_re = re.compile(re_string)
 
+        missing_auth_vars = tuple(
+                set(['AWS_SECRET_ACCESS_KEY', 'AWS_ACCESS_KEY_ID'])
+                - set(os.environ.keys()))
+        if len(missing_auth_vars) > 0:
+            raise EnvironmentError("Missing AWS S3 auth credentials:"
+                                   "  {}".format(missing_auth_vars))
+
         verbose_out("Searching AWS S3 bucket '{}' for key fragment"
                     " '{}'".format(cls._bucket_name, key_prefix), 4)
 
@@ -620,6 +627,9 @@ class landsatData(Data):
     }
     __toastring = 'toa: use top of the atmosphere reflectance'
     __visible_bands_union = [color for color in Asset._sensors['LC8']['colors'] if 'LWIR' not in color]
+
+    # note C1 products are also C1S3 products; they're added in below
+    # TODO don't use manual tables of repeated information in the first place
     _products = {
         #'Standard':
         'rad': {
@@ -632,7 +642,7 @@ class landsatData(Data):
             'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
         'ref': {
-            'assets': ['DN', 'C1', 'C1S3'],
+            'assets': ['DN', 'C1'],
             'description': 'Surface reflectance',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
@@ -786,7 +796,7 @@ class landsatData(Data):
             'bands': unitless_bands('ndsi'),
         },
         'ndvi': {
-            'assets': ['DN', 'C1', 'C1S3'],
+            'assets': ['DN', 'C1'],
             'description': 'Normalized Difference Vegetation Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
@@ -868,6 +878,10 @@ class landsatData(Data):
     }
 
     gips.atmosphere.add_acolite_product_dicts(_products, 'DN', 'C1')
+
+    for pname, pdict in _products.items():
+        if 'C1' in pdict['assets']:
+            pdict['assets'].append('C1S3')
 
     for product, product_info in _products.iteritems():
         product_info['startdate'] = min(
