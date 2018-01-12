@@ -134,8 +134,8 @@ created files are observed.  These observations are then compared with known
 correct values to see if the test ought to pass.
 
 System tests require a little setup, unfortunately:  Edit `settings.py` and
-set `OVERRIDE_VERSION` to the version the system tests expect.  You can check
-this by looking in `gips/test/sys/expected/modis.py` and checking on the
+set `GIPS_OVERRIDE_VERSION` to the version the system tests expect.  You can
+check this by looking in `gips/test/sys/expected/modis.py` and checking on the
 version that is expected to be output.  You should also have a correct
 `pytest.ini` file (see above).  Back up any data files you want to retain in
 your data repo directory; some system tests need to operate destructively on
