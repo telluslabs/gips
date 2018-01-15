@@ -1219,6 +1219,7 @@ class landsatData(Data):
                         tmpimg.PruneBands(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'])
                         arr = numpy.array(self.Asset._sensors[self.sensor_set[0]]['tcap']).astype('float32')
                         imgout = LinearTransform(tmpimg, fname, arr)
+                        imgout.SetMeta('AREA_OR_POINT', 'Point')
                         outbands = ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6']
                         for i in range(0, imgout.NumBands()):
                             imgout.SetBandName(outbands[i], i + 1)
@@ -1258,6 +1259,7 @@ class landsatData(Data):
                             diffimg[nodatainds] = imgout[band].NoDataValue()
                             imgout[band].Write(diffimg)
                     elif val[0] == 'wtemp':
+                        raise NotImplementedError('See https://gitlab.com/appliedgeosolutions/gips/issues/155')
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
                         [imgout.SetBandName(lwbands[i], i + 1) for i in range(0, imgout.NumBands())]
                         imgout.SetNoData(-32768)
