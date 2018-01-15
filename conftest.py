@@ -48,9 +48,17 @@ def pytest_addoption(parser):
     help_str = ("The directory housing the data repo for testing purposes.  "
                 "MUST match GIPS' configured REPOS setting.")
     parser.addini('data-repo', help=help_str)
-
     parser.addini('output-dir',
                   help="The directory housing output files from test runs.")
+
+    parser.addini('artifact-store-user', help="FTP artifact store username")
+    parser.addini('artifact-store-password',
+                  help="FTP artifact store password")
+    parser.addini('artifact-store-host', help="FTP artifact store hostname")
+    parser.addini('artifact-store-path',
+                  help="FTP artifact store root path; files are presumed to be"
+                       " stored driver-wise beneath this level,"
+                       " eg path/sar/asset.tgz")
 
     parser.addoption(
         "--slow", action="store_true", help="Do not skip @slow tests.")
@@ -73,12 +81,23 @@ def pytest_addoption(parser):
     parser.addoption(
         "--expectation-format", action="store_true", help=help_str)
 
+    parser.addoption('--record', action='store', default=None,
+                     help="Pass in a filename for expecations"
+                          " to be written to that filename.")
+    # cleanup may not need to be implemented at all
+    #parser.addoption('--cleanup-on-failure', action='store_true',
+    #        help="Normally cleanup is skipped on failure so you can examine"
+    #             " files; pass this option to cleanup even on failure.")
 
 def pytest_configure(config):
     """Process user config & command-line options."""
     raw_level = config.getoption("log_level")
     level = ('warning' if raw_level is None else raw_level).upper()
     root_logger.setLevel(level)
+
+    record_path = config.getoption('record')
+    if record_path and os.path.lexists(record_path):
+        raise IOError("Record file already exists at {}".format(record_path))
 
     dr = str(config.getini('data-repo'))
     if not dr:
@@ -101,6 +120,8 @@ def pytest_configure(config):
     elif config.getoption("setup_repo"):
         _log.debug("--setup-repo detected; setting up data repo")
         setup_data_repo()
+    else:
+        print "Skipping repo setup per lack of --setup-repo."
 
 
 def setup_data_repo():
