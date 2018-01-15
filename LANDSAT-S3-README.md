@@ -1,5 +1,5 @@
 
-Right now only ndvi-toa and ref-toa are supported.  Rerun gips installation
+Right now most products are supported.  Rerun gips installation
 faff to get the AWS API library you need:
 
 ```
