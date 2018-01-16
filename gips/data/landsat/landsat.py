@@ -263,9 +263,10 @@ class landsatAsset(Asset):
         if self.asset in ['DN', 'C1']:
             smeta = self._sensors[self.sensor]
             self.meta = {}
+            self.meta['bands'] = {}
             for i, band in enumerate(smeta['colors']):
                 wvlen = smeta['bandlocs'][i]
-                self.meta[band] = {
+                self.meta['bands'][band] = {
                     'bandnum': i + 1,
                     'wvlen': wvlen,
                     'wvlen1': wvlen - smeta['bandwidths'][i] / 2.0,
@@ -280,6 +281,7 @@ class landsatAsset(Asset):
         if self.sensor not in self._sensors.keys():
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
+        self.meta['cloud-cover'] = self.cloud_cover()
 
     def cloud_cover(self):
         """Returns the cloud cover for the current asset."""
@@ -871,7 +873,7 @@ class landsatData(Data):
             with utils.error_handler('Error reading ' + basename(self.assets[asset].filename)):
                 img = self._readraw(asset)
 
-            meta = self.assets[asset].meta
+            meta = self.assets[asset].meta['bands']
             visbands = self.assets[asset].visbands
             lwbands = self.assets[asset].lwbands
             md = self.meta_dict()
