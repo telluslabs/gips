@@ -6,33 +6,6 @@ from gips.inventory import orm
 
 """Test inventory.orm.* for correctness."""
 
-@pytest.mark.parametrize("env_var, expected", (
-    ('true',        True),
-    ('TrUe',        True),
-    ('TRUE',        True),
-    ('false',       False),
-    ('99agmavfa95', False),
-    ('1',           True),
-    ('1.0',         True),
-    ('1.1',         True),
-    ('-1.0',        True),
-    ('-1.1',        True),
-    ('0',           False),
-    ('-0',          False),
-    ('0.0',         False),
-    ('',            False),
-    (' ',           False),
-))
-def t_use_orm(mocker, env_var, expected):
-    """Test various inputs for the env var."""
-    mocker.patch.dict('gips.inventory.orm.os.environ', GIPS_ORM=env_var)
-    assert expected == orm.use_orm()
-
-def t_use_orm_unset_var(mocker):
-    """Unset env var should result in ORM use."""
-    mocker.patch.dict('gips.inventory.orm.os.environ', clear=True)
-    assert orm.use_orm()
-
 @pytest.mark.parametrize('setup_complete, use_orm, expected', (
     (False, True,  True),
     (False, False, False),

@@ -313,7 +313,8 @@ def t_archive_old_asset(archive_setup):
     """Confirm old-style assets archive properly."""
     stage_path, staged_asset_fn, archived_asset_fns = archive_setup
 
-    sentinel2.sentinel2Asset.archive(stage_path) # touches db if GIPS_ORM=true, hence django_db
+    # touches db if use_orm(), hence django_db
+    sentinel2.sentinel2Asset.archive(stage_path)
 
     assert (not os.path.exists(staged_asset_fn)
             and all([os.path.exists(fn) for fn in archived_asset_fns]))
