@@ -281,10 +281,13 @@ class landsatAsset(Asset):
         if self.sensor not in self._sensors.keys():
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
-        self.meta['cloud-cover'] = self.cloud_cover()
 
     def cloud_cover(self):
-        """Returns the cloud cover for the current asset."""
+        """Returns the cloud cover for the current asset.
+
+        Caches and returns the value found in self.meta['cloud-cover']."""
+        if 'cloud-cover' in self.meta:
+            return self.meta['cloud-cover']
         if os.path.exists(self.filename):
             mtlfilename = self.extract(
                     [f for f in self.datafiles() if f.endswith('MTL.txt')])[0]
@@ -297,7 +300,8 @@ class landsatAsset(Asset):
                 if not cloud_cover:
                     raise ValueError("No match for '{}' found in {}".format(
                                         cc_pattern, mtlfilename))
-                return float(cloud_cover.group(1))
+                self.meta['cloud-cover'] = float(cloud_cover.group(1))
+                return self.meta['cloud-cover']
 
         # no filename present; see if we can get it from the remote API
         api_key = self.ee_login()
@@ -316,7 +320,8 @@ class landsatAsset(Asset):
         xml_magic_string = (".//{http://earthexplorer.usgs.gov/eemetadata.xsd}"
                             "metadataField[@name='Scene Cloud Cover']")
         # Indexing an Element instance returns its children
-        return float(xml.find(xml_magic_string)[0].text)
+        self.meta['cloud-cover'] = float(xml.find(xml_magic_string)[0].text)
+        return self.meta['cloud-cover']
 
     def filter(self, pclouds=100, **kwargs):
         """
