@@ -233,7 +233,7 @@ class sentinel2Asset(Asset):
         self._version = int(''.join(
             match.group('pyear', 'pmon', 'pday', 'phour', 'pmin', 'psec')
         ))
-        self.meta = {'cloud-cover': self.cloud_cover()}
+        self.meta = {} # for caching asset metadata values
 
 
     def set_style_regular_expressions(self):
@@ -441,6 +441,11 @@ class sentinel2Asset(Asset):
 
 
     def cloud_cover(self):
+        """Returns cloud cover for the current asset.
+
+        Caches and returns the value found in self.meta['cloud-cover']."""
+        if 'cloud-cover' in self.meta:
+            return self.meta['cloud-cover']
         if os.path.exists(self.filename):
             with utils.make_temp_dir() as tmpdir:
                 metadata_file = [f for f in self.datafiles() if f.endswith("MTD_MSIL1C.xml")][0]
@@ -475,7 +480,8 @@ class sentinel2Asset(Asset):
         cloud_coverage_el = root.findall(
             "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
         )[0]
-        return float(cloud_coverage_el.text)
+        self.meta['cloud-cover'] = float(cloud_coverage_el.text)
+        return self.meta['cloud-cover']
 
     def filter(self, pclouds=100, **kwargs):
         return self.meta['cloud-cover'] <= pclouds
