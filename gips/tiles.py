@@ -91,7 +91,8 @@ class Tiles(object):
             fout = os.path.join(datadir, '%s_%s_%s' % (bname, sensor, product)) + '.tif'
             if not os.path.exists(fout) or overwrite:
                 with utils.error_handler("Error mosaicking " + fout + ". "
-                                         "Did you forget to specify a resolution (`--res x x`)?", continuable=True):
+                                         "Did you forget to specify a resolution (`--res x x`)?",
+                                         continuable=True):
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
                     if self.spatial.rastermask is not None:
