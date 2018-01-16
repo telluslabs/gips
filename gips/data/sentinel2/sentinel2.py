@@ -484,7 +484,7 @@ class sentinel2Asset(Asset):
         return self.meta['cloud-cover']
 
     def filter(self, pclouds=100, **kwargs):
-        return self.meta['cloud-cover'] <= pclouds
+        return pclouds >= 100 or self.cloud_cover() <= pclouds
 
     def xml_subtree(self, md_file_type, subtree_tag):
         """Loads XML, then returns the given Element from it.
