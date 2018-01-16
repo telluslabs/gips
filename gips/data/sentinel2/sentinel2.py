@@ -233,6 +233,7 @@ class sentinel2Asset(Asset):
         self._version = int(''.join(
             match.group('pyear', 'pmon', 'pday', 'phour', 'pmin', 'psec')
         ))
+        self.meta = {'cloud-cover': self.cloud_cover()}
 
 
     def set_style_regular_expressions(self):
@@ -439,47 +440,45 @@ class sentinel2Asset(Asset):
         return list(tiles)
 
 
+    def cloud_cover(self):
+        if os.path.exists(self.filename):
+            with utils.make_temp_dir() as tmpdir:
+                metadata_file = [f for f in self.datafiles() if f.endswith("MTD_MSIL1C.xml")][0]
+                self.extract([metadata_file], path=tmpdir)
+                tree = ElementTree.parse(tmpdir + '/' + metadata_file)
+                root = tree.getroot()
+        else:
+            scihub = "https://scihub.copernicus.eu/dhus/odata/v1"
+            username = self.Repository.get_setting('username')
+            password = self.Repository.get_setting('password')
+            asset_name = os.path.basename(self.filename)[0:-4]
+            query_url = "{}/Products?$filter=Name eq '{}'".format(scihub, asset_name)
+            r = requests.get(query_url, auth=(username, password))
+            r.raise_for_status()
+            root = ElementTree.fromstring(r.content)
+            namespaces = {
+                'a': "http://www.w3.org/2005/Atom",
+                'm': "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
+                'd': "http://schemas.microsoft.com/ado/2007/08/dataservices",
+            }
+            product_id_el = root.find("./a:entry/m:properties/d:Id", namespaces)
+            if product_id_el is None:
+                raise Exception("{} is not a valid asset".format(asset_name))
+            metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL1C.xml')/$value".format(
+                scihub, product_id_el.text, asset_name
+            )
+            r = requests.get(metadata_url, auth=(username, password))
+            r.raise_for_status()
+            root = ElementTree.fromstring(r.content)
+
+        ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
+        cloud_coverage_el = root.findall(
+            "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
+        )[0]
+        return float(cloud_coverage_el.text)
+
     def filter(self, pclouds=100, **kwargs):
-        if pclouds < 100:
-            if os.path.exists(self.filename):
-                with utils.make_temp_dir() as tmpdir:
-                    metadata_file = [f for f in self.datafiles() if f.endswith("MTD_MSIL1C.xml")][0]
-                    self.extract([metadata_file], path=tmpdir)
-                    tree = ElementTree.parse(tmpdir + '/' + metadata_file)
-                    root = tree.getroot()
-            else:
-                scihub = "https://scihub.copernicus.eu/dhus/odata/v1"
-                username = self.Repository.get_setting('username')
-                password = self.Repository.get_setting('password')
-                asset_name = os.path.basename(self.filename)[0:-4]
-                query_url = "{}/Products?$filter=Name eq '{}'".format(scihub, asset_name)
-                r = requests.get(query_url, auth=(username, password))
-                r.raise_for_status()
-                root = ElementTree.fromstring(r.content)
-                namespaces = {
-                    'a': "http://www.w3.org/2005/Atom",
-                    'm': "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata",
-                    'd': "http://schemas.microsoft.com/ado/2007/08/dataservices",
-                }
-                product_id_el = root.find("./a:entry/m:properties/d:Id", namespaces)
-                if product_id_el is None:
-                    raise Exception("{} is not a valid asset".format(asset_name))
-                metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL1C.xml')/$value".format(
-                    scihub, product_id_el.text, asset_name
-                )
-                r = requests.get(metadata_url, auth=(username, password))
-                r.raise_for_status()
-                root = ElementTree.fromstring(r.content)
-
-            ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
-            cloud_coverage_el = root.findall(
-                "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
-            )[0]
-            if float(cloud_coverage_el.text) > pclouds:
-                return False
-
-        return True
-
+        return self.meta['cloud-cover'] <= pclouds
 
     def xml_subtree(self, md_file_type, subtree_tag):
         """Loads XML, then returns the given Element from it.
