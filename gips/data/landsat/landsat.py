@@ -205,7 +205,7 @@ class landsatAsset(Asset):
         },
         'C1S3': {
             'sensors': ['LC8'],
-            'pattern': _c1_base_pattern + r'_S3\.tar\.gz$',
+            'pattern': _c1_base_pattern + r'_S3\.json$',
             'latency': 12,
         },
     }
@@ -386,8 +386,8 @@ class landsatAsset(Asset):
         """Handles AWS S3 queries for landsat data.
 
         Returns a filename suitable for naming the constructed asset,
-        and a list of S3 keys suitable for passing to gdalbuildvrt.
-        Returns (None, None) if no asset found for the given scene.
+        and a list of S3 keys.  Returns None if no asset found for the
+        given scene.
         """
         # for finding assets matching the tile
         key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
@@ -415,8 +415,9 @@ class landsatAsset(Asset):
         bucket = s3.Bucket(cls._bucket_name)
 
         # A rare instance of a stupid for-loop being the right choice:
+        # TODO no need for leading underscores (not sure why I did that)
         _30m_tifs = []
-        _15m_tif = mtl_txt = ang_txt = None
+        _15m_tif = mtl_txt = qa_tif = None
         for o in bucket.objects.filter(Prefix=key_prefix):
             key = o.key
             if not filter_re.match(key):
@@ -425,15 +426,15 @@ class landsatAsset(Asset):
                 _15m_tif = key
             elif key.endswith('MTL.txt'):
                 mtl_txt = key
-            elif key.endswith('ANG.txt'):
-                ang_txt = key
+            elif key.endswith('BQA.TIF'):
+                qa_tif = key
             elif key.endswith('.TIF'):
                 _30m_tifs.append(key)
 
-        if len(_30m_tifs) != 11 or None in (_15m_tif, mtl_txt, ang_txt):
+        if len(_30m_tifs) != 10 or None in (_15m_tif, mtl_txt, qa_tif):
             verbose_out('Found no complete S3 asset for'
                         ' (C1S3, {}, {})'.format(tile, date), 4)
-            return 5 * (None,)
+            return None
 
         verbose_out('Found complete C1S3 asset for'
                     ' (C1S3, {}, {})'.format(tile, date), 4)
@@ -441,12 +442,13 @@ class landsatAsset(Asset):
         # have to custom sort thanks to 'B1.TIF' instead of 'B01.TIF':
         def sort_key_f(key):
             match = re.search(r'B(\d+).TIF$', key)
-            return int(match.group(1)) if match else 99 # BQA.TIF goes last
+            # sort by band number; anything weird goes last
+            return int(match.group(1)) if match else 99
         _30m_tifs.sort(key=sort_key_f)
 
-        filename = re.search(fname_fragment, _15m_tif).group(0) + '_S3.tar.gz'
+        filename = re.search(fname_fragment, _15m_tif).group(0) + '_S3.json'
         verbose_out("Constructed S3 asset filename:  " + filename, 5)
-        return filename, _30m_tifs, _15m_tif, mtl_txt, ang_txt
+        return filename, _30m_tifs, _15m_tif, qa_tif, mtl_txt
 
     @classmethod
     def fetch_s3(cls, tile, date):
@@ -455,48 +457,29 @@ class landsatAsset(Asset):
         Doesn't fetch much; instead it constructs a VRT-based tarball.
         """
         query_results = cls.query_s3(tile, date)
-        if query_results == (5 * (None,)):
+        if query_results is None:
             return
-        (filename, _30m_tifs, _15m_tif, mtl_txt, ang_txt) = query_results
+        (filename, _30m_tifs, _15m_tif, qa_tif, mtl_txt) = query_results
         # construct VSI paths; sample (split into lines):
         # /vsis3_streaming/landsat-pds/c1/L8/013/030
         #   /LC08_L1TP_013030_20171128_20171207_01_T1
         #   /LC08_L1TP_013030_20171128_20171207_01_T1_B10.TIF
         # see also:  http://www.gdal.org/gdal_virtual_file_systems.html
         vsi_prefix = '/vsis3_streaming/{}/'.format(cls._bucket_name)
-        _30m_vsi_paths = [vsi_prefix + t for t in _30m_tifs]
-        _15m_vsi_path = vsi_prefix + _15m_tif
-
-        # file names to be saved in the final asset tarball
-        _30m_vrt_fn = '30m-bands.vrt'
-        _15m_vrt_fn = '15m-band.vrt'
-        txt_fns = []
+        asset_content = {
+            # can/should add metadata/versioning info here
+            '30m-bands': [vsi_prefix + t for t in _30m_tifs],
+            '15m-band': vsi_prefix + _15m_tif,
+            'qa-band': vsi_prefix + qa_tif,
+            'mtl': cls._s3_url + mtl_txt,
+        }
 
         with utils.make_temp_dir(prefix='fetch',
                                  dir=cls.Repository.path('stage')) as tmp_dir:
-            # build VRT files
-            # takes 1m-ish on a local NH workstation; AWS perf unknown
-            cmd = ['gdalbuildvrt', '-separate',
-                   tmp_dir + '/' + _30m_vrt_fn] + _30m_vsi_paths
-            subprocess.check_call(cmd)
-            cmd = ['gdalbuildvrt', '-separate',
-                   tmp_dir + '/' + _15m_vrt_fn, _15m_vsi_path]
-            subprocess.check_call(cmd)
-
-            # fetch metadata & angles file
-            for txt_key in (mtl_txt, ang_txt):
-                url = cls._s3_url + txt_key
-                response = requests.get(url, stream=True)
-                txt_fname = os.path.basename(txt_key)
-                txt_fns.append(txt_fname) # remember to add it to the tarball
-                with open(tmp_dir + '/' + txt_fname, 'wb') as fo:
-                    shutil.copyfileobj(response.raw, fo)
-
             tmp_fp = tmp_dir + '/' + filename
-            with tarfile.open(tmp_fp, 'w:gz') as tfo:
-                [tfo.add(tmp_dir + '/' + fn, arcname=fn)
-                        for fn in txt_fns + [_30m_vrt_fn, _15m_vrt_fn]]
-            # subprocess.check_call(['ls', '-lh', tmp_dir]) # for debugging
+            import json
+            with open(tmp_fp, 'w') as tfo:
+                json.dump(asset_content, tfo)
             shutil.copy(tmp_fp, cls.Repository.path('stage'))
 
     @classmethod
