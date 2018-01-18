@@ -35,6 +35,7 @@ import commands # TODO unused?
 import subprocess
 import tempfile
 import tarfile
+import json
 from xml.etree import ElementTree
 
 import numpy
@@ -477,7 +478,6 @@ class landsatAsset(Asset):
         with utils.make_temp_dir(prefix='fetch',
                                  dir=cls.Repository.path('stage')) as tmp_dir:
             tmp_fp = tmp_dir + '/' + filename
-            import json
             with open(tmp_fp, 'w') as tfo:
                 json.dump(asset_content, tfo)
             shutil.copy(tmp_fp, cls.Repository.path('stage'))
@@ -1434,25 +1434,35 @@ class landsatData(Data):
         return True
 
     def meta(self, asset_type):
-        """ Read in Landsat MTL (metadata) file """
+        """Read in Landsat metadata file and return it as a dict.
+
+         Also saves it to self.metadata."""
         # test if metadata already read in, if so, return
         if hasattr(self, 'metadata'):
-            return
+            return self.metadata
 
         asset_obj = self.assets[asset_type]
-        datafiles = asset_obj.datafiles()
-
-        # locate MTL file and save it to disk if it isn't saved already
-        mtlfilename = [f for f in datafiles if 'MTL.txt' in f][0]
-        if os.path.exists(mtlfilename) and os.stat(mtlfilename).st_size == 0:
-            os.remove(mtlfilename)
-        if not os.path.exists(mtlfilename):
-            mtlfilename = asset_obj.extract([mtlfilename])[0]
-        # Read MTL file
-        with utils.error_handler('Error reading metadata file ' + mtlfilename):
-            text = open(mtlfilename, 'r').read()
-        if len(text) < 10:
-            raise Exception('MTL file is too short. {}'.format(mtlfilename))
+        if asset_type == 'C1S3':
+            with open(asset_obj.filename) as aof:
+                asset_json = json.load(aof)
+            text = requests.get(asset_json['mtl']).text
+            qafn = asset_json['qa-band']
+        else:
+            datafiles = asset_obj.datafiles()
+            # save for later; defaults to None
+            qafn = next((f for f in datafiles if '_BQA.TIF' in f), None)
+            # locate MTL file and save it to disk if it isn't saved already
+            mtlfilename = next(f for f in datafiles if 'MTL.txt' in f)
+            if os.path.exists(mtlfilename) and os.stat(mtlfilename).st_size:
+                os.remove(mtlfilename)
+            if not os.path.exists(mtlfilename):
+                mtlfilename = asset_obj.extract([mtlfilename])[0]
+            # Read MTL file
+            with utils.error_handler(
+                            'Error reading metadata file ' + mtlfilename):
+                text = open(mtlfilename, 'r').read()
+            if len(text) < 10:
+                raise IOError('MTL file is too short. {}'.format(mtlfilename))
 
         sensor = asset_obj.sensor
         smeta = asset_obj._sensors[sensor]
@@ -1528,9 +1538,10 @@ class landsatData(Data):
             'geometry': _geometry,
             'datetime': dt,
             'clouds': clouds,
-            'qafilename': next((f for f in datafiles if '_BQA.TIF' in f), None) # defaults to None
+            'qafilename': qafn,
         }
         #self.metadata.update(smeta)
+        return self.metadata
 
     @classmethod
     def meta_dict(cls):
