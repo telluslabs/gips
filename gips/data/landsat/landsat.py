@@ -1562,7 +1562,6 @@ class landsatData(Data):
         qaimg = gippy.GeoImage(qadatafile)
         return qaimg
 
-
     def _readraw(self, asset_type):
         """ Read in Landsat bands using original tar.gz file """
         start = datetime.now()
@@ -1573,8 +1572,12 @@ class landsatData(Data):
         data_src = self.Repository.get_setting('source')
         s3_mode = (data_src, asset_type) == ('s3', 'C1S3')
         if s3_mode:
-            vrt_path = '/vsitar/' + asset_obj.filename + '/30m-bands.vrt'
-            image = gippy.GeoImage(vrt_path)
+            with open(asset_obj.filename) as aof:
+                asset_json = json.load(aof)
+            # json module insists on returning unicode, which gippy no likey
+            ascii_paths = [p.encode('ascii','ignore')
+                           for p in asset_json['30m-bands']]
+            image = gippy.GeoImage(ascii_paths)
         else:
             if settings().REPOS[self.Repository.name.lower()]['extract']:
                 # Extract all files
