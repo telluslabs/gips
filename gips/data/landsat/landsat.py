@@ -354,6 +354,15 @@ class landsatAsset(Asset):
 
         return scene_cloud_cover < pclouds
 
+    def load_c1s3_json(self):
+        """Load the content from a C1S3 json asset and return it.
+
+        Returns None if the current asset type isn't C1S3."""
+        if self.asset != 'C1S3':
+            return None
+        with open(self.filename) as aof:
+            return json.load(aof)
+
     @classmethod
     def ee_login(cls):
         if not hasattr(cls, '_ee_key'):
@@ -1442,11 +1451,10 @@ class landsatData(Data):
             return self.metadata
 
         asset_obj = self.assets[asset_type]
-        if asset_type == 'C1S3':
-            with open(asset_obj.filename) as aof:
-                asset_json = json.load(aof)
-            text = requests.get(asset_json['mtl']).text
-            qafn = asset_json['qa-band']
+        c1s3_content = asset_obj.load_c1s3_json()
+        if c1s3_content:
+            text = requests.get(c1s3_content['mtl']).text
+            qafn = c1s3_content['qa-band'].encode('ascii', 'ignore')
         else:
             datafiles = asset_obj.datafiles()
             # save for later; defaults to None
@@ -1550,15 +1558,17 @@ class landsatData(Data):
         return meta
 
     def _readqa(self, asset_type):
-        self.meta(asset_type)
+        md = self.meta(asset_type)
+        if asset_type == 'C1S3':
+            return gippy.GeoImage(md['qafilename'])
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract files
-            qadatafile = self.assets[asset_type].extract([self.metadata['qafilename']])
+            qadatafile = self.assets[asset_type].extract([md['qafilename']])
         else:
             # Use tar.gz directly using GDAL's virtual filesystem
             qadatafile = os.path.join(
                     '/vsitar/' + self.assets[asset_type].filename,
-                    self.metadata['qafilename'])
+                    md['qafilename'])
         qaimg = gippy.GeoImage(qadatafile)
         return qaimg
 
@@ -1567,13 +1577,12 @@ class landsatData(Data):
         start = datetime.now()
         asset_obj = self.assets[asset_type]
 
-        self.meta(asset_type)
+        md = self.meta(asset_type)
 
         data_src = self.Repository.get_setting('source')
         s3_mode = (data_src, asset_type) == ('s3', 'C1S3')
         if s3_mode:
-            with open(asset_obj.filename) as aof:
-                asset_json = json.load(aof)
+            asset_json = asset_obj.load_c1s3_json()
             # json module insists on returning unicode, which gippy no likey
             ascii_paths = [p.encode('ascii','ignore')
                            for p in asset_json['30m-bands']]
@@ -1581,11 +1590,11 @@ class landsatData(Data):
         else:
             if settings().REPOS[self.Repository.name.lower()]['extract']:
                 # Extract all files
-                datafiles = asset_obj.extract(self.metadata['filenames'])
+                datafiles = asset_obj.extract(md['filenames'])
             else:
                 # Use tar.gz directly using GDAL's virtual filesystem
                 datafiles = [os.path.join('/vsitar/' + asset_obj.filename, f)
-                        for f in self.metadata['filenames']]
+                        for f in md['filenames']]
             image = gippy.GeoImage(datafiles)
 
         image.SetNoData(0)
@@ -1600,14 +1609,14 @@ class landsatData(Data):
         sensor = asset_obj.sensor
         colors = asset_obj._sensors[sensor]['colors']
 
-        for bi in range(0, len(self.metadata['filenames'])):
+        for bi in range(0, len(md['filenames'])):
             image.SetBandName(colors[bi], bi + 1)
             # need to do this or can we index correctly?
             band = image[bi]
-            gain = self.metadata['gain'][bi]
+            gain = md['gain'][bi]
             band.SetGain(gain)
-            band.SetOffset(self.metadata['offset'][bi])
-            dynrange = self.metadata['dynrange'][bi]
+            band.SetOffset(md['offset'][bi])
+            dynrange = md['dynrange'][bi]
             # #band.SetDynamicRange(dynrange[0], dynrange[1])
             # dynrange[0] was used internally to for conversion to radiance
             # from DN in GeoRaster.Read:
