@@ -7,6 +7,7 @@ import subprocess
 
 import pytest
 
+import gippy
 from gips.inventory import dbinv
 from gips.inventory import orm
 from ...data.sentinel2 import sentinel2
@@ -309,10 +310,13 @@ def archive_setup(test_asset_fn):
 
 
 @pytest.mark.django_db
-def t_archive_old_asset(archive_setup):
+def t_archive_old_asset(archive_setup, mocker):
     """Confirm old-style assets archive properly."""
     stage_path, staged_asset_fn, archived_asset_fns = archive_setup
 
+    m_cloud_cover = mocker.patch.object(
+            sentinel2.sentinel2Asset, 'cloud_cover')
+    gippy.Options.SetVerbose(4) # to get tracebacks
     sentinel2.sentinel2Asset.archive(stage_path) # touches db if GIPS_ORM=true, hence django_db
 
     assert (not os.path.exists(staged_asset_fn)

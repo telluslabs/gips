@@ -18,6 +18,7 @@ new_style_fn = (
 def t_sentinel2Asset_constructor(mocker, fn, expected):
     """Test asset constructor against old & new-style assets."""
     mocker.patch.object(sentinel2.zipfile, 'ZipFile')
+    mocker.patch.object(sentinel2.sentinel2Asset, 'cloud_cover')
     asset = sentinel2.sentinel2Asset(fn)
     actual = (asset.filename, asset.asset, asset.sensor, asset.tile,
               asset.date.year, asset.date.timetuple().tm_yday)
