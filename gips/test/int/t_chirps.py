@@ -40,7 +40,7 @@ def scene_dir_setup():
         os.remove(target_product_fp)
     if use_fake_asset:
         os.remove(target_asset_fp)
-        [os.rmdir(d) for d in made_dirs]
+        [os.rmdir(d) for d in reversed(made_dirs)] # <- remove in correct order
 
 @pytest.mark.django_db
 def t_chirps_product_symlink(mocker, scene_dir_setup):

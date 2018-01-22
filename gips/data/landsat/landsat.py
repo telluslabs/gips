@@ -284,9 +284,10 @@ class landsatAsset(Asset):
         if self.asset in ['DN', 'C1', 'C1S3']:
             smeta = self._sensors[self.sensor]
             self.meta = {}
+            self.meta['bands'] = {}
             for i, band in enumerate(smeta['colors']):
                 wvlen = smeta['bandlocs'][i]
-                self.meta[band] = {
+                self.meta['bands'][band] = {
                     'bandnum': i + 1,
                     'wvlen': wvlen,
                     'wvlen1': wvlen - smeta['bandwidths'][i] / 2.0,
@@ -302,6 +303,48 @@ class landsatAsset(Asset):
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
 
+    def cloud_cover(self):
+        """Returns the cloud cover for the current asset.
+
+        Caches and returns the value found in self.meta['cloud-cover']."""
+        if 'cloud-cover' in self.meta:
+            return self.meta['cloud-cover']
+        if os.path.exists(self.filename):
+            mtlfilename = self.extract(
+                    [f for f in self.datafiles() if f.endswith('MTL.txt')])[0]
+            with utils.error_handler(
+                            'Error reading metadata file ' + mtlfilename):
+                with open(mtlfilename, 'r') as mtlfile:
+                    text = mtlfile.read()
+                cc_pattern = r".*CLOUD_COVER = (\d+.?\d*)"
+                cloud_cover = re.match(cc_pattern, text, flags=re.DOTALL)
+                if not cloud_cover:
+                    raise ValueError("No match for '{}' found in {}".format(
+                                        cc_pattern, mtlfilename))
+                self.meta['cloud-cover'] = float(cloud_cover.group(1))
+                return self.meta['cloud-cover']
+
+        # no filename present; see if we can get it from the remote API
+        api_key = self.ee_login()
+        self.load_ee_search_keys()
+        dataset_name = self._sensors[self.sensor]['ee_dataset']
+        path_field   = self._ee_datasets[dataset_name]['WRS Path']
+        row_field    = self._ee_datasets[dataset_name]['WRS Row']
+        date_string = datetime.strftime(self.date, "%Y-%m-%d")
+        from usgs import api
+        response = api.search(
+                dataset_name, 'EE',
+                where={path_field: self.tile[0:3], row_field: self.tile[3:]},
+                start_date=date_string, end_date=date_string, api_key=api_key)
+        metadata = requests.get(
+                response['data']['results'][0]['metadataUrl']).text
+        xml = ElementTree.fromstring(metadata)
+        xml_magic_string = (".//{http://earthexplorer.usgs.gov/eemetadata.xsd}"
+                            "metadataField[@name='Scene Cloud Cover']")
+        # Indexing an Element instance returns its children
+        self.meta['cloud-cover'] = float(xml.find(xml_magic_string)[0].text)
+        return self.meta['cloud-cover']
+
     def filter(self, pclouds=100, **kwargs):
         """
         Filters current asset, currently based on cloud cover.
@@ -313,44 +356,7 @@ class landsatAsset(Asset):
         if pclouds >= 100:
             return True
 
-        if os.path.exists(self.filename):
-            mtlfilename = self.extract([f for f in self.datafiles() if f.endswith('MTL.txt')])[0]
-            with utils.error_handler('Error reading metadata file ' + mtlfilename):
-                with open(mtlfilename, 'r') as mtlfile:
-                    text = mtlfile.read()
-                cc_pattern = r".*CLOUD_COVER = (\d+.?\d*)"
-                cloud_cover = re.match(
-                    cc_pattern,
-                    text,
-                    flags=re.DOTALL
-                )
-                if not cloud_cover:
-                    raise ValueError("No match for '{}' found in {}".format(cc_pattern, mtlfilename))
-                scene_cloud_cover = float(cloud_cover.group(1))
-        else:
-            api_key = self.ee_login()
-            dataset_name = landsatAsset._sensors[self.sensor]['ee_dataset']
-            path_field = landsatAsset._ee_datasets[dataset_name]['WRS Path']
-            row_field = landsatAsset._ee_datasets[dataset_name]['WRS Row']
-            from usgs import api
-            response = api.search(
-                dataset_name, 'EE',
-                where={
-                    path_field: self.tile[0:3], row_field: self.tile[3:]},
-                start_date=datetime.strftime(self.date, "%Y-%m-%d"),
-                end_date=datetime.strftime(self.date, "%Y-%m-%d"),
-                api_key=api_key
-            )
-            metadata = requests.get(
-                response['data']['results'][0]['metadataUrl']
-            ).text
-            xml = ElementTree.fromstring(metadata)
-            # Indexing an Element instance returns it's children
-            scene_cloud_cover_el = xml.find(
-                ".//{http://earthexplorer.usgs.gov/eemetadata.xsd}metadataField[@name='Scene Cloud Cover']"
-            )[0]
-
-            scene_cloud_cover = float(scene_cloud_cover_el.text)
+        scene_cloud_cover = self.cloud_cover()
 
         return scene_cloud_cover < pclouds
 
@@ -375,7 +381,6 @@ class landsatAsset(Asset):
     @classmethod
     def load_ee_search_keys(cls):
         if cls._ee_datasets:
-            print(cls._ee_datasets)
             return
         api_key = cls.ee_login()
         from usgs import api
@@ -1036,7 +1041,7 @@ class landsatData(Data):
             with utils.error_handler('Error reading ' + basename(self.assets[asset].filename)):
                 img = self._readraw(asset)
 
-            meta = self.assets[asset].meta
+            meta = self.assets[asset].meta['bands']
             visbands = self.assets[asset].visbands
             lwbands = self.assets[asset].lwbands
             md = self.meta_dict()
