@@ -400,6 +400,10 @@ class landsatAsset(Asset):
     _bucket_name = 'landsat-pds'
     _s3_url = 'https://landsat-pds.s3.amazonaws.com/'
 
+    # take advantage of gips' search order (tile is outer, date is inner)
+    # and cache search outcomes
+    _query_s3_cache = (None, None) # prefix, search results
+
     @classmethod
     def query_s3(cls, tile, date):
         """Handles AWS S3 queries for landsat data.
@@ -425,20 +429,26 @@ class landsatAsset(Asset):
             raise EnvironmentError("Missing AWS S3 auth credentials:"
                                    "  {}".format(missing_auth_vars))
 
-        verbose_out("Searching AWS S3 bucket '{}' for key fragment"
-                    " '{}'".format(cls._bucket_name, key_prefix), 4)
-
-        # find the layer and metadata files matching the current scene
-        import boto3 # import here so it only breaks if it's actually needed
-        s3 = boto3.resource('s3')
-        bucket = s3.Bucket(cls._bucket_name)
+        # on repeated searches, chances are we have a cache we can use
+        expected_prefix, keys = cls._query_s3_cache
+        if expected_prefix != key_prefix:
+            verbose_out("New prefix detected; refreshing S3 query cache.", 5)
+            # find the layer and metadata files matching the current scene
+            import boto3 # import here so it only breaks if it's actually needed
+            s3 = boto3.resource('s3')
+            bucket = s3.Bucket(cls._bucket_name)
+            keys = [o.key for o in bucket.objects.filter(Prefix=key_prefix)]
+            cls._query_s3_cache = key_prefix, keys
+            verbose_out("Found {} S3 keys while searching for for key fragment"
+                        " '{}'".format(len(keys), key_prefix), 5)
+        else:
+            verbose_out("Found {} cached search results for S3 key fragment"
+                        " '{}'".format(len(keys), key_prefix), 5)
 
         # A rare instance of a stupid for-loop being the right choice:
-        # TODO no need for leading underscores (not sure why I did that)
         _30m_tifs = []
         _15m_tif = mtl_txt = qa_tif = None
-        for o in bucket.objects.filter(Prefix=key_prefix):
-            key = o.key
+        for key in keys:
             if not filter_re.match(key):
                 continue
             if key.endswith('B8.TIF'):
@@ -510,7 +520,8 @@ class landsatAsset(Asset):
         available = []
 
         if asset in ['DN', 'SR']:
-            verbose_out('Landsat "{}" assets are no longer fetchable'.format(asset), 4)
+            verbose_out('Landsat "{}" assets are no longer fetchable'.format(
+                    asset), 6)
             return available
 
         path = tile[:3]
