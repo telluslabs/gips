@@ -310,19 +310,23 @@ class landsatAsset(Asset):
         if 'cloud-cover' in self.meta:
             return self.meta['cloud-cover']
         if os.path.exists(self.filename):
-            mtlfilename = self.extract(
-                    [f for f in self.datafiles() if f.endswith('MTL.txt')])[0]
-            with utils.error_handler(
-                            'Error reading metadata file ' + mtlfilename):
-                with open(mtlfilename, 'r') as mtlfile:
-                    text = mtlfile.read()
-                cc_pattern = r".*CLOUD_COVER = (\d+.?\d*)"
-                cloud_cover = re.match(cc_pattern, text, flags=re.DOTALL)
-                if not cloud_cover:
-                    raise ValueError("No match for '{}' found in {}".format(
-                                        cc_pattern, mtlfilename))
-                self.meta['cloud-cover'] = float(cloud_cover.group(1))
-                return self.meta['cloud-cover']
+            c1s3_content = self.load_c1s3_json()
+            if c1s3_content:
+                text = requests.get(c1s3_content['mtl']).text
+            else:
+                mtlfilename = self.extract(next(
+                        f for f in self.datafiles() if f.endswith('MTL.txt')))
+                err_msg = 'Error reading metadata file ' + mtlfilename
+                with utils.error_handler(err_msg):
+                    with open(mtlfilename, 'r') as mtlfile:
+                        text = mtlfile.read()
+            cc_pattern = r".*CLOUD_COVER = (\d+.?\d*)"
+            cloud_cover = re.match(cc_pattern, text, flags=re.DOTALL)
+            if not cloud_cover:
+                raise ValueError("No match for '{}' found in {}".format(
+                                    cc_pattern, mtlfilename))
+            self.meta['cloud-cover'] = float(cloud_cover.group(1))
+            return self.meta['cloud-cover']
 
         # no filename present; see if we can get it from the remote API
         api_key = self.ee_login()
