@@ -328,6 +328,10 @@ class landsatAsset(Asset):
             self.meta['cloud-cover'] = float(cloud_cover.group(1))
             return self.meta['cloud-cover']
 
+        if self.asset == 'C1S3': # but the file doesn't exist
+            raise NotImplementedError(
+                    'Cloud cover for C1S3 remote assets is not supported.')
+
         # no filename present; see if we can get it from the remote API
         api_key = self.ee_login()
         self.load_ee_search_keys()
