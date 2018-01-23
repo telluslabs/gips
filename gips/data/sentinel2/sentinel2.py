@@ -1157,7 +1157,7 @@ class sentinel2Data(Data):
         
         s2rep_img[0].Write(s2rep)
         s2rep_img[0].SetGain(gain)
-        s2rep_img[0].SetGain(offset)
+        s2rep_img[0].SetOffset(offset)
         s2rep_img[0].SetNoData(missing)
 
         self._product_images['s2rep'] = s2rep_img
