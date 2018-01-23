@@ -45,6 +45,10 @@ from gips.data.core import Repository, Asset, Data
 from gips import utils
 from gips import atmosphere
 
+
+from pdb import set_trace
+
+
 """Steps for adding a product to this driver:
 
 * add the product to the _products dict
@@ -292,10 +296,17 @@ class sentinel2Asset(Asset):
         search_cmd = (
                 'wget --no-verbose --no-check-certificate --user="{}" --password="{}" --timeout 30'
                 ' --output-document=/dev/stdout "{}"').format(username, password, search_url)
+
+        print(search_cmd)
+        
         with utils.error_handler("Error performing asset search '({})'".format(search_url)):
             args = shlex.split(search_cmd)
+            print("so exciting about to issue query request")
+            print(args)
             p = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+            print("but don't")
             (stdout_data, stderr_data) = p.communicate()
+            print("hold your breath")
             if p.returncode != 0:
                 utils.verbose_out(stderr_data, stream=sys.stderr)
                 raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
@@ -653,7 +664,7 @@ class sentinel2Data(Data):
     _productgroups = {
         'Index': [
             'ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari',
-            'brgt', 'mtci', 's2rep', 'ndti', 'crc', 'crcm', 'isti', 'sti',
+            'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti',
         ],
         'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
                     'spm655', 'turbidity', 'acoflags'],
@@ -679,6 +690,16 @@ class sentinel2Data(Data):
             'assets': [_asset_type],
             'bands': {'name': 'cfmask', 'units': Data._unitless},
         },
+        'mtci': {
+            'description': 'MERIS Terrestrial Chlorophyll Index',
+            'assets': [_asset_type],
+            'bands': {'name': 'mtci', 'units': Data._unitless}
+        },
+        's2rep': {
+            'description': 'Sentinel-2 Red Edge Position',
+            'assets': [_asset_type],
+            'bands': {'name': 's2rep', 'units': Data._unitless}
+        }
     }
 
     # add index products to _products
@@ -695,19 +716,13 @@ class sentinel2Data(Data):
             ('satvi',  'Soil-Adjusted Total Vegetation Index'),
             ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
             ('vari',   'Visible Atmospherically Resistant Index'),
-            # index products related to tillage
-            # rbraswell's original description of brgt:  "Brightness index:
-            # Visible to near infrared reflectance weighted by" approximate
-            # energy distribution of the solar spectrum. A proxy for
-            # broadband albedo."
             ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
+            # index products related to tillage            
             ('ndti',   'Normalized Difference Tillage Index'),
             ('crc',    'Crop Residue Cover (uses BLUE)'),
             ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
             ('isti',   'Inverse Standard Tillage Index'),
             ('sti',    'Standard Tillage Index'),
-            ('mtci',    'MERIS Terrestrial Chlorophyll Index'),
-            ('s2rep',    'Sentinel-2 Red-Edge Position'),
         ]
     )
 
@@ -721,6 +736,8 @@ class sentinel2Data(Data):
         'rad-toa':      'ref-toa',
         'ref-toa':      None, # has no deps but the asset
         'cfmask':       None,
+        'mtci':         'ref-toa',
+        's2rep':        'ref-toa',
     }
 
     def plan_work(self, requested_products, overwrite):
@@ -827,7 +844,7 @@ class sentinel2Data(Data):
                     for f in self.metadata['filenames']]
         self.metadata['abs-filenames'] = datafiles
 
-
+    
     def ref_toa_geoimage(self, sensor, data_spec):
         """Make a proto-product which acts as a basis for several products.
 
@@ -1072,6 +1089,80 @@ class sentinel2Data(Data):
         self._product_images['cfmask'] = fmask_image
 
 
+    def mtci_geoimage(self, asset_type):
+        """Generate MTCI
+        Python implementation of MTCI
+        """                
+        self._time_report('Generating MTCI')
+        asset_style = self.assets[asset_type].style
+
+        # change this to 'ref'
+        ref_img = self.load_image('ref-toa')
+
+        b4 = ref_img['RED'].Read()
+        b5 = ref_img['REDEDGE1'].Read()
+        b6 = ref_img['REDEDGE2'].Read()
+
+        gain = 0.0002
+        missing = -32768
+
+        mtci = missing + 0. * b4.copy()        
+        wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b5 - b4 != 0.)
+        mtci[wg] = ((b6[wg] - b5[wg]) / (b5[wg] - b4[wg]))
+        mtci[(mtci < -6.)|(mtci >= 6.)] = missing
+        mtci[mtci != missing] = mtci[mtci != missing]/gain
+        mtci = mtci.astype('int16')
+
+        mtci_filename = "%s/mtci.tif" % self._temp_proc_dir
+        mtci_img = gippy.GeoImage(mtci_filename, ref_img, gippy.GDT_Int16, 1)
+        
+        mtci_img[0].Write(mtci)
+        mtci_img[0].SetGain(gain)
+        mtci_img[0].SetNoData(missing)
+
+        self._product_images['mtci'] = mtci_img
+
+
+    # gips_process sentinel2 -t 16TDP -d 2017-10-01 -v5 -p mtci --overwrite --fetch
+        
+    def s2rep_geoimage(self, asset_type):
+        """Generate S2REP
+        Python implementation of S2REP
+        """                
+        self._time_report('Generating S2REP')
+        asset_style = self.assets[asset_type].style
+
+        # change this to 'ref'
+        ref_img = self.load_image('ref-toa')
+
+        b4 = ref_img['RED'].Read()
+        b5 = ref_img['REDEDGE1'].Read()
+        b6 = ref_img['REDEDGE2'].Read()
+        b7 = ref_img['REDEDGE3'].Read()
+
+        gain = 0.04
+        offset = 400.
+        missing = -32768
+
+        s2rep = missing + 0. * b4.copy()        
+        wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b7 > 0.)&(b7 <= 1.)&(b6 - b5 != 0.)
+        s2rep[wg] = 705. + 35. * ((((b7[wg] + b4[wg])/2.) - b5[wg])/(b6[wg] - b5[wg]))
+                
+        s2rep[(s2rep < 400.)|(s2rep >= 1100.)] = missing
+        s2rep[s2rep != missing] = (s2rep[s2rep != missing] - offset)/gain
+        s2rep = s2rep.astype('int16')
+
+        s2rep_filename = "%s/s2rep.tif" % self._temp_proc_dir
+        s2rep_img = gippy.GeoImage(s2rep_filename, ref_img, gippy.GDT_Int16, 1)
+        
+        s2rep_img[0].Write(s2rep)
+        s2rep_img[0].SetGain(gain)
+        s2rep_img[0].SetGain(offset)
+        s2rep_img[0].SetNoData(missing)
+
+        self._product_images['s2rep'] = s2rep_img
+
+
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
         """Produce data products and save them to files.
@@ -1088,7 +1179,7 @@ class sentinel2Data(Data):
             utils.verbose_out('No new processing required.')
             return
         self._product_images = {}
-
+        
         # Read the assets
         with utils.error_handler('Error reading '
                                  + utils.basename(self.assets[asset_type].filename)):
@@ -1111,10 +1202,14 @@ class sentinel2Data(Data):
             self.ref_geoimage(asset_type, sensor)
         if 'cfmask' in work:
             self.fmask_geoimage(asset_type)
+        if 'mtci' in work:
+            self.mtci_geoimage(asset_type)
+        if 's2rep' in work:
+            self.s2rep_geoimage(asset_type)
 
         self._time_report('Starting on standard product processing')
 
-        # Process standard products
+        # Process standard products    
         for prod_type in products.groups()['Standard']:
             err_msg = 'Error creating product {} for {}'.format(
                     prod_type, os.path.basename(self.assets[asset_type].filename))
@@ -1139,6 +1234,13 @@ class sentinel2Data(Data):
                     output_image.SetMeta('FMASK_3', 'cloud shadow')
                     output_image.SetMeta('FMASK_4', 'snow')
                     output_image.SetMeta('FMASK_5', 'water')
+                if prod_type == 'mtci':
+                    output_image.SetGain(0.0002)
+                    output_image.SetNoData(-32768)                    
+                if prod_type == 's2rep':
+                    output_image.SetGain(0.04)
+                    output_image.SetOffset(400.)
+                    output_image.SetNoData(-32768)                    
                 for b_num, b_name in enumerate(source_image.BandNames(), 1):
                     output_image.SetBandName(b_name, b_num)
                 # process bandwise because gippy had an error doing it all at once
