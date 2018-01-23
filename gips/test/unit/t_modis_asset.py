@@ -118,7 +118,7 @@ def basic_asset_db(db):
 
 
 @pytest.mark.django_db
-def t_discover(basic_asset_db):
+def t_discover(orm, basic_asset_db):
     """Confirm Asset.discover works (with the inventory DB).
 
     Set up the inventory db with some assets then confirm
