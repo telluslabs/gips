@@ -99,9 +99,19 @@ class cdlAsset(Asset):
             coverage_xml = requests.get(wcs_url, params=coverage_parameters, verify=False)
             root = ElementTree.fromstring(coverage_xml.text)
             ns = {'ows': 'http://www.opengis.net/ows/1.1', 'wcs': 'http://www.opengis.net/wcs/1.1'}
-            lower_corner = root.find(".//ows:BoundingBox[@crs='urn:ogc:def:crs:EPSG::102004']/ows:LowerCorner", ns).text
-            upper_corner = root.find(".//ows:BoundingBox[@crs='urn:ogc:def:crs:EPSG::102004']/ows:UpperCorner", ns).text
+            lower_corner = root.find(
+                ".//ows:BoundingBox[@crs='urn:ogc:def:crs:EPSG::102004']/ows:LowerCorner",
+                ns
+            ).text
+            upper_corner = root.find(
+                ".//ows:BoundingBox[@crs='urn:ogc:def:crs:EPSG::102004']/ows:UpperCorner",
+                ns
+            ).text
 
+            # The CropScapeService's WCS serves coverages that are a max of
+            # 2048x2048 pixels. Since this is smaller than almost every state,
+            # images must be fetched in small parts and then mosaicked
+            # together.
             coord_step = 30 * 2048  # cov must be max 2048x2048
             init_x, init_y = [int(coord) for coord in lower_corner.split(" ")]
             max_x, max_y = [int(coord) + coord_step for coord in upper_corner.split(" ")]
@@ -126,7 +136,11 @@ class cdlAsset(Asset):
                     }
                     r = requests.get(wcs_url, params=feature_parameters, stream=True, verify=False)
 
-                    with open("{}/{}_{}".format(cls.Repository.path('stage'), chip_number, asset_name), 'w') as asset_file:
+                    with open("{}/{}_{}".format(
+                              cls.Repository.path('stage'),
+                              chip_number,
+                              asset_name),
+                              'w') as asset_file:
                         asset_file.write(r.content)
 
                     prev_y = cur_y
@@ -136,10 +150,15 @@ class cdlAsset(Asset):
 
             chips = glob.glob("{}/*_{}".format(cls.Repository.path('stage'), asset_name))
 
+            # Iterating over a grid of 2048x2048 squares, as above, occasionally
+            # produces a request that is outside of the coverage area. In this
+            # case, the WCS returns an XML error response, so we need to filter
+            # those out before mosaicking.
             def is_valid_image(chip):
                 try:
                     GeoImage(chip)
                 except RuntimeError:
+                    os.unlink(chip)
                     return False
                 return True
             chips = list(ifilter(is_valid_image, chips))
