@@ -25,12 +25,17 @@ import os
 import re
 import datetime
 from csv import DictReader
+import glob
+from itertools import ifilter
+from xml.etree import ElementTree
 from zipfile import ZipFile
 
 from dbfread import DBF
+import requests
 
 from gips.data.core import Repository, Asset, Data
-from gippy import GeoImage
+from gips import utils
+from gippy import GeoImage, GeoImages
 from osgeo import gdal
 
 import imghdr
@@ -72,7 +77,79 @@ class cdlAsset(Asset):
         else:
             self.asset = _cdlmkii
         self.sensor = _cdl
-        self.products[self.asset] = filename # magically it is also a product
+        self.products[self.asset] = filename  # magically it is also a product
+
+    @classmethod
+    def fetch(cls, asset, tile, date):
+        # The nassgeodata site is known to have an invalid certificate.
+        # We don't want to clutter up the output with SSL warnings.
+        import urllib3; urllib3.disable_warnings()
+
+        if asset == _cdl:
+            utils.verbose_out("Fetching tile for {} on {}".format(tile, date.year), 2)
+            crop_scape_service = "https://nassgeodata.gmu.edu/CropScapeService"
+            wcs_url = "{}/wms_cdl_{}.cgi".format(crop_scape_service, tile.lower())
+
+            coverage_parameters = {
+                'service': 'wcs',
+                'version': '1.1.0',
+                'request': 'describecoverage',
+                'coverage': "cdl_{}_{}".format(date.year, tile.lower()),
+            }
+            coverage_xml = requests.get(wcs_url, params=coverage_parameters, verify=False)
+            root = ElementTree.fromstring(coverage_xml.text)
+            ns = {'ows': 'http://www.opengis.net/ows/1.1', 'wcs': 'http://www.opengis.net/wcs/1.1'}
+            lower_corner = root.find(".//ows:BoundingBox[@crs='urn:ogc:def:crs:EPSG::102004']/ows:LowerCorner", ns).text
+            upper_corner = root.find(".//ows:BoundingBox[@crs='urn:ogc:def:crs:EPSG::102004']/ows:UpperCorner", ns).text
+
+            coord_step = 30 * 2048  # cov must be max 2048x2048
+            init_x, init_y = [int(coord) for coord in lower_corner.split(" ")]
+            max_x, max_y = [int(coord) + coord_step for coord in upper_corner.split(" ")]
+            chip_number = 0
+            asset_name = "{}_{}_cdl_cdl.tif".format(tile, date.year)
+
+            prev_x = init_x
+            for cur_x in range(init_x, max_x, coord_step):
+                prev_y = init_y
+                for cur_y in range(init_y, max_y, coord_step):
+                    bbox = "{},{},{},{}".format(prev_x, prev_y, cur_x, cur_y)
+                    feature_parameters = {
+                        'service': 'wcs',
+                        'version': '1.0.0',
+                        'request': 'getcoverage',
+                        'coverage': "cdl_{}_{}".format(date.year, tile.lower()),
+                        'crs': 'epsg:102004',
+                        'bbox': bbox,
+                        'resx': '30',
+                        'resy': '30',
+                        'format': 'gtiff',
+                    }
+                    r = requests.get(wcs_url, params=feature_parameters, stream=True, verify=False)
+
+                    with open("{}/{}_{}".format(cls.Repository.path('stage'), chip_number, asset_name), 'w') as asset_file:
+                        asset_file.write(r.content)
+
+                    prev_y = cur_y
+                    chip_number += 1
+                prev_x = cur_x
+                chip_number += 1
+
+            chips = glob.glob("{}/*_{}".format(cls.Repository.path('stage'), asset_name))
+
+            def is_valid_image(chip):
+                try:
+                    GeoImage(chip)
+                except RuntimeError:
+                    return False
+                return True
+            chips = list(ifilter(is_valid_image, chips))
+
+            tile_vector = utils.open_vector(cls.Repository.get_setting('tiles'), 'STATE_ABBR')[tile]
+            utils.mosaic(GeoImages(chips), os.path.join(cls.Repository.path('stage'), asset_name), tile_vector)
+            for chip in chips:
+                os.unlink(chip)
+        else:
+            utils.verbose_out("Fetching not supported for cdlmkii", 2)
 
 
 class cdlData(Data):
