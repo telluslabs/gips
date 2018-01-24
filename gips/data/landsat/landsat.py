@@ -309,17 +309,28 @@ class landsatAsset(Asset):
         Caches and returns the value found in self.meta['cloud-cover']."""
         if 'cloud-cover' in self.meta:
             return self.meta['cloud-cover']
-        if os.path.exists(self.filename):
-            c1s3_content = self.load_c1s3_json()
-            if c1s3_content:
+        # first attempt to find or download an MTL file and get the CC value
+        text = None
+        if self.asset == 'C1S3':
+            if os.path.exists(self.filename):
+                c1s3_content = self.load_c1s3_json()
                 text = requests.get(c1s3_content['mtl']).text
             else:
-                mtlfilename = self.extract(next(
-                        f for f in self.datafiles() if f.endswith('MTL.txt')))
-                err_msg = 'Error reading metadata file ' + mtlfilename
-                with utils.error_handler(err_msg):
-                    with open(mtlfilename, 'r') as mtlfile:
-                        text = mtlfile.read()
+                query_results = self.query_s3(self.tile, self.date)
+                if query_results is None:
+                    raise IOError('Could not locate metadata for'
+                                  ' ({}, {})'.format(self.tile, self.date))
+                # [-1] is mtl file path
+                text = requests.get(self._s3_url + query_results[-1]).text
+        elif os.path.exists(self.filename):
+            mtlfilename = self.extract(next(
+                    f for f in self.datafiles() if f.endswith('MTL.txt')))
+            err_msg = 'Error reading metadata file ' + mtlfilename
+            with utils.error_handler(err_msg):
+                with open(mtlfilename, 'r') as mtlfile:
+                    text = mtlfile.read()
+
+        if text is not None:
             cc_pattern = r".*CLOUD_COVER = (\d+.?\d*)"
             cloud_cover = re.match(cc_pattern, text, flags=re.DOTALL)
             if not cloud_cover:
@@ -328,11 +339,7 @@ class landsatAsset(Asset):
             self.meta['cloud-cover'] = float(cloud_cover.group(1))
             return self.meta['cloud-cover']
 
-        if self.asset == 'C1S3': # but the file doesn't exist
-            raise NotImplementedError(
-                    'Cloud cover for C1S3 remote assets is not supported.')
-
-        # no filename present; see if we can get it from the remote API
+        # the MTL file didn't work out; attempt USGS API search instead
         api_key = self.ee_login()
         self.load_ee_search_keys()
         dataset_name = self._sensors[self.sensor]['ee_dataset']
