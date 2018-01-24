@@ -4,24 +4,15 @@ import traceback
 
 import django
 
-from gips.utils import verbose_out, error_handler
+from gips import utils
 
 
 def use_orm():
     """Check GIPS_ORM to see if the user wants to use the Django ORM.
 
-    Use the ORM only if the user sets GIPS_ORM to 'true' (case
-    insensitive) or any nonzero number.
+    Defaults to True.
     """
-    raw_val = os.environ.get('GIPS_ORM', 'true')
-    use_orm = raw_val.lower() == 'true'
-    if not use_orm:
-        try:
-            use_orm = bool(float(raw_val))
-        except ValueError:
-            pass # "anything else" is considered False
-    return use_orm
-
+    return getattr(utils.settings(), 'GIPS_ORM', True)
 
 setup_complete = False
 driver_for_dbinv_feature_toggle = 'unspecified'
@@ -37,10 +28,10 @@ def setup():
         busted_drivers = ('sarannual',)
 
         if driver_for_dbinv_feature_toggle in busted_drivers:
-            msg = ("Inventory database does not support '{}'.  "
-                   "Set GIPS_ORM=false to use the filesystem inventory instead.")
-            raise Exception(msg.format(driver_for_dbinv_feature_toggle))
-        with error_handler("Error initializing Django ORM"):
+            raise Exception("Inventory database does not support '{}'.  Set"
+                    " GIPS_ORM = False to use the filesystem inventory"
+                    " instead.".format(driver_for_dbinv_feature_toggle))
+        with utils.error_handler("Error initializing Django ORM"):
             os.environ.setdefault("DJANGO_SETTINGS_MODULE", "gips.inventory.orm.settings")
             django.setup()
     setup_complete = True
