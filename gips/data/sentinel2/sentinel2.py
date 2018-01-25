@@ -726,8 +726,10 @@ class sentinel2Data(Data):
         'rad-toa':      'ref-toa',
         'ref-toa':      None, # has no deps but the asset
         'cfmask':       None,
-        'mtci':         'ref-toa',
-        's2rep':        'ref-toa',
+        'mtci-toa':     'ref-toa',
+        's2rep-toa':    'ref-toa',
+        'mtci':         'ref',
+        's2rep':        'ref',
     }
 
     def plan_work(self, requested_products, overwrite):
@@ -752,6 +754,9 @@ class sentinel2Data(Data):
             elif rp in toa_indices:
                 prereq = 'indices-toa'
             else:
+                if rp not in _pd:
+                    raise ValueError(
+                            'Could not find dependency listing for ' + rp)
                 prereq = rp
             # go thru each prereq and add it in if it's not already present, respecting overwrite.
             while prereq in _pd and (overwrite or prereq not in self.products):
@@ -1079,15 +1084,15 @@ class sentinel2Data(Data):
         self._product_images['cfmask'] = fmask_image
 
 
-    def mtci_geoimage(self, asset_type):
+    def mtci_geoimage(self, mode):
         """Generate Python implementation of MTCI."""
         # test this with eg:
         # gips_process sentinel2 -t 16TDP -d 2017-10-01 -v5 -p mtci --overwrite
         self._time_report('Generating MTCI')
-        asset_style = self.assets[asset_type].style
+        asset_style = self.assets[_asset_type].style
 
         # change this to 'ref'
-        ref_img = self.load_image('ref-toa')
+        ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
 
         b4 = ref_img['RED'].Read()
         b5 = ref_img['REDEDGE1'].Read()
@@ -1110,15 +1115,16 @@ class sentinel2Data(Data):
         mtci_img[0].SetGain(gain)
         mtci_img[0].SetNoData(missing)
 
-        self._product_images['mtci'] = mtci_img
+        self._product_images[
+                'mtci-toa' if mode == 'toa' else 'mtci'] = mtci_img
 
-    def s2rep_geoimage(self, asset_type):
+    def s2rep_geoimage(self, mode):
         """Generate Python implementation of S2REP."""
         self._time_report('Generating S2REP')
-        asset_style = self.assets[asset_type].style
+        asset_style = self.assets[_asset_type].style
 
         # change this to 'ref'
-        ref_img = self.load_image('ref-toa')
+        ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
 
         b4 = ref_img['RED'].Read()
         b5 = ref_img['REDEDGE1'].Read()
@@ -1145,7 +1151,8 @@ class sentinel2Data(Data):
         s2rep_img[0].SetOffset(offset)
         s2rep_img[0].SetNoData(missing)
 
-        self._product_images['s2rep'] = s2rep_img
+        self._product_images[
+                's2rep-toa' if mode == 'toa' else 's2rep'] = s2rep_img
 
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
@@ -1186,10 +1193,14 @@ class sentinel2Data(Data):
             self.ref_geoimage(asset_type, sensor)
         if 'cfmask' in work:
             self.fmask_geoimage(asset_type)
+        if 'mtci-toa' in work:
+            self.mtci_geoimage('toa')
+        if 's2rep-toa' in work:
+            self.s2rep_geoimage('toa')
         if 'mtci' in work:
-            self.mtci_geoimage(asset_type)
+            self.mtci_geoimage('surf')
         if 's2rep' in work:
-            self.s2rep_geoimage(asset_type)
+            self.s2rep_geoimage('surf')
 
         self._time_report('Starting on standard product processing')
 
