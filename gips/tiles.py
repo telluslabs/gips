@@ -88,22 +88,34 @@ class Tiles(object):
             # create data directory when it is needed
             mkdir(datadir)
             # TODO - this is assuming a tif file.  Use gippy FileExtension function when it is exposed
-            fout = os.path.join(datadir, '%s_%s_%s' % (bname, sensor, product)) + '.tif'
-            if not os.path.exists(fout) or overwrite:
-                with utils.error_handler("Error mosaicking " + fout + ". "
-                                         "Did you forget to specify a resolution (`--res x x`)?",
-                                         continuable=True):
+            fp_fragment = os.path.join(
+                    datadir, '{}_{}_{}'.format(bname, sensor, product))
+            final_fp = fp_fragment + '.tif'
+            # use a temporary filename then move it once complete (for safety);
+            # have to do '.part.tif' because if we try to do '.tif.part', it
+            # writes to '.tif.part.tif' (adding the extension behind our back).
+            tmp_fp = fp_fragment + '.part.tif'
+            if not os.path.exists(final_fp) or overwrite:
+                err_msg = ("Error mosaicking " + final_fp + ". Did you forget"
+                           " to specify a resolution (`--res x x`)?")
+                with utils.error_handler(err_msg, continuable=True):
+                    try: # remove file from prior runs, if present
+                        os.remove(tmp_fp)
+                    except OSError:
+                        pass
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
                     if self.spatial.rastermask is not None:
-                        gridded_mosaic(images, fout, self.spatial.rastermask, interpolation)
+                        gridded_mosaic(images, tmp_fp,
+                                       self.spatial.rastermask, interpolation)
                     elif self.spatial.site is not None and res is not None:
                         CookieCutter(
-                            images, self.spatial.site, fout, res[0], res[1],
+                            images, self.spatial.site, tmp_fp, res[0], res[1],
                             crop, interpolation, {}, alltouch,
                         )
                     else:
-                        mosaic(images, fout, self.spatial.site)
+                        mosaic(images, tmp_fp, self.spatial.site)
+                    os.rename(tmp_fp, final_fp)
         t = datetime.now() - start
         VerboseOut('%s: created project files for %s tiles in %s' % (self.date, len(self.tiles), t), 2)
 
