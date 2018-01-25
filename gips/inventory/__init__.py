@@ -231,7 +231,7 @@ class DataInventory(Inventory):
         self.update = update
 
         if fetch:
-            dataclass.fetch(self.products.base, self.spatial.tiles, self.temporal, self.update)
+            dataclass.fetch(self.products.base, self.spatial, self.temporal, self.update)
             archived_assets = dataclass.Asset.archive(Repository.path('stage'), update=self.update)
 
             if orm.use_orm():
