@@ -82,6 +82,7 @@ class modisAsset(Asset):
     _asset_re_tail = '\.A.{7}\.h.{2}v.{2}\..{3}\..{13}\.hdf$'
 
     _assets = {
+        #Band info:  https://modis.gsfc.nasa.gov/about/specifications.php
         'MCD43A4': {
             'pattern': '^MCD43A4' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
@@ -263,6 +264,33 @@ class modisAsset(Asset):
         return retrieved_filenames
 
 
+# index product types and descriptions
+_index_products = [
+    # duplicated in sentinel2 and landsat; may be worth it to DRY out
+    ('ndvi',   'Normalized Difference Vegetation Index'),
+    ('evi',    'Enhanced Vegetation Index'),
+    ('lswi',   'Land Surface Water Index'),
+    ('ndsi',   'Normalized Difference Snow Index'),
+    ('bi',     'Brightness Index'),
+    ('satvi',  'Soil-Adjusted Total Vegetation Index'),
+    ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
+    ('vari',   'Visible Atmospherically Resistant Index'),
+    ('brgt',   'VIS and NIR reflectance, weighted by'
+               'solar energy distribution.'),
+    ('ndti',   'Normalized Difference Tillage Index'),
+    ('crc',    'Crop Residue Cover (uses BLUE)'),
+    ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
+    ('isti',   'Inverse Standard Tillage Index'),
+    ('sti',    'Standard Tillage Index'),
+]
+
+_index_product_entries = {
+    pt: {'bands': [pt], 'description': descr,
+         'assets': ['MCD43A4'], 'sensor': 'MCD',
+         'startdate': datetime.date(2000, 2, 18), 'latency': 15}
+    for pt, descr in _index_products}
+
+
 class modisData(Data):
     """ A tile of data (all assets and products) """
     name = 'Modis'
@@ -272,11 +300,14 @@ class modisData(Data):
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
         "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
+        "Index": [pt for (pt, _) in _index_products],
     }
-    _products = {
+
+    _products = { # note indices products are added in below
         # MCD Products
         'indices': {
-            'description': 'Land indices',
+            'description': 'Land indices (deprecated,'
+                           ' see indices product group)',
             'assets': ['MCD43A4'],
             'sensor': 'MCD',
             'bands': [
@@ -402,6 +433,39 @@ class modisData(Data):
         }
     }
 
+    _products.update(_index_product_entries)
+
+    def asset_check(self, prod_type):
+        """Is an asset available for the current scene and product?
+
+        Returns the last found asset, or else None, its version, the
+        complete lists of missing and available assets, and lastly, an array
+        of pseudo-filepath strings suitable for consumption by gdal/gippy.
+        """
+        # return values
+        asset = None
+        version = None
+        missingassets = []
+        availassets = []
+        allsds = []
+
+        for asset in self._products[prod_type]['assets']:
+            # many asset types won't be found for the current scene
+            if asset not in self.assets:
+                missingassets.append(asset)
+                continue
+            try:
+                sds = self.assets[asset].datafiles()
+            except Exception as e:
+                utils.report_error(e, 'Error reading datafiles for ' + asset)
+                missingassets.append(asset)
+            else:
+                availassets.append(asset)
+                allsds.extend(sds)
+                version = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
+
+        return asset, version, missingassets, availassets, allsds
+
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
         """Produce requested products."""
@@ -411,33 +475,17 @@ class modisData(Data):
 
         bname = os.path.join(self.path, self.basename)
 
-        # example products.requested: {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
-        # Note that val[0] is the only usage of val in this method.
+        # example products.requested:
+        # {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
+        # key is only used once far below, and val is only used for val[0].
         for key, val in products.requested.items():
+            # TODO replace val[0] below with this more meaningful name
+            prod_type = val[0]
+            if prod_type in self._productgroups['Index']:
+                continue # indices handled differently below
             start = datetime.datetime.now()
-
-            # Check for asset availability
-            assets = self._products[val[0]]['assets']
-            missingassets = []
-            availassets = []
-            allsds = []
-
-            versions = {}
-
-            for asset in assets:
-                # many asset types won't be found for the current date/spatial constraint
-                if asset not in self.assets:
-                    missingassets.append(asset)
-                    continue
-                try:
-                    sds = self.assets[asset].datafiles()
-                except Exception as e:
-                    utils.report_error(e, 'Error reading datafiles for ' + asset)
-                    missingassets.append(asset)
-                else:
-                    availassets.append(asset)
-                    allsds.extend(sds)
-                    versions[asset] = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
+            asset, version, missingassets, availassets, allsds = \
+                self.asset_check(prod_type)
 
             if not availassets:
                 # some products aren't available for every day but this is trying every day
@@ -448,7 +496,6 @@ class modisData(Data):
             meta = self.meta_dict()
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
 
-            prod_type = val[0]
             sensor = self._products[prod_type]['sensor']
             fname = self.temp_product_filename(sensor, prod_type) # moved to archive at end of loop
 
@@ -456,27 +503,8 @@ class modisData(Data):
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
-            if val[0] == "refl":
-                # NOTE this code is unreachable (no refl entry in _products)
-                if versions[asset] != 6:
-                    raise Exception('product version not supported')
-                sensor = 'MCD'
-                fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                img = gippy.GeoImage(sds[7:])
-                nodata = img[0].NoDataValue()
-                gain = img[0].Gain()
-                offset = img[0].Offset()
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
-                imgout.SetNoData(nodata)
-                imgout.SetOffset(offset)
-                imgout.SetGain(gain)
-                for i in range(6):
-                    data = img[i].Read()
-                    imgout[i].Write(data)
-                del img
-
             if val[0] == "quality":
-                if versions[asset] != 6:
+                if version != 6:
                     raise Exception('product version not supported')
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
@@ -484,12 +512,15 @@ class modisData(Data):
             # LAND VEGETATION INDICES PRODUCT
             # now with QC layer!
             if val[0] == "indices":
+                depr_msg = ("'indices' is deprecated, and may be removed in"
+                    " the future.  See the Index product group instead.")
+                utils.verbose_out(depr_msg, 2, stream=sys.stderr)
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
                 refl = gippy.GeoImage(allsds)
                 missing = 32767
 
-                if versions[asset] == 6:
+                if version == 6:
                     redimg = refl[7].Read()
                     nirimg = refl[8].Read()
                     bluimg = refl[9].Read()
@@ -505,6 +536,7 @@ class modisData(Data):
                 else:
                     raise Exception('product version not supported')
 
+                # wherever the value is too small, set it to a minimum of 0
                 redimg[redimg < 0.0] = 0.0
                 nirimg[nirimg < 0.0] = 0.0
                 bluimg[bluimg < 0.0] = 0.0
@@ -512,6 +544,7 @@ class modisData(Data):
                 mirimg[mirimg < 0.0] = 0.0
                 swrimg[swrimg < 0.0] = 0.0
 
+                # wherever the value is too saturated, set it to a max of 1.0
                 redimg[(redimg != missing) & (redimg > 1.0)] = 1.0
                 nirimg[(nirimg != missing) & (nirimg > 1.0)] = 1.0
                 bluimg[(bluimg != missing) & (bluimg > 1.0)] = 1.0
@@ -520,7 +553,10 @@ class modisData(Data):
                 swrimg[(swrimg != missing) & (swrimg > 1.0)] = 1.0
 
                 # red, nir
+                # first setup a blank array with everything set to missing
                 ndvi = missing + np.zeros_like(redimg)
+                # compute the ndvi only where neither input is missing, AND
+                # no divide-by-zero error will occur
                 wg = np.where((redimg != missing) & (nirimg != missing) & (redimg + nirimg != 0.0))
                 ndvi[wg] = (nirimg[wg] - redimg[wg]) / (nirimg[wg] + redimg[wg])
 
@@ -1071,3 +1107,46 @@ class modisData(Data):
             del imgout  # to cover for GDAL's internal problems
             utils.verbose_out(' -> {}: processed in {}'.format(
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
+
+        # process some index products (not all, see above)
+        requested_ipt = products.groups()['Index'].keys()
+        if requested_ipt:
+            model_pt = requested_ipt[0] # all should be similar
+            asset, version, _, _, allsds = self.asset_check(model_pt)
+            if asset is None:
+                raise IOError('Found no assets for {}'.format(
+                    requested_ipt))
+            if version < 6:
+                raise IOError('index products require MCD43A4 version 6,'
+                              ' but found {}'.format(version))
+            img = gippy.GeoImage(allsds[7:]) # don't need the QC bands
+
+            # GIPPY uses expected band names to find data:
+            """
+            index (ie img[i])
+            |  band num
+            |   |   wavelength  name
+            0   1   620 - 670   RED
+            1   2   841 - 876   NIR
+            2   3   459 - 479   BLUE
+            3   4   545 - 565   GREEN
+            4   5   1230 - 1250 CIRRUS (not used by gippy)
+            5   6   1628 - 1652 SWIR1
+            6   7   2105 - 2155 SWIR2
+            """
+            # SetBandName goes by band number, not index
+            [img.SetBandName(name, i) for (name, i) in [
+                ('RED',   1), ('NIR',   2), ('BLUE',  3),
+                ('GREEN', 4), ('SWIR1', 6), ('SWIR2', 7)]]
+
+            sensor = self._products[model_pt]['sensor']
+            prod_spec = {pt: self.temp_product_filename(sensor, pt)
+                         for pt in requested_ipt}
+
+            metadata = self.meta_dict()
+            metadata['VERSION'] = '1.0'
+            pt_to_temp_fps = Indices(img, prod_spec, metadata)
+
+            for pt, temp_fp in pt_to_temp_fps.items():
+                archived_fp = self.archive_temp_path(temp_fp)
+                self.AddFile(sensor, pt, archived_fp)

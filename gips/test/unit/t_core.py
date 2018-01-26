@@ -11,27 +11,7 @@ from gips import core
 from gips.data.landsat.landsat import landsatRepository, landsatData
 from gips.inventory import dbinv
 
-def t_version_override(mocker):
-    """Test gips.__init__.detect_version() for correct override of __version__."""
-    env = mocker.patch.object(gips.os, 'environ')
-    # os.environ.get is called by libs as well as detect_version(); fortunately no harm seems to
-    # come from giving them bad results.
-
-    # no override requested
-    env.get.side_effect = lambda key, default=None: default # key not found
-    version_a = gips.detect_version()
-
-    # override requested
-    env.get.side_effect = lambda key, default=None: 'fancy-new-version'
-    version_b = gips.detect_version()
-
-    env.get.assert_has_calls([ # assert two identical calls
-        mock.call('GIPS_OVERRIDE_VERSION', gips.version.__version__) for _ in range(2)
-    ])
-    assert (version_a, version_b) == (gips.version.__version__, 'fancy-new-version')
-
-
-def t_repository_find_tiles_normal_case(mocker):
+def t_repository_find_tiles_normal_case(mocker, orm):
     """Test Repository.find_tiles using landsatRepository as a guinea pig."""
     m_list_tiles = mocker.patch('gips.data.core.dbinv.list_tiles')
     expected = [u'tile1', u'tile2', u'tile3'] # list_tiles returns unicode
@@ -40,7 +20,7 @@ def t_repository_find_tiles_normal_case(mocker):
     assert expected == actual
 
 
-def t_repository_find_tiles_error_case(mocker):
+def t_repository_find_tiles_error_case(mocker, orm):
     """Confirm Repository.find_tiles quits on error."""
     m_list_tiles = mocker.patch('gips.data.core.dbinv.list_tiles')
     m_list_tiles.side_effect = RuntimeError('AAAAAAAAAAH!') # intentionally break list_tiles
@@ -49,7 +29,7 @@ def t_repository_find_tiles_error_case(mocker):
         landsatRepository.find_tiles()
 
 
-def t_repository_find_dates_normal_case(mocker):
+def t_repository_find_dates_normal_case(mocker, orm):
     """Test Repository.find_dates using landsatRepository as a guinea pig."""
     m_list_dates = mocker.patch('gips.data.core.dbinv.list_dates')
     dt = datetime
@@ -71,9 +51,8 @@ def t_repository_find_dates_error_case(mocker):
 
 
 @pytest.mark.parametrize('add_to_db', (False, True))
-def t_data_add_file(mocker, add_to_db):
+def t_data_add_file(orm, mocker, add_to_db):
     """Basic test for Data.AddFile; calls it once then tests its state."""
-    mocker.patch('gips.data.core.orm.use_orm', return_value=True)
     m_uoap = mocker.patch('gips.data.core.dbinv.update_or_add_product')
     t_sensor    = 'test-sensor'
     t_product   = 'test-product'
@@ -92,13 +71,11 @@ def t_data_add_file(mocker, add_to_db):
             and lsd.sensors == {t_product: t_sensor})
 
 
-@pytest.mark.django_db
-def t_data_add_file_repeat(mocker):
+def t_data_add_file_repeat(orm, mocker):
     """Confirm that calling Data.AddFile twice results in overwrite.
 
     Thus, confirm it's possible to replace file entries with new versions.
     """
-    mocker.patch('gips.data.core.orm.use_orm', return_value=True)
     t_tile      = 'test-tile'
     t_date      = datetime(1955, 11, 5)
     t_sensor    = 'test-sensor'
