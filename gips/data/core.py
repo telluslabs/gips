@@ -411,8 +411,8 @@ class Asset(object):
 
     @classmethod
     def start_date(cls, asset):
-        """ Get starting date for this asset """
-        return cls._assets[asset].get('startdate', None)
+        """Get starting date for this asset type."""
+        return cls._assets[asset]['startdate']
 
     @classmethod
     def end_date(cls, asset):
@@ -426,29 +426,41 @@ class Asset(object):
         a_info = cls._assets[asset]
         if 'enddate' in a_info:
             return a_info['enddate']
-        return datetime.now() - timedelta(a_info['latency'])
+        return datetime.now().date() - timedelta(a_info['latency'])
 
     @classmethod
     def available(cls, asset, date):
-        # TODO this method never seems to be called?
-        """ Check availability of an asset for given date """
-        date1 = cls._assets[asset].get(['startdate'], None)
-        date2 = cls._assets[asset].get(['enddate'], None)
-        if date2 is None:
-            date2 = datetime.now() - timedelta(cls._asssets[asset]['latency'])
-        if date1 is None or date2 is None:
-            return False
-        if date < date1 or date > date2:
-            return False
-        return True
+        """Check availability of an asset for given date."""
+        return cls.start_date(asset) <= date <= cls.end_date(asset)
 
     # TODO - combine this with fetch to get all dates
     @classmethod
     def dates(cls, asset, tile, dates, days):
-        """ For a given asset get all dates possible (in repo or not) - used for fetch """
+        """For a given asset get all dates possible (in repo or not).
+
+        Also prunes dates outside the bounds of the asset's valid date range,
+        as given by start_date and end_date.
+        """
         from dateutil.rrule import rrule, DAILY
+        req_start_dt, req_end_dt = dates
+
+        # if the dates are outside asset availability dates, use those instead
+        a_start_dt, a_end_dt = cls.start_date(asset), cls.end_date(asset)
+        start_dt = a_start_dt if a_start_dt > req_start_dt else req_start_dt
+        end_dt   = a_end_dt   if a_end_dt   < req_end_dt   else req_end_dt
+
+        # degenerate case:  There is no valid date range; notify user
+        if start_dt > end_dt:
+            utils.verbose_out(
+                    "Requested dates, {} - {},"
+                    " are not in valid range of {} - {}.".format(
+                            req_start_dt, req_end_dt, a_start_dt, a_end_dt))
+            return []
+        utils.verbose_out('Computed date range for processing: {} - {}'.format(
+                start_dt, end_dt), 5)
+
         # default assumes daily regardless of asset or tile
-        datearr = rrule(DAILY, dtstart=dates[0], until=dates[1])
+        datearr = rrule(DAILY, dtstart=req_start_dt, until=req_end_dt)
         dates = [dt for dt in datearr if days[0] <= int(dt.strftime('%j')) <= days[1]]
         return dates
 
@@ -475,6 +487,8 @@ class Asset(object):
         find them:  [{'basename': bn, 'url': url}, ...]. When nothing is
         avilable, must return [].
         """
+        if not cls.available(asset, date):
+            return []
         bn, url = cls.query_provider(asset, tile, date)
         if (bn, url) == (None, None):
             return []
