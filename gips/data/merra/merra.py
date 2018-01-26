@@ -183,7 +183,7 @@ class merraAsset(Asset):
             self.date = datetime.datetime.strptime(parts[2], '%Y%m%d').date()
 
     @classmethod
-    def query_service(cls, asset, tile, date):
+    def query_provider(cls, asset, tile, date):
         year, month, day = date.timetuple()[:3]
         if asset != "ASM":
             mainurl = "%s/%04d/%02d" % (cls._assets[asset]['url'], year, month)
@@ -197,8 +197,7 @@ class merraAsset(Asset):
             # obtain the list of files
             response = cls.Repository.managed_request(mainurl, verbosity=2)
             if response is None:
-                return []
-        available = []
+                return None, None
         for item in response.readlines():
             # inspect the page and extract the full name of the needed file
             if cpattern.search(item):
@@ -206,11 +205,10 @@ class merraAsset(Asset):
                     continue
                 basename = cpattern.findall(item)[0]
                 url = '/'.join([mainurl, basename])
-                available.append({'basename': basename, 'url': url})
-        if len(available) == 0:
-            msg = 'Unable to find a remote match for {} at {}'
-            utils.verbose_out(msg.format(pattern, mainurl), 4)
-        return available
+                return basename, url
+        utils.verbose_out("Unable to find a remote match for"
+                          " {} at {}".format(pattern, mainurl), 4)
+        return None, None
 
     @classmethod
     def fetch(cls, asset, tile, date):

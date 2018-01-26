@@ -430,8 +430,11 @@ class Asset(object):
 
     @classmethod
     def available(cls, asset, date):
-        """Check availability of an asset for given date."""
-        return cls.start_date(asset) <= date <= cls.end_date(asset)
+        """Check availability of an asset for given date.
+
+        Accepts both dates and datetimes for the `date` parameter."""
+        d = date.date() if type(date) is datetime else date
+        return cls.start_date(asset) <= d <= cls.end_date(asset)
 
     # TODO - combine this with fetch to get all dates
     @classmethod

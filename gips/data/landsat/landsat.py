@@ -363,6 +363,8 @@ class landsatAsset(Asset):
 
     @classmethod
     def query_service(cls, asset, tile, date, pcover=90.0):
+        if not cls.available(asset, date):
+            return []
         available = []
 
         if asset in ['DN', 'SR']:

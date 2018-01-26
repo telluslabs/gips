@@ -247,14 +247,6 @@ class sentinel2Asset(Asset):
             self.style_res['tile-md-re'] = sr['tile-md-re'].format(tileid=self.tile)
             self.style_res['datastrip-md-re'] = sr['datastrip-md-re'].format(tileid=self.tile)
 
-
-    @classmethod
-    def query_service(cls, asset, tile, date, pclouds=100):
-        """Compatibility method; not used by fetch."""
-        bn, url = cls.query_provider(asset, tile, date, pclouds)
-        return [{'basename': bn, 'url': url}]
-
-
     @classmethod
     def query_provider(cls, asset, tile, date, pclouds=100):
         """Search for a matching asset in the Sentinel-2 servers.

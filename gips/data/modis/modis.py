@@ -182,7 +182,7 @@ class modisAsset(Asset):
 
 
     @classmethod
-    def query_service(cls, asset, tile, date):
+    def query_provider(cls, asset, tile, date):
         """Find out from the modis servers what assets are available.
 
         Uses the given (asset, tile, date) tuple as a search key, and
@@ -193,7 +193,7 @@ class modisAsset(Asset):
         if asset == "MCD12Q1" and (month, day) != (1, 1):
             utils.verbose_out("Cannot fetch MCD12Q1:  Land cover data"
                               " are only available for Jan. 1", 1, stream=sys.stderr)
-            return []
+            return None, None
 
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (
@@ -208,9 +208,8 @@ class modisAsset(Asset):
         with utils.error_handler(err_msg):
             response = cls.Repository.managed_request(mainurl, verbosity=2)
             if response is None:
-                return []
+                return None, None
 
-        available = []
         for item in response.readlines():
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
@@ -220,13 +219,10 @@ class modisAsset(Asset):
                     continue
                 basename = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', basename])
-                available.append({'basename': basename, 'url': url})
-
-        if len(available) == 0:
-            err_msg = 'Unable to find remote match for {} at {}'.format(pattern, mainurl)
-            utils.verbose_out(err_msg, 4)
-        return available
-
+                return basename, url
+        utils.verbose_out('Unable to find remote match for '
+                          '{} at {}'.format(pattern, mainurl), 4)
+        return None, None
 
     @classmethod
     def fetch(cls, asset, tile, date):
