@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import sys
 import os
 import glob
 from osgeo import gdal
@@ -10,14 +11,12 @@ from fiona.crs import from_string
 from shapely.geometry import mapping, Polygon
 
 
-from pdb import set_trace
-
-
 STARTDIR = "/titan/data/modis6/tiles"
-DATE = '2004001'
-WIDTH = 2400
-OUTPATH = "new/tiles.shp"
+OUTPATH = "./tiles.shp"
 PROJ = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +a=6371007.181 +b=6371007.181 +units=m +no_defs"
+WIDTH = 2400
+NSTEP = 100
+VALIDATED = True
 
 
 def write_shapefile(data, proj):
@@ -28,12 +27,10 @@ def write_shapefile(data, proj):
     crs = from_string(proj)
     with fiona.open(OUTPATH, 'w', 'ESRI Shapefile', schema, crs=crs) as shp:
         for tileid, coords in data:
-
             arr = np.array(coords)
             xmin, ymin = tuple(arr.min(axis=0))
             xmax, ymax = tuple(arr.max(axis=0))
             bounds = str((xmin, ymin, xmax, ymax))
-
             poly = Polygon(coords)
             shp.write({
                 'geometry': mapping(poly),
@@ -41,36 +38,49 @@ def write_shapefile(data, proj):
             })
 
 
-def main():
-    tiles = glob.glob(os.path.join(STARTDIR, '*'))
-    itile = 0
-    boxes = []
-    for tile in tiles:
-        lcglob = os.path.join(tile, DATE, '*landcover*')
-        try:
-            lcpath = glob.glob(lcglob)[0]
-            print lcpath
-        except:
-            continue
-        gdalfile = gdal.Open(lcpath)
-        name = os.path.splitext(os.path.split(lcpath)[1])[0]
-        tile = name.split('_')[0]
-        x0, dx, dxy, y0, dyx, dy = gdalfile.GetGeoTransform()
-        xs, ys = (x0, y0)
-        coords = [(x0, y0)]
-        for direction in ((1, 0), (0, 1), (-1, 0), (0, -1)):
-            for step in range(10):
-                x1 = x0 + 240.*dx*direction[0]/float(step+1)
-                y1 = y0 + 240.*dy*direction[1]/float(step+1)
-                coords.append((x1, y1))
-                x0, y0 = (x1, y1)
-        coords[-1] = (xs, ys)
-        print tile, coords
-        boxes.append((tile, coords))
-        itile += 1
-
-    write_shapefile(boxes, PROJ)
-
-
 if __name__ == "__main__":
-    main()
+
+    boxes = []
+    tilecount = 0
+    for basepath, dirnames, filenames in os.walk(STARTDIR):
+        for filename in filenames:
+            if filename.endswith('.tif'):
+
+                filepath = os.path.join(basepath, filename)
+                name = os.path.splitext(os.path.split(filepath)[1])[0]
+                tile = name.split('_')[0]
+
+                if VALIDATED == True and tile in [b[0] for b in boxes]:
+                    continue
+
+                gdalfile = gdal.Open(filepath)
+                nx, ny = gdalfile.RasterXSize, gdalfile.RasterYSize
+                if nx != WIDTH:
+                    continue
+
+                print filepath                
+                x0, dx, dxy, y0, dyx, dy = gdalfile.GetGeoTransform()
+                nstep = NSTEP
+                xstep = nx/float(nstep)
+                ystep = ny/float(nstep)
+                xs, ys = (x0, y0)
+                coords = [(x0, y0)]                
+                for direction in ((1, 0), (0, 1), (-1, 0), (0, -1)):
+                    for step in range(nstep):
+                        x1 = x0 + dx*xstep*direction[0]
+                        y1 = y0 + dy*ystep*direction[1]
+                        coords.append((x1, y1))
+                        x0, y0 = (x1, y1)
+
+                coords[-1] = (xs, ys)
+                box = (tile, coords)
+                
+                if (tile, coords) not in boxes:
+                    assert tile not in [b[0] for b in boxes]
+                    assert coords not in [b[1] for b in boxes]
+                    print "appending", tile
+                    boxes.append((tile, coords))
+                    tilecount += 1
+
+    print "writing %d features" % len(boxes)
+    write_shapefile(boxes, PROJ)
