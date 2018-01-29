@@ -120,6 +120,8 @@ class sarAsset(Asset):
     _assets = {
         'alos1': {
             # KC_017-C27N00E100WB1ORSA1.tar.gz     # old
+            'startdate': _launchdate['alos1'],
+            'enddate': datetime.date(2011, 5, 12),
             'pattern': (
                 r'^KC_(?P<userid>[0-9]{3})-'
                 r'(?P<year_or_cycle>[CY])'
@@ -149,6 +151,8 @@ class sarAsset(Asset):
             'hdr_lines': copy.deepcopy(__JAXA_spec_hdr_lines),
         },
         'alos2': {
+            'startdate': _launchdate['alos2'],
+            'latency': 1, # fake; in truth nothing in sar is fetchable
             # KC_999-C045DRN00E115WBDORSA1.tar.gz  # new
             'pattern': (
                 r'^KC_(?P<userid>[0-9]{3})-'
