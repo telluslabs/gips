@@ -145,7 +145,7 @@ class merraAsset(Asset):
             'pattern': _asset_re_pattern % 'const_2d_asm_Nx',
             're_pattern': _asset_re_format_pattern.format(name='const_2d_asm_Nx'),
             'startdate': datetime.date(1980, 1, 1),
-            'latency': None,
+            'enddate': datetime.date(1980, 1, 1),
         }
 
         #'PROFILE': {
@@ -213,12 +213,6 @@ class merraAsset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         """Standard Asset.fetch implementation for downloading assets."""
-        if asset == "ASM" and date.date() != cls._assets[asset]['startdate']:
-            #TODO: which should it be? if message then remove comment
-            #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
-            utils.verbose_out('constants are available for %s only' % cls._assets[asset]['startdate'])
-            return
-
         available_assets = cls.query_service(asset, tile, date)
         retrieved_filenames = []
 

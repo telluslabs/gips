@@ -438,8 +438,8 @@ class Asset(object):
 
     # TODO - combine this with fetch to get all dates
     @classmethod
-    def dates(cls, asset, tile, dates, days):
-        """For a given asset get all dates possible (in repo or not).
+    def dates(cls, asset_type, tile, dates, days):
+        """For a given asset type get all dates possible (in repo or not).
 
         Also prunes dates outside the bounds of the asset's valid date range,
         as given by start_date and end_date.
@@ -448,16 +448,17 @@ class Asset(object):
         req_start_dt, req_end_dt = dates
 
         # if the dates are outside asset availability dates, use those instead
-        a_start_dt, a_end_dt = cls.start_date(asset), cls.end_date(asset)
+        a_start_dt = cls.start_date(asset_type)
+        a_end_dt   = cls.end_date(asset_type)
         start_dt = a_start_dt if a_start_dt > req_start_dt else req_start_dt
         end_dt   = a_end_dt   if a_end_dt   < req_end_dt   else req_end_dt
 
         # degenerate case:  There is no valid date range; notify user
         if start_dt > end_dt:
-            utils.verbose_out(
-                    "Requested dates, {} - {},"
-                    " are not in valid range of {} - {}.".format(
-                            req_start_dt, req_end_dt, a_start_dt, a_end_dt))
+            utils.verbose_out("For {}, requested dates, {} - {},"
+                              " are not in the valid range of {} - {}.".format(
+                                    asset_type, req_start_dt, req_end_dt,
+                                    a_start_dt, a_end_dt))
             return []
         utils.verbose_out('Computed date range for processing: {} - {}'.format(
                 start_dt, end_dt), 5)
