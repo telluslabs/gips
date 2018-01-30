@@ -186,7 +186,7 @@ class modisAsset(Asset):
         """Find out from the modis servers what assets are available.
 
         Uses the given (asset, tile, date) tuple as a search key, and
-        returns a list of dicts:  {'basename': base-filename, 'url': url}
+        returns a tuple:  base-filename, url
         """
         year, month, day = date.timetuple()[:3]
 
@@ -225,27 +225,19 @@ class modisAsset(Asset):
         return None, None
 
     @classmethod
-    def fetch(cls, asset, tile, date):
-        available_assets = cls.query_service(asset, tile, date)
-        retrieved_filenames = []
-        # TODO does modis ever have more than one asset per (a,t,d)?  If not, unloop this method.
-        for asset_info in available_assets:
-            basename = asset_info['basename']
-            url = asset_info['url']
-            outpath = os.path.join(cls.Repository.path('stage'), basename)
+    def fetch(cls, asset, tile, date, basename, url):
+        outpath = os.path.join(cls.Repository.path('stage'), basename)
 
-            with utils.error_handler(
-                    "Asset fetch error ({})".format(asset_info), continuable=True):
-                response = cls.Repository.managed_request(url)
-                if response is None:
-                    return retrieved_filenames # give up now as the rest
-                with open(outpath, 'wb') as fd:
-                    fd.write(response.read())
+        with utils.error_handler(
+                "Asset fetch error ({})".format(asset_info), continuable=True):
+            response = cls.Repository.managed_request(url)
+            if response is None:
+                return []
+            with open(outpath, 'wb') as fd:
+                fd.write(response.read())
 
-                utils.verbose_out('Retrieved %s' % basename, 2)
-                retrieved_filenames.append(outpath)
-
-        return retrieved_filenames
+            utils.verbose_out('Retrieved %s' % basename, 2)
+            return [outpath]
 
 
 # index product types and descriptions

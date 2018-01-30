@@ -384,30 +384,31 @@ class Asset(object):
         date:   datetime.date object to limit search in temporal dimension
         asset:  Asset type string, eg for modis could be 'MCD43A2'
         """
-        criteria = {'driver': cls.Repository.name.lower(), 'tile': tile, 'date': date}
-        if asset is not None:
-            criteria['asset'] = asset
+        a_types = cls._assets.keys() if asset is None else [asset]
+        found = [cls.discover_asset(a, tile, date) for a in a_types]
+        return [a for a in found if a is not None] # lastly filter Nones
+
+    @classmethod
+    def discover_asset(cls, asset_type, tile, date):
+        """Finds an asset for the a-t-d trio and returns an object for it."""
         if orm.use_orm():
             # search for ORM Assets to use for making GIPS Assets
-            return [cls(a.name) for a in dbinv.asset_search(**criteria)]
+            results = dbinv.asset_search(driver=cls.Repository.name.lower(),
+                                    asset=asset_type, tile=tile, date=date)
+            assert len(results) == 1 # sanity check; DB should enforce
+            return cls(results[0].name)
 
         # The rest of this fn uses the filesystem inventory
-        tpath = cls.Repository.data_path(tile, date)
-        if not os.path.isdir(tpath):
-            return []
-        if asset is not None:
-            assets = [asset]
-        else:
-            assets = cls._assets.keys()
-        found = []
-        for a in assets:
-            files = utils.find_files(cls._assets[a]['pattern'], tpath)
-            # more than 1 asset??
-            if len(files) > 1:
-                raise Exception("Duplicate(?) assets found: {}".format(files))
-            if len(files) == 1:
-                found.append(cls(files[0]))
-        return found
+        d_path = cls.Repository.data_path(tile, date)
+        if not os.path.isdir(d_path):
+            return None
+        files = utils.find_files(cls._assets[asset_type]['pattern'], d_path)
+        # Confirm only one asset
+        if len(files) > 1:
+            raise IOError("Duplicate(?) assets found: {}".format(files))
+        if len(files) == 1:
+            return cls(files[0])
+        return None
 
     @classmethod
     def start_date(cls, asset):
@@ -500,7 +501,7 @@ class Asset(object):
 
 
     @classmethod
-    def fetch(cls, asset, tile, date):
+    def fetch(cls, *args, **kwargs):
         """ Fetch stub """
         raise NotImplementedError("Fetch not supported for this data source")
 
@@ -1071,12 +1072,24 @@ class Data(object):
             for t in tiles:
                 asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                 for d in asset_dates:
+                    found_asset = cls.Asset.discover_asset(a, t, d)
+                    queried_afn, url = cls.Asset.query_provider(a, t, d)
+                    if queried_afn is None: # nothing remote; done
+                        continue
                     # if we don't have it already, or if update (force) flag
-                    if not cls.Asset.discover(t, d, a) or update == True:
+                    need_to_fetch = found_asset is None or (
+                        update and found_asset.updated(cls.Asset(queried_afn)))
+                    if need_to_fetch:
                         date_str = d.strftime("%y-%m-%d")
                         msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
                         with utils.error_handler(msg_prefix, continuable=True):
-                            cls.Asset.fetch(a, t, d)
+                            # sort of a feature toggle:  Not all drivers have
+                            # the new option, so fall back to a call that works
+                            # for them.  Revise later when all are updated.
+                            try:
+                                cls.Asset.fetch(a, t, d, queried_afn, url)
+                            except TypeError:
+                                cls.Asset.fetch(a, t, d)
                             # fetched may contain both fetched things and unfetchable things
                             fetched.append((a, t, d))
         return fetched
