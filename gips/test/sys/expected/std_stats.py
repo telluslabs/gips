@@ -164,12 +164,12 @@ expectations['modis'] = {
 
     # t_stats[clouds] recording:
     'clouds':
-	[('clouds_stats.txt',
-	  'text-full',
-	  ['date min max mean sd skew count\n',
-	   '2012-336 0.0 1.0 0.974299 0.158242 -5.9946 221002.0 \n',
-	   '2012-337 0.0 1.0 0.987498 0.111112 -8.7749 221002.0 \n',
-	   '2012-338 0.0 1.0 0.151446 0.358483 1.9446 216506.0 \n'])],
+        [('clouds_stats.txt',
+          'text-full',
+          ['date min max mean sd skew count\n',
+           '2012-336 0.0 1.0 0.974299 0.158242 -5.9946 221002.0 \n',
+           '2012-337 0.0 1.0 0.987498 0.111112 -8.7749 221002.0 \n',
+           '2012-338 0.0 1.0 0.151446 0.358483 1.9446 216506.0 \n'])],
 
     # t_stats[temp] recording:
     'temp':
