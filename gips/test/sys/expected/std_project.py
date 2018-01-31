@@ -88,36 +88,6 @@ expectations['modis'] = {
           'sha256',
           '23a72df39da253ac07de5a9e98c88f40e3335f3b1b779ccf91153d1d5573a780')],
 
-    # t_project[snow] recording:
-    'snow':
-        [('0/2012336_MCD_snow.tif',
-          'hash',
-          'sha256',
-          'b3eeca8fc933d2f43c2d96e869956447d9556737181635167744d0d420dfd813'),
-         ('0/2012338_MCD_snow.tif',
-          'hash',
-          'sha256',
-          '98a38e1a75fcea269bd75a952cde9d84af86b14ddb928e4777ff812dba8befbe'),
-         ('0/2012337_MCD_snow.tif',
-          'hash',
-          'sha256',
-          'da26696be559bb79c399ad18942ac629a9604d857dd7fc461fd76c4577a06303')],
-
-    # t_project[fsnow] recording:
-    'fsnow':
-        [('0/2012338_MCD_fsnow.tif',
-          'hash',
-          'sha256',
-          'f2efdf504e004caf05563f3402fdde7e771351d7d93de5970af0a54d0b5bd2c2'),
-         ('0/2012336_MCD_fsnow.tif',
-          'hash',
-          'sha256',
-          'a9d2ea29a6d77325246e0baaf298d16cb84d6003a19faed8ba162b475703f563'),
-         ('0/2012337_MCD_fsnow.tif',
-          'hash',
-          'sha256',
-          'e8465aa3764c60b21a943f3e078d93c0484272292f075455693ea2084971ace4')],
-
     # t_project[crcm] recording:
     'crcm':
         [('0/2012337_MCD_crcm.tif',
