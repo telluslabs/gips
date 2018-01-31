@@ -606,32 +606,28 @@ class modisData(Data):
                 imgout.SetBandName('EVI', 6)
                 imgout.SetBandName('QC', 7)
 
-            # CLOUD MASK PRODUCT
             if val[0] == "clouds":
-                VERSION = "1.0"
-                meta['VERSION'] = VERSION
-
+                # cloud mask product
+                meta['VERSION'] = '1.0'
                 img = gippy.GeoImage(allsds)
 
                 data = img[0].Read()
                 clouds = np.zeros_like(data)
 
-                clouds[data == 0] = 127
-                clouds[data == 1] = 127
-                clouds[data == 11] = 127
-                clouds[data == 25] = 0
-                clouds[data == 37] = 0
-                clouds[data == 39] = 0
-                clouds[data == 50] = 1
-                clouds[data == 100] = 0
-                clouds[data == 200] = 0
-                clouds[data == 254] = 127
-                clouds[data == 255] = 127
+                # See table 3 in the user guide:
+                # https://nsidc.org/sites/nsidc.org/files/files/
+                #   MODIS-snow-user-guide-C6.pdf
+                nodata = 127
+                for v in [200, 201, 211, 254, 255]:
+                    clouds[data == v] = nodata
+                clouds[data == 237] = 0
+                clouds[data == 239] = 0
+                clouds[data == 250] = 1
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
                 del img
-                imgout.SetNoData(127)
+                imgout.SetNoData(nodata)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
                 imgout.SetBandName('Cloud Cover', 1)
