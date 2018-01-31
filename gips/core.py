@@ -142,6 +142,12 @@ class SpatialExtent(object):
         return self.coverage.keys()
 
     @property
+    def wkt(self):
+        fname = self.feature[0]
+        feature = open_vector(fname)[0]
+        return feature.WKT()
+
+    @property
     def available_dates(self):
         """ Get list of all dates for these tiles """
         dates = []

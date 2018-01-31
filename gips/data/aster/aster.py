@@ -40,8 +40,10 @@ import xml.etree.ElementTree as ET
 import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
-from gips.utils import VerboseOut, settings
+from gips.utils import VerboseOut, settings, open_vector
 from gips import utils
+
+from shapely.wkt import loads
 
 from pyCMR.pyCMR import CMR
 
@@ -60,6 +62,26 @@ def get_temporal_string(date):
     return temporal_str
 
 
+def reproject_spatial_extent_wkt(spatent, target_epsg):
+    from osgeo import ogr, osr
+    vector = open_vector(spatent.feature[0])
+    shp = ogr.Open(vector.Filename())
+    if vector.LayerName() == '':
+        layer = shp.GetLayer(0)
+    else:
+        layer = shp.GetLayer(vector.LayerName())
+    # create and warp site geometry
+    ogrgeom = ogr.CreateGeometryFromWkt(spatent.wkt)
+    src = osr.SpatialReference(vector.Projection())
+    target = osr.SpatialReference()
+    target.ImportFromEPSG(target_epsg)
+    transform = osr.CoordinateTransformation(src, target)
+    ogrgeom.Transform(transform)
+
+    trans_wkt = ogrgeom.ExportToWkt()
+    return trans_wkt
+
+
 class asterRepository(Repository):
     name = 'Aster'
     description = ('Advanced Spaceborne Thermal Emission and Reflection '
@@ -71,11 +93,59 @@ class asterRepository(Repository):
     @classmethod
     def feature2tile(cls, feature):
         """ convert tile field attributes to tile identifier """
+        print("feature2tile is happening")
         fldindex_h = feature.GetFieldIndex("h")
         fldindex_v = feature.GetFieldIndex("v")
         h = str(int(feature.GetField(fldindex_h))).zfill(2)
         v = str(int(feature.GetField(fldindex_v))).zfill(2)
         return "h%sv%s" % (h, v)
+
+    @classmethod
+    def vector2tiles(cls, vector, pcov=0.0, ptile=0.0, tilelist=None):
+        """ Return matching tiles and coverage % for provided vector """
+        from osgeo import ogr, osr
+
+        # open tiles vector
+        print("Tiles setting:", cls.get_setting('tiles'))
+        v = open_vector(cls.get_setting('tiles'))
+        shp = ogr.Open(v.Filename())
+        if v.LayerName() == '':
+            layer = shp.GetLayer(0)
+        else:
+            layer = shp.GetLayer(v.LayerName())
+
+        # create and warp site geometry
+        ogrgeom = ogr.CreateGeometryFromWkt(vector.WKT())
+        srs = osr.SpatialReference(vector.Projection())
+        trans = osr.CoordinateTransformation(srs, layer.GetSpatialRef())
+        ogrgeom.Transform(trans)
+        # convert to shapely
+        geom = loads(ogrgeom.ExportToWkt())
+
+        # find overlapping tiles
+        tiles = {}
+        layer.SetSpatialFilter(ogrgeom)
+        layer.ResetReading()
+        feat = layer.GetNextFeature()
+        while feat is not None:
+            tgeom = loads(feat.GetGeometryRef().ExportToWkt())
+            if tgeom.intersects(geom):
+                area = geom.intersection(tgeom).area
+                if area != 0:
+                    tile = cls.feature2tile(feat)
+                    tiles[tile] = (area / geom.area, area / tgeom.area)
+            feat = layer.GetNextFeature()
+
+        # remove any tiles not in tilelist or that do not meet thresholds for % cover
+        remove_tiles = []
+        if tilelist is None:
+            tilelist = tiles.keys()
+        for t in tiles:
+            if (tiles[t][0] < (pcov / 100.0)) or (tiles[t][1] < (ptile / 100.0)) or t not in tilelist:
+                remove_tiles.append(t)
+        for t in remove_tiles:
+            tiles.pop(t, None)
+        return tiles
 
 
 class asterAsset(Asset):
@@ -113,7 +183,7 @@ class asterAsset(Asset):
     def query_service(cls, asset, feature, date):
         """Find out from the aster servers what assets are available.
 
-        Uses the given (asset, tile, date) tuple as a search key, and
+        Uses the given (asset, feature, date) tuple as a search key, and
         returns a list of dicts:  {'basename': base-filename, 'url': url}
 
         Assuming "feature" is WKT (for now)
@@ -131,6 +201,13 @@ class asterAsset(Asset):
         shape = shapely.wkt.loads(feature)
         poly_string = ""
         point_array = np.asarray(shape.exterior.coords)
+        print("Pointarr", point_array)
+
+        # Check if shape is counter-clockwise
+        if point_array[0][0] < point_array[1][0]:
+            point_array = point_array[::-1]
+            print("Reversed", point_array)
+
         for pair in point_array:
             poly_string += "%f,%f," % (pair[0], pair[1])
         poly_string = poly_string[:-1]
@@ -243,6 +320,14 @@ class asterData(Data):
     _productgroups = {
     }
     _products = {
+        'tempProduct': {
+            'description': 'A placeholder product',
+            'assets': ['L1T'],
+            'bands': [{'name': 'temp', 'units': 'none' }],
+            'category': 'Temporary Stuff',
+            'startdate': datetime.date(2000,1,1),
+            'latency': 1,
+        }
     }
 
     @Data.proc_temp_dir_manager
@@ -251,6 +336,11 @@ class asterData(Data):
         products = super(asterData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
+
+    @classmethod
+    def findTiles(cls, asset, spatent, textent):
+        return
+
 
     @classmethod
     def query_service(cls, products, spatent, textent, update=False, force=False, grouped=False):
@@ -269,9 +359,21 @@ class asterData(Data):
             response  = []
         for p in products:
             assets = cls.products2assets([p])
-            for t in spatent.tiles:
-                for a in assets:
-                    asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
+
+            # Add stuff here?
+            for a in assets:
+                asset_date = cls.Asset.dates(a, None, textent.datebounds, textent.daybounds)
+                wkt = reproject_spatial_extent_wkt(spatent, 4326)
+                results = cls.Asset.query_service(a, wkt, asset_date[0].strftime("%F"))
+                print(results)
+
+                # Calculate coverage
+
+                # Add to spatent
+
+                print("Asset_dates:", asset_date)
+                for t in spatent.tiles:
+                    #asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                     for d in asset_dates:
                         # if we don't have it already, or if 'update' flag
                         local_assets = cls.Asset.discover(t, d, a)
@@ -301,12 +403,12 @@ class asterData(Data):
                                         'date': d
                                     }
 
-                                    # Insert geometry into the database
-                                    dbinv.update_or_add_geometry(
-                                        cls.name.lower(),
-                                        aobj.get_geometry(),
-                                        aobj.get_geometry_name()
-                                    )
+                                    ## Insert geometry into the database
+                                    #dbinv.update_or_add_geometry(
+                                    #    cls.name.lower(),
+                                    #    aobj.get_geometry(),
+                                    #    aobj.get_geometry_name()
+                                    #)
                                     # Update remote assets
                                     update_or_add_asset(
                                         cls.name.lower(),
@@ -328,10 +430,11 @@ class asterData(Data):
                                             response[(p,t,d)] = [rec]
                                     else:
                                         response.append(rec)
-        return response
+            return response
 
     @classmethod
     def fetch(cls, products, spatent, textent, update=False):
+        print("asterData.fetch", products, spatent, textent)
         available_assets = cls.query_service(
             products, spatent, textent, update
         )
