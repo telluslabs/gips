@@ -65,15 +65,14 @@ def main():
                     #         quotechar='|', quoting=csv.QUOTE_MINIMAL)
                     # use utils.settings().STATS_CONF
                     writer = csv.writer(stats_fo)
-
-                    # print header
                     writer.writerow(header)
 
                     # print date, band description, and stats
                     for date in valid_dates:
-                        print '  date: {}'.format(date)
                         img = inv[date].open(p_type)
                         date_str = date.strftime('%Y-%j')
+                        utils.verbose_out('Computing stats for {} {}'.format(
+                                p_type, date_str), 2)
                         for b in img:
                             stats = [str(s) for s in b.Stats()]
                             writer.writerow(
