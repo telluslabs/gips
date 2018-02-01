@@ -136,6 +136,10 @@ class SpatialExtent(object):
             self.sitename = 'tiles'
         self.coverage = tiles
 
+
+    def set_tiles(self, tiles):
+        self.coverage = tiles
+
     @property
     def tiles(self):
         """ List of tile ids """

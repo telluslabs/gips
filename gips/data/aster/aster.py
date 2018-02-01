@@ -41,6 +41,7 @@ import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, settings, open_vector
+from gips.inventory import dbinv
 from gips import utils
 
 from shapely.wkt import loads
@@ -82,6 +83,19 @@ def reproject_spatial_extent_wkt(spatent, target_epsg):
     return trans_wkt
 
 
+def get_spatial_extent_projection(spatent):
+    from osgeo import ogr, osr
+    vector = open_vector(spatent.feature[0])
+    shp = ogr.Open(vector.Filename())
+    if vector.LayerName() == '':
+        layer = shp.GetLayer(0)
+    else:
+        layer = shp.GetLayer(vector.LayerName())
+    # create and warp site geometry
+    src = osr.SpatialReference(vector.Projection())
+    return src
+
+
 class asterRepository(Repository):
     name = 'Aster'
     description = ('Advanced Spaceborne Thermal Emission and Reflection '
@@ -93,7 +107,6 @@ class asterRepository(Repository):
     @classmethod
     def feature2tile(cls, feature):
         """ convert tile field attributes to tile identifier """
-        print("feature2tile is happening")
         fldindex_h = feature.GetFieldIndex("h")
         fldindex_v = feature.GetFieldIndex("v")
         h = str(int(feature.GetField(fldindex_h))).zfill(2)
@@ -104,9 +117,8 @@ class asterRepository(Repository):
     def vector2tiles(cls, vector, pcov=0.0, ptile=0.0, tilelist=None):
         """ Return matching tiles and coverage % for provided vector """
         from osgeo import ogr, osr
-
+        return {}
         # open tiles vector
-        print("Tiles setting:", cls.get_setting('tiles'))
         v = open_vector(cls.get_setting('tiles'))
         shp = ogr.Open(v.Filename())
         if v.LayerName() == '':
@@ -156,7 +168,7 @@ class asterAsset(Asset):
 
     _assets = {
         'L1T': {
-            'pattern': '\d{4}\.\d{2}\.\d{2}/.{47}.hdf',
+            'pattern': 'AST_L1T_\d{17}_\d{14}_\d+\.hdf',
             'url': 'https://e4ftl01.cr.usgs.gov/ASTER_L1T/ASTT/AST_L1T.003/',
         }
     }
@@ -173,10 +185,22 @@ class asterAsset(Asset):
 
         self.asset = parts[1]
 
-        year = parts[2][7:10]
+        year = parts[2][7:11]
         month = parts[2][3:5]
         dom = parts[2][5:7]
         self.date = datetime.datetime.strptime(year + month + dom, "%Y%m%d")
+        self.tile = os.path.splitext(bname)[0]
+
+
+    @classmethod
+    def get_url(cls, asset, date, tilename):
+        year = date.year
+        month = str(date.month).zfill(2)
+        day = str(date.day).zfill(2)
+        url = "%s%d.%s.%s/%s.hdf" % (
+                cls._assets[asset]['url'], year, month, day, tilename
+        )
+        return url
 
 
     @classmethod
@@ -189,6 +213,7 @@ class asterAsset(Asset):
         Assuming "feature" is WKT (for now)
         Date is in format YYYY-MM-DD
         """
+        mainurl = 'http://e4ftl01.cr.usgs.gov/'
         # Date format is yyyy-MM-ddTHH:mm:ssZ
         date = datetime.datetime.strptime(date, "%Y-%m-%d")
         temporal_str = get_temporal_string(date)
@@ -201,12 +226,10 @@ class asterAsset(Asset):
         shape = shapely.wkt.loads(feature)
         poly_string = ""
         point_array = np.asarray(shape.exterior.coords)
-        print("Pointarr", point_array)
 
         # Check if shape is counter-clockwise
         if point_array[0][0] < point_array[1][0]:
             point_array = point_array[::-1]
-            print("Reversed", point_array)
 
         for pair in point_array:
             poly_string += "%f,%f," % (pair[0], pair[1])
@@ -215,7 +238,7 @@ class asterAsset(Asset):
         # MODIS warning, might still be relevant
         if datetime.datetime.today().date().weekday() == 2:
             err_msg = ("Error downloading on a Wednesday;"
-                       " possible planned MODIS provider downtime: " + mainurl)
+                       " possible planned ASTER provider downtime: " + mainurl)
         else:
             err_msg = "Error downloading: "
 
@@ -232,7 +255,6 @@ class asterAsset(Asset):
                 return []
         available = []
 
-        mainurl = 'http://e4ftl01.cr.usgs.gov/'
         for item in results: # Should be 1
             # Extract URL and file name from search results
             basename = item['Granule']['DataGranule']['ProducerGranuleId']
@@ -252,6 +274,9 @@ class asterAsset(Asset):
         return available
 
 
+    def get_geometry_name(self):
+        return os.path.splitext(os.path.basename(self.filename))[0]
+
     def get_geometry(self):
         """Get the geometry of the asset
 
@@ -259,12 +284,7 @@ class asterAsset(Asset):
         """
 
         bname = os.path.basename(self.filename)
-        year = self.date.year
-        month = str(self.date.month).zfill(2)
-        day = str(self.date.day).zfill(2)
-        url = "%s%d.%s.%s/%s.xml" % (
-                self._assets[self.asset]['url'], year, month, day, bname
-        )
+        url = self.get_url(self.asset, self.date, bname) + ".xml"
 
         xmlfile = self.Repository.managed_request(url, verbosity=2)
         data = xmlfile.read()
@@ -290,24 +310,25 @@ class asterAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        available_assets = cls.query_service(asset, tile, date)
         retrieved_filenames = []
-        # TODO does aster ever have more than one asset per (a,t,d)?  If not, unloop this method.
-        for asset_info in available_assets:
-            basename = asset_info['basename']
-            url = asset_info['url']
-            outpath = os.path.join(cls.Repository.path('stage'), basename)
+        year = date.year
+        month = str(date.month).zfill(2)
+        day = str(date.day).zfill(2)
+        url = "%s%d.%s.%s/%s.hdf" % (
+                cls._assets[asset]['url'], year, month, day, tile
+        )
+        outpath = os.path.join(cls.Repository.path('stage'), tile + ".hdf")
 
-            with utils.error_handler(
-                    "Asset fetch error ({})".format(asset_info), continuable=True):
-                response = cls.Repository.managed_request(url)
-                if response is None:
-                    return retrieved_filenames # give up now as the rest
-                with open(outpath, 'wb') as fd:
-                    fd.write(response.read())
+        with utils.error_handler(
+                "Asset fetch error ({})".format(asset), continuable=True):
+            response = cls.Repository.managed_request(url)
+            if response is None:
+                return retrieved_filenames # give up now as the rest
+            with open(outpath, 'wb') as fd:
+                fd.write(response.read())
 
-                utils.verbose_out('Retrieved %s' % basename, 2)
-                retrieved_filenames.append(outpath)
+            utils.verbose_out('Retrieved %s' % tile, 2)
+            retrieved_filenames.append(outpath)
 
         return retrieved_filenames
 
@@ -357,39 +378,52 @@ class asterData(Data):
             response = {}
         else:
             response  = []
+        tiles = {}
         for p in products:
             assets = cls.products2assets([p])
 
             # Add stuff here?
             for a in assets:
-                asset_date = cls.Asset.dates(a, None, textent.datebounds, textent.daybounds)
+                asset_dates = cls.Asset.dates(a, None, textent.datebounds, textent.daybounds)
                 wkt = reproject_spatial_extent_wkt(spatent, 4326)
-                results = cls.Asset.query_service(a, wkt, asset_date[0].strftime("%F"))
-                print(results)
+                geom_shape = loads(wkt)
 
-                # Calculate coverage
+                for d in asset_dates:
+                    results = cls.Asset.query_service(a, wkt, d.strftime("%F"))
 
-                # Add to spatent
+                    geom_shape = loads(wkt)
 
-                print("Asset_dates:", asset_date)
-                for t in spatent.tiles:
-                    #asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                    for d in asset_dates:
+                    # Add resultst to geometry table
+                    for r in results:
+                        aobj = cls.Asset(r['basename'])
+                        aobj_geom = aobj.get_geometry()
+                        tile_name = aobj.get_geometry_name()
+                        dbinv.update_or_add_geometry(
+                            cls.name.lower(),
+                            aobj_geom,
+                            tile_name
+                        )
+
+                        # Calculate coverage
+                        tile_shape = loads(aobj_geom)
+                        area = geom_shape.intersection(tile_shape).area
+                        tiles[tile_name] = (area / geom_shape.area, area / tile_shape.area)
+                        # Add to spatent
                         # if we don't have it already, or if 'update' flag
-                        local_assets = cls.Asset.discover(t, d, a)
+                        local_assets = cls.Asset.discover(tile_name, d, a)
                         if force or len(local_assets) == 0 or update:
                             date_str = d.strftime("%F")
                             msg_prefix = (
                                 'query_service for {}, {}, {}'
-                                .format(a, t, date_str)
+                                .format(a, tile_name, date_str)
                             )
                             with utils.error_handler(msg_prefix, continuable=False):
-                                resp = cls.Asset.query_service(a, t, d)
-                                if len(resp) == 0:
-                                    continue
-                                elif len(resp) > 1:
-                                    raise Exception('should only be one asset')
-                                aobj = cls.Asset(resp[0]['basename'])
+                                #resp = cls.Asset.query_service(a, t, d)
+                                #if len(resp) == 0:
+                                #    continue
+                                #elif len(resp) > 1:
+                                #    raise Exception('should only be one asset')
+                                aobj = cls.Asset(tile_name)
 
                                 if (force or len(local_assets) == 0 or
                                     (len(local_assets) == 1 and
@@ -398,19 +432,13 @@ class asterData(Data):
                                     rec = {
                                         'product': p,
                                         'sensor': aobj.sensor,
-                                        'tile': t,
+                                        'tile': tile_name,
                                         'asset': a,
                                         'date': d
                                     }
 
-                                    ## Insert geometry into the database
-                                    #dbinv.update_or_add_geometry(
-                                    #    cls.name.lower(),
-                                    #    aobj.get_geometry(),
-                                    #    aobj.get_geometry_name()
-                                    #)
                                     # Update remote assets
-                                    update_or_add_asset(
+                                    dbinv.update_or_add_asset(
                                         cls.name.lower(),
                                         a,
                                         aobj.get_geometry_name(),
@@ -424,17 +452,17 @@ class asterData(Data):
                                     # grouped by (p,t,d) there is a fair bit of
                                     # duplicated info this way, but oh well
                                     if grouped:
-                                        if (p,t,d) in response:
-                                            response[(p,t,d)].append(rec)
+                                        if (p,tile_name,d) in response:
+                                            response[(p,tile_name,d)].append(rec)
                                         else:
-                                            response[(p,t,d)] = [rec]
+                                            response[(p,tile_name,d)] = [rec]
                                     else:
                                         response.append(rec)
+            spatent.set_tiles(tiles)
             return response
 
     @classmethod
     def fetch(cls, products, spatent, textent, update=False):
-        print("asterData.fetch", products, spatent, textent)
         available_assets = cls.query_service(
             products, spatent, textent, update
         )
