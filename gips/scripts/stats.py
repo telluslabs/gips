@@ -60,11 +60,8 @@ def main():
             for p_type, valid_dates in p_dates.items():
                 stats_fn = os.path.join(projdir, p_type + '_stats.txt')
                 with open(stats_fn, 'w') as stats_fo:
-                    # TODO configurable options:
-                    # spamwriter = csv.writer(csvfile, delimiter=' ',
-                    #         quotechar='|', quoting=csv.QUOTE_MINIMAL)
-                    # use utils.settings().STATS_CONF
-                    writer = csv.writer(stats_fo)
+                    sf = getattr(utils.settings(), 'STATS_FORMAT', {})
+                    writer = csv.writer(stats_fo, **sf)
                     writer.writerow(header)
 
                     # print date, band description, and stats
