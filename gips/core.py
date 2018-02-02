@@ -135,6 +135,8 @@ class SpatialExtent(object):
             tiles = {t: (1, 1) for t in tiles}
             self.sitename = 'tiles'
         self.coverage = tiles
+        self.pcov = pcov
+        self.ptile = ptile
 
 
     def set_tiles(self, tiles):

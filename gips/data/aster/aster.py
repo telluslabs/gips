@@ -407,7 +407,10 @@ class asterData(Data):
                         # Calculate coverage
                         tile_shape = loads(aobj_geom)
                         area = geom_shape.intersection(tile_shape).area
-                        tiles[tile_name] = (area / geom_shape.area, area / tile_shape.area)
+                        tile_coverage = (area / geom_shape.area, area / tile_shape.area)
+                        if (tile_coverage[0] < (spatent.pcov / 100.0)) or (tile_coverage[1] < (spatent.ptile / 100.0)):
+                            continue
+                        tiles[tile_name] = tile_coverage
                         # Add to spatent
                         # if we don't have it already, or if 'update' flag
                         local_assets = cls.Asset.discover(tile_name, d, a)
