@@ -159,10 +159,9 @@ class Tiles(object):
             cov = asset_coverage[a]
             if cov > 0:
                 text = self._colorize_product(
-                    '  {:>4.1f}%   '.format(cov), colors
-                )
+                        '  {:>4.1f}%  '.format(cov), colors)
             else:
-                text = '          '
+                text = ' ' * 10
             sys.stdout.write(text)
 
         products = [p for t in self.tiles for p in self.tiles[t].products]
@@ -173,5 +172,5 @@ class Tiles(object):
                 prods.append(p)
         for p in sorted(set(prods)):
             text = self._colorize_product(p, colors)
-            sys.stdout.write('  ' + text)
+            sys.stdout.write(' ' + text)
         sys.stdout.write('\n')
