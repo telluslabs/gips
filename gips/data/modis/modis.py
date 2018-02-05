@@ -56,14 +56,8 @@ class modisRepository(Repository):
     # NASA assets require special authentication
     _manager_url = "https://urs.earthdata.nasa.gov"
 
-    @classmethod
-    def feature2tile(cls, feature):
-        """ convert tile field attributes to tile identifier """
-        fldindex_h = feature.GetFieldIndex("h")
-        fldindex_v = feature.GetFieldIndex("v")
-        h = str(int(feature.GetField(fldindex_h))).zfill(2)
-        v = str(int(feature.GetField(fldindex_v))).zfill(2)
-        return "h%sv%s" % (h, v)
+    # the default tile ID
+    _tile_attribute = "tileid"
 
 
 class modisAsset(Asset):
