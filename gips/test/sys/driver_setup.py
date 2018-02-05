@@ -18,6 +18,7 @@ STD_ARGS = {
     'merra': ('merra', '-s', nh_shp, '-d', '2015-135', '-v', '4'),
     'prism': ('prism', '-s', nh_shp, '-d', '1982-12-01,1982-12-03', '-v4'),
     'landsat': ('landsat', '-s', nh_shp, '-d', '2017-08-01', '-v4'),
+    'aster': ('aster', '-s', nh_shp, '-d', '2010-09-07', '-v4'),
     # Here down, not NH shapefile:
     'aod': ('aod', '-s', util.NE_SHP_PATH, '-d', '2017-004,2017-006', '-v4'),
     'sentinel2': ('sentinel2', '-s', util.DURHAM_SHP_PATH, '-d2017-010', '-v4'),
@@ -36,8 +37,8 @@ sar_asset_fns = [
 
 def special_cases(driver):
     # handle modis scheduled downtime case
-    if driver == 'modis' and datetime.datetime.today().date().weekday() == 2:
-        raise RuntimeError("It's Wednesday; modis downloads are likely to fail.")
+    if (driver == 'modis' or driver == 'aster') and datetime.datetime.today().date().weekday() == 2:
+        raise RuntimeError("It's Wednesday; modis and aster downloads are likely to fail.")
     # sar isn't fetchable; get it from the artifact server
     # TODO emplace sar assets in the existing collection of system test artifacts
     # and write code that works for all of these artifacts

@@ -338,9 +338,12 @@ def params_from_expectations(expectations, mark_spec=None):
 
     for driver, prod_expectations in expectations.items():
         dm = get_mark_spec(driver) # get driver-scoped marks
-        for product in prod_expectations:
-            dpm = get_mark_spec((driver, product)) # get product-scoped marks
-            params.append(pytest.param(driver, product, marks=(dm + dpm)))
+        if isinstance(prod_expectations, list): # Driver-only test case
+            params.append(driver)
+        else:
+            for product in prod_expectations:
+                dpm = get_mark_spec((driver, product)) # get product-scoped marks
+                params.append(pytest.param(driver, product, marks=(dm + dpm)))
     return params
 
 def record_path():
@@ -360,9 +363,12 @@ def sys_test_wrapper(request, path):
     """
     rp = record_path() # does the user want record mode?  If so, save it where?
     driver = request.node.callspec.params['driver']
-    product = request.node.callspec.params['product']
+    product = request.node.callspec.params.get('product')
     # expected is an array of tuples:  (filename, type, data, data, data . . .)
-    expected = request.module.expectations[driver][product]
+    if product:
+        expected = request.module.expectations[driver][product]
+    else:
+        expected = request.module.expectations[driver]
     expected_filenames = [e[0] for e in expected]
 
     if not rp:
@@ -383,7 +389,7 @@ def sys_test_wrapper(request, path):
 
     yield bool(rp), wrapped_runner
 
-    if rp:
+    if rp and product:
         final_files = find_files(path)
         created_files = set(final_files) - set(initial_files)
         # when recording the path, don't capture the directory of interest
@@ -399,6 +405,20 @@ def sys_test_wrapper(request, path):
             print('    ', end='', file=rfo)
             print('\n    '.join(pretty_hashes.split('\n')), end='', file=rfo)
             print(',', file=rfo)
+    elif rp:
+        final_files = find_files(path)
+        created_files = set(final_files) - set(initial_files)
+        # when recording the path, don't capture the directory of interest
+        rel_cf = [os.path.relpath(fp, path) for fp in created_files]
+
+        cf_expectations = [generate_expectation(fn, path) for fn in rel_cf]
+        print("Recording outcome to {}.".format(rp))
+        with open(rp, 'a') as rfo:
+            print('\n# {}[{}] recording:'.format(request.function.__name__, driver),
+                  file=rfo)
+            pretty_hashes = pprint.pformat(cf_expectations)
+            print('    ', end='', file=rfo)
+            print('\n    '.join(pretty_hashes.split('\n')), end='', file=rfo)
 
 @pytest.yield_fixture
 def repo_wrapper(request):
