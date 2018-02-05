@@ -68,7 +68,6 @@ def binmask(arr, bit):
     """
     return arr & (1 << (bit - 1)) == (1 << (bit - 1))
 
-
 class landsatRepository(Repository):
     """ Singleton (all class methods) to be overridden by child data classes """
     name = 'Landsat'
@@ -763,6 +762,39 @@ class landsatData(Data):
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
 
+    def bqa_image(self, a_type):
+        """Computes the image for the BQA product."""
+        qadata = self._readqa(a_type).Read()
+        notfilled = ~binmask(qadata, 1)
+        if a_type == 'DN':
+            # DN QA band:  https://landsat.usgs.gov/qualityband
+            notdropped = ~binmask(qadata, 2)
+            notterrain = ~binmask(qadata, 3)
+            # TODO wtf ~x & y?
+            notsnow   = ~binmask(qadata, 12) & binmask(qadata, 11)
+            notcirrus = ~binmask(qadata, 14) & binmask(qadata, 13)
+            notcloud  = ~binmask(qadata, 16) & binmask(qadata, 15)
+        elif a_type == 'DN':
+            # C1 QA band:  https://landsat.usgs.gov/collectionqualityband
+            notdropped = ~binmask(qadata, 2) # TODO not there at all?
+            notterrain = ~binmask(qadata, 2)
+            # TODO wtf ~x & y?
+            # TODO is "snow/ice confidence" same as "snow/ice" from DN?
+            notsnow   = ~binmask(qadata, 11) & binmask(qadata, 10)
+            notcirrus = ~binmask(qadata, 13) & binmask(qadata, 12)
+            # TODO there's cloud confidence and cloud shadow confidence; use both?
+            notcloud  = ~binmask(qadata, 16) & binmask(qadata, 15)
+        else:
+            raise ValueError('{} not supported for bqa product'.format(a_type))
+
+        allgood = (notfilled * notdropped * notterrain * notcirrus * notcloud)
+        imgout[0].Write(allgood.astype('int16'))
+        imgout[1].Write(notfilled.astype('int16'))
+        imgout[2].Write(notdropped.astype('int16'))
+        imgout[3].Write(notterrain.astype('int16'))
+        imgout[4].Write(notsnow.astype('int16'))
+        imgout[5].Write(notcirrus.astype('int16'))
+        imgout[6].Write(notcloud.astype('int16'))
 
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
@@ -1115,21 +1147,7 @@ class landsatData(Data):
                         if 'LC8' not in self.sensor_set:
                             continue
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 7)
-                        qaimg = self._readqa(asset)
-                        qadata = qaimg.Read()
-                        notfilled = ~binmask(qadata, 1)
-                        notdropped = ~binmask(qadata, 2)
-                        notterrain = ~binmask(qadata, 3)
-                        notcirrus = ~binmask(qadata, 14) & binmask(qadata, 13)
-                        notcloud = ~binmask(qadata, 16) & binmask(qadata, 15)
-                        allgood = notfilled * notdropped * notterrain * notcirrus * notcloud
-                        imgout[0].Write(allgood.astype('int16'))
-                        imgout[1].Write(notfilled.astype('int16'))
-                        imgout[2].Write(notdropped.astype('int16'))
-                        imgout[3].Write(notterrain.astype('int16'))
-                        imgout[4].Write(notsnow.astype('int16'))
-                        imgout[5].Write(notcirrus.astype('int16'))
-                        imgout[6].Write(notcloud.astype('int16'))
+                        self.bqa_image(asset, imgout)
 
                     elif val[0] == 'bqashadow':
                         if 'LC8' not in self.sensor_set:
@@ -1164,6 +1182,7 @@ class landsatData(Data):
                         imgout.Process()
                         abimg = None
                         os.remove(abfn + '.tif')
+
                     fname = imgout.Filename()
                     imgout.SetMeta(md)
 
