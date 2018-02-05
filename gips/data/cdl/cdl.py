@@ -44,6 +44,16 @@ import imghdr
 _cdl = 'cdl'
 _cdlmkii = 'cdlmkii'
 
+
+class CDLNoDataError(Exception):
+    def __init__(self, tile, year):
+        self.tile = tile
+        self.year = year
+
+    def __str__(self):
+        return "There is no CDL data avaible for {} on {}".format(self.tile, self.year)
+
+
 class cdlRepository(Repository):
     name = 'CDL'
     description = 'Crop Data Layer'
@@ -87,86 +97,21 @@ class cdlAsset(Asset):
 
         if asset == _cdl:
             utils.verbose_out("Fetching tile for {} on {}".format(tile, date.year), 2)
-            crop_scape_service = "https://nassgeodata.gmu.edu/CropScapeService"
-            wcs_url = "{}/wms_cdl_{}.cgi".format(crop_scape_service, tile.lower())
-
-            coverage_parameters = {
-                'service': 'wcs',
-                'version': '1.1.0',
-                'request': 'describecoverage',
-                'coverage': "cdl_{}_{}".format(date.year, tile.lower()),
-            }
-            coverage_xml = requests.get(wcs_url, params=coverage_parameters, verify=False)
-            root = ElementTree.fromstring(coverage_xml.text)
-            ns = {'ows': 'http://www.opengis.net/ows/1.1', 'wcs': 'http://www.opengis.net/wcs/1.1'}
-            lower_corner = root.find(
-                ".//ows:BoundingBox[@crs='urn:ogc:def:crs:EPSG::102004']/ows:LowerCorner",
-                ns
-            ).text
-            upper_corner = root.find(
-                ".//ows:BoundingBox[@crs='urn:ogc:def:crs:EPSG::102004']/ows:UpperCorner",
-                ns
-            ).text
-
-            # The CropScapeService's WCS serves coverages that are a max of
-            # 2048x2048 pixels. Since this is smaller than almost every state,
-            # images must be fetched in small parts and then mosaicked
-            # together.
-            coord_step = 30 * 2048  # cov must be max 2048x2048
-            init_x, init_y = [int(coord) for coord in lower_corner.split(" ")]
-            max_x, max_y = [int(coord) + coord_step for coord in upper_corner.split(" ")]
-            chip_number = 0
-            asset_name = "{}_{}_cdl_cdl.tif".format(tile, date.year)
-
-            prev_x = init_x
-            for cur_x in range(init_x, max_x, coord_step):
-                prev_y = init_y
-                for cur_y in range(init_y, max_y, coord_step):
-                    bbox = "{},{},{},{}".format(prev_x, prev_y, cur_x, cur_y)
-                    feature_parameters = {
-                        'service': 'wcs',
-                        'version': '1.0.0',
-                        'request': 'getcoverage',
-                        'coverage': "cdl_{}_{}".format(date.year, tile.lower()),
-                        'crs': 'epsg:102004',
-                        'bbox': bbox,
-                        'resx': '30',
-                        'resy': '30',
-                        'format': 'gtiff',
-                    }
-                    r = requests.get(wcs_url, params=feature_parameters, stream=True, verify=False)
-
-                    with open("{}/{}_{}".format(
-                              cls.Repository.path('stage'),
-                              chip_number,
-                              asset_name),
-                              'w') as asset_file:
-                        asset_file.write(r.content)
-
-                    prev_y = cur_y
-                    chip_number += 1
-                prev_x = cur_x
-                chip_number += 1
-
-            chips = glob.glob("{}/*_{}".format(cls.Repository.path('stage'), asset_name))
-
-            # Iterating over a grid of 2048x2048 squares, as above, occasionally
-            # produces a request that is outside of the coverage area. In this
-            # case, the WCS returns an XML error response, so we need to filter
-            # those out before mosaicking.
-            def is_valid_image(chip):
-                try:
-                    GeoImage(chip)
-                except RuntimeError:
-                    os.unlink(chip)
-                    return False
-                return True
-            chips = list(ifilter(is_valid_image, chips))
+            url = "https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLFile"
 
             tile_vector = utils.open_vector(cls.Repository.get_setting('tiles'), 'STATE_ABBR')[tile]
-            utils.mosaic(GeoImages(chips), os.path.join(cls.Repository.path('stage'), asset_name), tile_vector)
-            for chip in chips:
-                os.unlink(chip)
+            params = {
+                'year': date.year,
+                'fips': tile_vector['STATE_FIPS']
+            }
+            xml = requests.get(url, params=params, verify=False)
+            if xml.status_code != 200:
+                raise CDLNoDataError(tile, date.year)
+            root = ElementTree.fromstring(xml.text)
+            file_url = root.find('./returnURL').text
+            file_response = requests.get(file_url, verify=False, stream=True)
+            with open("{}/{}_{}_cdl_cdl.tif".format(cls.Repository.path('stage'), tile, date.year), 'w') as asset:
+                asset.write(file_response.content)
         else:
             utils.verbose_out("Fetching not supported for cdlmkii", 2)
 
@@ -200,7 +145,6 @@ class cdlData(Data):
                     member_ext = member.filename.split('.', 1)[1]
                     extracted = zipfile.extract(member, fname_without_ext)
                     os.rename(extracted, fname_without_ext + '.' + member_ext)
-
 
             image = GeoImage(fname, True)
             image[0].SetNoData(0)
