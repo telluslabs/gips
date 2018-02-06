@@ -45,15 +45,6 @@ _cdl = 'cdl'
 _cdlmkii = 'cdlmkii'
 
 
-class CDLNoDataError(Exception):
-    def __init__(self, tile, year):
-        self.tile = tile
-        self.year = year
-
-    def __str__(self):
-        return "There is no CDL data avaible for {} on {}".format(self.tile, self.year)
-
-
 class cdlRepository(Repository):
     name = 'CDL'
     description = 'Crop Data Layer'
@@ -90,6 +81,23 @@ class cdlAsset(Asset):
         self.products[self.asset] = filename  # magically it is also a product
 
     @classmethod
+    def query_service(cls, asset, tile, date):
+        if asset == _cdlmkii:
+            return []
+        url = "https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLFile"
+        tile_vector = utils.open_vector(cls.Repository.get_setting('tiles'), 'STATE_ABBR')[tile]
+        params = {
+            'year': date.year,
+            'fips': tile_vector['STATE_FIPS']
+        }
+        xml = requests.get(url, params=params, verify=False)
+        if xml.status_code != 200:
+            return []
+        root = ElementTree.fromstring(xml.text)
+        file_url = root.find('./returnURL').text
+        return [{'url': file_url, 'basename': "{}_{}_cdl_cdl.tif".format(tile, date.year)}]
+
+    @classmethod
     def fetch(cls, asset, tile, date):
         # The nassgeodata site is known to have an invalid certificate.
         # We don't want to clutter up the output with SSL warnings.
@@ -97,19 +105,11 @@ class cdlAsset(Asset):
 
         if asset == _cdl:
             utils.verbose_out("Fetching tile for {} on {}".format(tile, date.year), 2)
-            url = "https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLFile"
-
-            tile_vector = utils.open_vector(cls.Repository.get_setting('tiles'), 'STATE_ABBR')[tile]
-            params = {
-                'year': date.year,
-                'fips': tile_vector['STATE_FIPS']
-            }
-            xml = requests.get(url, params=params, verify=False)
-            if xml.status_code != 200:
-                raise CDLNoDataError(tile, date.year)
-            root = ElementTree.fromstring(xml.text)
-            file_url = root.find('./returnURL').text
-            file_response = requests.get(file_url, verify=False, stream=True)
+            assets = cls.query_service(asset, tile, date)
+            if len(assets) == 0:
+                utils.verbose_out("No CDL data for {} on {}".format(tile, date.year), 2)
+                return
+            file_response = requests.get(assets[0]['url'], verify=False, stream=True)
             with open("{}/{}_{}_cdl_cdl.tif".format(cls.Repository.path('stage'), tile, date.year), 'w') as asset:
                 asset.write(file_response.content)
         else:
