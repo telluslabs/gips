@@ -762,7 +762,7 @@ class landsatData(Data):
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
 
-    def bqa_image(self, a_type):
+    def bqa_image(self, a_type, imgout):
         """Computes the image for the BQA product."""
         qadata = self._readqa(a_type).Read()
         notfilled = ~binmask(qadata, 1)
@@ -770,20 +770,20 @@ class landsatData(Data):
             # DN QA band:  https://landsat.usgs.gov/qualityband
             notdropped = ~binmask(qadata, 2)
             notterrain = ~binmask(qadata, 3)
-            # TODO wtf ~x & y?
-            notsnow   = ~binmask(qadata, 12) & binmask(qadata, 11)
+            notsnow   = binmask(qadata, 12) | binmask(qadata, 11)
             notcirrus = ~binmask(qadata, 14) & binmask(qadata, 13)
             notcloud  = ~binmask(qadata, 16) & binmask(qadata, 15)
-        elif a_type == 'DN':
+        elif a_type == 'C1':
             # C1 QA band:  https://landsat.usgs.gov/collectionqualityband
-            notdropped = ~binmask(qadata, 2) # TODO not there at all?
+            # TODO dropped frames aren't in the QA band for C1 assets;
+            # what should be done?  Set the whole band to 0?
+            notdropped = ~binmask(qadata, 1) # right now it's the fill bit
             notterrain = ~binmask(qadata, 2)
-            # TODO wtf ~x & y?
-            # TODO is "snow/ice confidence" same as "snow/ice" from DN?
             notsnow   = ~binmask(qadata, 11) & binmask(qadata, 10)
             notcirrus = ~binmask(qadata, 13) & binmask(qadata, 12)
-            # TODO there's cloud confidence and cloud shadow confidence; use both?
-            notcloud  = ~binmask(qadata, 16) & binmask(qadata, 15)
+            # TODO there's cloud, cloud confidence and cloud shadow confidence;
+            # what should be used?
+            notcloud  = ~binmask(qadata, 7) & binmask(qadata, 6)
         else:
             raise ValueError('{} not supported for bqa product'.format(a_type))
 
