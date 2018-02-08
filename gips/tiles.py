@@ -88,21 +88,15 @@ class Tiles(object):
             # create data directory when it is needed
             mkdir(datadir)
             # TODO - this is assuming a tif file.  Use gippy FileExtension function when it is exposed
-            fp_fragment = os.path.join(
-                    datadir, '{}_{}_{}'.format(bname, sensor, product))
-            final_fp = fp_fragment + '.tif'
-            # use a temporary filename then move it once complete (for safety);
-            # have to do '.part.tif' because if we try to do '.tif.part', it
-            # writes to '.tif.part.tif' (adding the extension behind our back).
-            tmp_fp = fp_fragment + '.part.tif'
+            fn = '{}_{}_{}.tif'.format(bname, sensor, product)
+            final_fp = os.path.join(datadir, fn)
             if not os.path.exists(final_fp) or overwrite:
                 err_msg = ("Error mosaicking " + final_fp + ". Did you forget"
                            " to specify a resolution (`--res x x`)?")
-                with utils.error_handler(err_msg, continuable=True):
-                    try: # remove file from prior runs, if present
-                        os.remove(tmp_fp)
-                    except OSError:
-                        pass
+                with utils.error_handler(err_msg, continuable=True), \
+                        utils.make_temp_dir(dir=datadir,
+                                            prefix='mosaic') as tmp_dir:
+                    tmp_fp = os.path.join(tmp_dir, fn) # for safety
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
                     if self.spatial.rastermask is not None:
