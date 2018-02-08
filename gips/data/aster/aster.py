@@ -107,17 +107,13 @@ class asterRepository(Repository):
     @classmethod
     def feature2tile(cls, feature):
         """ convert tile field attributes to tile identifier """
-        fldindex_h = feature.GetFieldIndex("h")
-        fldindex_v = feature.GetFieldIndex("v")
-        h = str(int(feature.GetField(fldindex_h))).zfill(2)
-        v = str(int(feature.GetField(fldindex_v))).zfill(2)
-        return "h%sv%s" % (h, v)
+        return feature.GetFieldAsString("name")
 
     @classmethod
     def vector2tiles(cls, vector, pcov=0.0, ptile=0.0, tilelist=None):
         """ Return matching tiles and coverage % for provided vector """
         from osgeo import ogr, osr
-        return {}
+        #return {}
         # open tiles vector
         v = open_vector(cls.get_setting('tiles'))
         shp = ogr.Open(v.Filename())
@@ -125,6 +121,9 @@ class asterRepository(Repository):
             layer = shp.GetLayer(0)
         else:
             layer = shp.GetLayer(v.LayerName())
+
+        # Get only the required driver
+        layer.SetAttributeFilter("driver = '{}'".format(cls.name.lower()))
 
         # create and warp site geometry
         ogrgeom = ogr.CreateGeometryFromWkt(vector.WKT())
@@ -249,6 +248,7 @@ class asterAsset(Asset):
                 limit=1000,
                 short_name="AST_L1T",
                 polygon=poly_string,
+                day_night_flag="day",
                 temporal=temporal_str
             )
             if len(results) == 0:
@@ -341,15 +341,47 @@ class asterData(Data):
     _productgroups = {
     }
     _products = {
-        'tempProduct': {
-            'description': 'A placeholder product',
+        'ref': {
+            'description': 'TOA reflectance',
             'assets': ['L1T'],
             'bands': [{'name': 'temp', 'units': 'none' }],
             'category': 'Temporary Stuff',
-            'startdate': datetime.date(2000,1,1),
+            'startdate': datetime.date(2000,3,4),
             'latency': 1,
         }
     }
+
+    def asset_check(self, prod_type):
+        """Is an asset available for the current scene and product?
+
+        Returns the last found asset, or else None, its version, the
+        complete lists of missing and available assets, and lastly, an array
+        of pseudo-filepath strings suitable for consumption by gdal/gippy.
+        """
+        # return values
+        asset = None
+        version = None
+        missingassets = []
+        availassets = []
+        allsds = []
+
+        for asset in self._products[prod_type]['assets']:
+            # many asset types won't be found for the current scene
+            if asset not in self.assets:
+                missingassets.append(asset)
+                continue
+            try:
+                sds = self.assets[asset].datafiles()
+            except Exception as e:
+                utils.report_error(e, 'Error reading datafiles for ' + asset)
+                missingassets.append(asset)
+            else:
+                availassets.append(asset)
+                allsds.extend(sds)
+                #version = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
+                version = 1 # What is this?
+
+        return asset, version, missingassets, availassets, allsds
 
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
@@ -416,10 +448,11 @@ class asterData(Data):
                         local_assets = cls.Asset.discover(tile_name, d, a)
                         if force or len(local_assets) == 0 or update:
                             date_str = d.strftime("%F")
-                            msg_prefix = (
+                            prefix = (
                                 'query_service for {}, {}, {}'
                                 .format(a, tile_name, date_str)
                             )
+
                             with utils.error_handler(msg_prefix, continuable=False):
                                 #resp = cls.Asset.query_service(a, t, d)
                                 #if len(resp) == 0:

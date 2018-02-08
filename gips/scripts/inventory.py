@@ -94,7 +94,7 @@ def main():
         )
         for extent in extents:
             inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
-            inv.pprint(md=args.md)            
+            inv.pprint(md=args.md)
 
     utils.gips_exit() # produce a summary error report then quit with a proper exit status
 
