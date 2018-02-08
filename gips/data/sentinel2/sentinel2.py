@@ -45,6 +45,7 @@ from gips.data.core import Repository, Asset, Data
 from gips import utils
 from gips import atmosphere
 
+
 """Steps for adding a product to this driver:
 
 * add the product to the _products dict
@@ -119,10 +120,12 @@ class sentinel2Asset(Asset):
 
             # colors needed for computing indices products such as NDVI
             # color names are ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2']
-            'indices-bands': ['02', '03', '04', '08', '11', '12'],
+            'indices-bands': ['02', '03', '04', '05', '06',
+                              '07', '08', '8A', '11', '12'],
             # similar to landsat's "visbands"
-            'indices-colors': ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'],
-            # landsat version: ['COASTAL', 'BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2', 'CIRRUS'],
+            'indices-colors': ['BLUE', 'GREEN', 'RED',
+                               'REDEDGE1', 'REDEDGE2', 'REDEDGE3',
+                               'NIR', 'REDEDGE4', 'SWIR1', 'SWIR2'],
         },
     }
     _sensors['S2B'] = copy.deepcopy(_sensors['S2A'])
@@ -184,7 +187,7 @@ class sentinel2Asset(Asset):
             'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B(?P<band>\d[\dA]).jp2$',
             ## internal metadata file patterns
             # updated assumption: only XML file in DATASTRIP/ (not including subdirs)
-            'datastrip-md-re': '^.*/DATASTRIP/[^/]+/[^/]*.xml$', 
+            'datastrip-md-re': '^.*/DATASTRIP/[^/]+/[^/]*.xml$',
             'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
         },
         _2016_12_07: {
@@ -643,12 +646,14 @@ class sentinel2Asset(Asset):
 
 class sentinel2Data(Data):
     name = 'Sentinel2'
-    version = '0.1.0'
+    version = '0.1.1'
     Asset = sentinel2Asset
 
     _productgroups = {
-        'Index': ['ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari', 'brgt',
-                  'ndti', 'crc', 'crcm', 'isti', 'sti'], # <-- tillage indices
+        'Index': [
+            'ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari',
+            'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti',
+        ],
         'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
                     'spm655', 'turbidity', 'acoflags'],
     }
@@ -672,7 +677,7 @@ class sentinel2Data(Data):
             'description': 'Cloud, cloud shadow, and water classification',
             'assets': [_asset_type],
             'bands': {'name': 'cfmask', 'units': Data._unitless},
-        }
+        },
     }
 
     # add index products to _products
@@ -690,17 +695,16 @@ class sentinel2Data(Data):
             ('satvi',  'Soil-Adjusted Total Vegetation Index'),
             ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
             ('vari',   'Visible Atmospherically Resistant Index'),
-            # index products related to tillage
-            # rbraswell's original description of brgt:  "Brightness index:
-            # Visible to near infrared reflectance weighted by" approximate
-            # energy distribution of the solar spectrum. A proxy for
-            # broadband albedo."
             ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
+            # index products related to tillage
             ('ndti',   'Normalized Difference Tillage Index'),
             ('crc',    'Crop Residue Cover (uses BLUE)'),
             ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
             ('isti',   'Inverse Standard Tillage Index'),
             ('sti',    'Standard Tillage Index'),
+            # not processed by gippy.Indices() but still indices products:
+            ('mtci',    'MERIS Terrestrial Chlorophyll Index'),
+            ('s2rep',   'Sentinel-2 Red Edge Position'),
         ]
     )
 
@@ -714,6 +718,10 @@ class sentinel2Data(Data):
         'rad-toa':      'ref-toa',
         'ref-toa':      None, # has no deps but the asset
         'cfmask':       None,
+        'mtci-toa':     'ref-toa',
+        's2rep-toa':    'ref-toa',
+        'mtci':         'ref',
+        's2rep':        'ref',
     }
 
     def plan_work(self, requested_products, overwrite):
@@ -738,6 +746,9 @@ class sentinel2Data(Data):
             elif rp in toa_indices:
                 prereq = 'indices-toa'
             else:
+                if rp not in _pd:
+                    raise ValueError(
+                            'Could not find dependency listing for ' + rp)
                 prereq = rp
             # go thru each prereq and add it in if it's not already present, respecting overwrite.
             while prereq in _pd and (overwrite or prereq not in self.products):
@@ -820,54 +831,44 @@ class sentinel2Data(Data):
                     for f in self.metadata['filenames']]
         self.metadata['abs-filenames'] = datafiles
 
-
     def ref_toa_geoimage(self, sensor, data_spec):
         """Make a proto-product which acts as a basis for several products.
 
         It is equivalent to ref-toa; it's needed because the asset's
         spatial resolution must be resampled to be equal for all bands
-        of interest.  Due to equivalence with ref-toa, if that product
-        exists in the filesystem, it's opened and returned in a GeoImage
-        instead of newly upsampled data.
+        of interest.
         """
-        # TODO data_spec can be refactored out of argslist; only depends on self & asset_type ('L1C')
-        self._time_report('Starting upsample of Sentinel-2 asset bands')
-        # TODO this upsamples everything, when only two bands need it.  The first attempt to remedy
-        # this was actually slower, however; see branch 200-optimize-upsampling, commit 2e97ba0.
-        # compile a list of the files needed for the proto-product
+        # TODO data_spec can be refactored out of argslist;
+        #      only depends on self & asset_type ('L1C')
+        self._time_report('Start VRT for ref-toa image')
         src_filenames = [f for f in self.metadata['abs-filenames']
-                if f[-6:-4] in data_spec['indices-bands']]
-        # upsample each one in turn (some don't need it but do them all for simplicity)
+                         if f[-6:-4] in data_spec['indices-bands']]
+
         with utils.make_temp_dir() as tmpdir:
-            upsampled_filenames = [os.path.join(tmpdir, os.path.basename(f) + '.tif')
-                    for f in src_filenames]
-            #  TODO:  this should be stuffed into the 'env' of Popen, but is a
-            #         necessary hack for now.
-            os.putenv(
-                'GDAL_NUM_THREADS',
-                str(int(gippy.Options.NumCores()))
-            )
-            for in_fn, out_fn in zip(src_filenames, upsampled_filenames):
-                cmd_str = 'gdal_translate -tr 20 20 -oo NUM_THREADS=1 {} {}'.format(in_fn, out_fn)
-                cmd_args = shlex.split(cmd_str)
-                self._time_report('Upsampling:  ' + cmd_str)
-                p = subprocess.Popen(cmd_args)
-                p.communicate()
-                if p.returncode != 0:
-                    raise IOError("Expected gdal_translate exit status 0, got {}".format(
-                            p.returncode))
-            upsampled_img = gippy.GeoImage(upsampled_filenames)
-            upsampled_img.SetMeta(self.meta_dict())
-            upsampled_img.SetNoData(0)
-            upsampled_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
+            # TODO document why VRT is superior to prior method (faster?)
+            vrt_filename = os.path.join(tmpdir, self.basename + '_ref-toa.vrt')
+            cmd_str = (
+                'gdalbuildvrt -tr 20 20 -separate '
+                '-srcnodata 0 -vrtnodata 0 {} {}'
+            ).format(vrt_filename, ' '.join(src_filenames))
+            cmd_args = shlex.split(cmd_str)
+            p = subprocess.Popen(cmd_args)
+            p.communicate()
+            if p.returncode != 0:
+                raise IOError("Expected gdalbuildvrt exit status 0, got {}"
+                              .format(p.returncode))
+            vrt_img = gippy.GeoImage(vrt_filename)
+            vrt_img.SetMeta(self.meta_dict())
+            vrt_img.SetNoData(0)
+            vrt_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
             # eg:   3        '08'
             for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
-                band_index = data_spec['band-strings'].index(band_string) # starts at 0
+                # starts at 0
+                band_index = data_spec['band-strings'].index(band_string)
                 color_name = data_spec['colors'][band_index]
-                upsampled_img.SetBandName(color_name, band_num)
-        self._product_images['ref-toa'] = upsampled_img
-        self._time_report('Completed upsampling of Sentinel-2 asset bands')
-
+                vrt_img.SetBandName(color_name, band_num)
+        self._product_images['ref-toa'] = vrt_img
+        self._time_report('Finished VRT for ref-toa image')
 
     def rad_toa_geoimage(self, asset_type, sensor):
         """Reverse-engineer TOA ref data back into a TOA radiance product.
@@ -876,13 +877,13 @@ class sentinel2Data(Data):
         product.
         """
         self._time_report('Starting reversion to TOA radiance.')
-        upsampled_img = self.load_image('ref-toa')
+        reftoa_img = self.load_image('ref-toa')
         asset_instance = self.assets[asset_type] # sentinel2Asset
         colors = asset_instance._sensors[sensor]['colors']
 
         radiance_factors = asset_instance.radiance_factors()
 
-        rad_image = gippy.GeoImage(upsampled_img)
+        rad_image = gippy.GeoImage(reftoa_img)
 
         for i in range(len(rad_image)):
             color = rad_image[i].Description()
@@ -1000,8 +1001,6 @@ class sentinel2Data(Data):
         for c in self.assets[asset_type]._sensors[sensor]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c]
             lu = 0.0001 * Lu # see rad_geoimage for reason for this
-            # believed to be faster to compute TLdS ahead of time (otherwise
-            # it may repeat the computation once per pixel)
             TLdS = T * Ld * scaling_factor
             sr_image[c] = (rad_toa_image[c] - lu) / TLdS
         self._product_images['ref'] = sr_image
@@ -1077,6 +1076,76 @@ class sentinel2Data(Data):
         self._product_images['cfmask'] = fmask_image
 
 
+    def mtci_geoimage(self, mode):
+        """Generate Python implementation of MTCI."""
+        # test this with eg:
+        # gips_process sentinel2 -t 16TDP -d 2017-10-01 -v5 -p mtci --overwrite
+        self._time_report('Generating MTCI')
+        asset_style = self.assets[_asset_type].style
+
+        # change this to 'ref'
+        ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
+
+        b4 = ref_img['RED'].Read()
+        b5 = ref_img['REDEDGE1'].Read()
+        b6 = ref_img['REDEDGE2'].Read()
+
+        gain = 0.0002
+        missing = -32768
+
+        mtci = missing + 0. * b4.copy()
+        wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b5 - b4 != 0.)
+        mtci[wg] = ((b6[wg] - b5[wg]) / (b5[wg] - b4[wg]))
+        mtci[(mtci < -6.)|(mtci >= 6.)] = missing
+        mtci[mtci != missing] = mtci[mtci != missing]/gain
+        mtci = mtci.astype('int16')
+
+        mtci_filename = "%s/mtci.tif" % self._temp_proc_dir
+        mtci_img = gippy.GeoImage(mtci_filename, ref_img, gippy.GDT_Int16, 1)
+
+        mtci_img[0].Write(mtci)
+        mtci_img[0].SetGain(gain)
+        mtci_img[0].SetNoData(missing)
+
+        self._product_images[
+                'mtci-toa' if mode == 'toa' else 'mtci'] = mtci_img
+
+    def s2rep_geoimage(self, mode):
+        """Generate Python implementation of S2REP."""
+        self._time_report('Generating S2REP')
+        asset_style = self.assets[_asset_type].style
+
+        # change this to 'ref'
+        ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
+
+        b4 = ref_img['RED'].Read()
+        b5 = ref_img['REDEDGE1'].Read()
+        b6 = ref_img['REDEDGE2'].Read()
+        b7 = ref_img['REDEDGE3'].Read()
+
+        gain = 0.04
+        offset = 400.
+        missing = -32768
+
+        s2rep = missing + 0. * b4.copy()
+        wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b7 > 0.)&(b7 <= 1.)&(b6 - b5 != 0.)
+        s2rep[wg] = 705. + 35. * ((((b7[wg] + b4[wg])/2.) - b5[wg])/(b6[wg] - b5[wg]))
+
+        s2rep[(s2rep < 400.)|(s2rep >= 1100.)] = missing
+        s2rep[s2rep != missing] = (s2rep[s2rep != missing] - offset)/gain
+        s2rep = s2rep.astype('int16')
+
+        s2rep_filename = "%s/s2rep.tif" % self._temp_proc_dir
+        s2rep_img = gippy.GeoImage(s2rep_filename, ref_img, gippy.GDT_Int16, 1)
+
+        s2rep_img[0].Write(s2rep)
+        s2rep_img[0].SetGain(gain)
+        s2rep_img[0].SetOffset(offset)
+        s2rep_img[0].SetNoData(missing)
+
+        self._product_images[
+                's2rep-toa' if mode == 'toa' else 's2rep'] = s2rep_img
+
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
         """Produce data products and save them to files.
@@ -1116,6 +1185,14 @@ class sentinel2Data(Data):
             self.ref_geoimage(asset_type, sensor)
         if 'cfmask' in work:
             self.fmask_geoimage(asset_type)
+        if 'mtci-toa' in work:
+            self.mtci_geoimage('toa')
+        if 's2rep-toa' in work:
+            self.s2rep_geoimage('toa')
+        if 'mtci' in work:
+            self.mtci_geoimage('surf')
+        if 's2rep' in work:
+            self.s2rep_geoimage('surf')
 
         self._time_report('Starting on standard product processing')
 
@@ -1144,6 +1221,13 @@ class sentinel2Data(Data):
                     output_image.SetMeta('FMASK_3', 'cloud shadow')
                     output_image.SetMeta('FMASK_4', 'snow')
                     output_image.SetMeta('FMASK_5', 'water')
+                if prod_type == 'mtci':
+                    output_image.SetGain(0.0002)
+                    output_image.SetNoData(-32768)
+                if prod_type == 's2rep':
+                    output_image.SetGain(0.04)
+                    output_image.SetOffset(400.0)
+                    output_image.SetNoData(-32768)
                 for b_num, b_name in enumerate(source_image.BandNames(), 1):
                     output_image.SetBandName(b_name, b_num)
                 # process bandwise because gippy had an error doing it all at once

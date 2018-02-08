@@ -36,6 +36,37 @@ https://lpdaac.usgs.gov/about/news_archive/important_changes_lp_daac_data_access
 
 For information on setting up automated testing, see `gips/test/README.md`.
 
+### Landsat S3 Configuration Note
+
+GIPS supports Landsat data access via AWS S3:
+
+https://aws.amazon.com/public-datasets/landsat/
+
+Most GIPS products are supported if you have API access to AWS:
+
+https://aws.amazon.com/premiumsupport/knowledge-center/create-access-key/
+
+Provide the special access tokens via environment variable:
+
+```
+export AWS_ACCESS_KEY_ID='your-id'
+export AWS_SECRET_ACCESS_KEY='your-key'
+```
+
+Finally set `settings.py` to tell gips to fetch C1 assets from S3:
+
+```
+REPOS = {
+    'landsat': {
+        # . . .
+        'source': 's3', # default is 'usgs'
+    }
+}
+```
+
+After this is done, `gips_inventory --fetch`, `gips_inventory`, and
+`gips_process -p <product-list-here>` should work for S3 assets.
+
 ## Environment
 
 `GIPS_ORM` controls whether or not the GIPS ORM is activated.  The ORM is
