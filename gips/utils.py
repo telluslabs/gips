@@ -162,7 +162,10 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
     try:
         yield absolute_pathname
     finally:
-        shutil.rmtree(absolute_pathname)
+        if 'GIPS_DEBUG' not in os.environ:
+            shutil.rmtree(absolute_pathname)
+        else:
+            print('GIPS_DEBUG: Orphaning {}'.format(absolute_pathname))
 
 
 def find_files(regex, path='.'):
