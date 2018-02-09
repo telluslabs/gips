@@ -27,6 +27,7 @@ import datetime
 from csv import DictReader
 import glob
 from itertools import ifilter
+import shutil
 from xml.etree import ElementTree
 from zipfile import ZipFile
 
@@ -110,8 +111,15 @@ class cdlAsset(Asset):
                 utils.verbose_out("No CDL data for {} on {}".format(tile, date.year), 2)
                 return
             file_response = requests.get(assets[0]['url'], verify=False, stream=True)
-            with open("{}/{}_{}_cdl_cdl.tif".format(cls.Repository.path('stage'), tile, date.year), 'w') as asset:
-                asset.write(file_response.content)
+            with utils.make_temp_dir(prefix='fetch', dir=cls.Repository.path('stage')) as tmp_dir:
+                fname = "{}_{}_cdl_cdl.tif".format(tile, date.year)
+                tmp_fname = tmp_dir + '/' + fname
+                with open(tmp_fname, 'w') as asset:
+                    asset.write(file_response.content)
+                imgout = GeoImage(tmp_fname, True)
+                imgout.SetNoData(0)
+                imgout = None
+                shutil.copy(tmp_fname, cls.Repository.path('stage'))
         else:
             utils.verbose_out("Fetching not supported for cdlmkii", 2)
 
