@@ -75,7 +75,7 @@ def t_data_inventory_load(orm):
 
     # instantiate the class under test
     tiles = ['h12v04', 'h12v05', 'h13v04', 'h13v05']
-    products = ['fsnow', 'temp8td', 'quality', 'landcover']
+    products = ['temp8td', 'quality', 'landcover']
     se = SpatialExtent(modisData, tiles, 0.0, 0.0)
     te = TemporalExtent('2012-12-01,2012-12-03')
     di = DataInventory(modisData, se, te, products)
