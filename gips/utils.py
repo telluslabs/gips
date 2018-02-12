@@ -531,7 +531,8 @@ def report_error(error, msg_prefix, show_tb=True):
     it via the GIPS global verbosity setting."""
     if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
         verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
-        traceback.print_exc()
+        error_text = getattr(error, 'tb_text', 'Error text not found.')
+        verbose_out(error_text, 1, stream=sys.stderr)
     else:
         verbose_out(msg_prefix + ': ' + str(error), 1, stream=sys.stderr)
 
@@ -543,6 +544,7 @@ def lib_error_handler(msg_prefix='Error', continuable=False):
         yield
     except Exception as e:
         if continuable and not _stop_on_error:
+            e.tb_text = traceback.format_exc()
             report_error(e, msg_prefix)
         else:
             raise
@@ -571,6 +573,7 @@ def cli_error_handler(msg_prefix='Error', continuable=False):
         yield
     except Exception as e:
         e.msg_prefix = msg_prefix # for use by gips_exit
+        e.tb_text = traceback.format_exc()
         _accumulated_errors.append(e)
         if continuable and not _stop_on_error:
             report_error(e, msg_prefix)
