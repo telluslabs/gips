@@ -563,20 +563,6 @@ class landsatData(Data):
             'latency': 1,
             'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
-        'bqa': {
-            'assets': ['DN', 'C1'],
-            # TODO prior description was too long; is this a good-enough short replacement?
-            'description': 'The quality band extracted into separate layers.',
-            # 'description': ('The bit-packed information in the QA bands is translation of binary strings. '
-            # 'As a simple example, the integer value "1" translates to the binary value "0001." The binary value '
-            # '"0001" has 4 bits, written right to left as bits 0 ("1"), 1 ("0"), 2 ("0"), and 3 ("0"). '
-            # 'Each of the bits 0-3 represents a yes/no indication of a physical value.'),
-            'toa': True,
-            'startdate': _lc8_startdate,
-            'latency': 1,
-            'bands': unitless_bands('allgood', 'notfilled', 'notdropped', 'notterrain',
-                                    'notsnow', 'notcirrus', 'notcloud'),
-        },
         'bqashadow': {
             'assets': ['DN', 'C1'],
             'description': 'LC8 QA + Shadow Smear',
@@ -761,40 +747,6 @@ class landsatData(Data):
         for temp_fp in prodout.values():
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
-
-    def bqa_image(self, a_type, imgout):
-        """Computes the image for the BQA product."""
-        qadata = self._readqa(a_type).Read()
-        notfilled = ~binmask(qadata, 1)
-        if a_type == 'DN':
-            # DN QA band:  https://landsat.usgs.gov/qualityband
-            notdropped = ~binmask(qadata, 2)
-            notterrain = ~binmask(qadata, 3)
-            notsnow   = binmask(qadata, 12) | binmask(qadata, 11)
-            notcirrus = ~binmask(qadata, 14) & binmask(qadata, 13)
-            notcloud  = ~binmask(qadata, 16) & binmask(qadata, 15)
-        elif a_type == 'C1':
-            # C1 QA band:  https://landsat.usgs.gov/collectionqualityband
-            # TODO dropped frames aren't in the QA band for C1 assets;
-            # what should be done?  Set the whole band to 0?
-            notdropped = ~binmask(qadata, 1) # right now it's the fill bit
-            notterrain = ~binmask(qadata, 2)
-            notsnow   = ~binmask(qadata, 11) & binmask(qadata, 10)
-            notcirrus = ~binmask(qadata, 13) & binmask(qadata, 12)
-            # TODO there's cloud, cloud confidence and cloud shadow confidence;
-            # what should be used?
-            notcloud  = ~binmask(qadata, 7) & binmask(qadata, 6)
-        else:
-            raise ValueError('{} not supported for bqa product'.format(a_type))
-
-        allgood = (notfilled * notdropped * notterrain * notcirrus * notcloud)
-        imgout[0].Write(allgood.astype('int16'))
-        imgout[1].Write(notfilled.astype('int16'))
-        imgout[2].Write(notdropped.astype('int16'))
-        imgout[3].Write(notterrain.astype('int16'))
-        imgout[4].Write(notsnow.astype('int16'))
-        imgout[5].Write(notcirrus.astype('int16'))
-        imgout[6].Write(notcloud.astype('int16'))
 
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
@@ -1142,12 +1094,6 @@ class landsatData(Data):
                             band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
                                     ) * meta[col]['K2'] - 273.15
                             band.Process(imgout[col])
-
-                    elif val[0] == 'bqa':
-                        if 'LC8' not in self.sensor_set:
-                            continue
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 7)
-                        self.bqa_image(asset, imgout)
 
                     elif val[0] == 'bqashadow':
                         if 'LC8' not in self.sensor_set:
