@@ -70,7 +70,6 @@ def binmask(arr, bit):
     """
     return arr & (1 << (bit - 1)) == (1 << (bit - 1))
 
-
 class landsatRepository(Repository):
     """ Singleton (all class methods) to be overridden by child data classes """
     name = 'Landsat'
@@ -749,20 +748,6 @@ class landsatData(Data):
             'latency': 1,
             'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
-        'bqa': {
-            'assets': ['DN', 'C1'],
-            # TODO prior description was too long; is this a good-enough short replacement?
-            'description': 'The quality band extracted into separate layers.',
-            # 'description': ('The bit-packed information in the QA bands is translation of binary strings. '
-            # 'As a simple example, the integer value "1" translates to the binary value "0001." The binary value '
-            # '"0001" has 4 bits, written right to left as bits 0 ("1"), 1 ("0"), 2 ("0"), and 3 ("0"). '
-            # 'Each of the bits 0-3 represents a yes/no indication of a physical value.'),
-            'toa': True,
-            'startdate': _lc8_startdate,
-            'latency': 1,
-            'bands': unitless_bands('allgood', 'notfilled', 'notdropped', 'notterrain',
-                                    'notsnow', 'notcirrus', 'notcloud'),
-        },
         'bqashadow': {
             'assets': ['DN', 'C1'],
             'description': 'LC8 QA + Shadow Smear',
@@ -951,7 +936,6 @@ class landsatData(Data):
         for temp_fp in prodout.values():
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
-
 
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
@@ -1302,26 +1286,6 @@ class landsatData(Data):
                                     ) * meta[col]['K2'] - 273.15
                             band.Process(imgout[col])
 
-                    elif val[0] == 'bqa':
-                        if 'LC8' not in self.sensor_set:
-                            continue
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 7)
-                        qaimg = self._readqa(asset)
-                        qadata = qaimg.Read()
-                        notfilled = ~binmask(qadata, 1)
-                        notdropped = ~binmask(qadata, 2)
-                        notterrain = ~binmask(qadata, 3)
-                        notcirrus = ~binmask(qadata, 14) & binmask(qadata, 13)
-                        notcloud = ~binmask(qadata, 16) & binmask(qadata, 15)
-                        allgood = notfilled * notdropped * notterrain * notcirrus * notcloud
-                        imgout[0].Write(allgood.astype('int16'))
-                        imgout[1].Write(notfilled.astype('int16'))
-                        imgout[2].Write(notdropped.astype('int16'))
-                        imgout[3].Write(notterrain.astype('int16'))
-                        imgout[4].Write(notsnow.astype('int16'))
-                        imgout[5].Write(notcirrus.astype('int16'))
-                        imgout[6].Write(notcloud.astype('int16'))
-
                     elif val[0] == 'bqashadow':
                         if 'LC8' not in self.sensor_set:
                             continue
@@ -1355,6 +1319,7 @@ class landsatData(Data):
                         imgout.Process()
                         abimg = None
                         os.remove(abfn + '.tif')
+
                     fname = imgout.Filename()
                     imgout.SetMeta(md)
 
