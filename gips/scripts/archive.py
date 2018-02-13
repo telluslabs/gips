@@ -42,6 +42,8 @@ def main():
         default=False,
         action='store_true'
     )
+    group.add_argument('--path', default='.',
+            help='Path to search for files to archive, defaults to `.`')
     args = parser.parse_args()
 
     utils.gips_script_setup(None, args.stop_on_error)
@@ -50,8 +52,8 @@ def main():
         print title
         cls = import_data_class(args.command)
         orm.setup() # set up DB orm in case it's needed for Asset.archive()
-        # TODO archive accepts limited args, pass them in explicitly
-        archived_assets = cls.Asset.archive(**vars(args))
+        archived_assets = cls.archive_assets(
+                args.path, args.recursive, args.keep, args.update)
 
         # if DB inventory is enabled, update it to contain the newly archived assets
         if orm.use_orm():

@@ -529,7 +529,7 @@ class Asset(object):
             ftp.close()
 
     @classmethod
-    def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
+    def archive(cls, path, recursive=False, keep=False, update=False):
         """Move asset into the archive.
 
         Pass in a path to a file or a directory.  If a directory, its
@@ -539,6 +539,8 @@ class Asset(object):
         then removed, unless `keep`. If a found asset would replace an
         extant archived asset, replacement is only performed if
         `update`.  kwargs is unused and likely without purpose.
+
+        Returns a list of Asset objects, representing that which was archived.
         """
         start = datetime.now()
 
@@ -577,7 +579,12 @@ class Asset(object):
 
     @classmethod
     def _archivefile(cls, filename, update=False):
-        """ archive specific file """
+        """Move the named file into the archive.
+
+        If update == True, replace any old versions and associated files.
+        Returns a 2-tuple:  An Asset object if anything was archived, or
+        None, and a count of hardlinks made, believed to be just 1 or 0.
+        """
         bname = os.path.basename(filename)
         try:
             asset = cls(filename)
@@ -1176,3 +1183,7 @@ class Data(object):
     def temp_product_filename(self, sensor, prod_type):
         """Generates a product filename within the managed temp dir."""
         return self.generate_temp_path(self.product_filename(sensor, prod_type))
+
+    @classmethod
+    def archive_assets(cls, path, recursive=False, keep=False, update=False):
+        return cls.Asset.archive(path, recursive, keep, update)

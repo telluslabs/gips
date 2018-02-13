@@ -369,7 +369,7 @@ class sentinel2Asset(Asset):
 
 
     @classmethod
-    def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
+    def archive(cls, path, recursive=False, keep=False, update=False):
         """Archive original and new-style Sentinel-2 assets.
 
         Original-style Sentinel-2 assets have special archiving needs
