@@ -1,27 +1,5 @@
 """Known-good outcomes for tests, mostly stdout and created files."""
 
-t_inventory = { 'stdout': u"""\x1b[1mGIPS Data Inventory (v0.8.2)\x1b[0m
-Retrieving inventory for site durham-0
-
-\x1b[1mAsset Coverage for site durham-0\x1b[0m
-\x1b[1m
-Tile Coverage
-\x1b[4m  Tile      % Coverage   % Tile Used\x1b[0m
-   19TCH      100.0%        0.1%
-
-\x1b[1m\x1b[4m    DATE       L1C     Product  \x1b[0m
-\x1b[1m2017        
-\x1b[0m    010       100.0%   
-
-
-1 files on 1 dates
-\x1b[1m
-SENSORS\x1b[0m
-\x1b[35mS2A: Sentinel-2, Satellite A\x1b[0m
-\x1b[31mS2B: Sentinel-2, Satellite B\x1b[0m
-"""
-}
-
 _en_base = ('sentinel2/tiles/19TCH/2017010'
             '/S2A_MSIL1C_20170110T153611_N0204_R111_T19TCH_20170110T154029.SAFE')
 
@@ -102,34 +80,6 @@ SENSORS\x1b[0m
 \x1b[31mS2B: Sentinel-2, Satellite B\x1b[0m
 """
 }
-
-
-t_info = { 'stdout': u"""\x1b[1mGIPS Data Repositories (v0.8.2)\x1b[0m
-\x1b[1m
-Sentinel2 Products v0.1.0\x1b[0m
-\x1b[1m
-Index Products
-\x1b[0m   bi          Brightness Index                        
-   brgt        VIS and NIR reflectance, weighted by solar energy distribution.
-   crc         Crop Residue Cover (uses BLUE)          
-   crcm        Crop Residue Cover, Modified (uses GREEN)
-   evi         Enhanced Vegetation Index               
-   isti        Inverse Standard Tillage Index          
-   lswi        Land Surface Water Index                
-   msavi2      Modified Soil-adjusted Vegetation Index 
-   ndsi        Normalized Difference Snow Index        
-   ndti        Normalized Difference Tillage Index     
-   ndvi        Normalized Difference Vegetation Index  
-   satvi       Soil-Adjusted Total Vegetation Index    
-   sti         Standard Tillage Index                  
-   vari        Visible Atmospherically Resistant Index 
-\x1b[1m
-Standard Products
-\x1b[0m   rad         Surface-leaving radiance                
-   ref         Surface reflectance                     
-"""
-}
-
 
 t_project = {
     'compare_stderr': False,

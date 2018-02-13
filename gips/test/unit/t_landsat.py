@@ -22,6 +22,7 @@ c1_lt5_fn = '/data-root/landsat/tiles/012030/2010018/LT05_L1GS_013030_20100118_2
     (c1_le7_fn, (c1_le7_fn, 'C1', 997452.9, 'LE7', 2010, 10)),
     (c1_lt5_fn, (c1_lt5_fn, 'C1', 997460.5, 'LT5', 2010, 18)),
 ])
-def t_landsatAsset_constructor(fn, expected):
+def t_landsatAsset_constructor(fn, expected, mocker):
+    m_cloud_cover = mocker.patch.object(landsat.landsatAsset, 'cloud_cover')
     la = landsat.landsatAsset(fn)
     assert expected == actual(la)

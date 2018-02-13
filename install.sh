@@ -3,10 +3,10 @@
 set -e
 git remote show origin | grep 'Fetch URL: .*gips.git$' -q
 
-echo -n "Enter full path to data repository:"
+echo -n "Enter full path to data repository: "
 read ARCHIVEDIR
 
-echo -n "Enter your email address"
+echo -n "Enter your email address: "
 read EMAIL
 
 sudo apt-get update
