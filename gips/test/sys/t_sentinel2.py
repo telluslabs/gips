@@ -40,20 +40,6 @@ def setup_fixture(pytestconfig):
                            outcome.std_out, outcome.std_err, outcome)
 
 @slow
-def t_process(setup_fixture, repo_env, expected):
-    """Test `gips_process`, confirming products are created."""
-    process_actual = repo_env.run('gips_process', *PROD_ARGS)
-    inventory_actual = envoy.run('gips_inventory ' + ' '.join(STD_ARGS))
-    assert (expected == process_actual
-            and expected._inv_stdout == inventory_actual.std_out)
-
-def t_project(setup_fixture, clean_repo_env, output_tfe, expected):
-    """Test gips_project with warping."""
-    args = PROD_ARGS + ['--res', '100', '100', '--outdir', OUTPUT_DIR, '--notld']
-    actual = output_tfe.run('gips_project', *args)
-    assert expected == actual
-
-@slow
 @acolite
 @pytest.mark.skip(reason="Overflows in zlib.crc32")
 def t_process_acolite(setup_fixture, repo_env, expected):

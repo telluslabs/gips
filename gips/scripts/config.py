@@ -80,21 +80,31 @@ def main():
 
     elif args.command == 'env':
         with utils.error_handler('Could not create environment settings'):
-            cfgfile = create_environment_settings(args.repos, email=args.email)
-            print 'Environment settings file: %s' % cfgfile
+            created_cf, cfgfile = create_environment_settings(
+                    args.repos, email=args.email)
 
     elif args.command == 'user':
         with utils.error_handler('Could not create user settings'):
             # first try importing environment settings
             import gips.settings
-            cfgfile = create_user_settings()
+            created_cf, cfgfile = create_user_settings()
+
 
     if args.command in ('user', 'env'):
+        msg = ('Wrote new config file:  {}.' if created_cf else
+               'Found existing config, left unmodified:  {}.')
+        print msg.format(cfgfile)
         with utils.error_handler('Could not create repos'):
-            print 'Creating repository directories'
-            create_repos()
+            print 'Creating repository directories, if needed.'
+            try:
+                create_repos()
+            except:
+                if created_cf:
+                    print ('Error; removing (likely broken) config file:'
+                           '  {}.'.format(cfgfile))
+                    os.remove(cfgfile)
+                raise
         with utils.error_handler('Could not migrate database'):
-            print 'Migrating database'
             migrate_database()
 
     utils.gips_exit()

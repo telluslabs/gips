@@ -67,6 +67,8 @@ class Repository(object):
     # valid sub directories in repo
     _subdirs = ['tiles', 'stage', 'quarantine', 'composites']
 
+    default_settings = {}
+
     @classmethod
     def feature2tile(cls, feature):
         """ Get tile designation from a geospatial feature (i.e. a row) """
@@ -110,21 +112,28 @@ class Repository(object):
     ##########################################################################
     @classmethod
     def get_setting(cls, key):
-        """ Get value from repo settings """
-        dataclass = cls.__name__[:-10]
+        """Get given setting from settings.REPOS[driver].
+
+        If the key isn't found, it attempts to load a default from
+        cls.default_settings, a dict of such things.  If still not found,
+        resorts to magic for 'driver' and 'tiles', ValueError otherwise.
+        """
+        dataclass = cls.__name__[:-10] # name of a class, not the class object
         r = settings().REPOS[dataclass]
-        if key not in r.keys():
-            # not in settings file, use defaults
-            exec('import gips.data.%s as clsname' % dataclass)
-            driverpath = os.path.dirname(clsname.__file__)
-            if key == 'driver':
-                return driverpath
-            elif key == 'tiles':
-                return os.path.join(driverpath, 'tiles.shp')
-            else:
-                raise Exception('%s is not a valid setting!' % key)
-        else:
+        if key in r:
             return r[key]
+        if key in cls.default_settings:
+            return cls.default_settings[key]
+
+        # not in settings file nor default, so resort to magic
+        exec('import gips.data.%s as clsname' % dataclass)
+        driverpath = os.path.dirname(clsname.__file__)
+        if key == 'driver':
+            return driverpath
+        if key == 'tiles':
+            return os.path.join(driverpath, 'tiles.shp')
+        raise ValueError("'{}' is not a valid setting for"
+                         " {} driver".format(key, cls.name))
 
     @classmethod
     def managed_request(cls, url, verbosity=1, debuglevel=0):

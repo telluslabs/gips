@@ -206,12 +206,12 @@ def create_environment_settings(repos_path, email=''):
     if src[-1] == 'c':
         src = src[:-1]
     if os.path.exists(cfgfile):
-        return cfgfile
+        return False, cfgfile
     with open(cfgfile, 'w') as fout:
         with open(src, 'r') as fin:
             for line in fin:
                 fout.write(line.replace('$TLD', repos_path).replace('$EMAIL', email))
-    return cfgfile
+    return True, cfgfile
 
 
 def create_user_settings(email=''):
@@ -224,12 +224,12 @@ def create_user_settings(email=''):
         os.mkdir(cfgpath)
     cfgfile = os.path.join(cfgpath, 'settings.py')
     if os.path.exists(cfgfile):
-        raise Exception('User settings file already exists: %s' % cfgfile)
+        return False, cfgfile
     with open(cfgfile, 'w') as fout:
         with open(src, 'r') as fin:
             for line in fin:
                 fout.write(line)
-    return cfgfile
+    return True, cfgfile
 
 
 def create_repos():
