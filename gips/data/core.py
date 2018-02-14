@@ -1033,13 +1033,24 @@ class Data(object):
 
     @classmethod
     def inventory(cls, site=None, key='', where='', tiles=None, pcov=0.0,
-                  ptile=0.0, dates=None, days=None, **kwargs):
+                  ptile=0.0, dates=None, days=None, rastermask=None, **kwargs):
         """ Return list of inventories (size 1 if not looping through geometries) """
         from gips.inventory import DataInventory
         from gips.core import SpatialExtent, TemporalExtent
-        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles,
-                                        pcov=pcov, ptile=ptile)
+
+        spatial = SpatialExtent.factory(
+            cls, site=site, rastermask=rastermask, key=key, where=where, tiles=tiles,
+            pcov=pcov, ptile=ptile
+        )
         temporal = TemporalExtent(dates, days)
+        if len(spatial) > 1:
+            raise ValueError(
+                '{}Data.inventory: site (or rastermask) may only specify 1'
+                .format(cls.name.lower()) +
+                '      feature via this API call ({} provided in {})'
+                .format(len(spatial),
+                        str((site, key, where)) if site else rastermask)
+                )
         return DataInventory(cls, spatial[0], temporal, **kwargs)
 
     @classmethod
