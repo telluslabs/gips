@@ -562,6 +562,8 @@ class Asset(object):
         numfiles = 0
         assets = []
         overwritten_assets = []
+        if not fnames:
+            utils.verbose_out('No files found; nothing to archive.')
         for f in fnames:
             (asset_obj, link_count, overwritten_ao) = cls._archivefile(f,
                                                                        update)
@@ -1207,24 +1209,23 @@ class Data(object):
             deletable_p_files = {}
             for asset_obj in overwritten_aol:
                 data_obj = cls(asset_obj.tile, asset_obj.date, search=True)
-                deletable_p_types = [
-                        pt for pt in cls._products
-                        if ao.asset in do._products[p_type]['assets']]
+                deletable_p_types = [pt for pt in cls._products
+                        if asset_obj.asset in data_obj._products[pt]['assets']]
                 #    v-- as usual don't care about the sensor
                 for (_, p_type), full_path in data_obj.filenames.items():
                     if p_type in deletable_p_types:
                         # need to know the key to delete from the ORM
-                        p_key = (cls.Repository.name.lower(), p_type,
+                        p_key = (cls.Asset.Repository.name.lower(), p_type,
                                  asset_obj.tile, asset_obj.date)
                         deletable_p_files[p_key] = full_path
 
             utils.verbose_out('Found {} stale products:'.format(
                                 len(deletable_p_files)), 2)
             for p_key, full_path in deletable_p_files.items():
-                utils.verbose_out('Deleting ' + dpf, 2)
+                utils.verbose_out('Deleting ' + full_path, 2)
                 if orm.use_orm():
-                    d, p, t, d = p_key
-                    dbinv.delete_product(driver=d, product=p, tile=t, date=d)
-                os.remove(path)
+                    dr, p, t, dt = p_key
+                    dbinv.delete_product(driver=dr, product=p, tile=t, date=dt)
+                os.remove(full_path)
 
         return archived_aol
