@@ -89,11 +89,11 @@ def main():
             import gips.settings
             created_cf, cfgfile = create_user_settings()
 
-    msg = ('Wrote new config file:  {}.' if created_cf else
-           'Found existing config, left unmodified:  {}.')
-    print msg.format(cfgfile)
 
     if args.command in ('user', 'env'):
+        msg = ('Wrote new config file:  {}.' if created_cf else
+               'Found existing config, left unmodified:  {}.')
+        print msg.format(cfgfile)
         with utils.error_handler('Could not create repos'):
             print 'Creating repository directories, if needed.'
             try:
