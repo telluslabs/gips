@@ -42,6 +42,8 @@ DATABASES = {
     },
 }
 
+# STATS_FORMAT = {} # defaults to empty dict
+
 # For NASA EarthData Authentication
 EARTHDATA_USER = ""
 EARTHDATA_PASS = ""
