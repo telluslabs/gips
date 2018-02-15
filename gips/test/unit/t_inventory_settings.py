@@ -20,7 +20,7 @@ def override_settings(mocker):
     sys.modules['gips.utils'].settings = s_mock
     # do the test run; have to reload to exercise the module code again after installing the mock
     reload(settings)
-    yield
+    yield s_mock
     # we twiddled a global object so clean that up
     sys.modules['gips.utils'].settings = saved_settings # restore normal settings function
     reload(settings) # load correct values
@@ -35,13 +35,13 @@ def t_inventory_settings_melding(override_settings):
     assert getattr(s, 'foo', None) == None  # it shouldn't load non-caps names
 
 
-def t_inventory_setup(mocker):
-    dontcare   = mocker.patch('gips.inventory.orm.os.environ')
+def t_inventory_setup(override_settings, mocker):
+    override_settings().GIPS_ORM = True
     setup_mock = mocker.patch.object(gips.inventory.orm.django, 'setup')
 
     gips.inventory.orm.setup_complete = False # in case its been called already
 
-    setup()
+    setup() # orm.setup()
     assert gips.inventory.orm.setup_complete
     setup_mock.assert_called_once_with()
 
