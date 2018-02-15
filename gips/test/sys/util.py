@@ -392,8 +392,8 @@ def sys_test_wrapper(request, path):
         cf_expectations = [generate_expectation(fn, path) for fn in rel_cf]
         print("Recording {} outcome to {}.".format(product, rp))
         with open(rp, 'a') as rfo:
-            print('\n# {}[{}] recording:'.format(request.function.__name__, product),
-                  file=rfo)
+            print('\n# {}[{}-{}] recording:'.format(
+                    request.function.__name__, driver, product), file=rfo)
             print("'{}':".format(product), file=rfo)
             pretty_hashes = pprint.pformat(cf_expectations)
             print('    ', end='', file=rfo)

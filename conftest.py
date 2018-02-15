@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import logging
 import os
 import shutil
@@ -118,10 +120,10 @@ def pytest_configure(config):
         setup_data_repo()
         config.option.setup_repo = True
     elif config.getoption("setup_repo"):
-        _log.debug("--setup-repo detected; setting up data repo")
+        print("--setup-repo detected; setting up data repo")
         setup_data_repo()
     else:
-        print "Skipping repo setup per lack of --setup-repo."
+        print("Skipping repo setup per lack of --setup-repo.")
 
 
 def setup_data_repo():
@@ -132,7 +134,6 @@ def setup_data_repo():
     if gcp.status_code != 0:
         raise RuntimeError("config check via `gips_config print` failed",
                            gcp.std_out, gcp.std_err, gcp)
-    _log.debug("`gips_config print` check succeeded.")
 
     # set up data root if it isn't there already
     gcp = envoy.run("gips_config env")
