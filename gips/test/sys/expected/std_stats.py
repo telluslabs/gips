@@ -56,27 +56,6 @@ expectations['modis'] = {
           ['date,band,min,max,mean,sd,skew,count\r\n',
            '2012-337,ndvi,-1.9475,3.2766,0.612297,0.162128,-3.72226,220758.0\r\n'])],
 
-    # t_stats[modis-snow] recording:
-    'snow':
-        [('snow_stats.txt',
-          'text-full',
-          ['date,band,min,max,mean,sd,skew,count\r\n',
-           '2012-336,Snow Cover,0.0,100.0,66.0782,43.1646,-0.66934,2379.0\r\n',
-           '2012-336,Fractional Snow Cover,0.0,70.0,44.8928,24.6763,-0.938924,2379.0\r\n',
-           '2012-337,Snow Cover,0.0,0.0,0.0,0.0,nan,677.0\r\n',
-           '2012-337,Fractional Snow Cover,0.0,0.0,0.0,0.0,nan,677.0\r\n',
-           '2012-338,Snow Cover,0.0,100.0,7.3169,20.9113,2.95797,221002.0\r\n',
-           '2012-338,Fractional Snow Cover,0.0,38.0,0.358599,2.04345,8.82778,221002.0\r\n'])],
-
-    # t_stats[modis-fsnow] recording:
-    'fsnow':
-        [('fsnow_stats.txt',
-          'text-full',
-          ['date,band,min,max,mean,sd,skew,count\r\n',
-           '2012-336,Fractional Snow Cover,0.0,70.0,36.4813,30.8325,-0.322887,2379.0\r\n',
-           '2012-337,Fractional Snow Cover,0.0,0.0,0.0,0.0,nan,677.0\r\n',
-           '2012-338,Fractional Snow Cover,0.0,35.0,0.0644655,1.11486,23.1911,221002.0\r\n'])],
-
     # t_stats[modis-crcm] recording:
     'crcm':
         [('crcm_stats.txt',
@@ -179,9 +158,9 @@ expectations['modis'] = {
         [('clouds_stats.txt',
           'text-full',
           ['date,band,min,max,mean,sd,skew,count\r\n',
-           '2012-336,Cloud Cover,0.0,1.0,0.974299,0.158242,-5.9946,221002.0\r\n',
-           '2012-337,Cloud Cover,0.0,1.0,0.987498,0.111112,-8.7749,221002.0\r\n',
-           '2012-338,Cloud Cover,0.0,1.0,0.151446,0.358483,1.9446,216506.0\r\n'])],
+           '2012-336,Cloud Cover,0.0,0.0,0.0,0.0,nan,219250.0\r\n',
+           '2012-337,Cloud Cover,0.0,0.0,0.0,0.0,nan,221002.0\r\n',
+           '2012-338,Cloud Cover,0.0,0.0,0.0,0.0,nan,220060.0\r\n'])],
 
     # t_stats[modis-temp] recording:
     'temp':
