@@ -128,6 +128,7 @@ def t_data_fetch_base_case(df_mocks):
     expected = [
         ('DN', '012030', datetime(2012, 12, 1, 0, 0)),
         ('C1', '012030', datetime(2012, 12, 1, 0, 0)),
+        ('C1S3', '012030', datetime(2012, 12, 1, 0, 0)),
     ]
     assert expected == landsatData.fetch(*df_args)
 
