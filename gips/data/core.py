@@ -1212,10 +1212,11 @@ class Data(object):
                 deletable_p_types = [pt for pt in cls._products
                         if asset_obj.asset in data_obj._products[pt]['assets']]
                 #    v-- as usual don't care about the sensor
-                for (_, p_type), full_path in data_obj.filenames.items():
+                for (_, raw_p_type), full_path in data_obj.filenames.items():
+                    p_type = raw_p_type.split('-')[0] # take out eg '-toa'
                     if p_type in deletable_p_types:
                         # need to know the key to delete from the ORM
-                        p_key = (cls.Asset.Repository.name.lower(), p_type,
+                        p_key = (cls.Asset.Repository.name.lower(), raw_p_type,
                                  asset_obj.tile, asset_obj.date)
                         deletable_p_files[p_key] = full_path
 
