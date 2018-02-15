@@ -232,7 +232,8 @@ class DataInventory(Inventory):
 
         if fetch:
             dataclass.fetch(self.products.base, self.spatial.tiles, self.temporal, self.update)
-            archived_assets = dataclass.Asset.archive(Repository.path('stage'), update=self.update)
+            archived_assets = dataclass.archive_assets(
+                    Repository.path('stage'), update=self.update)
 
             if orm.use_orm():
                 # save metadata about the fetched assets in the database

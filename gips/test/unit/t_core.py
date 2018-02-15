@@ -1,4 +1,4 @@
-"""Unit tests for core functions, such as those found in gips.core and gips.data.core."""
+"""Unit tests for core functions found in gips.core and gips.data.core."""
 
 import sys
 from datetime import datetime
@@ -8,7 +8,9 @@ import mock
 
 import gips
 from gips import core
+from gips.data import core as data_core
 from gips.data.landsat.landsat import landsatRepository, landsatData
+from gips.data.landsat import landsat
 from gips.inventory import dbinv
 
 def t_repository_find_tiles_normal_case(mocker, orm):
@@ -93,7 +95,7 @@ def t_data_add_file_repeat(orm, mocker):
 
 
 @pytest.mark.parametrize('search', (False, True))
-def t_data_init_search(mocker, search):
+def t_data_init_search(mocker, orm, search):
     """Confirm Data.__init__ searches the FS only when told to.
 
     Do this by instantiating landsatData."""
@@ -139,3 +141,67 @@ def t_data_fetch_error_case(df_mocks):
     It should return [], and shouldn't raise an exception."""
     df_mocks.side_effect = RuntimeError('aaah!')
     assert landsatData.fetch(*df_args) == []
+
+@pytest.fixture
+def asset_and_replacement():
+    """For tests of the update=True case of the archive call chain."""
+    # note later date processing date -------------vvvvvvvv
+    LA = landsat.landsatAsset
+    return (LA('LC08_L1TP_012030_20170801_20170811_01_T1.tar.gz'),
+            LA('LC08_L1TP_012030_20170801_20171231_01_T1.tar.gz'))
+
+def t_Asset_archive_update_case(mocker, asset_and_replacement):
+    """Tests Asset.archive with a single file and update=True"""
+    # TODO more cases --^
+    old_asset_obj, new_asset_obj = asset_and_replacement
+    # interpret path as a single file
+    mocker.patch.object(data_core.os.path, 'isdir').return_value = False
+    # needs to return (asset object, link count, overwritten asset object)
+    mocker.patch.object(landsat.landsatAsset, '_archivefile').return_value = (
+            old_asset_obj, 1, new_asset_obj)
+    # prevent exception for file-not-found
+    mocker.patch.object(data_core, 'RemoveFiles')
+
+    # setup complete; perform the call
+    (actual_assets, actual_replaced_assets) = landsat.landsatAsset.archive(
+            old_asset_obj.filename, update=True)
+
+    assert (actual_assets == [old_asset_obj] and
+            actual_replaced_assets == [new_asset_obj])
+
+def t_Data_archive_assets_update_case(orm, mocker, asset_and_replacement):
+    """Tests Data.archive_assets with a single file and update=True."""
+    # TODO more cases --^
+    old_asset_obj, new_asset_obj = asset_and_replacement
+    mocker.patch.object(landsatData.Asset, 'archive').return_value = (
+            [old_asset_obj], [new_asset_obj])
+    # two of these should be deleted; the third should remain
+    stale_product     = ('/archive/landsat/tiles/012030/2017213/'
+                         '012030_2017213_LC8_rad.tif')
+    stale_product_toa = ('/archive/landsat/tiles/012030/2017213/'
+                         '012030_2017213_LC8_rad-toa.tif')
+    keeper_product    = ('/archive/landsat/tiles/012030/2017213/'
+                         '012030_2017213_LC8SR_landmask.tif')
+
+    def m_lsd__init__(self, *args, **kwargs):
+        self.filenames = {('fake-sensor', 'rad'): stale_product,
+                          ('fake-sensor', 'rad-toa'): stale_product_toa,
+                          ('fake-sensor', 'landmask'): keeper_product}
+
+    # prevent the constructor from going out to the database/filesystem
+    mocker.patch.object(landsatData, '__init__', m_lsd__init__)
+    m_os_remove = mocker.patch.object(data_core.os, 'remove')
+    m_delete_product = mocker.patch.object(data_core.dbinv, 'delete_product')
+
+    # setup complete; call method being tested   vvvvvv-- mocked, don't care
+    actual = landsat.landsatData.archive_assets("hi-mom", update=True)
+
+    dt = datetime(2017, 8, 1, 0, 0)
+    m_delete_product.assert_any_call(
+        driver='landsat', product='rad', tile='012030', date=dt)
+    m_delete_product.assert_any_call(
+        driver='landsat', product='rad-toa', tile='012030', date=dt)
+    assert m_delete_product.call_count == 2
+    m_os_remove.assert_any_call(stale_product)
+    m_os_remove.assert_any_call(stale_product_toa)
+    assert m_os_remove.call_count == 2
