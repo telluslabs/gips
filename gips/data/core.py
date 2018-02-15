@@ -580,7 +580,7 @@ class Asset(object):
         # Summarize
         if numfiles > 0:
             VerboseOut('%s files (%s links) from %s added to archive in %s' %
-                      (numfiles, numlinks, os.path.abspath(path), datetime.now() - start))
+                      (numfiles, numlinks, path, datetime.now() - start))
         if numfiles != len(fnames):
             VerboseOut('%s files not added to archive' % (len(fnames) - numfiles))
         return assets, overwritten_assets

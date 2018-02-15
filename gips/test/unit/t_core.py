@@ -1,4 +1,4 @@
-"""Unit tests for core functions, such as those found in gips.core and gips.data.core."""
+"""Unit tests for core functions found in gips.core and gips.data.core."""
 
 import sys
 from datetime import datetime
@@ -8,7 +8,9 @@ import mock
 
 import gips
 from gips import core
+from gips.data import core as data_core
 from gips.data.landsat.landsat import landsatRepository, landsatData
+from gips.data.landsat import landsat
 from gips.inventory import dbinv
 
 def t_repository_find_tiles_normal_case(mocker, orm):
@@ -93,7 +95,7 @@ def t_data_add_file_repeat(orm, mocker):
 
 
 @pytest.mark.parametrize('search', (False, True))
-def t_data_init_search(mocker, search):
+def t_data_init_search(mocker, orm, search):
     """Confirm Data.__init__ searches the FS only when told to.
 
     Do this by instantiating landsatData."""
@@ -139,3 +141,30 @@ def t_data_fetch_error_case(df_mocks):
     It should return [], and shouldn't raise an exception."""
     df_mocks.side_effect = RuntimeError('aaah!')
     assert landsatData.fetch(*df_args) == []
+
+def t_Asset_archive_update_case(mocker):
+    """Tests Asset.archive with a single file and update=True"""
+    # TODO more cases --^
+    # note later date processing date -------------vvvvvvvv
+    asset_fn          = 'LC08_L1TP_012030_20170801_20170811_01_T1.tar.gz'
+    replaced_asset_fn = 'LC08_L1TP_012030_20170801_20171231_01_T1.tar.gz'
+
+    # interpret path as a single file
+    mocker.patch.object(data_core.os.path, 'isdir').return_value = False
+
+    # mock _archivefile
+    asset_obj          = landsat.landsatAsset(asset_fn)
+    replaced_asset_obj = landsat.landsatAsset(replaced_asset_fn)
+    m_archivefile = mocker.patch.object(landsat.landsatAsset, '_archivefile')
+    # needs to return (asset object, link count, overwritten asset object)
+    m_archivefile.return_value = (asset_obj, 1, replaced_asset_obj)
+
+    # prevent exception for file-not-found
+    mocker.patch.object(data_core, 'RemoveFiles')
+
+    # setup complete; perform the call
+    (actual_assets, actual_replaced_assets) = landsat.landsatAsset.archive(
+            asset_fn, update=True)
+
+    assert (actual_assets == [asset_obj] and
+            actual_replaced_assets == [replaced_asset_obj])
