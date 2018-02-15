@@ -1045,12 +1045,13 @@ class Data(object):
         temporal = TemporalExtent(dates, days)
         if len(spatial) > 1:
             raise ValueError(
-                '{}Data.inventory: site (or rastermask) may only specify 1'
-                .format(cls.name.lower()) +
-                '      feature via this API call ({} provided in {})'
-                .format(len(spatial),
-                        str((site, key, where)) if site else rastermask)
+                '{}.inventory: site (or rastermask) may only specify 1'
+                '     feature via this API call ({} provided in {})'
+                .format(
+                    cls.__name__, len(spatial),
+                    str((site, key, where)) if site else rastermask
                 )
+            )
         return DataInventory(cls, spatial[0], temporal, **kwargs)
 
     @classmethod
