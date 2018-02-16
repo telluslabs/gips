@@ -22,13 +22,13 @@ inv_cli_params = (
     ('modisndti', RASTERMASK, 'ndti', '2012-333', 'No matching files in inventory'),
 )
 inv_api_params = (
-    tuple((tup[:-1] + (i,) for (i, tup) in zip((1, 0, 1, 0), inv_cli_params)))
+    tuple((tup[:-1] + (i,) for (tup, i) in zip(inv_cli_params, (1, 0, 1, 0))))
 )
 
 
 @pytest.mark.parametrize("driver, spatial, product, datespec, expected", inv_cli_params)
 def t_cli_inventory(driver, spatial, product, datespec, expected):
-    """Test gips_process output."""
+    """Test gips_inventory for different CLI parameter combinations."""
     driver_setup.setup_repo_data(driver)
     spat_opt = '-r' if spatial.endswith('.tif') else '-s'
     outcome = sh.gips_inventory(
@@ -40,6 +40,10 @@ def t_cli_inventory(driver, spatial, product, datespec, expected):
 @pytest.mark.django_db
 @pytest.mark.parametrize("driver, spatial, product, datespec, expected", inv_api_params)
 def t_api_inventory(driver, spatial, product, datespec, expected):
+    """
+    Test gips.data.core.Data.inventory for different API parameter
+    combinations.
+    """
     driver_setup.setup_repo_data(driver)
     from gips.data.modis import modisData, modisAsset
     from gips.inventory import orm
@@ -50,6 +54,6 @@ def t_api_inventory(driver, spatial, product, datespec, expected):
     r = spatial if spatial.endswith('.tif') else None
     s = spatial if r is None else None
     inv = modisData.inventory(
-        site=s, rastermask=r, dates=datespec, products=[product]
+        site=s, rastermask=r, dates=datespec, products=[product],
     )
     assert len(inv.dates) == expected
