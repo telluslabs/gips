@@ -115,33 +115,47 @@ def t_data_init_search(mocker, orm, search):
             and lsd.assets == lsd.filenames == lsd.sensors == {}
             and lsd.ParseAndAddFiles.called == lsd.Asset.discover.called == search)
 
+@pytest.fixture
+def m_discover_asset(mocker):
+    return mocker.patch.object(landsatData.Asset, 'discover_asset',
+                               return_value=None)
 
 @pytest.fixture
-def df_mocks(mocker):
-    """Mocks for testing Data.fetch below."""
-    mocker.patch.object(landsatData.Asset, 'discover', return_value=False)
+def m_query_service(mocker):
+    asset_bn = 'LC08_L1TP_012030_20170801_20170811_01_T1.tar.gz'
+    query_rv = {'basename': asset_bn, 'url': 'himom.com'}
+    return mocker.patch.object(landsatData.Asset, 'query_service',
+                               return_value=query_rv)
+
+@pytest.fixture
+def m_fetch(mocker):
     return mocker.patch.object(landsatData.Asset, 'fetch')
 
 # useful constant for the following tests
-df_args = (['rad', 'ndvi', 'bqashadow'], ['012030'], core.TemporalExtent('2012-12-01'))
+df_args = (['rad', 'ndvi', 'bqashadow'], ['012030'],
+           core.TemporalExtent('2017-08-01'))
 
-def t_data_fetch_base_case(df_mocks):
+def t_data_fetch_base_case(mocker, m_discover_asset, m_query_service, m_fetch):
     """Test base case of data.core.Data.fetch.
 
     It should return data about the fetch on success, and shouldn't
     raise an exception."""
-    expected = [
-        ('DN', '012030', datetime.datetime(2012, 12, 1, 0, 0)),
-        ('C1', '012030', datetime.datetime(2012, 12, 1, 0, 0)),
-    ]
-    assert expected == landsatData.fetch(*df_args)
+    # setup
+    c1_atd = ('C1', '012030', datetime.datetime(2017, 8, 1, 0, 0))
+    c1s3_atd = ('C1S3', '012030', datetime.datetime(2017, 8, 1, 0, 0))
+    expected_calls = [mocker.call(*c1_atd, **m_query_service.return_value),
+                      mocker.call(*c1s3_atd, **m_query_service.return_value)]
+    # call
+    actual = landsatData.fetch(*df_args)
+    # assertions
+    assert ([c1_atd, c1s3_atd] == actual
+            and expected_calls == m_fetch.call_args_list)
 
-
-def t_data_fetch_error_case(df_mocks):
+def t_data_fetch_error_case(mocker, m_discover_asset, m_query_service, m_fetch):
     """Test error case of data.core.Data.fetch.
 
     It should return [], and shouldn't raise an exception."""
-    df_mocks.side_effect = RuntimeError('aaah!')
+    m_fetch.side_effect = RuntimeError('aaah!')
     assert landsatData.fetch(*df_args) == []
 
 

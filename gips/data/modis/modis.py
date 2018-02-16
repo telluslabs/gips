@@ -180,7 +180,7 @@ class modisAsset(Asset):
         """Find out from the modis servers what assets are available.
 
         Uses the given (asset, tile, date) tuple as a search key, and
-        returns a list of dicts:  {'basename': base-filename, 'url': url}
+        returns a tuple:  base-filename, url
         """
         year, month, day = date.timetuple()[:3]
 
@@ -219,17 +219,14 @@ class modisAsset(Asset):
         return None, None
 
     @classmethod
-    def fetch(cls, asset, tile, date):
-        asset_info = cls.query_service(asset, tile, date)
-        if asset_info is None:
-            return []
-        basename, url = asset_info['basename'], asset_info['url']
-        with utils.error_handler("Error fetching {} from {}".format(
-                basename, url), continuable=True):
+    def fetch(cls, asset, tile, date, basename, url):
+        outpath = os.path.join(cls.Repository.path('stage'), basename)
+
+        with utils.error_handler(
+                "Asset fetch error ({})".format(url), continuable=True):
             response = cls.Repository.managed_request(url)
             if response is None:
                 return []
-            outpath = os.path.join(cls.Repository.path('stage'), basename)
             with open(outpath, 'wb') as fd:
                 fd.write(response.read())
             utils.verbose_out('Retrieved ' + basename, 2)

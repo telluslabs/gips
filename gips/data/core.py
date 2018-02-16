@@ -393,30 +393,33 @@ class Asset(object):
         date:   datetime.date object to limit search in temporal dimension
         asset:  Asset type string, eg for modis could be 'MCD43A2'
         """
-        criteria = {'driver': cls.Repository.name.lower(), 'tile': tile, 'date': date}
-        if asset is not None:
-            criteria['asset'] = asset
+        a_types = cls._assets.keys() if asset is None else [asset]
+        found = [cls.discover_asset(a, tile, date) for a in a_types]
+        return [a for a in found if a is not None] # lastly filter Nones
+
+    @classmethod
+    def discover_asset(cls, asset_type, tile, date):
+        """Finds an asset for the a-t-d trio and returns an object for it."""
         if orm.use_orm():
             # search for ORM Assets to use for making GIPS Assets
-            return [cls(a.name) for a in dbinv.asset_search(**criteria)]
+            results = dbinv.asset_search(driver=cls.Repository.name.lower(),
+                                    asset=asset_type, tile=tile, date=date)
+            if len(results) == 0:
+                return None
+            assert len(results) == 1 # sanity check; DB should enforce
+            return cls(results[0].name)
 
         # The rest of this fn uses the filesystem inventory
-        tpath = cls.Repository.data_path(tile, date)
-        if not os.path.isdir(tpath):
-            return []
-        if asset is not None:
-            assets = [asset]
-        else:
-            assets = cls._assets.keys()
-        found = []
-        for a in assets:
-            files = utils.find_files(cls._assets[a]['pattern'], tpath)
-            # more than 1 asset??
-            if len(files) > 1:
-                raise Exception("Duplicate(?) assets found: {}".format(files))
-            if len(files) == 1:
-                found.append(cls(files[0]))
-        return found
+        d_path = cls.Repository.data_path(tile, date)
+        if not os.path.isdir(d_path):
+            return None
+        files = utils.find_files(cls._assets[asset_type]['pattern'], d_path)
+        # Confirm only one asset
+        if len(files) > 1:
+            raise IOError("Duplicate(?) assets found: {}".format(files))
+        if len(files) == 1:
+            return cls(files[0])
+        return None
 
     @classmethod
     def start_date(cls, asset):
@@ -510,7 +513,7 @@ class Asset(object):
 
 
     @classmethod
-    def fetch(cls, asset, tile, date):
+    def fetch(cls, *args, **kwargs):
         """ Fetch stub """
         raise NotImplementedError("Fetch not supported for this data source")
 
@@ -1108,16 +1111,33 @@ class Data(object):
         """ Download data for tiles and add to archive. update forces fetch """
         assets = cls.products2assets(products)
         fetched = []
+        # TODO rewrite this to back off the indentation
         for a in assets:
             for t in tiles:
                 asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                 for d in asset_dates:
+                    query = cls.Asset.query_service(a, t, d)
+                    if query is None: # nothing remote; done
+                        continue
                     # if we don't have it already, or if update (force) flag
-                    if not cls.Asset.discover(t, d, a) or update == True:
+                    queried_ao = cls.Asset(query['basename'])
+                    local_ao = cls.Asset.discover_asset(a, t, d)
+                    need_to_fetch = local_ao is None or (
+                            update and local_ao.updated(queried_ao))
+                    if need_to_fetch:
                         date_str = d.strftime("%y-%m-%d")
                         msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
                         with utils.error_handler(msg_prefix, continuable=True):
-                            cls.Asset.fetch(a, t, d)
+                            # Feature toggle:  Call new fetch only if driver
+                            # supports it (or from within a unit test in which
+                            # case it probably doesn't matter)
+                            import inspect
+                            if ('Mock' in type(cls.Asset.fetch).__name__
+                                        or len(inspect.getargspec(
+                                                cls.Asset.fetch)) > 4):
+                                cls.Asset.fetch(a, t, d, **query)
+                            else:
+                                cls.Asset.fetch(a, t, d)
                             # fetched may contain both fetched things and unfetchable things
                             fetched.append((a, t, d))
         return fetched
