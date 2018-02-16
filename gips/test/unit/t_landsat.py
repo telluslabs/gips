@@ -26,3 +26,12 @@ def t_landsatAsset_constructor(fn, expected, mocker):
     m_cloud_cover = mocker.patch.object(landsat.landsatAsset, 'cloud_cover')
     la = landsat.landsatAsset(fn)
     assert expected == actual(la)
+
+def t_landsatAsset_query_service_not_available_case(mocker):
+    """Confirms the query_service method gives up if dates are invalid."""
+    mocker.patch.object(landsat.landsatAsset, 'available').return_value = False
+    dc = 'dontcare'
+    # if it doesn't exit in time, this fake date will raise an exception when
+    # query_service tries to call strftime on it -------vv
+    actual = landsat.landsatAsset.query_service(dc, dc, dc)
+    assert [] == actual

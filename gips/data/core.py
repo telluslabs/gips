@@ -453,6 +453,7 @@ class Asset(object):
         Also prunes dates outside the bounds of the asset's valid date range,
         as given by start_date and end_date.
         """
+        # TODO tile arg isn't used
         from dateutil.rrule import rrule, DAILY
         req_start_dt, req_end_dt = dates
 
@@ -473,7 +474,7 @@ class Asset(object):
                 start_dt, end_dt), 5)
 
         # default assumes daily regardless of asset or tile
-        datearr = rrule(DAILY, dtstart=req_start_dt, until=req_end_dt)
+        datearr = rrule(DAILY, dtstart=start_dt, until=end_dt)
         dates = [dt for dt in datearr if days[0] <= int(dt.strftime('%j')) <= days[1]]
         return dates
 

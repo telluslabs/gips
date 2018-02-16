@@ -1,7 +1,7 @@
 """Unit tests for core functions, such as those found in gips.core and gips.data.core."""
 
 import sys
-from datetime import datetime
+import datetime
 
 import pytest
 import mock
@@ -9,6 +9,7 @@ import mock
 import gips
 from gips import core
 from gips.data.landsat.landsat import landsatRepository, landsatData
+from gips.data.sar import sar
 from gips.inventory import dbinv
 
 def t_repository_find_tiles_normal_case(mocker, orm):
@@ -32,8 +33,8 @@ def t_repository_find_tiles_error_case(mocker, orm):
 def t_repository_find_dates_normal_case(mocker, orm):
     """Test Repository.find_dates using landsatRepository as a guinea pig."""
     m_list_dates = mocker.patch('gips.data.core.dbinv.list_dates')
-    dt = datetime
-    expected = [dt(1900, 1, 1), dt(1950, 10, 10), dt(2000, 12, 12)]
+    expected = [datetime.datetime(*a) for a in
+                (1900, 1, 1), (1950, 10, 10), (2000, 12, 12)]
     m_list_dates.return_value = expected
     actual = landsatRepository.find_dates('some-tile')
     assert expected == actual
@@ -57,7 +58,8 @@ def t_data_add_file(orm, mocker, add_to_db):
     t_sensor    = 'test-sensor'
     t_product   = 'test-product'
     t_filename  = 'test-filename.tif'
-    lsd = landsatData('test-tile', datetime(1955, 11, 5), search=False)
+    lsd = landsatData(
+            'test-tile', datetime.datetime(1955, 11, 5), search=False)
 
     lsd.AddFile(t_sensor, t_product, t_filename, add_to_db)
 
@@ -77,7 +79,7 @@ def t_data_add_file_repeat(orm, mocker):
     Thus, confirm it's possible to replace file entries with new versions.
     """
     t_tile      = 'test-tile'
-    t_date      = datetime(1955, 11, 5)
+    t_date      = datetime.datetime(1955, 11, 5)
     t_sensor    = 'test-sensor'
     t_product   = 'test-product'
     t_filename  = 'test-filename.tif'
@@ -101,11 +103,12 @@ def t_data_init_search(mocker, search):
     mocker.patch.object(landsatData.Asset, 'discover')
     mocker.patch.object(landsatData, 'ParseAndAddFiles')
 
-    lsd = landsatData(tile='t', date=datetime(9999, 1, 1), search=search) # call-under-test
+    lsd = landsatData(tile='t', date=datetime.datetime(9999, 1, 1),
+                      search=search)
 
     # assert normal activity & entry of search block
     assert (lsd.id == 't'
-            and lsd.date == datetime(9999, 1, 1)
+            and lsd.date == datetime.datetime(9999, 1, 1)
             and '' not in (lsd.path, lsd.basename)
             and lsd.assets == lsd.filenames == lsd.sensors == {}
             and lsd.ParseAndAddFiles.called == lsd.Asset.discover.called == search)
@@ -126,8 +129,8 @@ def t_data_fetch_base_case(df_mocks):
     It should return data about the fetch on success, and shouldn't
     raise an exception."""
     expected = [
-        ('DN', '012030', datetime(2012, 12, 1, 0, 0)),
-        ('C1', '012030', datetime(2012, 12, 1, 0, 0)),
+        ('DN', '012030', datetime.datetime(2012, 12, 1, 0, 0)),
+        ('C1', '012030', datetime.datetime(2012, 12, 1, 0, 0)),
     ]
     assert expected == landsatData.fetch(*df_args)
 
@@ -138,3 +141,12 @@ def t_data_fetch_error_case(df_mocks):
     It should return [], and shouldn't raise an exception."""
     df_mocks.side_effect = RuntimeError('aaah!')
     assert landsatData.fetch(*df_args) == []
+
+def t_Asset_dates():
+    """Test Asset's start and end dates, using SAR."""
+    dates_in = datetime.date(2006, 1, 20), datetime.date(2006, 1, 27)
+    # tile isn't used --------------vvv     dayrange --vvvvvv
+    actual = sar.sarAsset.dates('alos1', 'dontcare', dates_in, (1, 366))
+    expected = [datetime.datetime(*a) for a in
+                (2006, 1, 24), (2006, 1, 25), (2006, 1, 26), (2006, 1, 27)]
+    assert expected == actual
