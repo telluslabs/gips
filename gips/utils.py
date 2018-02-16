@@ -479,8 +479,9 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
         " ".join(filenames),
         outfile
     )
-    result = commands.getstatusoutput(cmd)
-    verbose_out('{}: {}'.format(cmd, result, 4))
+    status, output = commands.getstatusoutput(cmd)
+    verbose_out(' COMMAND: {}\n exit_status: {}\n output: {}'
+                .format(cmd, status, output ), 4)
 
     imgout = gippy.GeoImage(outfile, True)
     for b in range(0, images[0].NumBands()):
