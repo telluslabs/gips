@@ -70,6 +70,10 @@ def binmask(arr, bit):
     """
     return arr & (1 << (bit - 1)) == (1 << (bit - 1))
 
+
+class NoSentinelError(Exception):
+    pass
+
 class landsatRepository(Repository):
     """ Singleton (all class methods) to be overridden by child data classes """
     name = 'Landsat'
@@ -82,8 +86,7 @@ class landsatRepository(Repository):
     def feature2tile(cls, feature):
         tile = super(landsatRepository, cls).feature2tile(feature)
         return tile.zfill(6)
-
-
+    
 class landsatAsset(Asset):
     """ Landsat asset (original raw tar file) """
     Repository = landsatRepository
@@ -1040,8 +1043,7 @@ class landsatData(Data):
                 archive_fp = self.archive_temp_path(fname)
                 self.AddFile(sensor, key, archive_fp)
 
-        elif asset in ('DN', 'C1', 'C1S3'):
-
+        elif asset in ('DN', 'C1', 'C1S3'):            
             # This block contains everything that existed in the first generation Landsat driver
 
             # Add the sensor for this date to the basename
@@ -1064,14 +1066,20 @@ class landsatData(Data):
                 # needs to be shifted as well as a hint to users who will
                 # likely only do this as an accident anyway.
                 raise ValueError("Mixing coreg and non-coreg products is not allowed")
+            
             if coreg:
                 if not glob.glob(os.path.join(self.path, "*coreg_args.txt")):
-                    # run arop and store coefficients
                     with utils.make_temp_dir() as tmpdir:
-                        s2_export = self.sentinel2_coreg_export(tmpdir)
-                        self.run_arop(s2_export)
-                coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
-
+                        try:
+                            s2_export = self.sentinel2_coreg_export(tmpdir)
+                            self.run_arop(s2_export)
+                        except NoSentinelError:
+                            pass
+                try:
+                    coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
+                except:
+                    coreg_xshift, coreg_yshift = (0.0, 0.0)
+                    
             # running atmosphere if any products require it
             toa = True
             for val in products.requested.values():
@@ -1664,7 +1672,7 @@ class landsatData(Data):
 
         while len(inventory) == 0:
             if delta > timedelta(90):
-                raise ValueError("No sentinel2 data could be found within 180 days")
+                raise NoSentinelError("No sentinel2 data could be found within 180 days")
 
             temporal_extent = TemporalExtent((starting_date + delta).strftime("%Y-%j"))
             inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch)
@@ -1679,6 +1687,7 @@ class landsatData(Data):
             date_found = starting_date - delta
             delta += timedelta(1)
 
+            
         geo_images = []
         tiles = inventory[date_found].tiles.keys()
         for tile in tiles:
