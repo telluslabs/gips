@@ -89,7 +89,7 @@ class cdlAsset(Asset):
     @classmethod
     def query_service(cls, asset, tile, date):
         if asset == _cdlmkii:
-            return []
+            return None
         url = "https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLFile"
         tile_vector = utils.open_vector(cls.Repository.get_setting('tiles'), 'STATE_ABBR')[tile]
         params = {
@@ -98,10 +98,11 @@ class cdlAsset(Asset):
         }
         xml = requests.get(url, params=params, verify=False)
         if xml.status_code != 200:
-            return []
+            return None
         root = ElementTree.fromstring(xml.text)
         file_url = root.find('./returnURL').text
-        return [{'url': file_url, 'basename': "{}_{}_cdl_cdl.tif".format(tile, date.year)}]
+        return {'url': file_url,
+                'basename': "{}_{}_cdl_cdl.tif".format(tile, date.year)}
 
     @classmethod
     def fetch(cls, asset, tile, date):

@@ -140,10 +140,11 @@ class aodAsset(Asset):
         return super(aodAsset, cls).ftp_connect(wd)
 
     @classmethod
-    def query_provider(cls, asset, tile, date):
+    def query_service(cls, asset, tile, date):
         """Query the data provider for files matching the arguments.
 
-        Returns (filename, url), or (None, None) if nothing found.
+        Returns {'filename': fn}, or None if nothing found; note no URL
+        is relevant for ftp.
         """
         utils.verbose_out('{}: query tile {} for {}'.format(asset, tile, date), 3)
         if asset not in cls._assets:
@@ -153,10 +154,12 @@ class aodAsset(Asset):
             filenames = [fn for fn in ftp.nlst('*')
                          if re.match(cls._assets[asset]['pattern'], fn)]
             ftp.quit()
+            if len(filenames) == 0:
+                return None
             if len(filenames) > 1: # 0 assets happens all the time
                 raise ValueError("Expected one asset, found {}".format(len(filenames)))
-            return filenames[0], None # urls are not relevant for ftp
-        return None, None
+            return {'basename': filenames[0]}
+        return None
 
     @classmethod
     def fetch(cls, asset, tile, date):

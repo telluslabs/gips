@@ -45,3 +45,18 @@ def t_cdlData_legend(mocker):
     assert d.legend() == expected_legend and \
         d.get_code('class1') == 0 and \
         d.get_cropname(0) == 'class1'
+
+def t_cdlAsset_query_service_success_case(mocker):
+    """Confirm aodAsset.query_service successfully reports a found asset."""
+    fake_tile = 'fake-tile'
+    mocker.patch.object(cdl.utils, 'open_vector').return_value = {
+        'fake-tile': {'STATE_FIPS': 'hi mom!'}}
+    mocker.patch.object(cdl.requests, 'get').return_value.status_code = 200
+    expected_url = 'http://www.fluffy-bunnies-and-rainbows.mil/'
+    m_root = mocker.patch.object(cdl.ElementTree, 'fromstring').return_value
+    m_root.find.return_value.text = expected_url
+
+    actual = cdl.cdlAsset.query_service('cdl', fake_tile,
+                                        datetime.date(2015, 01, 01))
+    assert {'basename': 'fake-tile_2015_cdl_cdl.tif',
+            'url': expected_url} == actual

@@ -531,20 +531,17 @@ class landsatAsset(Asset):
         permitted cloud cover %.
         """
         if not cls.available(asset, date):
-            return []
-        available = []
-
+            return None
         if asset in ['DN', 'SR']:
             verbose_out('Landsat "{}" assets are no longer fetchable'.format(
                     asset), 6)
-            return available
+            return None
 
         path = tile[:3]
         row = tile[3:]
         fdate = date.strftime('%Y-%m-%d')
         cls.load_ee_search_keys()
         api_key = cls.ee_login()
-        available = []
         from usgs import api
         for dataset in cls._ee_datasets.keys():
             response = api.search(
@@ -569,15 +566,15 @@ class landsatAsset(Asset):
                 )[0].text
 
                 if float(scene_cloud_cover) < pcover:
-                    available.append({
+                    return {
                         'basename': result['displayId'] + '.tar.gz',
                         'sceneID': result['entityId'],
                         'dataset': dataset,
                         'sceneCloudCover': float(scene_cloud_cover),
                         'landCloudCover': float(land_cloud_cover),
-                    })
+                    }
 
-        return available
+        return None
 
     @classmethod
     def fetch(cls, asset, tile, date):
