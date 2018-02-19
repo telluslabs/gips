@@ -208,7 +208,7 @@ def t_Data_archive_assets_update_case(orm, mocker, asset_and_replacement):
     # setup complete; call method being tested   vvvvvv-- mocked, don't care
     actual = landsat.landsatData.archive_assets("hi-mom", update=True)
 
-    dt = datetime(2017, 8, 1, 0, 0)
+    dt = datetime.datetime(2017, 8, 1, 0, 0)
     m_delete_product.assert_any_call(
         driver='landsat', product='rad', tile='012030', date=dt)
     m_delete_product.assert_any_call(
