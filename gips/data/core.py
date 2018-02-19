@@ -502,11 +502,11 @@ class Asset(object):
         avilable, must return [].
         """
         if not cls.available(asset, date):
-            return []
+            return None
         bn, url = cls.query_provider(asset, tile, date)
         if (bn, url) == (None, None):
-            return []
-        return [{'basename': bn, 'url': url}]
+            return None
+        return {'basename': bn, 'url': url}
 
 
     @classmethod

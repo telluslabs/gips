@@ -220,27 +220,21 @@ class modisAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        available_assets = cls.query_service(asset, tile, date)
-        retrieved_filenames = []
-        # TODO does modis ever have more than one asset per (a,t,d)?  If not, unloop this method.
-        for asset_info in available_assets:
-            basename = asset_info['basename']
-            url = asset_info['url']
+        asset_info = cls.query_service(asset, tile, date)
+        if asset_info is None:
+            return []
+        basename, url = asset_info['basename'], asset_info['url']
+        with utils.error_handler("Error fetching {} from {}".format(
+                basename, url), continuable=True):
+            response = cls.Repository.managed_request(url)
+            if response is None:
+                return []
             outpath = os.path.join(cls.Repository.path('stage'), basename)
-
-            with utils.error_handler(
-                    "Asset fetch error ({})".format(asset_info), continuable=True):
-                response = cls.Repository.managed_request(url)
-                if response is None:
-                    return retrieved_filenames # give up now as the rest
-                with open(outpath, 'wb') as fd:
-                    fd.write(response.read())
-
-                utils.verbose_out('Retrieved %s' % basename, 2)
-                retrieved_filenames.append(outpath)
-
-        return retrieved_filenames
-
+            with open(outpath, 'wb') as fd:
+                fd.write(response.read())
+            utils.verbose_out('Retrieved ' + basename, 2)
+            return [outpath]
+        return []
 
 # index product types and descriptions
 _index_products = [
