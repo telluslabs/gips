@@ -548,7 +548,7 @@ class Asset(object):
             ftp.close()
 
     @classmethod
-    def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
+    def archive(cls, path, recursive=False, keep=False, update=False):
         """Move asset into the archive.
 
         Pass in a path to a file or a directory.  If a directory, its
@@ -558,6 +558,10 @@ class Asset(object):
         then removed, unless `keep`. If a found asset would replace an
         extant archived asset, replacement is only performed if
         `update`.  kwargs is unused and likely without purpose.
+
+        Returns a pair of lists:  A list of Asset objects that were archived,
+        and a list of asset objects whose files have been overwritten (by the
+        update flag).
         """
         start = datetime.now()
 
@@ -576,28 +580,41 @@ class Asset(object):
         numlinks = 0
         numfiles = 0
         assets = []
+        overwritten_assets = []
+        if not fnames:
+            utils.verbose_out('No files found; nothing to archive.')
         for f in fnames:
-            archived = cls._archivefile(f, update)
-            if archived[1] >= 0:
+            (asset_obj, link_count, overwritten_ao) = cls._archivefile(f,
+                                                                       update)
+            if overwritten_ao is not None:
+                overwritten_assets.append(overwritten_ao)
+            if link_count >= 0:
                 if not keep:
                     RemoveFiles([f], ['.index', '.aux.xml'])
-            if archived[1] > 0:
+            if link_count > 0:
                 numfiles = numfiles + 1
-                numlinks = numlinks + archived[1]
-                assets.append(archived[0])
+                numlinks = numlinks + link_count
+                assets.append(asset_obj)
 
         # Summarize
         if numfiles > 0:
             VerboseOut('%s files (%s links) from %s added to archive in %s' %
-                      (numfiles, numlinks, os.path.abspath(path), datetime.now() - start))
+                      (numfiles, numlinks, path, datetime.now() - start))
         if numfiles != len(fnames):
             VerboseOut('%s files not added to archive' % (len(fnames) - numfiles))
-        return assets
+        return assets, overwritten_assets
 
     @classmethod
     def _archivefile(cls, filename, update=False):
-        """ archive specific file """
+        """Move the named file into the archive.
+
+        If update == True, replace any old versions and associated files.
+        Returns a 3-tuple:  An Asset object if anything was archived, or
+        None, a count of hardlinks made, believed to be just 1 or 0, and
+        an asset object for any asset file that was overwritten.
+        """
         bname = os.path.basename(filename)
+        overwritten_ao = None
         try:
             asset = cls(filename)
         except Exception, e:
@@ -606,7 +623,7 @@ class Asset(object):
             qname = os.path.join(cls.Repository.path('quarantine'), bname)
             if not os.path.exists(qname):
                 os.link(os.path.abspath(filename), qname)
-            return (None, 0)
+            return (None, 0, None)
 
         # make an array out of asset.date if it isn't already
         dates = asset.date
@@ -648,16 +665,12 @@ class Asset(object):
                             )
                             # NOTE: This return makes sense iff len(existing)
                             # cannot be greater than 1
-                            return (None, 0)
+                            return (None, 0, None)
+                        overwritten_ao = cls(ef.filename)
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
                         errmsg = 'Unable to remove existing version: ' + ef.filename
                         with utils.error_handler(errmsg):
                             os.remove(ef.filename)
-                    files = glob.glob(os.path.join(tpath, '*'))
-                    for f in set(files).difference([ef.filename]):
-                        msg = 'Unable to remove product {} from {}'.format(f, tpath)
-                        with utils.error_handler(msg, continuable=True):
-                            os.remove(f)
                     with utils.error_handler('Problem adding {} to archive'.format(filename)):
                         os.link(os.path.abspath(filename), newfilename)
                         asset.archived_filename = newfilename
@@ -677,9 +690,9 @@ class Asset(object):
             else:
                 VerboseOut('%s already in archive' % filename, 2)
         if otherversions and numlinks == 0:
-            return (asset, -1)
+            return (asset, -1, overwritten_ao)
         else:
-            return (asset, numlinks)
+            return (asset, numlinks, overwritten_ao)
         # should return asset instance
 
 
@@ -828,7 +841,13 @@ class Data(object):
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)
             if search:
                 [self.add_asset(a) for a in self.Asset.discover(tile, date)] # Find all assets
-                self.ParseAndAddFiles() # Find products
+                fn_to_add = None
+                if orm.use_orm():
+                    search = {'driver': self.Repository.name.lower(),
+                              'date': date, 'tile': tile}
+                    fn_to_add = [str(p.name)
+                                 for p in dbinv.product_search(**search)]
+                self.ParseAndAddFiles(fn_to_add)
 
     def add_asset(self, asset):
         """Add an Asset object to self.assets and:
@@ -1052,13 +1071,25 @@ class Data(object):
 
     @classmethod
     def inventory(cls, site=None, key='', where='', tiles=None, pcov=0.0,
-                  ptile=0.0, dates=None, days=None, **kwargs):
+                  ptile=0.0, dates=None, days=None, rastermask=None, **kwargs):
         """ Return list of inventories (size 1 if not looping through geometries) """
         from gips.inventory import DataInventory
         from gips.core import SpatialExtent, TemporalExtent
-        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles,
-                                        pcov=pcov, ptile=ptile)
+
+        spatial = SpatialExtent.factory(
+            cls, site=site, rastermask=rastermask, key=key, where=where, tiles=tiles,
+            pcov=pcov, ptile=ptile
+        )
         temporal = TemporalExtent(dates, days)
+        if len(spatial) > 1:
+            raise ValueError(
+                '{}.inventory: site (or rastermask) may only specify 1'
+                '     feature via this API call ({} provided in {})'
+                .format(
+                    cls.__name__, len(spatial),
+                    str((site, key, where)) if site else rastermask
+                )
+            )
         return DataInventory(cls, spatial[0], temporal, **kwargs)
 
     @classmethod
@@ -1195,3 +1226,38 @@ class Data(object):
     def temp_product_filename(self, sensor, prod_type):
         """Generates a product filename within the managed temp dir."""
         return self.generate_temp_path(self.product_filename(sensor, prod_type))
+
+    @classmethod
+    def archive_assets(cls, path, recursive=False, keep=False, update=False):
+        """Adds asset files found in the given path to the repo.
+
+        For arguments see Asset.archive."""
+        archived_aol, overwritten_aol = cls.Asset.archive(
+                path, recursive, keep, update)
+        if overwritten_aol:
+            utils.verbose_out('Updated {} assets, checking for stale '
+                              'products.'.format(len(overwritten_aol)), 2)
+            deletable_p_files = {}
+            for asset_obj in overwritten_aol:
+                data_obj = cls(asset_obj.tile, asset_obj.date, search=True)
+                deletable_p_types = [pt for pt in cls._products
+                        if asset_obj.asset in data_obj._products[pt]['assets']]
+                #    v-- as usual don't care about the sensor
+                for (_, raw_p_type), full_path in data_obj.filenames.items():
+                    p_type = raw_p_type.split('-')[0] # take out eg '-toa'
+                    if p_type in deletable_p_types:
+                        # need to know the key to delete from the ORM
+                        p_key = (cls.Asset.Repository.name.lower(), raw_p_type,
+                                 asset_obj.tile, asset_obj.date)
+                        deletable_p_files[p_key] = full_path
+
+            utils.verbose_out('Found {} stale products:'.format(
+                                len(deletable_p_files)), 2)
+            for p_key, full_path in deletable_p_files.items():
+                utils.verbose_out('Deleting ' + full_path, 2)
+                if orm.use_orm():
+                    dr, p, t, dt = p_key
+                    dbinv.delete_product(driver=dr, product=p, tile=t, date=dt)
+                os.remove(full_path)
+
+        return archived_aol

@@ -175,7 +175,7 @@ class landsatAsset(Asset):
         r'^L(?P<sensor>\w)(?P<satellite>\d{2})_'
         r'(?P<correction_level>.{4})_(?P<path>\d{3})(?P<row>\d{3})_'
         r'(?P<acq_year>\d{4})(?P<acq_month>\d{2})(?P<acq_day>\d{2})_'
-        r'(?P<proc_year>\d{4})(?P<proc_month>\d{2})(?P<proc_day>\d{2})_'
+        r'(?P<processing_date>\d{8})_'
         r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})')
 
     _assets = {
@@ -273,8 +273,10 @@ class landsatAsset(Asset):
                                          int(match.group('satellite')))
             self.collection_number = match.group('coll_num')
             self.collection_category = match.group('coll_cat')
+            processing_date = datetime.strptime(match.group('processing_date'),
+                                                '%Y%m%d')
             self.version = 1e6 * int(self.collection_number) + \
-                    (self.date - datetime(2017, 1, 1)).days + \
+                    (processing_date - datetime(2017, 1, 1)).days + \
                     {'RT': 0, 'T2': 0.5, 'T1': 0.9}[self.collection_category]
         else:
             msg = "No matching landsat asset type for '{}'".format(fname)

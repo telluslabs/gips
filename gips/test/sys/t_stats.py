@@ -18,9 +18,12 @@ def t_stats(export_wrapper, driver, product):
     """Test gips_stats on projected files."""
     record_mode, runner, working_dir = export_wrapper
 
+    driver_setup.setup_repo_data(driver)
+
     # generate data needed for stats computation
     args = driver_setup.STD_ARGS[driver] + ('--res', '100', '100', '--notld',
                             '--outdir', working_dir, '-p', product)
+    print('prepping for stats:', 'gips_project', *args)
     outcome = sh.gips_project(*args)
 
     # compute & confirm stats

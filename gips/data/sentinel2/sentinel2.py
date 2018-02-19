@@ -361,7 +361,7 @@ class sentinel2Asset(Asset):
 
 
     @classmethod
-    def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
+    def archive(cls, path, recursive=False, keep=False, update=False):
         """Archive original and new-style Sentinel-2 assets.
 
         Original-style Sentinel-2 assets have special archiving needs
@@ -388,8 +388,12 @@ class sentinel2Asset(Asset):
                     raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(bn))
 
         assets = []
+        overwritten_assets = []
         for fn in found_files[cls._2016_12_07]:
-            assets += super(sentinel2Asset, cls).archive(fn, False, keep, update)
+            new_aol, new_overwritten_aol = super(sentinel2Asset, cls).archive(
+                    fn, False, keep, update)
+            assets += new_aol
+            overwritten_assets += new_overwritten_aol
 
         for fn in found_files['original']:
             tile_list = cls.tile_list(fn)
@@ -398,11 +402,15 @@ class sentinel2Asset(Asset):
                 for tile in tile_list:
                     tiled_fp = os.path.join(tdname, tile + '_' + os.path.basename(fn))
                     os.link(fn, tiled_fp)
-                assets += super(sentinel2Asset, cls).archive(tdname, False, False, update)
+                orig_aol, orig_overwritten_aol = (
+                        super(sentinel2Asset, cls).archive(
+                                tdname, False, False, update))
+                assets += orig_aol
+                overwritten_assets += orig_overwritten_aol
             if not keep:
                 utils.RemoveFiles([fn], ['.index', '.aux.xml'])
 
-        return assets
+        return assets, overwritten_assets
 
 
     @classmethod

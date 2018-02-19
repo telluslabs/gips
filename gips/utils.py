@@ -162,7 +162,10 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
     try:
         yield absolute_pathname
     finally:
-        shutil.rmtree(absolute_pathname)
+        if 'GIPS_DEBUG' not in os.environ:
+            shutil.rmtree(absolute_pathname)
+        else:
+            print('GIPS_DEBUG: Orphaning {}'.format(absolute_pathname))
 
 
 def find_files(regex, path='.'):
@@ -476,8 +479,9 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
         " ".join(filenames),
         outfile
     )
-    result = commands.getstatusoutput(cmd)
-    verbose_out('{}: {}'.format(cmd, result, 4))
+    status, output = commands.getstatusoutput(cmd)
+    verbose_out(' COMMAND: {}\n exit_status: {}\n output: {}'
+                .format(cmd, status, output ), 4)
 
     imgout = gippy.GeoImage(outfile, True)
     for b in range(0, images[0].NumBands()):
@@ -531,7 +535,8 @@ def report_error(error, msg_prefix, show_tb=True):
     it via the GIPS global verbosity setting."""
     if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
         verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
-        traceback.print_exc()
+        error_text = getattr(error, 'tb_text', 'Error text not found.')
+        verbose_out(error_text, 1, stream=sys.stderr)
     else:
         verbose_out(msg_prefix + ': ' + str(error), 1, stream=sys.stderr)
 
@@ -543,6 +548,7 @@ def lib_error_handler(msg_prefix='Error', continuable=False):
         yield
     except Exception as e:
         if continuable and not _stop_on_error:
+            e.tb_text = traceback.format_exc()
             report_error(e, msg_prefix)
         else:
             raise
@@ -571,6 +577,7 @@ def cli_error_handler(msg_prefix='Error', continuable=False):
         yield
     except Exception as e:
         e.msg_prefix = msg_prefix # for use by gips_exit
+        e.tb_text = traceback.format_exc()
         _accumulated_errors.append(e)
         if continuable and not _stop_on_error:
             report_error(e, msg_prefix)

@@ -171,7 +171,7 @@ class modisAsset(Asset):
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
 
         collection = int(parts[3])
-        file_version = int(parts[4])
+        file_version = int(parts[4]) # datetimestamp near end of the filename
         self._version = float('{}.{}'.format(collection, file_version))
 
 
