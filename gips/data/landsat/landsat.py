@@ -490,38 +490,12 @@ class landsatAsset(Asset):
 
         filename = re.search(fname_fragment, _15m_tif).group(0) + '_S3.json'
         verbose_out("Constructed S3 asset filename:  " + filename, 5)
-        return filename, _30m_tifs, _15m_tif, qa_tif, mtl_txt
+        return {'basename': filename,
+                '_30m_tifs': _30m_tifs, '_15m_tif': _15m_tif,
+                'qa_tif': qa_tif, 'mtl_txt': mtl_txt}
 
     @classmethod
-    def fetch_s3(cls, tile, date):
-        """Fetches AWS S3 assets; currently only 'C1S3' assets.
 
-        Doesn't fetch much; instead it constructs a VRT-based tarball.
-        """
-        query_results = cls.query_s3(tile, date)
-        if query_results is None:
-            return
-        (filename, _30m_tifs, _15m_tif, qa_tif, mtl_txt) = query_results
-        # construct VSI paths; sample (split into lines):
-        # /vsis3_streaming/landsat-pds/c1/L8/013/030
-        #   /LC08_L1TP_013030_20171128_20171207_01_T1
-        #   /LC08_L1TP_013030_20171128_20171207_01_T1_B10.TIF
-        # see also:  http://www.gdal.org/gdal_virtual_file_systems.html
-        vsi_prefix = '/vsis3_streaming/{}/'.format(cls._bucket_name)
-        asset_content = {
-            # can/should add metadata/versioning info here
-            '30m-bands': [vsi_prefix + t for t in _30m_tifs],
-            '15m-band': vsi_prefix + _15m_tif,
-            'qa-band': vsi_prefix + qa_tif,
-            'mtl': cls._s3_url + mtl_txt,
-        }
-
-        with utils.make_temp_dir(prefix='fetch',
-                                 dir=cls.Repository.path('stage')) as tmp_dir:
-            tmp_fp = tmp_dir + '/' + filename
-            with open(tmp_fp, 'w') as tfo:
-                json.dump(asset_content, tfo)
-            shutil.copy(tmp_fp, cls.Repository.path('stage'))
 
     @classmethod
     def query_service(cls, asset, tile, date, pcover=90.0):
@@ -536,7 +510,15 @@ class landsatAsset(Asset):
             verbose_out('Landsat "{}" assets are no longer fetchable'.format(
                     asset), 6)
             return None
+        if asset == 'C1S3':
+            data_src = cls.Repository.get_setting('source')
+            if data_src not in ('s3', 'usgs'):
+                raise ValueError("Data source '{}' is not known"
+                                 " (expected 's3' or 'usgs')".format(data_src))
+            if data_src == 's3':
+                return cls.query_s3(tile, date)
 
+        # if we arrive here, must want C1 from USGS, so we can proceed:
         path = tile[:3]
         row = tile[3:]
         fdate = date.strftime('%Y-%m-%d')
@@ -567,62 +549,74 @@ class landsatAsset(Asset):
 
                 if float(scene_cloud_cover) < pcover:
                     return {
-                        'basename': result['displayId'] + '.tar.gz',
-                        'sceneID': result['entityId'],
+                        # actually used
+                        'scene_id': result['entityId'],
                         'dataset': dataset,
-                        'sceneCloudCover': float(scene_cloud_cover),
-                        'landCloudCover': float(land_cloud_cover),
+                        # ignored but required
+                        'basename': result['displayId'] + '.tar.gz',
+                        # ignored
+                        #'scene_cloud_cover': float(scene_cloud_cover),
+                        #'land_cloud_cover': float(land_cloud_cover),
                     }
 
         return None
 
     @classmethod
-    def fetch(cls, asset, tile, date):
-        # If the user wants to use AWS S3 landsat data, don't fetch
-        # standard C1 assets, which come from conventional USGS data sources.
-        data_src = cls.Repository.get_setting('source')
-        if data_src not in ('s3', 'usgs'):
-            raise ValueError("Data source '{}' is not known"
-                             " (expected 's3' or 'usgs')".format(data_src))
-        if (data_src, asset) == ('s3', 'C1S3'):
-            cls.fetch_s3(tile, date)
-            return
-        if (data_src, asset) in [('usgs', 'C1S3'), ('s3', 'C1')]:
-            return
-        # else proceed as usual:
+    def fetch(cls, asset, tile, date, basename, **query_params):
+        """Fetch the asset given by the given parameters.
 
-        fdate = date.strftime('%Y-%m-%d')
-        response = cls.query_service(asset, tile, date)
-        if len(response) > 0:
-            verbose_out('Fetching %s %s %s' % (asset, tile, fdate), 1)
-            if len(response) != 1:
-                raise Exception('Single date, single location, '
-                                'returned more than one result')
-            result = response[0]
-            utils.verbose_out(str(response), 4)
-            sceneID = result['sceneID']
-            stage_dir = cls.Repository.path('stage')
-            sceneIDs = [str(sceneID)]
+        Many arguments are unused, but must be present for compatibility.
+        """
+        if asset == 'C1S3':
+            return cls.fetch_s3(**query_params)
+        elif asset == 'C1':
+            return cls.fetch_c1(**query_params)
+        else:
+            raise ValueError('Unfetchable asset type: {}'.format(asset))
 
-            api_key = cls.ee_login()
-            from usgs import api
-            url = api.download(
-                result['dataset'], 'EE', sceneIDs, 'STANDARD', api_key
-            )['data'][0]
-            with utils.make_temp_dir(prefix='dwnld', dir=stage_dir) as dldir:
-                homura.download(url, dldir)
+    @classmethod
+    def fetch_c1(cls, scene_id, dataset):
+        """Fetches the C1 asset defined by the arguments."""
+        stage_dir = cls.Repository.path('stage')
+        api_key = cls.ee_login()
+        from usgs import api
+        url = api.download(
+            dataset, 'EE', [str(scene_id)], 'STANDARD', api_key)['data'][0]
+        with utils.make_temp_dir(prefix='dwnld', dir=stage_dir) as dldir:
+            homura.download(url, dldir)
+            granules = os.listdir(dldir)
+            if len(granules) == 0:
+                raise Exception("Download didn't seem to"
+                                " produce a file:  {}".format(str(granules)))
+            os.rename(os.path.join(dldir, granules[0]),
+                      os.path.join(stage_dir, granules[0]))
 
-                granules = os.listdir(dldir)
-                if len(granules) == 0:
-                    raise Exception(
-                        'Download appears to have not produced a file: {}'
-                        .format(str(granules))
-                    )
-                os.rename(
-                    os.path.join(dldir, granules[0]),
-                    os.path.join(stage_dir, granules[0]),
-                )
+    @classmethod
+    def fetch_s3(cls, _30m_tifs, _15m_tif, qa_tif, mtl_txt):
+        """Fetches AWS S3 assets; currently only 'C1S3' assets.
 
+        Doesn't fetch much; instead it constructs a VRT-based tarball.
+        """
+        # construct VSI paths; sample (split into lines):
+        # /vsis3_streaming/landsat-pds/c1/L8/013/030
+        #   /LC08_L1TP_013030_20171128_20171207_01_T1
+        #   /LC08_L1TP_013030_20171128_20171207_01_T1_B10.TIF
+        # see also:  http://www.gdal.org/gdal_virtual_file_systems.html
+        vsi_prefix = '/vsis3_streaming/{}/'.format(cls._bucket_name)
+        asset_content = {
+            # can/should add metadata/versioning info here
+            '30m-bands': [vsi_prefix + t for t in _30m_tifs],
+            '15m-band': vsi_prefix + _15m_tif,
+            'qa-band': vsi_prefix + qa_tif,
+            'mtl': cls._s3_url + mtl_txt,
+        }
+
+        with utils.make_temp_dir(prefix='fetch',
+                                 dir=cls.Repository.path('stage')) as tmp_dir:
+            tmp_fp = tmp_dir + '/' + filename
+            with open(tmp_fp, 'w') as tfo:
+                json.dump(asset_content, tfo)
+            shutil.copy(tmp_fp, cls.Repository.path('stage'))
 
 def unitless_bands(*bands):
     return [{'name': b, 'units': Data._unitless} for b in bands]
