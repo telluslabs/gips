@@ -58,6 +58,9 @@ import requests
 import homura
 
 
+from pdb import set_trace
+
+
 requirements = ['Py6S>=1.5.0']
 
 def path_row(tile_id):
@@ -74,6 +77,9 @@ def binmask(arr, bit):
 class NoSentinelError(Exception):
     pass
 
+class CantAlignError(Exception):
+    pass
+
 class landsatRepository(Repository):
     """ Singleton (all class methods) to be overridden by child data classes """
     name = 'Landsat'
@@ -86,7 +92,7 @@ class landsatRepository(Repository):
     def feature2tile(cls, feature):
         tile = super(landsatRepository, cls).feature2tile(feature)
         return tile.zfill(6)
-    
+
 class landsatAsset(Asset):
     """ Landsat asset (original raw tar file) """
     Repository = landsatRepository
@@ -1043,7 +1049,7 @@ class landsatData(Data):
                 archive_fp = self.archive_temp_path(fname)
                 self.AddFile(sensor, key, archive_fp)
 
-        elif asset in ('DN', 'C1', 'C1S3'):            
+        elif asset in ('DN', 'C1', 'C1S3'):
             # This block contains everything that existed in the first generation Landsat driver
 
             # Add the sensor for this date to the basename
@@ -1066,20 +1072,43 @@ class landsatData(Data):
                 # needs to be shifted as well as a hint to users who will
                 # likely only do this as an accident anyway.
                 raise ValueError("Mixing coreg and non-coreg products is not allowed")
-            
+
             if coreg:
+
+                # If possible, use AROP 'ortho' command to co-register this landsat scene
+                # against a reference Sentinel2 scene. When AROP is successful it creates
+                # a text file with parameters in it that is needed to apply an offset.
+                # That text file will get reused if it exists. Otherwise, we will attempt
+                # to create a new one. This might fail because it cannot find a S2 scene
+                # within a specified window; in this case simply use the Landsat data as
+                # it is. This might also fail for mathematical reasons, in which case
+                # do still create a product? Note S2 is a new sensor so for most years
+                # the expected situation is not finding matching scene.
+
+                # TODO: call fetch on the landsat scene boundary, thus eliminating the
+                # case where S2 exists but is not found by GIPS.
+
+                # TODO: question: why are we using glob here?
                 if not glob.glob(os.path.join(self.path, "*coreg_args.txt")):
-                    with utils.make_temp_dir() as tmpdir:
-                        try:
-                            s2_export = self.sentinel2_coreg_export(tmpdir)
-                            self.run_arop(s2_export)
-                        except NoSentinelError:
-                            pass
+                    with utils.error_handler('Problem with running AROP'):
+                        with utils.make_temp_dir() as tmpdir:
+                            try:
+                                s2_export = self.sentinel2_coreg_export(tmpdir)
+                                self.run_arop(s2_export)
+                            except NoSentinelError:
+                                # fall through and use the image unshifted
+                                pass
+                            except CantAlignError:
+                                # fall through and use the image unshifted
+                                pass
+
                 try:
                     coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
-                except:
+                    md['COREG_STATUS'] = 'AROP'
+                except IOError:
                     coreg_xshift, coreg_yshift = (0.0, 0.0)
-                    
+                    md['COREG_STATUS'] = 'FALLBACK'
+
             # running atmosphere if any products require it
             toa = True
             for val in products.requested.values():
@@ -1668,26 +1697,27 @@ class landsatData(Data):
 
         temporal_extent = TemporalExtent(starting_date.strftime("%Y-%j"))
         self._time_report("querying for most recent sentinel2 images")
-        inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch)
+
+        # TODO: DRY the following statement which is repeated 3 times here
+        inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
         while len(inventory) == 0:
             if delta > timedelta(90):
-                raise NoSentinelError("No sentinel2 data could be found within 180 days")
+                raise NoSentinelError("No sentinel2 data could be found within +/-90 days")
 
             temporal_extent = TemporalExtent((starting_date + delta).strftime("%Y-%j"))
-            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch)
+            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
             if len(inventory) != 0:
                 date_found = starting_date + delta
                 break
 
             temporal_extent = TemporalExtent((starting_date - delta).strftime("%Y-%j"))
-            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch)
+            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
             date_found = starting_date - delta
             delta += timedelta(1)
 
-            
         geo_images = []
         tiles = inventory[date_found].tiles.keys()
         for tile in tiles:
@@ -1771,8 +1801,13 @@ class landsatData(Data):
                 os.path.join(tmpdir, 'lndortho.cps_par.ini')
             )
 
-            subprocess.check_call(["ortho", "-r", parameter_file])
-            
+            try:
+                # subprocess has a timeout option as of python 3.3
+                ORTHO_TIMEOUT = 100
+                returnstatus = subprocess.check_call(["timeout", str(ORTHO_TIMEOUT), "ortho", "-r", parameter_file])
+            except subprocess.CalledProcessError as e:
+                raise CantAlignError(repr((warp_tile, warp_date)))
+
             with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
                 xcoef_re = re.compile(r"x' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
                 ycoef_re = re.compile(r"y' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
@@ -1806,7 +1841,7 @@ class landsatData(Data):
         info = ps.stdout.read()
         utm_zone_re = re.compile(".+UTM[ _][Z|z]one[ _](\d{2})[N|S].+", flags=re.DOTALL)
         self.utm_zone_number = utm_zone_re.match(info).group(1)
-        
+
         return self.utm_zone_number
 
     def parse_coreg_coefficients(self):
