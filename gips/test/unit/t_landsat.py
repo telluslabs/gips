@@ -64,10 +64,11 @@ def t_landsatAsset_query_service_success_case(mocker):
 
     ### now do the call & assertion
     expected = {'basename': 'basename.tar.gz',
-                'sceneID': 'scene-id',
+                'scene_id': 'scene-id',
                 'dataset': m_dataset,
-                'sceneCloudCover': 0.6,
-                'landCloudCover': 0.6}
+                #'sceneCloudCover': 0.6, # presently unused
+                #'landCloudCover': 0.6,
+                }
 
     actual = landsat.landsatAsset.query_service('C1', '012030',
                                                 datetime.date(2016, 1, 1))
