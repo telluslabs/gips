@@ -497,8 +497,7 @@ class landsatAsset(Asset):
     @classmethod
     def query_c1(cls, tile, date, pcover):
         """Query for C1 assets by incquiring of the USGS API"""
-        path = tile[:3]
-        row = tile[3:]
+        path, row = path_row(tile)
         fdate = date.strftime('%Y-%m-%d')
         cls.load_ee_search_keys()
         api_key = cls.ee_login()
@@ -570,12 +569,11 @@ class landsatAsset(Asset):
 
         Many arguments are unused, but must be present for compatibility.
         """
-        if asset == 'C1S3':
-            return cls.fetch_s3(**query_params)
-        elif asset == 'C1':
+        if asset == 'C1':
             return cls.fetch_c1(**query_params)
-        else:
-            raise ValueError('Unfetchable asset type: {}'.format(asset))
+        if asset == 'C1S3':
+            return cls.fetch_s3(basename, **query_params)
+        raise ValueError('Unfetchable asset type: {}'.format(asset))
 
     @classmethod
     def fetch_c1(cls, scene_id, dataset):
@@ -595,7 +593,7 @@ class landsatAsset(Asset):
                       os.path.join(stage_dir, granules[0]))
 
     @classmethod
-    def fetch_s3(cls, _30m_tifs, _15m_tif, qa_tif, mtl_txt):
+    def fetch_s3(cls, basename, _30m_tifs, _15m_tif, qa_tif, mtl_txt):
         """Fetches AWS S3 assets; currently only 'C1S3' assets.
 
         Doesn't fetch much; instead it constructs a VRT-based tarball.
@@ -616,7 +614,7 @@ class landsatAsset(Asset):
 
         with utils.make_temp_dir(prefix='fetch',
                                  dir=cls.Repository.path('stage')) as tmp_dir:
-            tmp_fp = tmp_dir + '/' + filename
+            tmp_fp = tmp_dir + '/' + basename
             with open(tmp_fp, 'w') as tfo:
                 json.dump(asset_content, tfo)
             shutil.copy(tmp_fp, cls.Repository.path('stage'))
