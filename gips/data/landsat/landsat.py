@@ -333,8 +333,9 @@ class landsatAsset(Asset):
                 # [-1] is mtl file path
                 text = requests.get(self._s3_url + query_results[-1]).text
         elif os.path.exists(self.filename):
-            mtlfilename = self.extract(next(
-                    f for f in self.datafiles() if f.endswith('MTL.txt')))
+            mtlfilename = self.extract(
+                [f for f in self.datafiles() if f.endswith('MTL.txt')]
+            )[0]
             err_msg = 'Error reading metadata file ' + mtlfilename
             with utils.error_handler(err_msg):
                 with open(mtlfilename, 'r') as mtlfile:
