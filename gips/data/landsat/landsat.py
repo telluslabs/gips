@@ -495,30 +495,8 @@ class landsatAsset(Asset):
                 'qa_tif': qa_tif, 'mtl_txt': mtl_txt}
 
     @classmethod
-
-
-    @classmethod
-    def query_service(cls, asset, tile, date, pcover=90.0):
-        """As superclass with optional argument:
-
-        Finds assets matching the arguments, where pcover is maximum
-        permitted cloud cover %.
-        """
-        if not cls.available(asset, date):
-            return None
-        if asset in ['DN', 'SR']:
-            verbose_out('Landsat "{}" assets are no longer fetchable'.format(
-                    asset), 6)
-            return None
-        if asset == 'C1S3':
-            data_src = cls.Repository.get_setting('source')
-            if data_src not in ('s3', 'usgs'):
-                raise ValueError("Data source '{}' is not known"
-                                 " (expected 's3' or 'usgs')".format(data_src))
-            if data_src == 's3':
-                return cls.query_s3(tile, date)
-
-        # if we arrive here, must want C1 from USGS, so we can proceed:
+    def query_c1(cls, tile, date, pcover):
+        """Query for C1 assets by incquiring of the USGS API"""
         path = tile[:3]
         row = tile[3:]
         fdate = date.strftime('%Y-%m-%d')
@@ -558,7 +536,32 @@ class landsatAsset(Asset):
                         #'scene_cloud_cover': float(scene_cloud_cover),
                         #'land_cloud_cover': float(land_cloud_cover),
                     }
+        return None
 
+    @classmethod
+    def query_service(cls, asset, tile, date, pcover=90.0):
+        """As superclass with optional argument:
+
+        Finds assets matching the arguments, where pcover is maximum
+        permitted cloud cover %.
+        """
+        # start with pre-query checks
+        if not cls.available(asset, date):
+            return None
+        if asset in ['DN', 'SR']:
+            verbose_out('Landsat "{}" assets are no longer fetchable'.format(
+                    asset), 6)
+            return None
+        data_src = cls.Repository.get_setting('source')
+        if data_src not in ('s3', 'usgs'):
+            raise ValueError("Data source '{}' is not known"
+                             " (expected 's3' or 'usgs')".format(data_src))
+        # perform the query
+        if (asset, data_src) == ('C1', 'usgs'):
+            return cls.query_c1(tile, date, pcover)
+        if (asset, data_src) == ('C1S3', 's3'):
+            return cls.query_s3(tile, date)
+        # source-asset-type mismatch, do nothing
         return None
 
     @classmethod

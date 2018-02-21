@@ -40,8 +40,9 @@ def t_landsatAsset_query_service_not_available_case(mocker):
 
 def t_landsatAsset_query_service_success_case(mocker):
     """Confirms method works for the normal case."""
-
     ### big pile o' mocks
+    mocker.patch.object(landsat.landsatAsset.Repository, 'get_setting',
+                        return_value='usgs')
     mocker.patch.object(landsat.landsatAsset, 'load_ee_search_keys')
     mocker.patch.object(landsat.landsatAsset, 'ee_login')
 
