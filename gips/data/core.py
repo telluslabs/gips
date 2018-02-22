@@ -497,12 +497,12 @@ class Asset(object):
     def query_service(cls, asset, tile, date):
         """Query the data provider for files matching the arguments.
 
-        Drivers must override this method, or else query_provider, to
-        contact a data source regarding the given arguments, and report
-        on whether anything is available for fetching. Must return a
-        list of dicts containing available asset filenames and where to
-        find them:  [{'basename': bn, 'url': url}, ...]. When nothing is
-        avilable, must return [].
+        Drivers must override this method, or else query_provider, to contact a
+        data source regarding the given arguments, and report on whether
+        anything is available for fetching. Must return a dict containing an
+        available asset filename.  The dict is passed to the driver's
+        Asset.fetch method so additional data can be passed along in other
+        keys. When nothing is available, must return None.
         """
         if not cls.available(asset, date):
             return None
