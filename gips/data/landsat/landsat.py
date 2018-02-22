@@ -106,8 +106,8 @@ class landsatAsset(Asset):
         'LT5': {
             'description': 'Landsat 5',
             'ee_dataset': 'LANDSAT_TM_C1',
-            'startdate': datetime(1984, 3, 1),
-            'enddate': datetime(2013, 1, 1),
+            'startdate': date(1984, 3, 1),
+            'enddate': date(2013, 1, 1),
             'bands': ['1', '2', '3', '4', '5', '6', '7'],
             'oldbands': ['1', '2', '3', '4', '5', '6', '7'],
             'colors': ["BLUE", "GREEN", "RED", "NIR", "SWIR1", "LWIR", "SWIR2"],
@@ -122,7 +122,7 @@ class landsatAsset(Asset):
         'LE7': {
             'description': 'Landsat 7',
             'ee_dataset': 'LANDSAT_EMT_C1',
-            'startdate': datetime(1999, 4, 15),
+            'startdate': date(1999, 4, 15),
             #bands = ['1','2','3','4','5','6_VCID_1','6_VCID_2','7','8']
             'bands': ['1', '2', '3', '4', '5', '6_VCID_1', '7'],
             'oldbands': ['1', '2', '3', '4', '5', '61', '7'],
@@ -137,7 +137,7 @@ class landsatAsset(Asset):
         'LC8': {
             'description': 'Landsat 8',
             'ee_dataset': 'LANDSAT_8_C1',
-            'startdate': datetime(2013, 4, 1),
+            'startdate': date(2013, 4, 1),
             # as normal for Landsat 8 but with panchromatic band left out, CF:
             # https://landsat.usgs.gov/what-are-band-designations-landsat-satellites
             'bands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
@@ -165,7 +165,7 @@ class landsatAsset(Asset):
         },
         'LC8SR': {
             'description': 'Landsat 8 Surface Reflectance',
-            'startdate': datetime(2013, 4, 1),
+            'startdate': date(2013, 4, 1),
         }
     }
 
@@ -182,7 +182,7 @@ class landsatAsset(Asset):
         # DN & SR assets are no longer fetchable
         'DN': {
             'sensors': ['LT5', 'LE7', 'LC8'],
-            'enddate': datetime(2017, 4, 30),
+            'enddate': date(2017, 4, 30),
             'pattern': (
                 r'^L(?P<sensor>[A-Z])(?P<satellie>\d)'
                 r'(?P<path>\d{3})(?P<row>\d{3})'
@@ -530,6 +530,8 @@ class landsatAsset(Asset):
         Finds assets matching the arguments, where pcover is maximum
         permitted cloud cover %.
         """
+        if not cls.available(asset, date):
+            return []
         available = []
 
         if asset in ['DN', 'SR']:
