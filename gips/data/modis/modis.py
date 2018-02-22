@@ -81,73 +81,73 @@ class modisAsset(Asset):
             'pattern': '^MCD43A4' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': -15
+            'latency': 15,
         },
         'MCD43A2': {
             'pattern': '^MCD43A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': -15
+            'latency': 15,
         },
         'MOD09Q1': {
             'pattern': '^MOD09Q1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': -7,
+            'latency': 7,
         },
         'MOD10A1': {
             'pattern': '^MOD10A1' + _asset_re_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A1.006',
             'startdate': datetime.date(2000, 2, 24),
-            'latency': -3
+            'latency': 3,
         },
         'MYD10A1': {
             'pattern': '^MYD10A1' + _asset_re_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A1.006',
             'startdate': datetime.date(2002, 7, 4),
-            'latency': -3
+            'latency': 3,
         },
         'MOD11A1': {
             'pattern': '^MOD11A1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.006',
             'startdate': datetime.date(2000, 3, 5),
-            'latency': -1
+            'latency': 1,
         },
         'MYD11A1': {
             'pattern': '^MYD11A1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.006',
             'startdate': datetime.date(2002, 7, 8),
-            'latency': -1
+            'latency': 1,
         },
         'MOD11A2': {
             'pattern': '^MOD11A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.006',
             'startdate': datetime.date(2000, 3, 5),
-            'latency': -7
+            'latency': 7,
         },
         'MYD11A2': {
             'pattern': '^MYD11A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.006',
             'startdate': datetime.date(2002, 7, 4),
-            'latency': -7
+            'latency': 7,
         },
         'MOD10A2': {
             'pattern': '^MOD10A2' + _asset_re_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A2.006',
             'startdate': datetime.date(2000, 2, 24),
-            'latency': -3
+            'latency': 3,
         },
         'MYD10A2': {
             'pattern': '^MYD10A2' + _asset_re_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A2.006',
             'startdate': datetime.date(2002, 7, 4),
-            'latency': -3
+            'latency': 3,
         },
         'MCD12Q1': {
             'pattern': '^MCD12Q1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
             'startdate': datetime.date(2002, 7, 4),
-            'latency': -3
+            'latency': 3,
         },
 
     }
@@ -176,7 +176,7 @@ class modisAsset(Asset):
 
 
     @classmethod
-    def query_service(cls, asset, tile, date):
+    def query_provider(cls, asset, tile, date):
         """Find out from the modis servers what assets are available.
 
         Uses the given (asset, tile, date) tuple as a search key, and
@@ -187,7 +187,7 @@ class modisAsset(Asset):
         if asset == "MCD12Q1" and (month, day) != (1, 1):
             utils.verbose_out("Cannot fetch MCD12Q1:  Land cover data"
                               " are only available for Jan. 1", 1, stream=sys.stderr)
-            return []
+            return None, None
 
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (
@@ -202,9 +202,8 @@ class modisAsset(Asset):
         with utils.error_handler(err_msg):
             response = cls.Repository.managed_request(mainurl, verbosity=2)
             if response is None:
-                return []
+                return None, None
 
-        available = []
         for item in response.readlines():
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
@@ -214,13 +213,10 @@ class modisAsset(Asset):
                     continue
                 basename = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', basename])
-                available.append({'basename': basename, 'url': url})
-
-        if len(available) == 0:
-            err_msg = 'Unable to find remote match for {} at {}'.format(pattern, mainurl)
-            utils.verbose_out(err_msg, 4)
-        return available
-
+                return basename, url
+        utils.verbose_out('Unable to find remote match for '
+                          '{} at {}'.format(pattern, mainurl), 4)
+        return None, None
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -295,7 +291,7 @@ class modisData(Data):
             'sensor': 'MCD',
             'bands': ['ndvi', 'lswi', 'vari', 'brgt', 'satvi', 'evi'],
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15
+            'latency': 15,
         },
         'quality': {
             'description': 'MCD Product Quality',

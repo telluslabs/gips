@@ -87,7 +87,7 @@ class aodAsset(Asset):
             'pattern': r'^MOD08_D3.+?hdf$',
             'startdate': datetime.date(2000, 2, 18),
             'path': '/allData/6/MOD08_D3',
-            'latency': -7,
+            'latency': 7,
         },
         #'MYD08': {
         #    'pattern': 'MYD08_D3*hdf',
