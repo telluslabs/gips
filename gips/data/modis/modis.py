@@ -220,13 +220,12 @@ class modisAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date, basename, url):
-        outpath = os.path.join(cls.Repository.path('stage'), basename)
-
         with utils.error_handler(
                 "Asset fetch error ({})".format(url), continuable=True):
             response = cls.Repository.managed_request(url)
             if response is None:
                 return []
+            outpath = os.path.join(cls.Repository.path('stage'), basename)
             with open(outpath, 'wb') as fd:
                 fd.write(response.read())
             utils.verbose_out('Retrieved ' + basename, 2)

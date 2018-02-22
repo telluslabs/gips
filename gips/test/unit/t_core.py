@@ -9,10 +9,16 @@ import mock
 import gips
 from gips import core
 from gips.data import core as data_core
+from gips.inventory import dbinv
+
+# the tests use certain drivers to help out with testing core functions
 from gips.data.landsat.landsat import landsatRepository, landsatData
 from gips.data.sar import sar
 from gips.data.landsat import landsat
-from gips.inventory import dbinv
+# re-use mocks from modis fetch tests
+from . import t_modis_fetch
+from .t_modis_fetch import fetch_mocks # have to do direct import; pytest magic
+from gips.data.modis import modis
 
 def t_repository_find_tiles_normal_case(mocker, orm):
     """Test Repository.find_tiles using landsatRepository as a guinea pig."""
@@ -231,3 +237,25 @@ def t_Data_archive_assets_update_case(orm, mocker, asset_and_replacement):
     m_os_remove.assert_any_call(stale_product)
     m_os_remove.assert_any_call(stale_product_toa)
     assert m_os_remove.call_count == 2
+
+def t_query_fetch_agreement(mpo, fetch_mocks):
+    """Test Data.fetch and modis' query & fetch methods.
+
+    If Data.fetch()'s return value is correct, and there's evidence that
+    Asset.fetch() wrote the expected asset content to a file object, then pass.
+    """
+    ### mocks
+    # the file object returned by open() ---vvvv
+    m_managed_request, m_get_setting, _, _, m_fo = fetch_mocks
+    m_managed_request().readlines.return_value = t_modis_fetch.MOD11A1_listing
+    m_managed_request().read.return_value = t_modis_fetch.asset_content
+    mpo(modis.modisAsset, 'discover_asset').return_value = None # force fetch
+
+    ### perform the call
+    te = core.TemporalExtent('2012-12-01,2012-12-01')
+    actual = modis.modisData.fetch(['temp'], ['h12v04'], te, update=False)
+
+    ### assertions
+    expected = [('MOD11A1', 'h12v04', datetime.datetime(2012, 12, 1, 0, 0))]
+    assert (expected == actual
+            and t_modis_fetch.asset_content == m_fo.write.call_args[0][0])

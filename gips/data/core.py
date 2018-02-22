@@ -1134,7 +1134,7 @@ class Data(object):
                             import inspect
                             if ('Mock' in type(cls.Asset.fetch).__name__
                                         or len(inspect.getargspec(
-                                                cls.Asset.fetch)) > 4):
+                                                cls.Asset.fetch)[0]) > 4):
                                 cls.Asset.fetch(a, t, d, **query)
                             else:
                                 cls.Asset.fetch(a, t, d)

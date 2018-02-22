@@ -9,6 +9,7 @@ import urllib2
 import pytest
 import mock
 
+from gips import core
 from ...data.modis import modis
 
 dt = datetime.datetime
@@ -42,16 +43,17 @@ model_404 = (
 )
 
 @pytest.fixture
-def fetch_mocks(mocker):
+def fetch_mocks(mpo, mocker):
     """Mock out all I/O used in modisAsset.fetch; used for unit tests below."""
     # called once to get a listing of files then again when one is chosen to download
-    managed_request = mocker.patch.object(modis.modisRepository, 'managed_request')
+    m_get_setting = mpo(modis.modisRepository, 'get_setting')
+    m_get_setting.return_value = 'driver-dir'
+    managed_request = mpo(modis.modisRepository, 'managed_request')
     content = mocker.Mock(code=200, msg='OK')
     managed_request.return_value = content
-
-    open = mocker.patch.object(modis, 'open')
+    open = mpo(modis, 'open')
     file = open.return_value.__enter__.return_value # context manager
-    return (managed_request, content, open, file)
+    return (managed_request, m_get_setting, content, open, file)
 
 @pytest.mark.parametrize('a_type, tile, date, url', http_404_params)
 def t_managed_request_returns_none(fetch_mocks, a_type, tile, date, url):
@@ -59,7 +61,7 @@ def t_managed_request_returns_none(fetch_mocks, a_type, tile, date, url):
 
     This happens for any 4xx error, 5xx error, and similar."""
     # setup & mocks
-    (managed_request, content, open, file) = fetch_mocks
+    (managed_request, m_get_setting, content, open, file) = fetch_mocks
     managed_request.return_value = None
 
     # call
@@ -133,13 +135,6 @@ MOD11A1_listing = [
     '</body></html>\n'
 ]
 
-# TODO need to test modis' query_provider (perhaps, if it shows up in the diff)
-#MOD11A1_listing, # HTML index page
-#MYD11A1_listing, # HTML index page
-# listing urls:
-# 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.006/2012.12.01'),
-# 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.006/2012.12.01'),
-
 # everything for NH's tile for Dec 1 2012 that succeeds, including both inputs and outputs
 http_200_params = (
     ('MYD11A1', 'h12v04', dt(2012, 12, 1, 0, 0),
@@ -151,19 +146,18 @@ http_200_params = (
          'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.006/2012.12.01/himom.hdf'),
 )
 
+# fake asset contents
+asset_content = ("If you think you understand, you don't.\n"
+                 "If you think you don't understand, you still don't.")
 
 @pytest.mark.parametrize('a_type, tile, date, asset_fn, url', http_200_params)
 def t_http_matching_listings(mocker, fetch_mocks, a_type, tile, date, asset_fn, url):
     """Query http server, extract asset URL, then download it."""
-    (managed_request, content, open, file) = fetch_mocks
+    (managed_request, m_get_setting, content, open, file) = fetch_mocks
+    content.read.return_value = asset_content
 
-    content_data = ("If you think you understand, you don't.\n"
-                    "If you think you don't understand, you still don't.")
-    content.read.return_value = content_data
-
-    expected = [os.path.join(modis.modisRepository.path('stage'), asset_fn)]
+    expected = ['driver-dir/stage/' + asset_fn]
     actual = modis.modisAsset.fetch(a_type, tile, date, asset_fn, url)
-
 
     # assertions
     assert (expected == actual
@@ -172,4 +166,4 @@ def t_http_matching_listings(mocker, fetch_mocks, a_type, tile, date, asset_fn, 
             # did we open the right filename?
             and open.call_args[0][0].endswith(asset_fn)
             # file write assertions:  open(...) as fd && fd.write(...)
-            and (content_data,) == file.write.call_args[0])
+            and (asset_content,) == file.write.call_args[0])
