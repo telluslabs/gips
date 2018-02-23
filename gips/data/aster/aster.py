@@ -22,8 +22,6 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
-from __future__ import print_function
-
 import os
 import re
 import datetime
@@ -37,7 +35,7 @@ from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, open_vector, basename
 from gips.inventory import dbinv
 from gips import utils
-from osgeo import gdal, osr
+from osgeo import gdal, osr, ogr
 
 from shapely.wkt import loads
 
@@ -73,12 +71,10 @@ def binmask(arr, bit):
 def get_temporal_string(date):
     start_date_str = date.strftime("%Y-%m-%dT00:00:00Z")
     end_date_str = date.strftime("%Y-%m-%dT23:59:58Z")
-    temporal_str = "%s,%s" % (start_date_str, end_date_str)
-    return temporal_str
+    return "%s,%s" % (start_date_str, end_date_str)
 
 
 def reproject_spatial_extent_wkt(spatent, target_epsg):
-    from osgeo import ogr, osr
     vector = open_vector(spatent.feature[0])
 
     # create and warp site geometry
@@ -89,8 +85,7 @@ def reproject_spatial_extent_wkt(spatent, target_epsg):
     transform = osr.CoordinateTransformation(src, target)
     ogrgeom.Transform(transform)
 
-    trans_wkt = ogrgeom.ExportToWkt()
-    return trans_wkt
+    return ogrgeom.ExportToWkt()
 
 
 def get_spatial_extent_projection(spatent):
@@ -114,7 +109,6 @@ class asterRepository(Repository):
     @classmethod
     def vector2tiles(cls, vector, pcov=0.0, ptile=0.0, tilelist=None):
         """ Return matching tiles and coverage % for provided vector """
-        from osgeo import ogr, osr
         # open tiles vector
         v = open_vector(cls.get_setting('tiles'))
         shp = ogr.Open(v.Filename())
@@ -384,7 +378,6 @@ class asterData(Data):
             else:
                 availassets.append(asset)
                 allsds.extend(sds)
-                #version = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
                 version = 1  # What is this?
 
         return asset, version, missingassets, availassets, allsds
@@ -408,9 +401,7 @@ class asterData(Data):
                 # only admit product files matching a single date
                 if self.date is None:
                     # First time through
-                    print("Parts[5]", parts[5])
                     self.date = datetime.datetime.strptime(parts[5], datedir).date()
-                    print(self.date)
                 else:
                     date = datetime.datetime.strptime(parts[5], datedir).date()
                     if date != self.date:
@@ -425,7 +416,8 @@ class asterData(Data):
         products = super(asterData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
-        # These are the bands used by gippy
+        # These are the bands used by gippy. May need to add  more
+        # for new products
         desired_sds_keys = [
             'ImageData2',
             'ImageData3N',
@@ -478,11 +470,6 @@ class asterData(Data):
             gain_02 = dn_meta['GAIN.2'].strip()
             gain_03n = dn_meta['GAIN.3'].strip()
 
-            # Define UL, LR, UTM zone
-            ul = [np.float(x) for x in dn_meta['UPPERLEFTM'].split(', ')]
-            lr = [np.float(x) for x in dn_meta['LOWERRIGHTM'].split(', ')]
-            n_s = np.float(dn_meta['NORTHBOUNDINGCOORDINATE'])
-
             # Create UTM zone code numbers
             utm_n = [i+32600 for i in range(60)]
             utm_s = [i+32700 for i in range(60)]
@@ -513,30 +500,12 @@ class asterData(Data):
 
                     del aster_sd, aster_sd2, aster_sd3
 
-                    # Define extent and provide offset for UTM South zones
-                    if n_s < 0:
-                        ul_y = ul[0] + 10000000
-                        ul_x = ul[1]
-
-                        lr_y = lr[0] + 10000000
-                        lr_x = lr[1]
-
-                    # Define extent for UTM North zones
-                    else:
-                        ul_y = ul[0]
-                        ul_x = ul[1]
-
-                        lr_y = lr[0]
-                        lr_x = lr[1]
-
                     # Query raster dimensions and calculate raster x and y resolution
                     ncol, nrow = sds.shape
-                    y_res = -1 * round((max(ul_y, lr_y)-min(ul_y, lr_y))/ncol)
-                    x_res = round((max(ul_x, lr_x)-min(ul_x, lr_x))/nrow)
 
                     if band == 'ImageData2':
                         bn = -1 + 2
-                        key = 'redimg'
+                        band_key = 'redimg'
                         # Query for gain specified in file metadata (by band)
                         if gain_02 == 'HGH':
                             ucc1 = ucc[bn, 0]
@@ -546,7 +515,7 @@ class asterData(Data):
                             ucc1 = ucc[bn, 2]
 
                     if band == 'ImageData3N':
-                        key = 'nirimg'
+                        band_key = 'nirimg'
                         bn = -1 + 3
                         # Query for gain specified in file metadata (by band)
                         if gain_03n == 'HGH':
@@ -564,7 +533,7 @@ class asterData(Data):
 
                     # Convert from Radiance to TOA Reflectance
                     ref = (np.pi * rad * (esd * esd)) / (irradiance1 * np.sin(np.pi * sza / 180.))
-                    ref_bands[key] = ref
+                    ref_bands[band_key] = ref
 
             # Make NDVI
             if prod_type == "ndvi":
@@ -626,7 +595,6 @@ class asterData(Data):
         for p in products:
             assets = cls.products2assets([p])
 
-            # Add stuff here?
             for a in assets:
                 asset_dates = cls.Asset.dates(a, None, textent.datebounds, textent.daybounds)
                 wkt = reproject_spatial_extent_wkt(spatent, 4326)
