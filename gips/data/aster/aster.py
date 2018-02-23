@@ -31,8 +31,10 @@ import shapely
 import numpy as np
 import xml.etree.ElementTree as ET
 
+import gippy
+
 from gips.data.core import Repository, Asset, Data
-from gips.utils import VerboseOut, settings, open_vector, basename
+from gips.utils import VerboseOut, open_vector, basename
 from gips.inventory import dbinv
 from gips import utils
 from osgeo import gdal, osr
@@ -343,6 +345,15 @@ class asterData(Data):
             'category': 'Temporary Stuff',
             'startdate': datetime.date(2000, 3, 4),
             'latency': 1,
+        },
+        'ndvi': {
+            'description': 'Normalized Difference Vegetation Index',
+            'assets': ['L1T'],
+            'sensor': 'L1T',
+            'bands': [{'name': 'ndvi', 'units': 'dimensionless'}],
+            'category': 'Reflective indices',
+            'startdate': datetime.date(2000, 3, 4),
+            'latency': 1,
         }
     }
 
@@ -444,6 +455,7 @@ class asterData(Data):
             desired_sds = [s for s in allsds if s.split(':')[-1] in desired_sds_keys]
 
             # Make ref
+            missing = 32767
             asset_fn = desired_sds[0].split('"')[1]
             dn_image = gdal.Open(asset_fn)
             aster_sds = dn_image.GetSubDatasets()
@@ -469,7 +481,6 @@ class asterData(Data):
             # Define UL, LR, UTM zone
             ul = [np.float(x) for x in dn_meta['UPPERLEFTM'].split(', ')]
             lr = [np.float(x) for x in dn_meta['LOWERRIGHTM'].split(', ')]
-            utm = np.int(dn_meta['UTMZONENUMBER'])
             n_s = np.float(dn_meta['NORTHBOUNDINGCOORDINATE'])
 
             # Create UTM zone code numbers
@@ -478,14 +489,10 @@ class asterData(Data):
 
             # Define UTM zone based on North or South
             # Unused?
-            if n_s < 0:
-                utm_zone = utm_s[utm]
-            else:
-                utm_zone = utm_n[utm]
-
-            del utm_n, utm_s, utm, dn_meta
+            del utm_n, utm_s, dn_meta
 
             # Loop through all ASTER L1T SDS (bands)
+            ref_bands = {}
             for i in range(len(aster_sds)):
 
                 # Maintain original dataset name
@@ -527,12 +534,9 @@ class asterData(Data):
                     y_res = -1 * round((max(ul_y, lr_y)-min(ul_y, lr_y))/ncol)
                     x_res = round((max(ul_x, lr_x)-min(ul_x, lr_x))/nrow)
 
-                    # Define UL x and y coordinates based on spatial resolution
-                    ul_yy = ul_y - (y_res/2)
-                    ul_xx = ul_x - (x_res/2)
-
                     if band == 'ImageData2':
                         bn = -1 + 2
+                        key = 'redimg'
                         # Query for gain specified in file metadata (by band)
                         if gain_02 == 'HGH':
                             ucc1 = ucc[bn, 0]
@@ -542,6 +546,7 @@ class asterData(Data):
                             ucc1 = ucc[bn, 2]
 
                     if band == 'ImageData3N':
+                        key = 'nirimg'
                         bn = -1 + 3
                         # Query for gain specified in file metadata (by band)
                         if gain_03n == 'HGH':
@@ -551,7 +556,7 @@ class asterData(Data):
                         else:
                             ucc1 = ucc[bn, 2]
 
-                    #Set irradiance value for specific band
+                    # Set irradiance value for specific band
                     irradiance1 = irradiance[bn]
 
                     # Convert from DN to Radiance
@@ -559,12 +564,37 @@ class asterData(Data):
 
                     # Convert from Radiance to TOA Reflectance
                     ref = (np.pi * rad * (esd * esd)) / (irradiance1 * np.sin(np.pi * sza / 180.))
+                    ref_bands[key] = ref
 
-                    return
-                    # Make NDVI
-                    if prod_type == "ndvi":
-                        # Do stuff here
-                        pass
+            # Make NDVI
+            if prod_type == "ndvi":
+                meta['VERSION'] = '1.0'
+                redimg = ref_bands['redimg']
+                nirimg = ref_bands['nirimg']
+
+                # Wherever the value is too small, set it to a minimum of zero
+                redimg[redimg < 0.0] = 0.0
+                nirimg[nirimg < 0.0] = 0.0
+
+                # first setup a blank array with everything set to missing
+                ndvi = missing + np.zeros_like(redimg)
+                # compute the ndvi only where neither input is missing, AND
+                # no divide-by-zero error will occur
+                wg = np.where((redimg != missing) & (nirimg != missing) & (redimg + nirimg != 0.0))
+                ndvi[wg] = (nirimg[wg] - redimg[wg]) / (nirimg[wg] + redimg[wg])
+
+                template = gippy.GeoImage(desired_sds)
+                imgout = gippy.GeoImage(fname, template, gippy.GDT_Int16, 1)
+                imgout.SetNoData(missing)
+                imgout.SetOffset(0.0)
+                imgout.SetGain(0.0001)
+
+                imgout[0].Write(ndvi)
+                imgout.SetBandName('NDVI', 1)
+
+            # set metadata
+            meta = {k: str(v) for k, v in meta.iteritems()}
+            imgout.SetMeta(meta)
 
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
@@ -636,11 +666,6 @@ class asterData(Data):
                             )
 
                             with utils.error_handler(msg_prefix, continuable=False):
-                                #resp = cls.Asset.query_service(a, t, d)
-                                #if len(resp) == 0:
-                                #    continue
-                                #elif len(resp) > 1:
-                                #    raise Exception('should only be one asset')
                                 aobj = cls.Asset(tile_name)
 
                                 if force or len(local_assets) == 0 or (
