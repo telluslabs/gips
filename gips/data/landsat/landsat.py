@@ -58,9 +58,6 @@ import requests
 import homura
 
 
-from pdb import set_trace
-
-
 requirements = ['Py6S>=1.5.0']
 
 def path_row(tile_id):
