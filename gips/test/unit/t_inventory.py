@@ -14,10 +14,10 @@ from gips.data.modis.modis import modisData, modisAsset
 from gips.core import SpatialExtent, TemporalExtent
 
 @pytest.fixture
-def di_init_mocks(mocker, orm):
+def di_init_mocks(mpo, orm):
     """Appropriate mocks for DataInventory.__init__."""
-    modisData.fetch = mocker.Mock() # behavior not super important
-    modisData.Asset.archive = mocker.Mock() # has to return list of modisAssets
+    mpo(modisData, 'fetch') # behavior not super important
+    mpo(modisData.Asset, 'archive') # has to return list of modisAssets
     return (modisData.fetch,
             modisData.Asset.archive,
             mock.patch('gips.inventory.dbinv.add_asset'))

@@ -213,43 +213,41 @@ class merraAsset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         """Standard Asset.fetch implementation for downloading assets."""
-        available_assets = cls.query_service(asset, tile, date)
-        retrieved_filenames = []
+        asset_info = cls.query_service(asset, tile, date)
+        if asset_info is None:
+            return []
+        basename, url = asset_info['basename'], asset_info['url']
 
-        for asset_info in available_assets:
-            basename = asset_info['basename']
-            url = asset_info['url']
-            outpath = os.path.join(cls.Repository.path('stage'), basename)
+        basename = asset_info['basename']
+        url = asset_info['url']
+        outpath = os.path.join(cls.Repository.path('stage'), basename)
 
-            with utils.error_handler("Asset fetch error", continuable=True):
-                # obtain the data
-                response = cls.Repository.managed_request(url)
-                if response is None:
-                    continue
-                tmp_outpath = tempfile.mkstemp(
-                    suffix='.nc4', prefix='downloading',
-                    dir=cls.Repository.path('stage')
-                )[1]
-                with open(tmp_outpath, 'w') as fd:
-                    fd.write(response.read())
-
-                # verify that it is a netcdf file
-                try:
-                    ncroot = Dataset(tmp_outpath)
-                    os.rename(tmp_outpath, outpath)
-                except Exception as e:
-                    text = ''
-                    if e.message.endswith('Unknown file format'):
-                        token = 'Authorize NASA GESDISC DATA ARCHIVE'
-                        html = open(tmp_outpath, 'r').read(100000)
-                        if token in html:
-                            text = ('\n\nYou need to {t} \nfor your NASA '
-                                    'EarthData login.\n').format(t=token)
-                    raise Exception(e.message + text)
-            retrieved_filenames.append(outpath)
-            utils.verbose_out('Retrieved %s' % basename, 2)
-
-        return retrieved_filenames
+        with utils.error_handler("Error fetching {} from {}".format(
+                basename, url), continuable=True):
+            # obtain the data
+            response = cls.Repository.managed_request(url)
+            if response is None:
+                return []
+        stage_dir = cls.Repository.path('stage')
+        with utils.make_temp_dir(prefix='fetch', dir=stage_dir) as tmp_dn:
+            tmp_outpath = os.path.join(tmp_dn, basename)
+            with open(tmp_outpath, 'w') as fd:
+                fd.write(response.read())
+            # verify that it is a netcdf file
+            try:
+                ncroot = Dataset(tmp_outpath)
+                os.rename(tmp_outpath, outpath)
+            except Exception as e:
+                text = ''
+                if e.message.endswith('Unknown file format'):
+                    token = 'Authorize NASA GESDISC DATA ARCHIVE'
+                    html = open(tmp_outpath, 'r').read(100000)
+                    if token in html:
+                        text = ('\n\nYou need to {t} \nfor your NASA '
+                                'EarthData login.\n').format(t=token)
+                raise Exception(e.message + text)
+        utils.verbose_out('Retrieved ' + basename, 2)
+        return [outpath]
 
 
 class merraData(Data):
