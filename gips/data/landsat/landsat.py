@@ -925,7 +925,8 @@ class landsatData(Data):
         if 'C1' in product_info['assets']:
             product_info['latency'] = landsatAsset._assets['C1']['latency']
         else:
-            product_info['latency'] = float("inf")
+            product_info['latency'] = 0 # better nonsense value needed, but 
+                                        # fetch is guarded against in method
 
     def _process_indices(self, image, metadata, sensor, indices, coreg_shift=None):
         """Process the given indices and add their files to the inventory.
