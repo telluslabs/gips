@@ -71,14 +71,6 @@ def m_usgs_lib(mocker):
     if saved_usgs is not None:
         sys.modules['usgs'] = saved_usgs
 
-@pytest.fixture
-def m_utils_make_temp_dir(mocker):
-    m_context_manager = mocker.patch.object(landsat.utils, 'make_temp_dir'
-                                            ).return_value
-    # in 'with blah.blah() as x:', x == 'fake-temp-dir'
-    m_context_manager.__enter__.return_value = 'fake-temp-dir'
-    return m_context_manager
-
 def t_landsatAsset_query_service_c1_success_case(
         mocker, m_ee_login, m_get_setting, m_load_ee_search_keys, m_usgs_lib):
     """Confirms method works for the normal case."""
@@ -165,8 +157,8 @@ def t_landsatAsset_query_service_c1s3_success_case(mocker, c1s3_cache_control):
     assert expected == actual
 
 def t_landsatAsset_fetch_c1(
-        mocker, m_ee_login, m_get_setting, m_usgs_lib, m_utils_make_temp_dir):
-    #m_get_setting.return_value = 'dontcare' # just
+        mocker, m_ee_login, m_get_setting, m_usgs_lib, mock_context_manager):
+    mock_context_manager(landsat.utils, 'make_temp_dir', 'fake-temp-dir')
     m_get_setting.return_value = 'driver-dir'
     mocker.patch.object(landsat.homura, 'download')
     mocker.patch.object(landsat.os, 'listdir'
@@ -196,8 +188,9 @@ sample_c1s3_asset_content = {
     u'qa-band': u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_BQA.TIF',
 }
 
-def t_landsatAsset_fetch_s3(mocker, m_get_setting, m_utils_make_temp_dir):
+def t_landsatAsset_fetch_s3(mocker, m_get_setting, mock_context_manager):
     """Check the content passed in to json.dump to confirm the method."""
+    mock_context_manager(landsat.utils, 'make_temp_dir', 'fake-temp-dir')
     mocker.patch.object(landsat, 'open')
     m_json_dump = mocker.patch.object(landsat, 'json').dump
     m_shutil_copy = mocker.patch.object(landsat.shutil, 'copy')

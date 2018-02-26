@@ -164,9 +164,10 @@ class aodAsset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
-        fname, _ = cls.query_provider(asset, tile, date)
-        if fname is None:
+        query_rv = cls.query_service(asset, tile, date)
+        if query_rv is None:
             return []
+        fname = query_rv['basename']
         stage_fp = os.path.join(cls.Repository.path('stage'), fname)
         ftp = cls.ftp_connect(asset, date)
         ftp.retrbinary('RETR ' + fname, open(stage_fp, "wb").write)
