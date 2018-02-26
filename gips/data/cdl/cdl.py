@@ -31,6 +31,7 @@ import shutil
 from xml.etree import ElementTree
 from zipfile import ZipFile
 
+from backports.functools_lru_cache import lru_cache
 from dbfread import DBF
 import requests
 
@@ -87,6 +88,7 @@ class cdlAsset(Asset):
         self.products[self.asset] = filename  # magically it is also a product
 
     @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
     def query_service(cls, asset, tile, date):
         if asset == _cdlmkii:
             return None

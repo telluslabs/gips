@@ -259,3 +259,18 @@ def t_query_fetch_agreement(mpo, fetch_mocks):
     expected = [('MOD11A1', 'h12v04', datetime.datetime(2012, 12, 1, 0, 0))]
     assert (expected == actual
             and t_modis_fetch.asset_content == m_fo.write.call_args[0][0])
+
+def t_query_service_caching(mpo):
+    bn, url = 'basename.hdf', 'http://www.himom.com/'
+    m_query_provider = mpo(modis.modisAsset, 'query_provider')
+    m_query_provider.return_value = (bn, url)
+    modis.modisAsset.query_service.cache_clear() # in case it's not empty atm
+
+    atd = ('MOD11A1', 'h12v04', datetime.datetime(2012, 12, 1, 0, 0))
+    actual_first = modis.modisAsset.query_service(*atd)
+    actual_second = modis.modisAsset.query_service(*atd)
+
+    expected_for_both = {'basename': bn, 'url': url}
+
+    assert (m_query_provider.call_count == 1 # should use the cache 2nd time
+            and actual_first == actual_second == expected_for_both)

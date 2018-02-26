@@ -26,6 +26,7 @@ import glob
 import traceback
 import re
 
+from backports.functools_lru_cache import lru_cache
 import gdal
 import numpy
 
@@ -140,6 +141,7 @@ class aodAsset(Asset):
         return super(aodAsset, cls).ftp_connect(wd)
 
     @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
     def query_service(cls, asset, tile, date):
         """Query the data provider for files matching the arguments.
 

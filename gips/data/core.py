@@ -36,6 +36,12 @@ import traceback
 import ftplib
 import shutil
 import commands
+from urllib import urlencode
+import urllib2
+from cookielib import CookieJar
+
+# from functools import lru_cache <-- python 3.2+ can do this instead
+from backports.functools_lru_cache import lru_cache
 
 import gippy
 from gippy.algorithms import CookieCutter
@@ -44,10 +50,6 @@ from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File,
         basename, mkdir, open_vector)
 from gips import utils
 from ..inventory import dbinv, orm
-
-from cookielib import CookieJar
-from urllib import urlencode
-import urllib2
 
 
 """
@@ -494,6 +496,7 @@ class Asset(object):
         raise NotImplementedError('query_provider not supported for' + cls.__name__)
 
     @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
     def query_service(cls, asset, tile, date):
         """Query the data provider for files matching the arguments.
 

@@ -38,6 +38,7 @@ import tarfile
 import json
 from xml.etree import ElementTree
 
+from backports.functools_lru_cache import lru_cache
 import numpy
 # once gippy==1.0, switch to GeoRaster.erode
 from scipy.ndimage import binary_erosion
@@ -538,6 +539,7 @@ class landsatAsset(Asset):
         return None
 
     @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
     def query_service(cls, asset, tile, date, pcover=90.0):
         """As superclass with optional argument:
 
