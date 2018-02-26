@@ -31,6 +31,23 @@ def mpo(mocker):
     """Just to save typing."""
     yield mocker.patch.object
 
+@pytest.fixture
+def mock_context_manager(mocker, mpo):
+    """Mocks a given context manager.
+
+    Generate the mock by calling the value of this fixture in situ:
+    'with location.cm_name() as return_value:'.  location should be a module,
+    cm_name is a string naming the context manager to mock, and return_value
+    is the mock value emitted by the context manager at runtime.
+    """
+    def inner(location, cm_name, return_value=None):
+        m_context_manager = mpo(location, cm_name).return_value
+        if return_value is not None:
+            m_context_manager.__enter__.return_value = return_value
+        return m_context_manager
+    return inner
+
+
 # pytest_* functions are hooks automatically detected by pytest
 def pytest_addoption(parser):
     """Add custom options & settings to py.test.

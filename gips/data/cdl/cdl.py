@@ -112,11 +112,11 @@ class cdlAsset(Asset):
 
         if asset == _cdl:
             utils.verbose_out("Fetching tile for {} on {}".format(tile, date.year), 2)
-            assets = cls.query_service(asset, tile, date)
-            if len(assets) == 0:
+            query_rv = cls.query_service(asset, tile, date)
+            if query_rv is None:
                 utils.verbose_out("No CDL data for {} on {}".format(tile, date.year), 2)
-                return
-            file_response = requests.get(assets[0]['url'], verify=False, stream=True)
+                return []
+            file_response = requests.get(query_rv['url'], verify=False, stream=True)
             with utils.make_temp_dir(prefix='fetch', dir=cls.Repository.path('stage')) as tmp_dir:
                 fname = "{}_{}_cdl_cdl.tif".format(tile, date.year)
                 tmp_fname = tmp_dir + '/' + fname
