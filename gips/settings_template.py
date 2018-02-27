@@ -52,6 +52,10 @@ EARTHDATA_PASS = ""
 USGS_USER = ""
 USGS_PASS = ""
 
+# For USGS machine-to-machine authentication
+ESA_USER = ""
+ESA_PASS = ""
+
 REPOS = {
     'aod': {
         'repository': '$TLD/aod',
@@ -74,8 +78,8 @@ REPOS = {
     'sentinel2': {
         'repository': '$TLD/sentinel2',
         # sign up for access to data source here:  https://scihub.copernicus.eu/dhus/#/self-registration
-        'username': '',
-        'password': '',
+        'username': ESA_USER,
+        'password': ESA_PASS,
         'extract': False,  # extract files from tar.gz before processing instead of direct access
     },
     # these drivers tend to more specialized and experimental so turned off by default
