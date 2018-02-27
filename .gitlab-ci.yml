@@ -4,13 +4,19 @@ stages:
 
 make_image:
   stage: build
-  - wget ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/sixs
-  - wget ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gitlab_ci
-  - wget ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gips_creds.sh.enc
-  - docker build -t gippy-0.x -f docker/gippy-install.docker docker
-  - docker build -t gips_test -f docker/gips-dev-install.docker --build-arg ref=$CI_COMMIT_REF_NAME docker
+  script:
+    - wget -O sixs ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/sixs
+    - wget -O gitlab_ci ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gitlab_ci
+    - wget -O gips_creds.sh.enc ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gips_creds.sh.enc
+    - docker build -t gippy-0.x -f docker/gippy-install.docker docker
+    - docker build -t gips_test -f docker/gips-dev-install.docker --build-arg ref=$CI_COMMIT_REF_NAME docker
+  tags:
+    - gipsdev
 
 run_tests:
   stage: test
-  - docker run --rm gips_test pytest -vv 
+  script:
+    - docker run --rm gips_test pytest -vv
+  tags:
+    - gipsdev
 
