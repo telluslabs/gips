@@ -16,7 +16,7 @@ make_image:
 run_tests:
   stage: test
   script:
-    - docker run --rm gips_test pytest -vv
+    - docker run --rm gips_test bash -c 'cd /gips ; pytest -vv'
   tags:
     - gipsdev
 
