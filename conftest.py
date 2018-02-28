@@ -26,6 +26,11 @@ def orm(db, mocker):
     mocker.patch('gips.data.core.orm.use_orm', return_value=True)
     yield db
 
+@pytest.fixture
+def mpo(mocker):
+    """Just to save typing."""
+    yield mocker.patch.object
+
 # pytest_* functions are hooks automatically detected by pytest
 def pytest_addoption(parser):
     """Add custom options & settings to py.test.

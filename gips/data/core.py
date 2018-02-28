@@ -393,35 +393,38 @@ class Asset(object):
         date:   datetime.date object to limit search in temporal dimension
         asset:  Asset type string, eg for modis could be 'MCD43A2'
         """
-        criteria = {'driver': cls.Repository.name.lower(), 'tile': tile, 'date': date}
-        if asset is not None:
-            criteria['asset'] = asset
+        a_types = cls._assets.keys() if asset is None else [asset]
+        found = [cls.discover_asset(a, tile, date) for a in a_types]
+        return [a for a in found if a is not None] # lastly filter Nones
+
+    @classmethod
+    def discover_asset(cls, asset_type, tile, date):
+        """Finds an asset for the a-t-d trio and returns an object for it."""
         if orm.use_orm():
             # search for ORM Assets to use for making GIPS Assets
-            return [cls(a.name) for a in dbinv.asset_search(**criteria)]
+            results = dbinv.asset_search(driver=cls.Repository.name.lower(),
+                                    asset=asset_type, tile=tile, date=date)
+            if len(results) == 0:
+                return None
+            assert len(results) == 1 # sanity check; DB should enforce
+            return cls(results[0].name)
 
         # The rest of this fn uses the filesystem inventory
-        tpath = cls.Repository.data_path(tile, date)
-        if not os.path.isdir(tpath):
-            return []
-        if asset is not None:
-            assets = [asset]
-        else:
-            assets = cls._assets.keys()
-        found = []
-        for a in assets:
-            files = utils.find_files(cls._assets[a]['pattern'], tpath)
-            # more than 1 asset??
-            if len(files) > 1:
-                raise Exception("Duplicate(?) assets found: {}".format(files))
-            if len(files) == 1:
-                found.append(cls(files[0]))
-        return found
+        d_path = cls.Repository.data_path(tile, date)
+        if not os.path.isdir(d_path):
+            return None
+        files = utils.find_files(cls._assets[asset_type]['pattern'], d_path)
+        # Confirm only one asset
+        if len(files) > 1:
+            raise IOError("Duplicate(?) assets found: {}".format(files))
+        if len(files) == 1:
+            return cls(files[0])
+        return None
 
     @classmethod
     def start_date(cls, asset):
-        """ Get starting date for this asset """
-        return cls._assets[asset].get('startdate', None)
+        """Get starting date for this asset type."""
+        return cls._assets[asset]['startdate']
 
     @classmethod
     def end_date(cls, asset):
@@ -435,29 +438,46 @@ class Asset(object):
         a_info = cls._assets[asset]
         if 'enddate' in a_info:
             return a_info['enddate']
-        return datetime.now() - timedelta(a_info['latency'])
+        return datetime.now().date() - timedelta(a_info['latency'])
 
     @classmethod
     def available(cls, asset, date):
-        # TODO this method never seems to be called?
-        """ Check availability of an asset for given date """
-        date1 = cls._assets[asset].get(['startdate'], None)
-        date2 = cls._assets[asset].get(['enddate'], None)
-        if date2 is None:
-            date2 = datetime.now() - timedelta(cls._asssets[asset]['latency'])
-        if date1 is None or date2 is None:
-            return False
-        if date < date1 or date > date2:
-            return False
-        return True
+        """Check availability of an asset for given date.
+
+        Accepts both dates and datetimes for the `date` parameter."""
+        d = date.date() if type(date) is datetime else date
+        return cls.start_date(asset) <= d <= cls.end_date(asset)
 
     # TODO - combine this with fetch to get all dates
     @classmethod
-    def dates(cls, asset, tile, dates, days):
-        """ For a given asset get all dates possible (in repo or not) - used for fetch """
+    def dates(cls, asset_type, tile, dates, days):
+        """For a given asset type get all dates possible (in repo or not).
+
+        Also prunes dates outside the bounds of the asset's valid date range,
+        as given by start_date and end_date.
+        """
+        # TODO tile arg isn't used
         from dateutil.rrule import rrule, DAILY
+        req_start_dt, req_end_dt = dates
+
+        # if the dates are outside asset availability dates, use those instead
+        a_start_dt = cls.start_date(asset_type)
+        a_end_dt   = cls.end_date(asset_type)
+        start_dt = a_start_dt if a_start_dt > req_start_dt else req_start_dt
+        end_dt   = a_end_dt   if a_end_dt   < req_end_dt   else req_end_dt
+
+        # degenerate case:  There is no valid date range; notify user
+        if start_dt > end_dt:
+            utils.verbose_out("For {}, requested dates, {} - {},"
+                              " are not in the valid range of {} - {}.".format(
+                                    asset_type, req_start_dt, req_end_dt,
+                                    a_start_dt, a_end_dt))
+            return []
+        utils.verbose_out('Computed date range for processing: {} - {}'.format(
+                start_dt, end_dt), 5)
+
         # default assumes daily regardless of asset or tile
-        datearr = rrule(DAILY, dtstart=dates[0], until=dates[1])
+        datearr = rrule(DAILY, dtstart=start_dt, until=end_dt)
         dates = [dt for dt in datearr if days[0] <= int(dt.strftime('%j')) <= days[1]]
         return dates
 
@@ -477,21 +497,23 @@ class Asset(object):
     def query_service(cls, asset, tile, date):
         """Query the data provider for files matching the arguments.
 
-        Drivers must override this method, or else query_provider, to
-        contact a data source regarding the given arguments, and report
-        on whether anything is available for fetching. Must return a
-        list of dicts containing available asset filenames and where to
-        find them:  [{'basename': bn, 'url': url}, ...]. When nothing is
-        avilable, must return [].
+        Drivers must override this method, or else query_provider, to contact a
+        data source regarding the given arguments, and report on whether
+        anything is available for fetching. Must return a dict containing an
+        available asset filename.  The dict is passed to the driver's
+        Asset.fetch method so additional data can be passed along in other
+        keys. When nothing is available, must return None.
         """
+        if not cls.available(asset, date):
+            return None
         bn, url = cls.query_provider(asset, tile, date)
         if (bn, url) == (None, None):
-            return []
-        return [{'basename': bn, 'url': url}]
+            return None
+        return {'basename': bn, 'url': url}
 
 
     @classmethod
-    def fetch(cls, asset, tile, date):
+    def fetch(cls, *args, **kwargs):
         """ Fetch stub """
         raise NotImplementedError("Fetch not supported for this data source")
 
@@ -1089,16 +1111,33 @@ class Data(object):
         """ Download data for tiles and add to archive. update forces fetch """
         assets = cls.products2assets(products)
         fetched = []
+        # TODO rewrite this to back off the indentation
         for a in assets:
             for t in tiles:
                 asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                 for d in asset_dates:
+                    query = cls.Asset.query_service(a, t, d)
+                    if query is None: # nothing remote; done
+                        continue
                     # if we don't have it already, or if update (force) flag
-                    if not cls.Asset.discover(t, d, a) or update == True:
+                    queried_ao = cls.Asset(query['basename'])
+                    local_ao = cls.Asset.discover_asset(a, t, d)
+                    need_to_fetch = local_ao is None or (
+                            update and local_ao.updated(queried_ao))
+                    if need_to_fetch:
                         date_str = d.strftime("%y-%m-%d")
                         msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
                         with utils.error_handler(msg_prefix, continuable=True):
-                            cls.Asset.fetch(a, t, d)
+                            # Feature toggle:  Call new fetch only if driver
+                            # supports it (or from within a unit test in which
+                            # case it probably doesn't matter)
+                            import inspect
+                            if ('Mock' in type(cls.Asset.fetch).__name__
+                                        or len(inspect.getargspec(
+                                                cls.Asset.fetch)[0]) > 4):
+                                cls.Asset.fetch(a, t, d, **query)
+                            else:
+                                cls.Asset.fetch(a, t, d)
                             # fetched may contain both fetched things and unfetchable things
                             fetched.append((a, t, d))
         return fetched

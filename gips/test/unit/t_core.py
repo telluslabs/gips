@@ -1,7 +1,7 @@
 """Unit tests for core functions found in gips.core and gips.data.core."""
 
 import sys
-from datetime import datetime
+import datetime
 
 import pytest
 import mock
@@ -9,9 +9,16 @@ import mock
 import gips
 from gips import core
 from gips.data import core as data_core
-from gips.data.landsat.landsat import landsatRepository, landsatData
-from gips.data.landsat import landsat
 from gips.inventory import dbinv
+
+# the tests use certain drivers to help out with testing core functions
+from gips.data.landsat.landsat import landsatRepository, landsatData
+from gips.data.sar import sar
+from gips.data.landsat import landsat
+# re-use mocks from modis fetch tests
+from . import t_modis_fetch
+from .t_modis_fetch import fetch_mocks # have to do direct import; pytest magic
+from gips.data.modis import modis
 
 def t_repository_find_tiles_normal_case(mocker, orm):
     """Test Repository.find_tiles using landsatRepository as a guinea pig."""
@@ -34,8 +41,8 @@ def t_repository_find_tiles_error_case(mocker, orm):
 def t_repository_find_dates_normal_case(mocker, orm):
     """Test Repository.find_dates using landsatRepository as a guinea pig."""
     m_list_dates = mocker.patch('gips.data.core.dbinv.list_dates')
-    dt = datetime
-    expected = [dt(1900, 1, 1), dt(1950, 10, 10), dt(2000, 12, 12)]
+    expected = [datetime.datetime(*a) for a in
+                (1900, 1, 1), (1950, 10, 10), (2000, 12, 12)]
     m_list_dates.return_value = expected
     actual = landsatRepository.find_dates('some-tile')
     assert expected == actual
@@ -59,7 +66,8 @@ def t_data_add_file(orm, mocker, add_to_db):
     t_sensor    = 'test-sensor'
     t_product   = 'test-product'
     t_filename  = 'test-filename.tif'
-    lsd = landsatData('test-tile', datetime(1955, 11, 5), search=False)
+    lsd = landsatData(
+            'test-tile', datetime.datetime(1955, 11, 5), search=False)
 
     lsd.AddFile(t_sensor, t_product, t_filename, add_to_db)
 
@@ -79,7 +87,7 @@ def t_data_add_file_repeat(orm, mocker):
     Thus, confirm it's possible to replace file entries with new versions.
     """
     t_tile      = 'test-tile'
-    t_date      = datetime(1955, 11, 5)
+    t_date      = datetime.datetime(1955, 11, 5)
     t_sensor    = 'test-sensor'
     t_product   = 'test-product'
     t_filename  = 'test-filename.tif'
@@ -103,44 +111,68 @@ def t_data_init_search(mocker, orm, search):
     mocker.patch.object(landsatData.Asset, 'discover')
     mocker.patch.object(landsatData, 'ParseAndAddFiles')
 
-    lsd = landsatData(tile='t', date=datetime(9999, 1, 1), search=search) # call-under-test
+    lsd = landsatData(tile='t', date=datetime.datetime(9999, 1, 1),
+                      search=search)
 
     # assert normal activity & entry of search block
     assert (lsd.id == 't'
-            and lsd.date == datetime(9999, 1, 1)
+            and lsd.date == datetime.datetime(9999, 1, 1)
             and '' not in (lsd.path, lsd.basename)
             and lsd.assets == lsd.filenames == lsd.sensors == {}
             and lsd.ParseAndAddFiles.called == lsd.Asset.discover.called == search)
 
+@pytest.fixture
+def m_discover_asset(mocker):
+    return mocker.patch.object(landsatData.Asset, 'discover_asset',
+                               return_value=None)
 
 @pytest.fixture
-def df_mocks(mocker):
-    """Mocks for testing Data.fetch below."""
-    mocker.patch.object(landsatData.Asset, 'discover', return_value=False)
+def m_query_service(mocker):
+    asset_bn = 'LC08_L1TP_012030_20170801_20170811_01_T1.tar.gz'
+    query_rv = {'basename': asset_bn, 'url': 'himom.com'}
+    return mocker.patch.object(landsatData.Asset, 'query_service',
+                               return_value=query_rv)
+
+@pytest.fixture
+def m_fetch(mocker):
     return mocker.patch.object(landsatData.Asset, 'fetch')
 
 # useful constant for the following tests
-df_args = (['rad', 'ndvi', 'bqashadow'], ['012030'], core.TemporalExtent('2012-12-01'))
+df_args = (['rad', 'ndvi', 'bqashadow'], ['012030'],
+           core.TemporalExtent('2017-08-01'))
 
-def t_data_fetch_base_case(df_mocks):
+def t_data_fetch_base_case(mocker, m_discover_asset, m_query_service, m_fetch):
     """Test base case of data.core.Data.fetch.
 
     It should return data about the fetch on success, and shouldn't
     raise an exception."""
-    expected = [
-        ('DN', '012030', datetime(2012, 12, 1, 0, 0)),
-        ('C1', '012030', datetime(2012, 12, 1, 0, 0)),
-        ('C1S3', '012030', datetime(2012, 12, 1, 0, 0)),
-    ]
-    assert expected == landsatData.fetch(*df_args)
+    # setup
+    c1_atd = ('C1', '012030', datetime.datetime(2017, 8, 1, 0, 0))
+    c1s3_atd = ('C1S3', '012030', datetime.datetime(2017, 8, 1, 0, 0))
+    expected_calls = [mocker.call(*c1_atd, **m_query_service.return_value),
+                      mocker.call(*c1s3_atd, **m_query_service.return_value)]
+    # call
+    actual = landsatData.fetch(*df_args)
+    # assertions
+    assert ([c1_atd, c1s3_atd] == actual
+            and expected_calls == m_fetch.call_args_list)
 
-
-def t_data_fetch_error_case(df_mocks):
+def t_data_fetch_error_case(mocker, m_discover_asset, m_query_service, m_fetch):
     """Test error case of data.core.Data.fetch.
 
     It should return [], and shouldn't raise an exception."""
-    df_mocks.side_effect = RuntimeError('aaah!')
+    m_fetch.side_effect = RuntimeError('aaah!')
     assert landsatData.fetch(*df_args) == []
+
+
+def t_Asset_dates():
+    """Test Asset's start and end dates, using SAR."""
+    dates_in = datetime.date(2006, 1, 20), datetime.date(2006, 1, 27)
+    # tile isn't used --------------vvv     dayrange --vvvvvv
+    actual = sar.sarAsset.dates('alos1', 'dontcare', dates_in, (1, 366))
+    expected = [datetime.datetime(*a) for a in
+                (2006, 1, 24), (2006, 1, 25), (2006, 1, 26), (2006, 1, 27)]
+    assert expected == actual
 
 @pytest.fixture
 def asset_and_replacement():
@@ -196,7 +228,7 @@ def t_Data_archive_assets_update_case(orm, mocker, asset_and_replacement):
     # setup complete; call method being tested   vvvvvv-- mocked, don't care
     actual = landsat.landsatData.archive_assets("hi-mom", update=True)
 
-    dt = datetime(2017, 8, 1, 0, 0)
+    dt = datetime.datetime(2017, 8, 1, 0, 0)
     m_delete_product.assert_any_call(
         driver='landsat', product='rad', tile='012030', date=dt)
     m_delete_product.assert_any_call(
@@ -205,3 +237,25 @@ def t_Data_archive_assets_update_case(orm, mocker, asset_and_replacement):
     m_os_remove.assert_any_call(stale_product)
     m_os_remove.assert_any_call(stale_product_toa)
     assert m_os_remove.call_count == 2
+
+def t_query_fetch_agreement(mpo, fetch_mocks):
+    """Test Data.fetch and modis' query & fetch methods.
+
+    If Data.fetch()'s return value is correct, and there's evidence that
+    Asset.fetch() wrote the expected asset content to a file object, then pass.
+    """
+    ### mocks
+    # the file object returned by open() ---vvvv
+    m_managed_request, m_get_setting, _, _, m_fo = fetch_mocks
+    m_managed_request().readlines.return_value = t_modis_fetch.MOD11A1_listing
+    m_managed_request().read.return_value = t_modis_fetch.asset_content
+    mpo(modis.modisAsset, 'discover_asset').return_value = None # force fetch
+
+    ### perform the call
+    te = core.TemporalExtent('2012-12-01,2012-12-01')
+    actual = modis.modisData.fetch(['temp'], ['h12v04'], te, update=False)
+
+    ### assertions
+    expected = [('MOD11A1', 'h12v04', datetime.datetime(2012, 12, 1, 0, 0))]
+    assert (expected == actual
+            and t_modis_fetch.asset_content == m_fo.write.call_args[0][0])

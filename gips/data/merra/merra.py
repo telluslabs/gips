@@ -145,7 +145,7 @@ class merraAsset(Asset):
             'pattern': _asset_re_pattern % 'const_2d_asm_Nx',
             're_pattern': _asset_re_format_pattern.format(name='const_2d_asm_Nx'),
             'startdate': datetime.date(1980, 1, 1),
-            'latency': None,
+            'enddate': datetime.date(1980, 1, 1),
         }
 
         #'PROFILE': {
@@ -183,7 +183,7 @@ class merraAsset(Asset):
             self.date = datetime.datetime.strptime(parts[2], '%Y%m%d').date()
 
     @classmethod
-    def query_service(cls, asset, tile, date):
+    def query_provider(cls, asset, tile, date):
         year, month, day = date.timetuple()[:3]
         if asset != "ASM":
             mainurl = "%s/%04d/%02d" % (cls._assets[asset]['url'], year, month)
@@ -197,8 +197,7 @@ class merraAsset(Asset):
             # obtain the list of files
             response = cls.Repository.managed_request(mainurl, verbosity=2)
             if response is None:
-                return []
-        available = []
+                return None, None
         for item in response.readlines():
             # inspect the page and extract the full name of the needed file
             if cpattern.search(item):
@@ -206,58 +205,49 @@ class merraAsset(Asset):
                     continue
                 basename = cpattern.findall(item)[0]
                 url = '/'.join([mainurl, basename])
-                available.append({'basename': basename, 'url': url})
-        if len(available) == 0:
-            msg = 'Unable to find a remote match for {} at {}'
-            utils.verbose_out(msg.format(pattern, mainurl), 4)
-        return available
+                return basename, url
+        utils.verbose_out("Unable to find a remote match for"
+                          " {} at {}".format(pattern, mainurl), 4)
+        return None, None
 
     @classmethod
     def fetch(cls, asset, tile, date):
         """Standard Asset.fetch implementation for downloading assets."""
-        if asset == "ASM" and date.date() != cls._assets[asset]['startdate']:
-            #TODO: which should it be? if message then remove comment
-            #raise Exception, "constants are available for %s only" % cls._assets[asset]['startdate']
-            utils.verbose_out('constants are available for %s only' % cls._assets[asset]['startdate'])
-            return
+        asset_info = cls.query_service(asset, tile, date)
+        if asset_info is None:
+            return []
+        basename, url = asset_info['basename'], asset_info['url']
 
-        available_assets = cls.query_service(asset, tile, date)
-        retrieved_filenames = []
+        basename = asset_info['basename']
+        url = asset_info['url']
+        outpath = os.path.join(cls.Repository.path('stage'), basename)
 
-        for asset_info in available_assets:
-            basename = asset_info['basename']
-            url = asset_info['url']
-            outpath = os.path.join(cls.Repository.path('stage'), basename)
-
-            with utils.error_handler("Asset fetch error", continuable=True):
-                # obtain the data
-                response = cls.Repository.managed_request(url)
-                if response is None:
-                    continue
-                tmp_outpath = tempfile.mkstemp(
-                    suffix='.nc4', prefix='downloading',
-                    dir=cls.Repository.path('stage')
-                )[1]
-                with open(tmp_outpath, 'w') as fd:
-                    fd.write(response.read())
-
-                # verify that it is a netcdf file
-                try:
-                    ncroot = Dataset(tmp_outpath)
-                    os.rename(tmp_outpath, outpath)
-                except Exception as e:
-                    text = ''
-                    if e.message.endswith('Unknown file format'):
-                        token = 'Authorize NASA GESDISC DATA ARCHIVE'
-                        html = open(tmp_outpath, 'r').read(100000)
-                        if token in html:
-                            text = ('\n\nYou need to {t} \nfor your NASA '
-                                    'EarthData login.\n').format(t=token)
-                    raise Exception(e.message + text)
-            retrieved_filenames.append(outpath)
-            utils.verbose_out('Retrieved %s' % basename, 2)
-
-        return retrieved_filenames
+        with utils.error_handler("Error fetching {} from {}".format(
+                basename, url), continuable=True):
+            # obtain the data
+            response = cls.Repository.managed_request(url)
+            if response is None:
+                return []
+        stage_dir = cls.Repository.path('stage')
+        with utils.make_temp_dir(prefix='fetch', dir=stage_dir) as tmp_dn:
+            tmp_outpath = os.path.join(tmp_dn, basename)
+            with open(tmp_outpath, 'w') as fd:
+                fd.write(response.read())
+            # verify that it is a netcdf file
+            try:
+                ncroot = Dataset(tmp_outpath)
+                os.rename(tmp_outpath, outpath)
+            except Exception as e:
+                text = ''
+                if e.message.endswith('Unknown file format'):
+                    token = 'Authorize NASA GESDISC DATA ARCHIVE'
+                    html = open(tmp_outpath, 'r').read(100000)
+                    if token in html:
+                        text = ('\n\nYou need to {t} \nfor your NASA '
+                                'EarthData login.\n').format(t=token)
+                raise Exception(e.message + text)
+        utils.verbose_out('Retrieved ' + basename, 2)
+        return [outpath]
 
 
 class merraData(Data):
