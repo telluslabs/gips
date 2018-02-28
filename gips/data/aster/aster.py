@@ -32,7 +32,7 @@ import xml.etree.ElementTree as ET
 import gippy
 
 from gips.data.core import Repository, Asset, Data
-from gips.utils import VerboseOut, open_vector, basename
+from gips.utils import VerboseOut, open_vector, basename, settings
 from gips.inventory import dbinv
 from gips import utils
 from osgeo import gdal, osr, ogr
@@ -212,8 +212,25 @@ class asterAsset(Asset):
         temporal_str = get_temporal_string(date)
 
         # Authenticate with Earthdata login
-        # TODO: Don't use this file
-        cmr = CMR('cmr.cfg')
+        # Create config file
+        aster_settings = settings().REPOS['aster']
+        cfg_text = '''[credentials]
+provider = AGS
+username = {}
+password = {}
+client_id = gips
+echo_token = 00CE7FF3-AFEF-0F39-C5E7-F5BD2CE344F2
+tmpfilenamepath = /tmp/cmrToken5
+
+[request]
+request_token_url = https://api-test.echo.nasa.gov/echo-rest/tokens/
+content_type = application/echo10+xml
+cmr_host = cmr.earthdata.nasa.gov
+ingest_url = https://%(cmr_host)s/ingest/providers/
+page_size = 50
+search_granule_url = https://%(cmr_host)s/search/granules
+search_collection_url = https://%(cmr_host)s/search/collections'''.format(
+            aster_settings['username'], aster_settings['password'])
 
         # Create geometry search string
         shape = shapely.wkt.loads(feature)
@@ -236,17 +253,22 @@ class asterAsset(Asset):
             err_msg = "Error downloading: "
 
         # Use cmr to get results with given geometry and time
-        with utils.error_handler(err_msg):
-            # TODO: Make this work for other assets
-            results = cmr.searchGranule(
-                limit=1000,
-                short_name="AST_L1T",
-                polygon=poly_string,
-                day_night_flag="day",
-                temporal=temporal_str
-            )
-            if len(results) == 0:
-                return []
+        with utils.make_temp_dir() as temp_path:
+            fname = os.path.join(temp_path, "cmr.cfg")
+            with open(fname, 'w') as cfg:
+                cfg.write(cfg_text)
+
+            cmr = CMR(fname)
+            with utils.error_handler(err_msg):
+                results = cmr.searchGranule(
+                    limit=1000,
+                    short_name="AST_L1T",
+                    polygon=poly_string,
+                    day_night_flag="day",
+                    temporal=temporal_str
+                )
+                if len(results) == 0:
+                    return []
         available = []
 
         for item in results:  # Should be 1
