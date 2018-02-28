@@ -1,6 +1,7 @@
 make_image:
   stage: build
   script:
+    - apt-get update && apt-get install wget 
     - wget -O sixs ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/sixs
     - wget -O gitlab_ci ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gitlab_ci
     - wget -O gips_creds.sh.enc ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gips_creds.sh.enc
