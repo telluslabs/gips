@@ -83,12 +83,12 @@ REPOS = {
         'extract': False,  # extract files from tar.gz before processing instead of direct access
     },
     # these drivers tend to more specialized and experimental so turned off by default
-    #'cdl': {
-    #    'repository': '$TLD/cdl',
-    #},
-    #'sar': {
-    #    'repository': '$TLD/sar',
-    #},
+    'cdl': {
+        'repository': '$TLD/cdl',
+    },
+    'sar': {
+        'repository': '$TLD/sar',
+    },
     #'sarannual': {
     #    'repository': '$TLD/sarannual',
     #},
@@ -97,9 +97,9 @@ REPOS = {
         'username': EARTHDATA_USER,
         'password': EARTHDATA_PASS
     },
-    #'daymet': {
-    #    'repository': '$TLD/daymet',
-    #},
+    'daymet': {
+        'repository': '$TLD/daymet',
+    },
 }
 
 
