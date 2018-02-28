@@ -10,7 +10,7 @@ RUN apt-get update \
     && cd /gips \
     && pip install -r dev_requirements.txt \
     && pip install --process-dependency-links -e . \
-    && rm /gips/gips/settings.py /gips/pytest.ini \
+    && rm -f /gips/gips/settings.py /gips/pytest.ini \
     && gips_config env -r /archive -e icooke@ags.io \
     && openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh  -pass file:/root/.ssh/gitlab_ci \
     && eval $(cat gips_creds.sh) \
