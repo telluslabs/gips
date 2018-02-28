@@ -1,4 +1,4 @@
-FROM gippy-ubuntugis
+FROM gippy-0.x
 
 COPY . /gips
 COPY gitlab_ci /root/.ssh/gitlab_ci
