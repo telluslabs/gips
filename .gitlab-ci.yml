@@ -18,7 +18,7 @@ make_image:
 run_tests:
   stage: test
   script:
-    - docker run --rm gips_test pytest -vv
+    - docker run --rm gips_test pytest -vv --setup-repo --slow --sys -k 'modis or landsat or aod or sentinel2'
   tags:
     - gipsdev
 
