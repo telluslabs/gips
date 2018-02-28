@@ -1,0 +1,27 @@
+FROM gippy-ubuntugis
+
+COPY . /gips
+COPY gitlab_ci /root/.ssh/gitlab_ci
+COPY sixs /usr/local/bin/sixs
+COPY gips_creds.sh.enc /root/gips_creds.sh.enc
+
+RUN apt-get update \
+    && apt-get -y install libcurl4-gnutls-dev \
+    && cd /gips \
+    && pip install -r dev_requirements.txt \
+    && pip install --process-dependency-links -e . \
+    && rm /gips/gips/settings.py /gips/pytest.ini \
+    && gips_config env -r /archive -e icooke@ags.io \
+    && openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh  -pass file:/root/.ssh/gitlab_ci \
+    && eval $(cat gips_creds.sh) \
+    && sed -i~ \
+ 	   -e "s/^EARTHDATA_USER.*/EARTHDATA_USER = \"${EARTHDATA_USER}\"/" \
+ 	   -e "s/^EARTHDATA_PASS.*/EARTHDATA_PASS = \"${EARTHDATA_PASS}\"/" \
+	   -e "s/^USGS_USER.*/USGS_USER = \"${USGS_USER}\"/" \
+ 	   -e "s/^USGS_PASS.*/USGS_PASS = \"${USGS_PASS}\"/" \
+	   -e "s/^ESA_USER.*/ESA_USER = \"${ESA_USER}\"/" \
+ 	   -e "s/^ESA_PASS.*/ESA_PASS = \"${ESA_PASS}\"/" \
+	   /gips/gips/settings.py \
+    && echo "[pytest]\n# these will save time/prevent certain errors\ntestpaths = gips/test\nnorecursedirs = .venv data-root\n# GIPS' configured data repository:\ndata-repo = /archive\n# a directory of your choice, used for output from, e.g., gips_project\noutput-dir = /tmp/gips-testout\n# These should remain as they are (placing them in a committed file is a TODO):\npython_functions =  t_\npython_classes =    T_\npython_files =      t_*.py\nDJANGO_SETTINGS_MODULE=gips.inventory.orm.settings" >> /gips/pytest.ini
+
+WORKDIR /gips
