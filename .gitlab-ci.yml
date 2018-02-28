@@ -6,7 +6,6 @@ make_image:
     - wget -O gitlab_ci ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gitlab_ci
     - wget -O gips_creds.sh.enc ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gips_creds.sh.enc
     - git checkout $CI_COMMIT_REF_NAME
-    - git merge dev
     - docker build -t gippy-0.x -f docker/gippy-install.docker docker
     - docker build -t gips_test -f docker/gips-ci.docker .
   tags:
