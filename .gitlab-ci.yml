@@ -1,7 +1,3 @@
-stages:
-  build
-  test
-
 make_image:
   stage: build
   script:
