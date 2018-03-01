@@ -7,7 +7,8 @@ make_image:
     - wget -O gips_creds.sh.enc ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gips_creds.sh.enc
     - git checkout $CI_COMMIT_REF_NAME
     - docker build -t gippy-0.x -f docker/gippy-install.docker docker
-    - docker build -t gips_test_$CI_RUNNER_ID -f docker/gips-ci.docker .
+    - docker build -t gips_test_$CI_COMMIT_REF_SLUG -f docker/gips-ci.docker .
+    - docker system prune -f
   tags:
     - gipsdev
 
@@ -15,6 +16,8 @@ run_tests:
   stage: test
   script:
     - docker run --rm -e GIPS_OVERRIDE_VERSION=0.8.2 gips_test_$CI_RUNNER_ID pytest -vv --setup-repo --slow --sys -k 'cdl'
+    - docker image rm gips_test_$CI_COMMIT_REF_SLUG
+    - docker system prune -f
   tags:
     - gipsdev
 
