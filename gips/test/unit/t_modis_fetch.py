@@ -46,6 +46,7 @@ model_404 = (
 def fetch_mocks(mpo, mocker):
     """Mock out all I/O used in modisAsset.fetch; used for unit tests below."""
     # called once to get a listing of files then again when one is chosen to download
+    m_query_service = mpo(modis.modisAsset, 'query_service')
     m_get_setting = mpo(modis.modisRepository, 'get_setting')
     m_get_setting.return_value = 'driver-dir'
     managed_request = mpo(modis.modisRepository, 'managed_request')
@@ -53,7 +54,8 @@ def fetch_mocks(mpo, mocker):
     managed_request.return_value = content
     open = mpo(modis, 'open')
     file = open.return_value.__enter__.return_value # context manager
-    return (managed_request, m_get_setting, content, open, file)
+    return (m_query_service, managed_request,
+            m_get_setting, content, open, file)
 
 @pytest.mark.parametrize('a_type, tile, date, url', http_404_params)
 def t_managed_request_returns_none(fetch_mocks, a_type, tile, date, url):
@@ -61,11 +63,12 @@ def t_managed_request_returns_none(fetch_mocks, a_type, tile, date, url):
 
     This happens for any 4xx error, 5xx error, and similar."""
     # setup & mocks
-    (managed_request, m_get_setting, content, open, file) = fetch_mocks
+    (m_query_service, managed_request, _, _, open, _) = fetch_mocks
+    m_query_service.return_value = {'basename': 'whatever.hdf', 'url': url}
     managed_request.return_value = None
 
     # call
-    actual = modis.modisAsset.fetch(a_type, tile, date, 'whatever.hdf', url)
+    actual = modis.modisAsset.fetch(a_type, tile, date)
 
     # assertions:
     assert ([] == actual
@@ -153,11 +156,13 @@ asset_content = ("If you think you understand, you don't.\n"
 @pytest.mark.parametrize('a_type, tile, date, asset_fn, url', http_200_params)
 def t_http_matching_listings(mocker, fetch_mocks, a_type, tile, date, asset_fn, url):
     """Query http server, extract asset URL, then download it."""
-    (managed_request, m_get_setting, content, open, file) = fetch_mocks
+    (m_query_service, managed_request, m_get_setting, content, open, file
+     ) = fetch_mocks
+    m_query_service.return_value = {'basename': asset_fn, 'url': url}
     content.read.return_value = asset_content
 
     expected = ['driver-dir/stage/' + asset_fn]
-    actual = modis.modisAsset.fetch(a_type, tile, date, asset_fn, url)
+    actual = modis.modisAsset.fetch(a_type, tile, date)
 
     # assertions
     assert (expected == actual
