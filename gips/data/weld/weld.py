@@ -167,6 +167,10 @@ class weldData(Data):
         },
     }
 
+    @classmethod
+    def need_to_fetch(cls, *args, **kwargs):
+        return True
+
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
         """Process requested products."""
