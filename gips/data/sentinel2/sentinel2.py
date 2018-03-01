@@ -737,6 +737,16 @@ class sentinel2Data(Data):
         's2rep':        'ref',
     }
 
+    @classmethod
+    def need_to_fetch(cls, a_type, tile, date, update):
+        if date < sentinel2Asset._2016_12_07:
+            # must be an original-style asset, which has many tiles at
+            # query time, so there's no easy way to tell if we can skip the
+            # download or not.  So, just assume the worst and fetch it.
+            return True
+        return super(sentinel2Data, cls).need_to_fetch(
+                a_type, tile, date, update)
+
     def plan_work(self, requested_products, overwrite):
         """Plan processing run using requested products & their dependencies.
 

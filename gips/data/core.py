@@ -1110,6 +1110,16 @@ class Data(object):
         return set(assets)
 
     @classmethod
+    def need_to_fetch(cls, a_type, tile, date, update):
+        qs_rv = cls.Asset.query_service(a_type, tile, date)
+        if qs_rv is None: # nothing remote; done
+            return False
+        # if we don't have it already, or if `update` flag
+        queried_ao = cls.Asset(qs_rv['basename'])
+        local_ao = cls.Asset.discover_asset(a_type, tile, date)
+        return local_ao is None or (update and local_ao.updated(queried_ao))
+
+    @classmethod
     def fetch(cls, products, tiles, textent, update=False):
         """ Download data for tiles and add to archive. update forces fetch """
         assets = cls.products2assets(products)
@@ -1118,31 +1128,27 @@ class Data(object):
         for a in assets:
             for t in tiles:
                 asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                for d in asset_dates:
-                    query = cls.Asset.query_service(a, t, d)
-                    if query is None: # nothing remote; done
+                for d in asset_dates: # we say dates but really datetimes
+                    if not cls.need_to_fetch(a, t, d, update):
                         continue
-                    # if we don't have it already, or if update (force) flag
-                    queried_ao = cls.Asset(query['basename'])
-                    local_ao = cls.Asset.discover_asset(a, t, d)
-                    need_to_fetch = local_ao is None or (
-                            update and local_ao.updated(queried_ao))
-                    if need_to_fetch:
-                        date_str = d.strftime("%y-%m-%d")
-                        msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
-                        with utils.error_handler(msg_prefix, continuable=True):
-                            # Feature toggle:  Call new fetch only if driver
-                            # supports it (or from within a unit test in which
-                            # case it probably doesn't matter)
-                            import inspect
-                            if ('Mock' in type(cls.Asset.fetch).__name__
-                                        or len(inspect.getargspec(
-                                                cls.Asset.fetch)[0]) > 4):
-                                cls.Asset.fetch(a, t, d, **query)
-                            else:
-                                cls.Asset.fetch(a, t, d)
-                            # fetched may contain both fetched things and unfetchable things
-                            fetched.append((a, t, d))
+                    with utils.error_handler(
+                            'Problem fetching asset for {}, {}, {}'.format(
+                                a, t, d.strftime("%y-%m-%d")),
+                            continuable=True):
+                        # Feature toggle:  Call new fetch only if driver
+                        # supports it (or from within a unit test in which
+                        # case it probably doesn't matter)
+                        import inspect
+                        if ('Mock' in type(cls.Asset.fetch).__name__
+                                    or len(inspect.getargspec(
+                                            cls.Asset.fetch)[0]) > 4):
+                            query = cls.Asset.query_service(a, t, d)
+                            cls.Asset.fetch(a, t, d, **query)
+                        else:
+                            cls.Asset.fetch(a, t, d)
+                        # fetched may contain both fetched things and unfetchable things
+                        fetched.append((a, t, d))
+
         return fetched
 
     @classmethod
