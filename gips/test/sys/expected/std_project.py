@@ -527,6 +527,16 @@ expectations['aod'] = {
           'ed9fc349c037f39eca87f2e7495024eeaf7fd0e99165ecb0f52cc7927e985977')],
 }
 
+expectations['cdl'] = {
+    'cdl': [
+        ('nopath/file.tif',
+         'raster',
+         'gdalinfo-stats',
+         ['Driver: GTiff/GeoTIFF',],
+        )
+    ],
+}
+
 expectations['prism'] = {
     # t_project[tmax] recording:
     'tmax':
