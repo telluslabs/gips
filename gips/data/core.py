@@ -1135,17 +1135,7 @@ class Data(object):
                             'Problem fetching asset for {}, {}, {}'.format(
                                 a, t, d.strftime("%y-%m-%d")),
                             continuable=True):
-                        # Feature toggle:  Call new fetch only if driver
-                        # supports it (or from within a unit test in which
-                        # case it probably doesn't matter)
-                        import inspect
-                        if ('Mock' in type(cls.Asset.fetch).__name__
-                                    or len(inspect.getargspec(
-                                            cls.Asset.fetch)[0]) > 4):
-                            query = cls.Asset.query_service(a, t, d)
-                            cls.Asset.fetch(a, t, d, **query)
-                        else:
-                            cls.Asset.fetch(a, t, d)
+                        cls.Asset.fetch(a, t, d)
                         # fetched may contain both fetched things and unfetchable things
                         fetched.append((a, t, d))
 
