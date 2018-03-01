@@ -116,7 +116,7 @@ class cdlAsset(Asset):
             if len(assets) == 0:
                 utils.verbose_out("No CDL data for {} on {}".format(tile, date.year), 2)
                 return
-            file_response = requests.get(assets[0]['url'], verify=False, stream=True)
+            file_response = requests.get(assets['url'], verify=False, stream=True)
             with utils.make_temp_dir(prefix='fetch', dir=cls.Repository.path('stage')) as tmp_dir:
                 fname = "{}_{}_cdl_cdl.tif".format(tile, date.year)
                 tmp_fname = tmp_dir + '/' + fname
@@ -129,7 +129,20 @@ class cdlAsset(Asset):
         else:
             utils.verbose_out("Fetching not supported for cdlmkii", 2)
 
+    @classmethod
+    def _archivefile(cls, filename, update=False):
+        '''
+        overriding because asset is the product.
+        '''
+        asset, numlinks, overwritten_ao = super(cdlAsset, cls)._archivefile(
+            filename, update)
+        # HACKALERT!!!!  -- paths of returned object point to stage because
+        # assets come with products, and are automagically populated.                                                                     
+        new_asset_obj = cls(asset.archived_filename)
+        new_asset_obj.archived_filename = asset.archived_filename
+        return new_asset_obj, numlinks, overwritten_ao
 
+    
 class cdlData(Data):
     """ A tile (CONUS State) of CDL """
     name = 'CDL'
