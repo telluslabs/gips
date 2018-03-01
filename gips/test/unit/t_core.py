@@ -149,8 +149,7 @@ def t_data_fetch_base_case(mocker, m_discover_asset, m_query_service, m_fetch):
     # setup
     c1_atd = ('C1', '012030', datetime.datetime(2017, 8, 1, 0, 0))
     c1s3_atd = ('C1S3', '012030', datetime.datetime(2017, 8, 1, 0, 0))
-    expected_calls = [mocker.call(*c1_atd, **m_query_service.return_value),
-                      mocker.call(*c1s3_atd, **m_query_service.return_value)]
+    expected_calls = [mocker.call(*c1_atd), mocker.call(*c1s3_atd)]
     # call
     actual = landsatData.fetch(*df_args)
     # assertions

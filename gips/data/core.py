@@ -1111,12 +1111,16 @@ class Data(object):
 
     @classmethod
     def need_to_fetch(cls, a_type, tile, date, update):
+        local_ao = cls.Asset.discover_asset(a_type, tile, date)
+        # we have something for this atd, and user doesn't want to update,
+        # so the decision is easy
+        if local_ao is not None and not update:
+            return False
         qs_rv = cls.Asset.query_service(a_type, tile, date)
         if qs_rv is None: # nothing remote; done
             return False
         # if we don't have it already, or if `update` flag
         queried_ao = cls.Asset(qs_rv['basename'])
-        local_ao = cls.Asset.discover_asset(a_type, tile, date)
         return local_ao is None or (update and local_ao.updated(queried_ao))
 
     @classmethod
