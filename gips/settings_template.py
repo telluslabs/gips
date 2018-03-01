@@ -86,6 +86,9 @@ REPOS = {
     'cdl': {
         'repository': '$TLD/cdl',
     },
+    'prism': {
+        'repository': '$TLD/prism',
+    },
     'sar': {
         'repository': '$TLD/sar',
     },
