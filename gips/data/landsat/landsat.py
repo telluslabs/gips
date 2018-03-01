@@ -566,15 +566,20 @@ class landsatAsset(Asset):
         return None
 
     @classmethod
-    def fetch(cls, asset, tile, date, basename, **query_params):
+    def fetch(cls, asset, tile, date):
         """Fetch the asset given by the given parameters.
 
         Many arguments are unused, but must be present for compatibility.
         """
+        qs_rv = cls.query_service(asset, tile, date)
+        if qs_rv is None:
+            return []
+        basename = qs_rv.pop('basename')
+
         if asset == 'C1':
-            return cls.fetch_c1(**query_params)
+            return cls.fetch_c1(**qs_rv)
         if asset == 'C1S3':
-            return cls.fetch_s3(basename, **query_params)
+            return cls.fetch_s3(basename, **qs_rv)
         raise ValueError('Unfetchable asset type: {}'.format(asset))
 
     @classmethod

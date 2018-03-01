@@ -71,6 +71,10 @@ def m_usgs_lib(mocker):
     if saved_usgs is not None:
         sys.modules['usgs'] = saved_usgs
 
+@pytest.fixture
+def m_query_service(mpo):
+    return mpo(landsat.landsatAsset, 'query_service')
+
 def t_landsatAsset_query_service_c1_success_case(
         mocker, m_ee_login, m_get_setting, m_load_ee_search_keys, m_usgs_lib):
     """Confirms method works for the normal case."""
@@ -156,18 +160,21 @@ def t_landsatAsset_query_service_c1s3_success_case(mocker, c1s3_cache_control):
                                                 datetime.date(2017, 5, 6))
     assert expected == actual
 
-def t_landsatAsset_fetch_c1(
-        mocker, m_ee_login, m_get_setting, m_usgs_lib, mock_context_manager):
+def t_landsatAsset_fetch_c1(mocker, m_query_service, m_ee_login, m_get_setting,
+                            m_usgs_lib, mock_context_manager):
+    dc = 'dontcare'
+    asset_fn = 'fake-asset.tar.gz'
+    m_query_service.return_value = {'basename': asset_fn,
+                                    'scene_id': dc, 'dataset': dc}
+    # TODO here down
     mock_context_manager(landsat.utils, 'make_temp_dir', 'fake-temp-dir')
     m_get_setting.return_value = 'driver-dir'
     mocker.patch.object(landsat.homura, 'download')
-    mocker.patch.object(landsat.os, 'listdir'
-                        ).return_value = ['fake-asset.tar.gz']
+    mocker.patch.object(landsat.os, 'listdir').return_value = [asset_fn]
     m_rename = mocker.patch.object(landsat.os, 'rename')
-    dc = 'dontcare'
-    landsat.landsatAsset.fetch('C1', dc, dc, dc, scene_id=dc, dataset=dc)
-    expected = mocker.call('fake-temp-dir/fake-asset.tar.gz',
-                'driver-dir/stage/fake-asset.tar.gz')
+    landsat.landsatAsset.fetch('C1', dc, dc)
+    expected = mocker.call(
+        'fake-temp-dir/' + asset_fn, 'driver-dir/stage/' + asset_fn)
     assert (m_rename.call_count == 1
             and expected == m_rename.call_args)
 
@@ -188,15 +195,18 @@ sample_c1s3_asset_content = {
     u'qa-band': u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_BQA.TIF',
 }
 
-def t_landsatAsset_fetch_s3(mocker, m_get_setting, mock_context_manager):
+def t_landsatAsset_fetch_s3(mocker, m_query_service,
+                            m_get_setting, mock_context_manager):
     """Check the content passed in to json.dump to confirm the method."""
+    dc = 'dontcare'
+    m_query_service.return_value = {'basename': dc}
+    m_query_service.return_value.update(sample_c1s3_keys)
     mock_context_manager(landsat.utils, 'make_temp_dir', 'fake-temp-dir')
     mocker.patch.object(landsat, 'open')
     m_json_dump = mocker.patch.object(landsat, 'json').dump
     m_shutil_copy = mocker.patch.object(landsat.shutil, 'copy')
 
-    dc = 'dontcare'
-    landsat.landsatAsset.fetch('C1S3', dc, dc, dc, **sample_c1s3_keys)
+    landsat.landsatAsset.fetch('C1S3', dc, dc)
 
     # this means "the first argument of the call" -----------vvvvvv
     assert sample_c1s3_asset_content == m_json_dump.call_args[0][0]
