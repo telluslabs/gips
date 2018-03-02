@@ -15,7 +15,7 @@ make_image:
 run_tests:
   stage: test
   script:
-    - docker run --rm ${PWD}:/out-to-runner -e GIPS_OVERRIDE_VERSION=0.8.2 gips_test_$CI_RUNNER_ID bash -c 'pytest --setup-repo --slow --sys --record=process_expectations.py -k t_process ; cp process_expectations.py /out-to-runner/'
+    - docker run --rm -v ${PWD}:/out-to-runner -e GIPS_OVERRIDE_VERSION=0.8.2 gips_test_$CI_RUNNER_ID bash -c 'pytest --setup-repo --slow --sys --record=process_expectations.py -k t_process ; cp process_expectations.py /out-to-runner/'
     - docker image rm gips_test_$CI_COMMIT_REF_SLUG
     - docker system prune -f
   tags:
