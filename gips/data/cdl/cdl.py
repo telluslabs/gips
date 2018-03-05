@@ -131,7 +131,20 @@ class cdlAsset(Asset):
         else:
             utils.verbose_out("Fetching not supported for cdlmkii", 2)
 
+    @classmethod
+    def _archivefile(cls, filename, update=False):
+        '''
+        overriding because asset is the product.
+        '''
+        asset, numlinks, overwritten_ao = super(cdlAsset, cls)._archivefile(
+            filename, update)
+        # HACKALERT!!!!  -- paths of returned object point to stage because
+        # assets come with products, and are automagically populated.                                                                     
+        new_asset_obj = cls(asset.archived_filename)
+        new_asset_obj.archived_filename = asset.archived_filename
+        return new_asset_obj, numlinks, overwritten_ao
 
+    
 class cdlData(Data):
     """ A tile (CONUS State) of CDL """
     name = 'CDL'
