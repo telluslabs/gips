@@ -17,6 +17,7 @@ STD_ARGS = {
     'modis': ('modis', '-s', nh_shp, '-d', '2012-12-01,2012-12-03', '-v', '4'),
     'merra': ('merra', '-s', nh_shp, '-d', '2015-135', '-v', '4'),
     'prism': ('prism', '-s', nh_shp, '-d', '1982-12-01,1982-12-03', '-v4'),
+    'cdl': ('cdl', '-s', nh_shp, '-d', '2015', '--days', '1,1', '-t', 'NH', '-v4'),
     'landsat': ('landsat', '-s', nh_shp, '-d', '2017-08-01', '-v4'),
     # Here down, not NH shapefile:
     'aod': ('aod', '-s', util.NE_SHP_PATH, '-d', '2017-004,2017-006', '-v4'),
