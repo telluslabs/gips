@@ -193,6 +193,7 @@ class landsatAsset(Asset):
         },
         'SR': {
             'sensors': ['LC8SR'],
+            'enddate': date(2017, 4, 30),
             'pattern': r'^L.*?-SC.*?\.tar\.gz$',
         },
 

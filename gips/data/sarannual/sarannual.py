@@ -64,9 +64,13 @@ class sarannualAsset(Asset):
     }
     _assets = {
         'MOS': {
+            'startdate': datetime.date(1, 1, 1),
+            'latency': 0,
             'pattern': r'^.{7}_.{2}_MOS\.tar\.gz$'
         },
         'FNF': {
+            'startdate': datetime.date(1, 1, 1),
+            'latency': 0,
             'pattern': r'^.{7}_.{2}_FNF\.tar\.gz$'
         },
     }

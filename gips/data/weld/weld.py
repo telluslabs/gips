@@ -77,7 +77,7 @@ class weldAsset(Asset):
             'pattern': r'^CONUS\.week\d{2}\..{4}\.h.{2}v.{2}\.doy\d{3}to\d{3}\.v1\.5\.hdf$',
             'url': 'http://e4ftl01.cr.usgs.gov/WELD/WELDUSWK.001',
             'startdate': datetime.date(2003, 1, 1),
-            'latency': None
+            'latency': 0,
         },
     }
 

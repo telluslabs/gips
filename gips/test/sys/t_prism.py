@@ -45,11 +45,13 @@ setup_fixture = setup_prism_data
 #     assert expected == process_run2
 #     assert process_run1.timestamps != process_run2.timestamps
 
+'''
 def t_project_no_warp(setup_fixture, clean_repo_env, output_tfe, expected):
     """Test gips_project {} without warping.""".format(driver)
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     actual = output_tfe.run('gips_project', *args)
     assert expected == actual
+'''
 
 def t_tiles_copy(setup_fixture, clean_repo_env, output_tfe, expected):
     """Test gips_tiles {} with copying.""".format(driver)

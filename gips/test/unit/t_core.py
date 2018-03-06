@@ -1,6 +1,9 @@
 """Unit tests for core functions found in gips.core and gips.data.core."""
 
 import sys
+import os
+import pkgutil
+import imp
 import datetime
 
 import pytest
@@ -251,3 +254,59 @@ def t_query_service_caching(mpo):
 
     assert (m_query_provider.call_count == 1 # should use the cache 2nd time
             and actual_first == actual_second == expected_for_both)
+
+class GipsDriverModules(object):
+    """Introspect the GIPS codebase and load all the driver modules."""
+    def __init__(self):
+        self.load_driver_modules()
+
+    def load_driver_modules(self):
+        """Locate all gips drivers under gips.data and return them in a dict.
+
+        Format is {'modis': <modis module object>, 'landsat': <object>..."""
+        gips_data_dir_name = os.path.dirname(gips.data.__file__)
+        driver_names = [
+            name for (_, name, is_pkg)
+            in pkgutil.iter_modules([gips_data_dir_name])
+            if is_pkg and name is not 'core']
+        driver_dirs = {dn: os.path.join(gips_data_dir_name, dn)
+                       for dn in driver_names}
+        fmtups = {dn: imp.find_module(dn, [dd]) for (dn, dd)
+                  in driver_dirs.items()}
+        modules = {dn: imp.load_module(dn, *fmtup)
+                   for (dn, fmtup) in fmtups.items()}
+        self.modules = modules
+
+    def asset_classes(self):
+        return {driver: module.__dict__[driver + 'Asset']
+                for driver, module in self.modules.items()}
+
+gips_driver_modules = GipsDriverModules()
+
+@pytest.mark.parametrize('driver, asset_class',
+                         gips_driver_modules.asset_classes().items())
+def t_check_startdate_compliance(driver, asset_class):
+    expected, actual = {}, {}
+    for a_type, a_info in asset_class._assets.items():
+        expected[a_type] = datetime.date
+        actual[a_type] = type(a_info.get('startdate', None))
+
+    assert expected == actual
+
+@pytest.mark.parametrize('driver, asset_class',
+                         gips_driver_modules.asset_classes().items())
+def t_check_enddate_latency_compliance(driver, asset_class):
+    busted_a_types = {} # asset types & reasons for failure
+    for a_type, a_info in asset_class._assets.items():
+        if 'enddate' in a_info:
+            v, t = a_info['enddate'], datetime.date
+        elif 'latency' in a_info:
+            v, t = a_info['latency'], int
+        else:
+            busted_a_types[a_type] = "Neither 'enddate' nor 'latency' found"
+            continue
+        if not isinstance(v, t):
+            busted_a_types[a_type] = 'Expected {} but got {}'.format(
+                t, type(v))
+
+    assert {} == busted_a_types
