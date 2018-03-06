@@ -39,11 +39,13 @@ setup_fixture = setup_driver_data
 # ###   SHOULD BE STANDARD BELOW HERE #####
 
 
+'''
 def t_project_no_warp(setup_fixture, clean_repo_env, output_tfe, expected):
     """Test gips_project {} without warping.""".format(driver)
     args = STD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     actual = output_tfe.run('gips_project', *args)
     assert expected == actual
+'''
 
 
 # Haven't used gips_tiles ever
