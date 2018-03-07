@@ -695,6 +695,16 @@ class Asset(object):
                         numlinks = numlinks + 1
             else:
                 VerboseOut('%s already in archive' % filename, 2)
+
+        # newly created asset should have only automagical products, and those
+        # would have paths in stage with the existing asset.  Re-instantiation
+        # using archived_filename rectifies this.
+        if len(asset.products) > 0:
+            new_asset_obj = cls(asset.archived_filename)
+            # next line is strange, but is used by DataInventory.fetch
+            new_asset_obj.archived_filename = asset.archived_filename
+            asset = new_asset_obj
+
         if otherversions and numlinks == 0:
             return (asset, -1, overwritten_ao)
         else:
