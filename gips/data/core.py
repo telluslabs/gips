@@ -525,9 +525,11 @@ class Asset(object):
         """Connect to an FTP server and chdir according to the args.
 
         Returns the ftplib connection object."""
+        utils.verbose_out('Connecting to {}'.format(cls._host), 5)
         conn = ftplib.FTP(cls._host)
         conn.login('anonymous', settings().EMAIL)
         conn.set_pasv(True)
+        utils.verbose_out('Changing to {}'.format(working_directory), 5)
         conn.cwd(working_directory)
         return conn
 
