@@ -7,7 +7,9 @@ make_image:
     - wget -O gips_creds.sh.enc ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gips_creds.sh.enc
     - git checkout $CI_COMMIT_REF_NAME
     - docker build -t gippy-0.x -f docker/gippy-install.docker docker
-    - docker build -t gips_test_$CI_COMMIT_REF_SLUG -f docker/gips-ci.docker .
+    - docker build -e GIPS_UID=$(id -u)
+      -t gips_test_$CI_COMMIT_REF_SLUG
+      -f docker/gips-ci.docker .
   tags:
     - gipsdev
   after_script:
@@ -18,10 +20,11 @@ run_tests:
   stage: test
   script:
     - test -e /tmp/std_project_aod.py && rm -f /tmp/std_project_aod.py
-    - docker run -v /tmp/:/outtahere --rm -e GIPS_OVERRIDE_VERSION=0.8.2
-      gips_test_$CI_COMMIT_REF_SLUG bash -c 'pytest -vv --setup-repo
-      --record=/outtahere/std_project_aod.py --slow --sys -s
-      -k \'aod and t_project\' && chmod 666 /tmp/std_project_aod.py'
+    - docker run -v /tmp/:/outtahere --rm
+      -e GIPS_OVERRIDE_VERSION=0.8.2
+      gips_test_$CI_COMMIT_REF_SLUG
+      pytest -vv --setup-repo --record=/outtahere/std_project_aod.py
+      --slow --sys -s -k 'aod and t_project'
   artifacts:
     paths:
     - /tmp/std_project_aod.py
