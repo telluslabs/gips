@@ -15,7 +15,7 @@ make_image:
 run_tests:
   stage: test
   script:
-    - docker run --rm -e GIPS_OVERRIDE_VERSION=0.8.2 gips_test_$CI_COMMIT_REF_SLUG pytest -vv --setup-repo --slow --sys -s -k 'unit or t_project'
+    - docker run --rm -e GIPS_OVERRIDE_VERSION=0.8.2 gips_test_$CI_COMMIT_REF_SLUG pytest -vv --setup-repo --slow --sys -s -k 'aod'
     - docker image rm gips_test_$CI_COMMIT_REF_SLUG
     - docker system prune -f
   tags:
