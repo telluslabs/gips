@@ -19,9 +19,9 @@ run_tests:
   script:
     - test -e /tmp/std_project_aod.py && rm -f /tmp/std_project_aod.py
     - docker run -v /tmp/:/outtahere --rm -e GIPS_OVERRIDE_VERSION=0.8.2
-      gips_test_$CI_COMMIT_REF_SLUG pytest -vv --setup-repo
+      gips_test_$CI_COMMIT_REF_SLUG bash -c 'pytest -vv --setup-repo
       --record=/outtahere/std_project_aod.py --slow --sys -s
-      -k 'aod and t_project'
+      -k \'aod and t_project\' && chmod 666 /tmp/std_project_aod.py'
   artifacts:
     paths:
     - /tmp/std_project_aod.py
@@ -29,7 +29,6 @@ run_tests:
   tags:
     - gipsdev
   after_script:
-    - chmod 666 /tmp/std_project_aod.py
     - docker image rm gips_test_$CI_COMMIT_REF_SLUG
     - docker system prune -f
 
