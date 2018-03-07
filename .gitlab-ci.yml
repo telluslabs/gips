@@ -15,9 +15,13 @@ make_image:
 run_tests:
   stage: test
   script:
-    - docker run --rm -e GIPS_OVERRIDE_VERSION=0.8.2 gips_test_$CI_COMMIT_REF_SLUG pytest -vv --setup-repo --slow --sys -s -k 'aod'
+    - docker run -v /tmp/:/outtahere --rm -e GIPS_OVERRIDE_VERSION=0.8.2 gips_test_$CI_COMMIT_REF_SLUG pytest -vv --setup-repo --record=/outtahere/std_project_aod.py --slow --sys -s -k 'aod'
     - docker image rm gips_test_$CI_COMMIT_REF_SLUG
     - docker system prune -f
+  artifacts:
+    paths:
+    - /tmp/std_project_aod.py
+    expire_in: 3 days
   tags:
     - gipsdev
 

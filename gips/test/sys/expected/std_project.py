@@ -514,17 +514,17 @@ expectations['aod'] = {
     # t_project[aod] recording:
     'aod':
         [('0/2017004_MOD_aod.tif',
-          'hash',
-          'sha256',
-          '2fe93815b6d1686fd357e8685c82ff23689d99200b3aec2654277fb6db86a8c7'),
+          'raster',
+          'gdalinfo-stats',
+          ['2fe93815b6d1686fd357e8685c82ff23689d99200b3aec2654277fb6db86a8c7']),
          ('0/2017005_MOD_aod.tif',
-          'hash',
-          'sha256',
-          '3830875aa1603cc86fc452286d365c1dcd12af60889f0761d8df3493c7541ef7'),
+          'raster',
+          'gdalinfo-stats',
+          ['3830875aa1603cc86fc452286d365c1dcd12af60889f0761d8df3493c7541ef7']),
          ('0/2017006_MOD_aod.tif',
-          'hash',
-          'sha256',
-          'ed9fc349c037f39eca87f2e7495024eeaf7fd0e99165ecb0f52cc7927e985977')],
+          'raster',
+          'gdalinfo-stats',
+          ['ed9fc349c037f39eca87f2e7495024eeaf7fd0e99165ecb0f52cc7927e985977'])],
 }
 
 expectations['cdl'] = {
