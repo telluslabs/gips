@@ -11,7 +11,7 @@ make_image:
       -t gips_test_$CI_COMMIT_REF_SLUG
       -f docker/gips-ci.docker .
   tags:
-    - gipsdev
+    - dontbuildme_gipsdev
   after_script:
    - docker system prune -f
 
@@ -30,7 +30,7 @@ run_tests:
     - /tmp/std_project_aod.py
     expire_in: 3 days
   tags:
-    - gipsdev
+    - dontbuildme_gipsdev
   after_script:
     - docker image rm gips_test_$CI_COMMIT_REF_SLUG
     - docker system prune -f
