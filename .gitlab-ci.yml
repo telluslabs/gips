@@ -11,7 +11,7 @@ make_image:
       -t gips_test_$CI_COMMIT_REF_SLUG
       -f docker/gips-ci.docker .
   tags:
-    - dontbuildme_gipsdev
+:   - gipsdev
   after_script:
    - docker system prune -f
 
@@ -23,14 +23,14 @@ run_tests:
     - docker run -v /tmp/:/outtahere --rm
       -e GIPS_OVERRIDE_VERSION=0.8.2
       gips_test_$CI_COMMIT_REF_SLUG
-      pytest -vv --setup-repo --record=/outtahere/std_project_aod.py
-      --slow --sys -s -k 'aod and t_project'
+      pytest -vv --setup-repo 
+      --slow --sys -s -k '(aod or cdl) and t_project'
   artifacts:
     paths:
     - /tmp/std_project_aod.py
     expire_in: 3 days
   tags:
-    - dontbuildme_gipsdev
+    - gipsdev
   after_script:
     - docker image rm gips_test_$CI_COMMIT_REF_SLUG
     - docker system prune -f
