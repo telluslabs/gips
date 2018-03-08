@@ -11,7 +11,7 @@ make_image:
       -t gips_test_$CI_COMMIT_REF_SLUG
       -f docker/gips-ci.docker .
   tags:
-:   - gipsdev
+    - gipsdev
   after_script:
    - docker system prune -f
 
