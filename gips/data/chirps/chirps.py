@@ -111,7 +111,10 @@ class chirpsAsset(Asset):
         stage_dir = cls.Repository.path('stage')
         with utils.error_handler("Error downloading from " + cls._host, continuable=True), \
                 utils.make_temp_dir(prefix='fetchtmp', dir=stage_dir) as td_name:
-            remote_fn, _ = cls.query_provider(asset, tile, date)
+            qs_rv = cls.query_service(asset, tile, date)
+            if qs_rv is None:
+                return []
+            remote_fn = qs_rv['basename']
             local_fn = fn_prefix + remote_fn
             temp_fp = os.path.join(td_name, local_fn)
             stage_fp = os.path.join(stage_dir, local_fn)
@@ -137,6 +140,16 @@ class chirpsData(Data):
             'bands': [{'name': _product_type, 'units': 'mm'}],
         },
     }
+
+    @classmethod
+    def need_to_fetch(cls, *args, **kwargs):
+        """Always fetch chirps assets; don't try to optimize with pre-querying.
+
+        Chirps edits the filename at archive time, so chirpsAsset() expects
+        a different filename than what is found at download time.  So chirps
+        can't make use of the pre-fetch query optimization.
+        """
+        return True
 
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):

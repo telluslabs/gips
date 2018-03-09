@@ -26,6 +26,7 @@ import glob
 import traceback
 import re
 
+from backports.functools_lru_cache import lru_cache
 import gdal
 import numpy
 
@@ -140,6 +141,7 @@ class aodAsset(Asset):
         return super(aodAsset, cls).ftp_connect(wd)
 
     @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
     def query_service(cls, asset, tile, date):
         """Query the data provider for files matching the arguments.
 
@@ -164,9 +166,10 @@ class aodAsset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
-        fname, _ = cls.query_provider(asset, tile, date)
-        if fname is None:
+        query_rv = cls.query_service(asset, tile, date)
+        if query_rv is None:
             return []
+        fname = query_rv['basename']
         stage_fp = os.path.join(cls.Repository.path('stage'), fname)
         ftp = cls.ftp_connect(asset, date)
         ftp.retrbinary('RETR ' + fname, open(stage_fp, "wb").write)

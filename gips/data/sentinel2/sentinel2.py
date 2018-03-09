@@ -312,14 +312,6 @@ class sentinel2Asset(Asset):
             asset_url = entry['link'][0]['href']
             output_file_name = entry['title'] + '.zip'
 
-        # old-style assets cover many tiles, so there may be duplication of effort; avoid that by
-        # aborting if the stage already contains the desired asset
-        full_staged_path = os.path.join(cls.Repository.path('stage'), output_file_name)
-        if os.path.exists(full_staged_path):
-            utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
-                    output_file_name))
-            return None, None
-
         if pclouds < 100:
             asset = cls(output_file_name)
             if not asset.filter(pclouds):
@@ -331,9 +323,21 @@ class sentinel2Asset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         """Fetch the asset corresponding to the given asset type, tile, and date."""
-        output_file_name, asset_url = cls.query_provider(asset, tile, date)
-        if (output_file_name, asset_url) == (None, None):
-            return # nothing found
+        qs_rv = cls.query_service(asset, tile, date)
+        if qs_rv is None:
+            return []
+        output_file_name, asset_url = (qs_rv['basename'], qs_rv['url'])
+
+        # old-style assets cover many tiles, so there may be duplication of
+        # effort; avoid that by aborting if the stage already contains the
+        # desired asset
+        full_staged_path = os.path.join(cls.Repository.path('stage'),
+                                        output_file_name)
+        if os.path.exists(full_staged_path):
+            utils.verbose_out('Asset `{}` needed but already in stage/,'
+                              ' skipping.'.format(output_file_name))
+            return []
+
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage
@@ -358,6 +362,7 @@ class sentinel2Asset(Asset):
                 cls.stage_asset(output_full_path, output_file_name)
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
+        return [output_full_path]
 
 
     @classmethod
@@ -731,6 +736,16 @@ class sentinel2Data(Data):
         'mtci':         'ref',
         's2rep':        'ref',
     }
+
+    @classmethod
+    def need_to_fetch(cls, a_type, tile, date, update):
+        if date < sentinel2Asset._2016_12_07:
+            # must be an original-style asset, which has many tiles at
+            # query time, so there's no easy way to tell if we can skip the
+            # download or not.  So, just assume the worst and fetch it.
+            return True
+        return super(sentinel2Data, cls).need_to_fetch(
+                a_type, tile, date, update)
 
     def plan_work(self, requested_products, overwrite):
         """Plan processing run using requested products & their dependencies.

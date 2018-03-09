@@ -80,13 +80,13 @@ def t_process_acolite(repo_env, expected):
     actual = repo_env.run('gips_process', *ACOLITE_PROD_ARGS)
     assert expected == actual
 
-
+'''
 def t_project_no_warp(setup_landsat_data, clean_repo_env, output_tfe, expected):
     """Test gips_project modis without warping."""
     args = STD_PROD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     actual = output_tfe.run('gips_project', *args)
     assert expected == actual
-
+'''
 
 def t_tiles(setup_landsat_data, clean_repo_env, output_tfe, expected):
     """Test gips_tiles modis with warping."""

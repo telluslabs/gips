@@ -219,7 +219,11 @@ class modisAsset(Asset):
         return None, None
 
     @classmethod
-    def fetch(cls, asset, tile, date, basename, url):
+    def fetch(cls, asset, tile, date):
+        qs_rv = cls.query_service(asset, tile, date)
+        if qs_rv is None:
+            return []
+        basename, url = qs_rv['basename'], qs_rv['url']
         with utils.error_handler(
                 "Asset fetch error ({})".format(url), continuable=True):
             response = cls.Repository.managed_request(url)

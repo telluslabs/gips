@@ -31,6 +31,7 @@ import shutil
 from xml.etree import ElementTree
 from zipfile import ZipFile
 
+from backports.functools_lru_cache import lru_cache
 from dbfread import DBF
 import requests
 
@@ -87,6 +88,7 @@ class cdlAsset(Asset):
         self.products[self.asset] = filename  # magically it is also a product
 
     @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
     def query_service(cls, asset, tile, date):
         if asset == _cdlmkii:
             return None
@@ -112,11 +114,11 @@ class cdlAsset(Asset):
 
         if asset == _cdl:
             utils.verbose_out("Fetching tile for {} on {}".format(tile, date.year), 2)
-            assets = cls.query_service(asset, tile, date)
-            if len(assets) == 0:
+            query_rv = cls.query_service(asset, tile, date)
+            if query_rv is None:
                 utils.verbose_out("No CDL data for {} on {}".format(tile, date.year), 2)
-                return
-            file_response = requests.get(assets[0]['url'], verify=False, stream=True)
+                return []
+            file_response = requests.get(query_rv['url'], verify=False, stream=True)
             with utils.make_temp_dir(prefix='fetch', dir=cls.Repository.path('stage')) as tmp_dir:
                 fname = "{}_{}_cdl_cdl.tif".format(tile, date.year)
                 tmp_fname = tmp_dir + '/' + fname
@@ -129,7 +131,20 @@ class cdlAsset(Asset):
         else:
             utils.verbose_out("Fetching not supported for cdlmkii", 2)
 
+    @classmethod
+    def _archivefile(cls, filename, update=False):
+        '''
+        overriding because asset is the product.
+        '''
+        asset, numlinks, overwritten_ao = super(cdlAsset, cls)._archivefile(
+            filename, update)
+        # HACKALERT!!!!  -- paths of returned object point to stage because
+        # assets come with products, and are automagically populated.                                                                     
+        new_asset_obj = cls(asset.archived_filename)
+        new_asset_obj.archived_filename = asset.archived_filename
+        return new_asset_obj, numlinks, overwritten_ao
 
+    
 class cdlData(Data):
     """ A tile (CONUS State) of CDL """
     name = 'CDL'
