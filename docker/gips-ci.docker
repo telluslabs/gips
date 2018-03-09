@@ -1,4 +1,4 @@
-FROM gippy-0.x
+FROM gippy-0.3.x
 
 ARG GIPS_UID
 RUN apt-get update \
