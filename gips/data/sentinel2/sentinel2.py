@@ -456,7 +456,10 @@ class sentinel2Asset(Asset):
             return self.meta['cloud-cover']
         if os.path.exists(self.filename):
             with utils.make_temp_dir() as tmpdir:
-                metadata_file = [f for f in self.datafiles() if f.endswith("MTD_MSIL1C.xml")][0]
+                metadata_file = [
+                    f for f in self.datafiles()
+                    if re.match(self.style_res['tile-md-re'], f)
+                ][0]
                 self.extract([metadata_file], path=tmpdir)
                 tree = ElementTree.parse(tmpdir + '/' + metadata_file)
                 root = tree.getroot()
