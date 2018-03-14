@@ -4,8 +4,9 @@ from .. import util
 
 from . import modis_project
 from . import merra_project
+from . import std_process
 
-mark_spec = {}
+mark_spec = std_process.lite_mark_spec.copy()
 expectations = {}
 
 expectations['modis'] = modis_project.expectations

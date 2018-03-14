@@ -20,10 +20,10 @@ make_image:
 run_tests:
   stage: test
   script:
+    - docker run --rm gips_test_$CI_COMMIT_REF_SLUG pytest -vv -s -k unit # TODO both int & unit
     - docker run --rm -e GIPS_OVERRIDE_VERSION=0.8.2
-      gips_test_$CI_COMMIT_REF_SLUG
-      pytest -vv --setup-repo --slow --sys -s
-      -k '(aod or cdl or sentinel2) and t_project'
+      gips_test_$CI_COMMIT_REF_SLUG 
+      pytest -vv --setup-repo --slow --sys -s -m lite
   tags:
     - gipsdev
   after_script:
