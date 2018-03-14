@@ -23,7 +23,7 @@ run_tests:
     - docker run --rm -e GIPS_OVERRIDE_VERSION=0.8.2
       gips_test_$CI_COMMIT_REF_SLUG
       pytest -vv --setup-repo --slow --sys -s
-      -k '(aod or cdl) and t_project'
+      -k '(aod or cdl or sentinel2) and t_project'
   tags:
     - gipsdev
   after_script:
