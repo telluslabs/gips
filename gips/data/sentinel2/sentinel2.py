@@ -456,10 +456,17 @@ class sentinel2Asset(Asset):
             return self.meta['cloud-cover']
         if os.path.exists(self.filename):
             with utils.make_temp_dir() as tmpdir:
-                metadata_file = [f for f in self.datafiles() if f.endswith("MTD_MSIL1C.xml")][0]
+                metadata_file = [
+                    f for f in self.datafiles()
+                    if re.match(self.style_res['tile-md-re'], f)
+                ][0]
                 self.extract([metadata_file], path=tmpdir)
                 tree = ElementTree.parse(tmpdir + '/' + metadata_file)
                 root = tree.getroot()
+            ns = "{https://psd-12.sentinel2.eo.esa.int/PSD/S2_PDI_Level-1C_Tile_Metadata.xsd}"
+            cloud_coverage_el = root.findall(
+                "./{}Quality_Indicators_Info/Image_Content_QI/CLOUDY_PIXEL_PERCENTAGE".format(ns)
+            )[0]
         else:
             scihub = "https://scihub.copernicus.eu/dhus/odata/v1"
             username = self.Repository.get_setting('username')
@@ -483,11 +490,11 @@ class sentinel2Asset(Asset):
             r = requests.get(metadata_url, auth=(username, password))
             r.raise_for_status()
             root = ElementTree.fromstring(r.content)
+            ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
+            cloud_coverage_el = root.findall(
+                "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
+            )[0]
 
-        ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
-        cloud_coverage_el = root.findall(
-            "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
-        )[0]
         self.meta['cloud-cover'] = float(cloud_coverage_el.text)
         return self.meta['cloud-cover']
 
