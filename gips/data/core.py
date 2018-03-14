@@ -701,7 +701,7 @@ class Asset(object):
         # newly created asset should have only automagical products, and those
         # would have paths in stage with the existing asset.  Re-instantiation
         # using archived_filename rectifies this.
-        if len(asset.products) > 0:
+        if len(asset.products) > 0 and hasattr(asset, 'archived_filename'):
             new_asset_obj = cls(asset.archived_filename)
             # next line is strange, but is used by DataInventory.fetch
             new_asset_obj.archived_filename = asset.archived_filename
