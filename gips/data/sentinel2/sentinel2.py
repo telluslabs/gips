@@ -833,6 +833,12 @@ class sentinel2Data(Data):
             raise IOError(err_msg)
         return tile_string.upper()
 
+    @classmethod
+    def add_filter_args(cls, parser):
+        """Add custom filtering options for sentinel2."""
+        parser.add_argument('--pclouds',
+                            type=cls.natural_percentage, default=100)
+
     def filter(self, pclouds=100, **kwargs):
         return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 

@@ -39,6 +39,7 @@ import commands
 from urllib import urlencode
 import urllib2
 from cookielib import CookieJar
+import argparse
 
 # from functools import lru_cache <-- python 3.2+ can do this instead
 from backports.functools_lru_cache import lru_cache
@@ -797,6 +798,26 @@ class Data(object):
                         #shutil.copyfile(fin, fout)
         procstr = 'copied' if site is None else 'warped'
         VerboseOut('%s tile %s: %s files %s' % (self.date, self.id, len(products.requested), procstr))
+
+    @classmethod
+    def natural_percentage(cls, raw_value):
+        """Callable used for argparse, defines a new type for %0.0 to %100.0.
+
+        Receives a string, return a float.  See also:
+        https://docs.python.org/2/library/argparse.html#type
+        """
+        f_value = float(raw_value)
+        if not (0 <= f_value <= 100):
+            raise argparse.ArgumentTypeError(
+                "Value '{}' is outside the range [%0, %100]".format(raw_value))
+        return f_value
+
+    @classmethod
+    def add_filter_args(cls, parser):
+        """Override to add arguments to the command line suitable for filter().
+
+        parser is expected to be a python ArgumentParser."""
+        return
 
     def filter(self, **kwargs):
         """Permit child classes to implement filtering.

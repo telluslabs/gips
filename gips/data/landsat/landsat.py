@@ -1467,6 +1467,12 @@ class landsatData(Data):
                 shutil.rmtree(aco_proc_dir)
                 ## end ACOLITE
 
+    @classmethod
+    def add_filter_args(cls, parser):
+        """Add custom filtering options for landsat."""
+        parser.add_argument('--pclouds',
+                            type=cls.natural_percentage, default=100)
+
     def filter(self, pclouds=100, sensors=None, **kwargs):
         """Check if Data object passes filter.
 
