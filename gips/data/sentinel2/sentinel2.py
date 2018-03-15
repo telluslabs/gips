@@ -462,18 +462,9 @@ class sentinel2Asset(Asset):
                 ][0]
                 self.extract([metadata_file], path=tmpdir)
                 tree = ElementTree.parse(tmpdir + '/' + metadata_file)
-                root = tree.getroot()
-                nsre = r'^({.+})Level-1C_Tile_ID$'
-                for el in root.iter():
-                    match = re.match(nsre, el.tag)
-                    if match:
-                        ns = match.group(1)
-                        break
-                    if not ns:
-                        raise Exception("Tile metadata xml namespace could not be found")
-            cloud_coverage_el = root.findall(
-                "./{}Quality_Indicators_Info/Image_Content_QI/CLOUDY_PIXEL_PERCENTAGE".format(ns)
-            )[0]
+            root = tree.getroot()
+            nsre = r'^({.+})Level-1C_Tile_ID$'
+            cloud_cover_xpath = "./{}Quality_Indicators_Info/Image_Content_QI/CLOUDY_PIXEL_PERCENTAGE"
         else:
             scihub = "https://scihub.copernicus.eu/dhus/odata/v1"
             username = self.Repository.get_setting('username')
@@ -508,20 +499,17 @@ class sentinel2Asset(Asset):
             r.raise_for_status()
             root = ElementTree.fromstring(r.content)
             nsre = r'^({.+})Level-1C_User_Product$'
-            for el in root.iter():
-                match = re.match(nsre, el.tag)
-                ns = False
-                if match:
-                    ns = match.group(1)
-                    break
-                if not ns:
-                    raise Exception("Tile metadata xml namespace could not be found")
+            cloud_cover_xpath = "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment"
 
-            print(ns)
-            cloud_coverage_el = root.findall(
-                "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
-            )[0]
-
+        for el in root.iter():
+            match = re.match(nsre, el.tag)
+            ns = False
+            if match:
+                ns = match.group(1)
+                break
+            if not ns:
+                raise Exception("Tile metadata xml namespace could not be found")
+        cloud_coverage_el = root.findall(cloud_cover_xpath.format(ns))[0]
         self.meta['cloud-cover'] = float(cloud_coverage_el.text)
         return self.meta['cloud-cover']
 
