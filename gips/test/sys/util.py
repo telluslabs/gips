@@ -422,7 +422,8 @@ def export_wrapper(request):
     Makes a working directory that nests inside the OUTPUT_DIR."""
     driver = request.node.callspec.params['driver']
     product = request.node.callspec.params['product']
-    working_dir = os.path.join(OUTPUT_DIR, '{}-{}'.format(driver, product))
+    working_dir = os.path.join(OUTPUT_DIR, '{}-{}-{}'.format(
+        request.function.__name__, driver, product))
     os.makedirs(working_dir) # raises if leaf dir exists; this is desired
     # This is how you wrap a generator in python:
     # https://stackoverflow.com/questions/11197186/
