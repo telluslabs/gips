@@ -1805,7 +1805,7 @@ class landsatData(Data):
 
             try:
                 # subprocess has a timeout option as of python 3.3
-                ORTHO_TIMEOUT = 100
+                ORTHO_TIMEOUT = 5 * 60
                 returnstatus = subprocess.check_call(["timeout", str(ORTHO_TIMEOUT), "ortho", "-r", parameter_file])
             except subprocess.CalledProcessError as e:
                 raise CantAlignError(repr((warp_tile, warp_date)))
