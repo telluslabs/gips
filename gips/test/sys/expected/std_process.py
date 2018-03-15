@@ -16,7 +16,6 @@ lite_mark_spec = { k: util.lite for k in [
     ('landsat', 'ndvi-toa'),
     # ref-toa has to be here becuase evi-toa changes otherwise:
     # https://gitlab.com/appliedgeosolutions/gips/issues/522
-    ('sentinel2', 'ref-toa'),
     ('sentinel2', 'evi-toa'),
     ('prism', 'ppt'),
     #('sar', 'sign'), # TODO automate arttifact-* pytest.ini values
