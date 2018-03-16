@@ -936,10 +936,14 @@ class landsatData(Data):
         if coreg_shift:
             for key, val in prodout.iteritems():
                 self._time_report("coregistering index")
+                xcoreg = coreg_shift.get('x', 0.0)
+                ycoreg = coreg_shift.get('y', 0.0)
+                self._time_report("coreg (x, y) = ({:.3f}, {:.3f})"
+                                  .format(xcoreg, ycoreg))
                 img = gippy.GeoImage(val, True)
                 affine = img.Affine()
-                affine[0] += coreg_shift.get('x', 0.0)
-                affine[3] += coreg_shift.get('y', 0.0)
+                affine[0] += xcoreg
+                affine[3] += ycoreg
                 img.SetAffine(affine)
                 img.Process()
                 img = None
@@ -1099,9 +1103,13 @@ class landsatData(Data):
                                 self.run_arop(s2_export)
                             except NoSentinelError:
                                 # fall through and use the image unshifted
+                                utils.verbose_out(
+                                    'No Sentinel found for co-registration', 4)
                                 pass
                             except CantAlignError:
                                 # fall through and use the image unshifted
+                                utils.verbose_out(
+                                    'Unknown co-registration error', 4)
                                 pass
 
                 try:
@@ -1685,7 +1693,10 @@ class landsatData(Data):
         """
         from gips.data.sentinel2 import sentinel2Asset, sentinel2Data
         landsat_shp = landsatRepository.get_setting('tiles')
-        spatial_extent = SpatialExtent.factory(sentinel2Data, site=landsat_shp, where="pr = '{}'".format(self.id), pcov=33.0)[0]
+        spatial_extent = SpatialExtent.factory(
+            sentinel2Data, site=landsat_shp,
+            where="pr = '{}'".format(self.id),
+            ptile=33.0)[0]
         fetch = False
 
         # If there is no available sentinel2 scene on that day, search before and after
@@ -1724,16 +1735,27 @@ class landsatData(Data):
         tiles = inventory[date_found].tiles.keys()
         for tile in tiles:
             asset = inventory[date_found][tile].assets['L1C']
-            band_8 = [f for f in asset.datafiles() if f.endswith('B08.jp2')]
-            asset.extract(band_8, tmpdir)
-            geo_images.append(os.path.join(tmpdir, band_8[0]))
+            if asset.tile[:2] != self.utm_zone():
+                continue
+            band_8 = [
+                f for f in asset.datafiles()
+                if f.endswith('B08.jp2') and tile in basename(f)
+            ][0]
+            asset.extract([band_8], tmpdir)
+            geo_images.append(os.path.join(tmpdir, band_8))
+
+        if len(geo_images) < 1:
+            raise Exception(
+                "didn't find s2 images to coreg in this utm zone {}"
+                .format(self.utm_zone())
+            )
 
         self._time_report("merge sentinel images to bin")
-        merge_args = ["gdal_merge.py", "-o", tmpdir + "/sentinel_mosaic.bin", "-of", "ENVI", "-a_nodata", "0"]
+        merge_args = ["gdal_merge.py", "-o", tmpdir + "/sentinel_mosaic.bin",
+                      "-of", "ENVI", "-a_nodata", "0"]
         # only use images that are in the same proj as landsat tile
-        merge_args.extend([i for i in geo_images if basename(i)[1:3] == self.utm_zone()])
+        merge_args.extend(geo_images)
         subprocess.call(merge_args)
-
         self._time_report("done with s2 export")
         return tmpdir + '/sentinel_mosaic.bin'
 
@@ -1755,7 +1777,10 @@ class landsatData(Data):
             warp_bands_bin = []
             for band in warp_band_filenames:
                 band_bin = basename(band) + '.bin'
-                subprocess.call(["gdal_translate", "-of", "ENVI", os.path.join(tmpdir, band), os.path.join(tmpdir, band_bin)])
+                cmd = ["gdal_translate", "-of", "ENVI",
+                       os.path.join(tmpdir, band),
+                       os.path.join(tmpdir, band_bin)]
+                subprocess.call(args=cmd, cwd=tmpdir)
                 warp_bands_bin.append(band_bin)
 
             # make parameter file
@@ -1788,10 +1813,14 @@ class landsatData(Data):
                 warp_upper_left_x=warp_base_band_img.MinXY().x(),
                 warp_upper_left_y=warp_base_band_img.MaxXY().y(),
                 warp_utm=self.utm_zone(),
-                out_bands=' '.join([os.path.join(tmpdir, basename(band) + '_warped.bin') for band in warp_bands_bin]),
-                out_base_band=os.path.join(tmpdir, basename(warp_base_band_filename)) + '_warped.bin',
+                out_bands=' '.join(
+                    [os.path.join(tmpdir, basename(band) + '_warped.bin')
+                     for band in warp_bands_bin]
+                ),
+                out_base_band=os.path.join(
+                    tmpdir, basename(warp_base_band_filename)) + '_warped.bin',
                 out_pixel_size=out_pixel_size,
-                log_file='{}/cp_log.txt'.format(tmpdir),
+                tmpdir=tmpdir
             )
 
             parameter_file = os.path.join(tmpdir, 'parameter_file.inp')
@@ -1805,8 +1834,10 @@ class landsatData(Data):
 
             try:
                 # subprocess has a timeout option as of python 3.3
-                ORTHO_TIMEOUT = 100
-                returnstatus = subprocess.check_call(["timeout", str(ORTHO_TIMEOUT), "ortho", "-r", parameter_file])
+                ORTHO_TIMEOUT = 5 * 60
+                cmd = ["timeout", str(ORTHO_TIMEOUT),
+                       "ortho", "-r", parameter_file]
+                returnstatus = subprocess.check_call(args=cmd, cwd=tmpdir)
             except subprocess.CalledProcessError as e:
                 raise CantAlignError(repr((warp_tile, warp_date)))
 

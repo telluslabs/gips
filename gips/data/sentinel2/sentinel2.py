@@ -462,16 +462,17 @@ class sentinel2Asset(Asset):
                 ][0]
                 self.extract([metadata_file], path=tmpdir)
                 tree = ElementTree.parse(tmpdir + '/' + metadata_file)
-                root = tree.getroot()
-            ns = "{https://psd-12.sentinel2.eo.esa.int/PSD/S2_PDI_Level-1C_Tile_Metadata.xsd}"
-            cloud_coverage_el = root.findall(
-                "./{}Quality_Indicators_Info/Image_Content_QI/CLOUDY_PIXEL_PERCENTAGE".format(ns)
-            )[0]
+            root = tree.getroot()
+            nsre = r'^({.+})Level-1C_Tile_ID$'
+            cloud_cover_xpath = "./{}Quality_Indicators_Info/Image_Content_QI/CLOUDY_PIXEL_PERCENTAGE"
         else:
             scihub = "https://scihub.copernicus.eu/dhus/odata/v1"
             username = self.Repository.get_setting('username')
             password = self.Repository.get_setting('password')
-            asset_name = os.path.basename(self.filename)[0:-4]
+            if self.style == 'original':
+                asset_name = os.path.basename(self.filename)[6:-4]
+            else:
+                asset_name = os.path.basename(self.filename)[0:-4]
             query_url = "{}/Products?$filter=Name eq '{}'".format(scihub, asset_name)
             r = requests.get(query_url, auth=(username, password))
             r.raise_for_status()
@@ -484,17 +485,31 @@ class sentinel2Asset(Asset):
             product_id_el = root.find("./a:entry/m:properties/d:Id", namespaces)
             if product_id_el is None:
                 raise Exception("{} is not a valid asset".format(asset_name))
-            metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL1C.xml')/$value".format(
-                scihub, product_id_el.text, asset_name
-            )
+            if self.style == 'original':
+                mtd_file = asset_name.replace('PRD', 'MTD')
+                mtd_file = mtd_file.replace('MSIL1C', 'SAFL1C')
+                metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('{}.xml')/$value".format(
+                    scihub, product_id_el.text, asset_name, mtd_file
+                )
+            else:
+                metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL1C.xml')/$value".format(
+                    scihub, product_id_el.text, asset_name
+                )
             r = requests.get(metadata_url, auth=(username, password))
             r.raise_for_status()
             root = ElementTree.fromstring(r.content)
-            ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
-            cloud_coverage_el = root.findall(
-                "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
-            )[0]
+            nsre = r'^({.+})Level-1C_User_Product$'
+            cloud_cover_xpath = "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment"
 
+        for el in root.iter():
+            match = re.match(nsre, el.tag)
+            ns = False
+            if match:
+                ns = match.group(1)
+                break
+            if not ns:
+                raise Exception("Tile metadata xml namespace could not be found")
+        cloud_coverage_el = root.findall(cloud_cover_xpath.format(ns))[0]
         self.meta['cloud-cover'] = float(cloud_coverage_el.text)
         return self.meta['cloud-cover']
 
