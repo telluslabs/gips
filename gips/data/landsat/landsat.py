@@ -1755,7 +1755,10 @@ class landsatData(Data):
             warp_bands_bin = []
             for band in warp_band_filenames:
                 band_bin = basename(band) + '.bin'
-                subprocess.call(["gdal_translate", "-of", "ENVI", os.path.join(tmpdir, band), os.path.join(tmpdir, band_bin)])
+                cmd = ["gdal_translate", "-of", "ENVI",
+                       os.path.join(tmpdir, band),
+                       os.path.join(tmpdir, band_bin)]
+                subprocess.call(args=cmd, cwd=tmpdir)
                 warp_bands_bin.append(band_bin)
 
             # make parameter file
@@ -1806,7 +1809,9 @@ class landsatData(Data):
             try:
                 # subprocess has a timeout option as of python 3.3
                 ORTHO_TIMEOUT = 5 * 60
-                returnstatus = subprocess.check_call(["timeout", str(ORTHO_TIMEOUT), "ortho", "-r", parameter_file])
+                cmd = ["timeout", str(ORTHO_TIMEOUT),
+                       "ortho", "-r", parameter_file]
+                returnstatus = subprocess.check_call(args=cmd, cwd=tmpdir)
             except subprocess.CalledProcessError as e:
                 raise CantAlignError(repr((warp_tile, warp_date)))
 
