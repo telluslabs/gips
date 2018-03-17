@@ -20,9 +20,9 @@ RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
     python-scipy \
     python-gdal \
     swig2.0 \
-    wget \
-    emacs-nox \
     git \
+    mg \
+    && ln -s  /usr/bin/mg /usr/bin/emacs \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -U pip setuptools wheel \
     && pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy \

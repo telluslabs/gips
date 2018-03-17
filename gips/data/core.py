@@ -525,9 +525,11 @@ class Asset(object):
         """Connect to an FTP server and chdir according to the args.
 
         Returns the ftplib connection object."""
+        utils.verbose_out('Connecting to {}'.format(cls._host), 5)
         conn = ftplib.FTP(cls._host)
         conn.login('anonymous', settings().EMAIL)
         conn.set_pasv(True)
+        utils.verbose_out('Changing to {}'.format(working_directory), 5)
         conn.cwd(working_directory)
         return conn
 
@@ -695,6 +697,16 @@ class Asset(object):
                         numlinks = numlinks + 1
             else:
                 VerboseOut('%s already in archive' % filename, 2)
+
+        # newly created asset should have only automagical products, and those
+        # would have paths in stage with the existing asset.  Re-instantiation
+        # using archived_filename rectifies this.
+        if len(asset.products) > 0 and hasattr(asset, 'archived_filename'):
+            new_asset_obj = cls(asset.archived_filename)
+            # next line is strange, but is used by DataInventory.fetch
+            new_asset_obj.archived_filename = asset.archived_filename
+            asset = new_asset_obj
+
         if otherversions and numlinks == 0:
             return (asset, -1, overwritten_ao)
         else:
