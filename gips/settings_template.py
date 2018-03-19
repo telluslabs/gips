@@ -86,22 +86,22 @@ REPOS = {
     'cdl': {
         'repository': '$TLD/cdl',
     },
+    'chirps': {
+        'repository': '$TLD/chirps',
+    },
     'prism': {
         'repository': '$TLD/prism',
     },
-    'sar': {
-        'repository': '$TLD/sar',
-    },
-    #'sarannual': {
-    #    'repository': '$TLD/sarannual',
-    #},
     'merra': {
         'repository': '$TLD/merra',
         'username': EARTHDATA_USER,
-        'password': EARTHDATA_PASS
+        'password': EARTHDATA_PASS,
     },
     'daymet': {
         'repository': '$TLD/daymet',
+    },
+    'prism': {
+        'repository': '$TLD/prism',
     },
 }
 
