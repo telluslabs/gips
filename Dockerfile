@@ -18,16 +18,16 @@ RUN apt-get -y update \
     swig2.0 \
     wget \
     emacs-nox \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN pip install -U pip setuptools wheel
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install -U pip setuptools wheel
 
 COPY . /gips
 
 RUN cd /gips \
     && pip install -r dev_requirements.txt \
     && pip install -e . --process-dependency-links \
-    && mv sixs /usr/local/bin/sixs
+    && mv sixs /usr/local/bin/sixs \
+    && bash settings_creds.sh
 
 VOLUME /archive
 VOLUME /gips
