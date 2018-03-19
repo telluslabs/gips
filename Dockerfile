@@ -1,39 +1,51 @@
 FROM ubuntu:16.04
 
-RUN apt-get -y update \
+RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
+       /etc/apt/sources.list \
+    && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 314DF160 \
+    && apt-get -y update \
     && apt-get install -y \
     python python-apt \
     python-pip \
     gfortran \
+    libboost-system1.58.0 \
+    libboost-log1.58.0 \
     libboost-all-dev \
     libfreetype6-dev \
     libgnutls-dev \
     libatlas-base-dev \
     libgdal-dev \
-    libgdal1-dev \
     gdal-bin \
     python-numpy \
     python-scipy \
     python-gdal \
     swig2.0 \
-    wget \
-    emacs-nox \
+    git \
+    mg \
+    libcurl4-gnutls-dev \
+    && ln -s  /usr/bin/mg /usr/bin/emacs \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install -U pip setuptools wheel
+    && pip install -U pip setuptools wheel \
+    && pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy
 
 COPY . /gips
 
 RUN cd /gips \
     && pip install -r dev_requirements.txt \
-    && pip install -e . --process-dependency-links \
+    && pip install --process-dependency-links -e . \
     && mv sixs /usr/local/bin/sixs \
     && bash settings_creds.sh
+
+RUN apt-get -y purge \
+    gfortran \
+    libboost-all-dev \
+    libfreetype6-dev \
+    libatlas-base-dev \
+    libgdal-dev \
+    swig2.0 \
+    && apt-get -y autoremove \
+    && apt-get -y autoclean
 
 VOLUME /archive
 VOLUME /gips
 WORKDIR /gips
-
-
-#COPY trial.sh /trial.sh
-#RUN chmod +x /trial.sh
-#CMD /trial.sh
