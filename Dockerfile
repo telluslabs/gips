@@ -34,6 +34,18 @@ RUN cd /gips \
     && pip install --process-dependency-links -e . \
     && mv sixs /usr/local/bin/sixs
 
+
+RUN apt-get -y purge \
+       gfortran \
+       libboost-all-dev \
+       libfreetype6-dev \
+       libatlas-base-dev \
+       libgdal-dev \
+       swig2.0 \
+    && apt-get -y autoremove \
+    && apt-get -y autoclean
+
+
 VOLUME /archive
 VOLUME /gips
 WORKDIR /gips

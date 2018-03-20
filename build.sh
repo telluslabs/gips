@@ -1,7 +1,7 @@
 source credentials.sh
 
 wget -O sixs ftp://${AGSFTPCREDS}@agsftp.ags.io/gipsftp/sixs
-wget -O composites.tgz ftp://${AGSFTPCREDS}@agsftp.ags.io/gipsftp/composites.tar.gz
+wget -O aod.composites.tgz ftp://${AGSFTPCREDS}@agsftp.ags.io/gipsftp/aod.composites.tar.gz
 cp -f gips/settings_template.py gips/settings.py
 sed -i~ \
     -e "s/^EARTHDATA_USER.*/EARTHDATA_USER = \"${EARTHDATA_USER}\"/" \
@@ -13,8 +13,7 @@ sed -i~ \
     gips/settings.py
 
 docker build -t gips --no-cache .
-
 rm -rf ${ARCHIVEDIR}
 docker run --rm --name gips -h gips -v ${ARCHIVEDIR}:/archive gips gips_config env
-tar xfvz aod.composites.tgz -C ${ARCHIVEDIR}/aod/
-docker run -it --rm --name gips -h gips -e GIPS_OVERRIDE_VERSION=0.8.2 -v ${ARCHIVEDIR}:/archive gips
+tar xfvz aod.composites.tgz -C ${ARCHIVEDIR}
+docker run --rm --name gips -h gips -e GIPS_OVERRIDE_VERSION=0.8.2 -v ${ARCHIVEDIR}:/archive gips pytest -vv --setup-repo --slow --sys -s -k 'modis and t_project'
