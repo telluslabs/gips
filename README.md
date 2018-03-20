@@ -83,6 +83,7 @@ The following have been authors or contributers to GIPS
     Bobby Braswell (Rob), rbraswell@appliedgeosolutions.com
     Ian Cooke, icooke@appliedgeosolutions.com
     Rick Emery, remery@appliedgeosolutions.com
+    Justin Fisk, jfisk@appliedgeosolutions.com
     Matthew Hanson, matt.a.hanson@gmail.com
     Tom Olson, tolson@appliedgeosolutions.com
     Nate Rubin, nrubing@appliedgeosolutions.com
