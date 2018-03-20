@@ -1,7 +1,7 @@
 # GIPS
 
 See http://gipit.github.io/gips/ for documentation, but know it is not
-necessarily current.
+~~necessarily~~ current.
 
 ## Installation
 
@@ -80,10 +80,12 @@ After this is done, `gips_inventory --fetch`, `gips_inventory`, and
 ## Authors and Contributors
 The following have been authors or contributers to GIPS
 
-    Matthew Hanson, matt.a.hanson@gmail.com
     Bobby Braswell (Rob), rbraswell@appliedgeosolutions.com
     Ian Cooke, icooke@appliedgeosolutions.com
+    Rick Emery, remery@appliedgeosolutions.com
+    Matthew Hanson, matt.a.hanson@gmail.com
     Tom Olson, tolson@appliedgeosolutions.com
+    Nate Rubin, nrubing@appliedgeosolutions.com
 
 ## License (GPL v2)
 
