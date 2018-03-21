@@ -24,10 +24,8 @@
 # GIPS complete settings file
 
 # Used for anonymous FTP
-EMAIL = 'rbraswell@ags.io'
-TLD = '/archive'
+EMAIL = '$EMAIL'
 
-prepend = lambda dir: ('{}/'+dir).format(TLD)
 
 # Site files and data tiles vectors can be retrieved from a database
 DATABASES = {
@@ -40,7 +38,7 @@ DATABASES = {
 #    }
     'inventory': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': prepend('gips-inv-db.sqlite3'),
+        'NAME': '$TLD/gips-inv-db.sqlite3',
     },
 }
 
@@ -60,45 +58,64 @@ ESA_PASS = ""
 
 REPOS = {
     'aod': {
-        'repository': prepend('aod'),
+        'repository': '$TLD/aod',
     },
     'landsat': {
-        'repository': prepend('landsat'),
+        'repository': '$TLD/landsat',
+        # Landsat specific settings
         '6S': False,            # atm correction for VIS/NIR/SWIR bands
         'MODTRAN': False,       # atm correction for LWIR
         'extract': False,       # extract files from tar.gz before processing instead of direct access
         'username': USGS_USER,
         'password': USGS_PASS,
+        # 'ACOLITE_DIR':  '',   # ACOLITE installation for atm correction over water
     },
     'modis': {
-        'repository': prepend('modis'),
+        'repository': '$TLD/modis',
         'username': EARTHDATA_USER,
-        'password': EARTHDATA_PASS,
+        'password': EARTHDATA_PASS
     },
     'sentinel2': {
-        'repository': prepend('sentinel2'),
+        'repository': '$TLD/sentinel2',
+        # sign up for access to data source here:  https://scihub.copernicus.eu/dhus/#/self-registration
         'username': ESA_USER,
         'password': ESA_PASS,
         'extract': False,  # extract files from tar.gz before processing instead of direct access
     },
+    # these drivers tend to more specialized and experimental so turned off by default
     'cdl': {
-        'repository': prepend('cdl'),
-    },
-    'chirps': {
-        'repository': prepend('chirps'),
+        'repository': '$TLD/cdl',
     },
     'prism': {
-        'repository': prepend('prism'),
+        'repository': '$TLD/prism',
     },
+    'sar': {
+        'repository': '$TLD/sar',
+    },
+    #'sarannual': {
+    #    'repository': '$TLD/sarannual',
+    #},
     'merra': {
-        'repository': prepend('merra'),
+        'repository': '$TLD/merra',
         'username': EARTHDATA_USER,
-        'password': EARTHDATA_PASS,
+        'password': EARTHDATA_PASS
     },
     'daymet': {
-        'repository': prepend('daymet'),
-    },
-    'prism': {
-        'repository': prepend('prism'),
+        'repository': '$TLD/daymet',
     },
 }
+
+
+"""
+# to add repository add new key to the REPOS dictionary
+    'dataname': {
+        # path to driver directory location (default to gips/data/dataname/ if not given)
+        'driver': '',
+        # path to top level directory of data
+        'repository': '',
+        # override location of tiles vector (default to gips/data/dataname/tiles.shp)
+       'tiles': '',
+        #'tiles': 'mydatabase:mydatatype_tiles',        # database format
+        #'tiles': '~/randomdir/dataname_tiles.shp'      # file format
+    }
+"""
