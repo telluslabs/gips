@@ -34,7 +34,6 @@ RUN cd /gips \
     && pip install --process-dependency-links -e . \
     && mv sixs /usr/local/bin/sixs
 
-
 RUN apt-get -y purge \
        gfortran \
        libboost-all-dev \
@@ -45,7 +44,5 @@ RUN apt-get -y purge \
     && apt-get -y autoremove \
     && apt-get -y autoclean
 
-
 VOLUME /archive
-VOLUME /gips
 WORKDIR /gips
