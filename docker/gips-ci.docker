@@ -26,7 +26,7 @@ RUN cd /gips \
 	   /gips/gips/settings.py \
     && echo "[pytest]\n# these will save time/prevent certain errors\ntestpaths = gips/test\nnorecursedirs = .venv data-root\n# GIPS' configured data repository:\ndata-repo = /archive\n# a directory of your choice, used for output from, e.g., gips_project\noutput-dir = /tmp/gips-testout\n# These should remain as they are (placing them in a committed file is a TODO):\npython_functions =  t_\npython_classes =    T_\npython_files =      t_*.py\nDJANGO_SETTINGS_MODULE=gips.inventory.orm.settings" >> /gips/pytest.ini \
     && groupadd -g $GIPS_UID gips \
-    && useradd -r -u $GIPS_UID -g gips gips \
+    && useradd -m -r -u $GIPS_UID -g gips gips \
     && chown -R gips:gips /gips /archive
 
 USER gips
