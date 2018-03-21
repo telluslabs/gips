@@ -80,5 +80,5 @@ def setup_repo_data(driver):
 
     args = STD_ARGS[driver] + ('--fetch',)
     print('Downloading', driver, 'data:  gips_inventory', *args)
-    outcome = sh.Command('gips_inventory')(*args)
+    outcome = sh.Command('gips_inventory')(*args, _err='/dev/stderr')
     print(driver, "data download complete.")
