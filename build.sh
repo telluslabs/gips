@@ -1,7 +1,7 @@
 source credentials.sh
 
 wget -O sixs ftp://${AGSFTPCREDS}@agsftp.ags.io/gipsftp/sixs
-cp -f gips/settings_template.py gips/settings.py
+cp -f gips/settings_template_docker.py gips/settings.py
 sed -i~ \
     -e "s/^EARTHDATA_USER.*/EARTHDATA_USER = \"${EARTHDATA_USER}\"/" \
     -e "s/^EARTHDATA_PASS.*/EARTHDATA_PASS = \"${EARTHDATA_PASS}\"/" \
