@@ -246,6 +246,7 @@ def t_fetch_old_asset_duplicate(fetch_mocks, mocker):
     purpose.
     """
     # setup & mocks
+    sentinel2.sentinel2Asset.query_service.cache_clear()
     staged_fn = os.path.join(sentinel2.sentinel2Repository.path('stage'), test_asset_bn)
 
     if os.path.lexists(staged_fn):

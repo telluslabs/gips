@@ -216,6 +216,10 @@ def add_product(**values):
     p.save()
     return p  # in case the user needs it
 
+def delete_product(**values):
+    """Deletes the object found by get(**values)."""
+    from .models import Product
+    Product.objects.get(**values).delete()
 
 def update_or_add_asset(driver, asset, tile, date, sensor, name, status='complete'):
     """Update an existing model or create it if it's not found.

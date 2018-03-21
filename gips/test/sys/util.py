@@ -309,7 +309,7 @@ def generate_gdalinfo_stats_expectation(filename):
     sidecar = filename + '.aux.xml'
     os.path.exists(sidecar) and os.remove(sidecar) # RACE CONDITION LOL
     os.environ['GDAL_PAM_ENABLED'] = 'NO'
-    # TODO look at -json
+    # if needed switch to -json for more programmatic access to the data
     outcome = sh.gdalinfo('-stats', filename)
     # The output includes unpredictable file paths, so filter them out:
     lines = []
@@ -318,8 +318,13 @@ def generate_gdalinfo_stats_expectation(filename):
         # first detect whether we're in a 'Files:' block
         in_files_block = (l.startswith('Files: ')
                           or (in_files_block and l.startswith(' ')))
-        if not in_files_block:
-            lines.append(l)
+        if in_files_block:
+            continue
+
+        # stop at a certain decimal place for all decimal numbers
+        significant_digits = 8
+        sig_digits_re = r'(\.\d{' + str(significant_digits) + r'})\d+'
+        lines.append(re.sub(sig_digits_re, r'\1', l))
     return lines
 
 def params_from_expectations(expectations, mark_spec=None):
@@ -392,8 +397,8 @@ def sys_test_wrapper(request, path):
         cf_expectations = [generate_expectation(fn, path) for fn in rel_cf]
         print("Recording {} outcome to {}.".format(product, rp))
         with open(rp, 'a') as rfo:
-            print('\n# {}[{}] recording:'.format(request.function.__name__, product),
-                  file=rfo)
+            print('\n# {}[{}-{}] recording:'.format(
+                    request.function.__name__, driver, product), file=rfo)
             print("'{}':".format(product), file=rfo)
             pretty_hashes = pprint.pformat(cf_expectations)
             print('    ', end='', file=rfo)

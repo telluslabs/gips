@@ -25,24 +25,21 @@ import os, sys
 import pprint
 import traceback
 
+import django
+from django.core.management import call_command
 
 import gips
 from gips import __version__ as version
 from gips.parsers import GIPSParser
-from gips.utils import (create_environment_settings,
-    create_user_settings, create_repos, get_data_variables)
+from gips.utils import create_environment_settings, create_user_settings, create_repos
 from gips import utils
 from gips.inventory import orm
 
 
 def migrate_database():
-    """
-    TODO: move this into orm
-    Migrate the database if the ORM is turned on.
-    """
+    """Migrate the database if the ORM is turned on."""
     if not orm.use_orm():
         return
-    from django.core.management import call_command
     print 'Migrating database'
     orm.setup()
     call_command('migrate', interactive=False)
@@ -70,7 +67,7 @@ def configure_environment(repos, email, drivers, earthdata_user,
                           earthdata_password, update, **kwargs):
     try:
         # kwargs added for datahandler enabling
-        cfgfile = create_environment_settings(
+        created_cf, cfgfile = create_environment_settings(
             repos, email, drivers,
             earthdata_user, earthdata_password,
             update_config=update, **kwargs
@@ -85,10 +82,11 @@ def configure_environment(repos, email, drivers, earthdata_user,
         print traceback.format_exc()
         print 'Could not create environment settings: %s' % e
         sys.exit(1)
-
+    return created_cf, cfgfile
 
 
 def main():
+    import gips
     title = 'GIPS Configuration Utility (v%s)' % (version)
 
     parser = GIPSParser(description=title, datasources=False)
@@ -148,19 +146,29 @@ def main():
                     exec('pprint.pprint(s.%s)' % v)
 
     elif args.command == 'env':
-        configure_environment(**vars(args))
+        created_cf, cfgfile = configure_environment(**vars(args))
     elif args.command == 'user':
         with utils.error_handler('Could not create user settings'):
             # first try importing environment settings
             import gips.settings
-            cfgfile = create_user_settings()
+            created_cf, cfgfile = create_user_settings()
+
 
     if args.command in ('user', 'env'):
+        msg = ('Wrote new config file:  {}.' if created_cf else
+               'Found existing config, left unmodified:  {}.')
+        print msg.format(cfgfile)
         with utils.error_handler('Could not create repos'):
-            print 'Creating repository directories'
-            create_repos()
+            print 'Creating repository directories, if needed.'
+            try:
+                create_repos()
+            except:
+                if created_cf:
+                    print ('Error; removing (likely broken) config file:'
+                           '  {}.'.format(cfgfile))
+                    os.remove(cfgfile)
+                raise
         with utils.error_handler('Could not migrate database'):
-            print 'Migrating database'
             migrate_database()
 
     utils.gips_exit()

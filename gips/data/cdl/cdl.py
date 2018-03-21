@@ -25,12 +25,19 @@ import os
 import re
 import datetime
 from csv import DictReader
+import glob
+from itertools import ifilter
+import shutil
+from xml.etree import ElementTree
 from zipfile import ZipFile
 
+from backports.functools_lru_cache import lru_cache
 from dbfread import DBF
+import requests
 
 from gips.data.core import Repository, Asset, Data
-from gippy import GeoImage
+from gips import utils
+from gippy import GeoImage, GeoImages
 from osgeo import gdal
 
 import imghdr
@@ -38,6 +45,7 @@ import imghdr
 # make the compiler spell-check the one sensor, product, and asset type in the driver
 _cdl = 'cdl'
 _cdlmkii = 'cdlmkii'
+
 
 class cdlRepository(Repository):
     name = 'CDL'
@@ -54,11 +62,16 @@ class cdlAsset(Asset):
     _assets = {
         _cdl: {
             # CDL assets are named just like products: tile_date_sensor_asset-product.tif
-            'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdl + '\.tif$'
+            'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdl + '\.tif$',
+            'startdate': datetime.date(1997, 1, 1),
+            'latency': 426, # released in february for the previous year
+                            # which we interpret as january that year
         },
         _cdlmkii: {
             'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdlmkii + '\.zip$',
             'description': '',
+            'startdate': datetime.date(1997, 1, 1),
+            'latency': 426, # see previous for explanation for this crazy value
         },
     }
 
@@ -72,9 +85,53 @@ class cdlAsset(Asset):
         else:
             self.asset = _cdlmkii
         self.sensor = _cdl
-        self.products[self.asset] = filename # magically it is also a product
+        self.products[self.asset] = filename  # magically it is also a product
 
+    @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
+    def query_service(cls, asset, tile, date):
+        if asset == _cdlmkii:
+            return None
+        url = "https://nassgeodata.gmu.edu/axis2/services/CDLService/GetCDLFile"
+        tile_vector = utils.open_vector(cls.Repository.get_setting('tiles'), 'STATE_ABBR')[tile]
+        params = {
+            'year': date.year,
+            'fips': tile_vector['STATE_FIPS']
+        }
+        xml = requests.get(url, params=params, verify=False)
+        if xml.status_code != 200:
+            return None
+        root = ElementTree.fromstring(xml.text)
+        file_url = root.find('./returnURL').text
+        return {'url': file_url,
+                'basename': "{}_{}_cdl_cdl.tif".format(tile, date.year)}
 
+    @classmethod
+    def fetch(cls, asset, tile, date):
+        # The nassgeodata site is known to have an invalid certificate.
+        # We don't want to clutter up the output with SSL warnings.
+        import urllib3; urllib3.disable_warnings()
+
+        if asset == _cdl:
+            utils.verbose_out("Fetching tile for {} on {}".format(tile, date.year), 2)
+            query_rv = cls.query_service(asset, tile, date)
+            if query_rv is None:
+                utils.verbose_out("No CDL data for {} on {}".format(tile, date.year), 2)
+                return []
+            file_response = requests.get(query_rv['url'], verify=False, stream=True)
+            with utils.make_temp_dir(prefix='fetch', dir=cls.Repository.path('stage')) as tmp_dir:
+                fname = "{}_{}_cdl_cdl.tif".format(tile, date.year)
+                tmp_fname = tmp_dir + '/' + fname
+                with open(tmp_fname, 'w') as asset:
+                    asset.write(file_response.content)
+                imgout = GeoImage(tmp_fname, True)
+                imgout.SetNoData(0)
+                imgout = None
+                shutil.copy(tmp_fname, cls.Repository.path('stage'))
+        else:
+            utils.verbose_out("Fetching not supported for cdlmkii", 2)
+
+    
 class cdlData(Data):
     """ A tile (CONUS State) of CDL """
     name = 'CDL'
@@ -104,7 +161,6 @@ class cdlData(Data):
                     member_ext = member.filename.split('.', 1)[1]
                     extracted = zipfile.extract(member, fname_without_ext)
                     os.rename(extracted, fname_without_ext + '.' + member_ext)
-
 
             image = GeoImage(fname, True)
             image[0].SetNoData(0)

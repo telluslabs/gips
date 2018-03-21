@@ -26,6 +26,7 @@ import glob
 import traceback
 import re
 
+from backports.functools_lru_cache import lru_cache
 import gdal
 import numpy
 
@@ -87,7 +88,7 @@ class aodAsset(Asset):
             'pattern': r'^MOD08_D3.+?hdf$',
             'startdate': datetime.date(2000, 2, 18),
             'path': '/allData/6/MOD08_D3',
-            'latency': -7,
+            'latency': 7,
         },
         #'MYD08': {
         #    'pattern': 'MYD08_D3*hdf',
@@ -140,10 +141,12 @@ class aodAsset(Asset):
         return super(aodAsset, cls).ftp_connect(wd)
 
     @classmethod
-    def query_provider(cls, asset, tile, date):
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
+    def query_service(cls, asset, tile, date):
         """Query the data provider for files matching the arguments.
 
-        Returns (filename, url), or (None, None) if nothing found.
+        Returns {'filename': fn}, or None if nothing found; note no URL
+        is relevant for ftp.
         """
         utils.verbose_out('{}: query tile {} for {}'.format(asset, tile, date), 3)
         if asset not in cls._assets:
@@ -153,17 +156,20 @@ class aodAsset(Asset):
             filenames = [fn for fn in ftp.nlst('*')
                          if re.match(cls._assets[asset]['pattern'], fn)]
             ftp.quit()
+            if len(filenames) == 0:
+                return None
             if len(filenames) > 1: # 0 assets happens all the time
                 raise ValueError("Expected one asset, found {}".format(len(filenames)))
-            return filenames[0], None # urls are not relevant for ftp
-        return None, None
+            return {'basename': filenames[0]}
+        return None
 
     @classmethod
     def fetch(cls, asset, tile, date):
         """ Fetch stub """
-        fname, _ = cls.query_provider(asset, tile, date)
-        if fname is None:
+        query_rv = cls.query_service(asset, tile, date)
+        if query_rv is None:
             return []
+        fname = query_rv['basename']
         stage_fp = os.path.join(cls.Repository.path('stage'), fname)
         ftp = cls.ftp_connect(asset, date)
         ftp.retrbinary('RETR ' + fname, open(stage_fp, "wb").write)

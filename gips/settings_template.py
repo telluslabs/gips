@@ -42,6 +42,8 @@ DATABASES = {
     },
 }
 
+# STATS_FORMAT = {} # defaults to empty dict
+
 # For NASA EarthData Authentication
 EARTHDATA_USER = "$EARTHDATA_USER"
 EARTHDATA_PASSWORD = "$EARTHDATA_PASSWORD"
@@ -49,6 +51,10 @@ EARTHDATA_PASSWORD = "$EARTHDATA_PASSWORD"
 # For USGS machine-to-machine authentication
 USGS_USER = ""
 USGS_PASS = ""
+
+# For ESA SciHub authentication
+ESA_USER = ""
+ESA_PASS = ""
 
 REPOS = dict()
 

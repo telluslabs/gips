@@ -248,16 +248,8 @@ class sentinel2Asset(Asset):
             self.style_res['tile-md-re'] = sr['tile-md-re'].format(tileid=self.tile)
             self.style_res['datastrip-md-re'] = sr['datastrip-md-re'].format(tileid=self.tile)
 
-
     @classmethod
-    def query_service(cls, asset, tile, date):
-        """Compatibility method; not used by fetch."""
-        bn, url = cls.query_provider(asset, tile, date)
-        return [{'basename': bn, 'url': url}]
-
-
-    @classmethod
-    def query_provider(cls, asset, tile, date):
+    def query_provider(cls, asset, tile, date, pclouds=100):
         """Search for a matching asset in the Sentinel-2 servers.
 
         Uses the given (asset, tile, date) tuple as a search key, and
@@ -318,17 +310,6 @@ class sentinel2Asset(Asset):
             asset_url = entry['link'][0]['href']
             output_file_name = entry['title'] + '.zip'
 
-        if style != 'original':
-            return output_file_name, asset_url
-
-        # old-style assets cover many tiles, so there may be duplication of effort; avoid that by
-        # aborting if the stage already contains the desired asset
-        full_staged_path = os.path.join(cls.Repository.path('stage'), output_file_name)
-        if os.path.exists(full_staged_path):
-            utils.verbose_out('Asset `{}` needed but already in stage/, skipping.'.format(
-                    output_file_name))
-            return None, None
-
         if pclouds < 100:
             asset = cls(output_file_name)
             if not asset.filter(pclouds):
@@ -340,9 +321,21 @@ class sentinel2Asset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         """Fetch the asset corresponding to the given asset type, tile, and date."""
-        output_file_name, asset_url = cls.query_provider(asset, tile, date)
-        if (output_file_name, asset_url) == (None, None):
-            return # nothing found
+        qs_rv = cls.query_service(asset, tile, date)
+        if qs_rv is None:
+            return []
+        output_file_name, asset_url = (qs_rv['basename'], qs_rv['url'])
+
+        # old-style assets cover many tiles, so there may be duplication of
+        # effort; avoid that by aborting if the stage already contains the
+        # desired asset
+        full_staged_path = os.path.join(cls.Repository.path('stage'),
+                                        output_file_name)
+        if os.path.exists(full_staged_path):
+            utils.verbose_out('Asset `{}` needed but already in stage/,'
+                              ' skipping.'.format(output_file_name))
+            return []
+
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage
@@ -367,10 +360,11 @@ class sentinel2Asset(Asset):
                 cls.stage_asset(output_full_path, output_file_name)
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
+        return [output_full_path]
 
 
     @classmethod
-    def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
+    def archive(cls, path, recursive=False, keep=False, update=False):
         """Archive original and new-style Sentinel-2 assets.
 
         Original-style Sentinel-2 assets have special archiving needs
@@ -397,8 +391,12 @@ class sentinel2Asset(Asset):
                     raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(bn))
 
         assets = []
+        overwritten_assets = []
         for fn in found_files[cls._2016_12_07]:
-            assets += super(sentinel2Asset, cls).archive(fn, False, keep, update)
+            new_aol, new_overwritten_aol = super(sentinel2Asset, cls).archive(
+                    fn, False, keep, update)
+            assets += new_aol
+            overwritten_assets += new_overwritten_aol
 
         for fn in found_files['original']:
             tile_list = cls.tile_list(fn)
@@ -407,11 +405,15 @@ class sentinel2Asset(Asset):
                 for tile in tile_list:
                     tiled_fp = os.path.join(tdname, tile + '_' + os.path.basename(fn))
                     os.link(fn, tiled_fp)
-                assets += super(sentinel2Asset, cls).archive(tdname, False, False, update)
+                orig_aol, orig_overwritten_aol = (
+                        super(sentinel2Asset, cls).archive(
+                                tdname, False, False, update))
+                assets += orig_aol
+                overwritten_assets += orig_overwritten_aol
             if not keep:
                 utils.RemoveFiles([fn], ['.index', '.aux.xml'])
 
-        return assets
+        return assets, overwritten_assets
 
 
     @classmethod
@@ -452,15 +454,23 @@ class sentinel2Asset(Asset):
             return self.meta['cloud-cover']
         if os.path.exists(self.filename):
             with utils.make_temp_dir() as tmpdir:
-                metadata_file = [f for f in self.datafiles() if f.endswith("MTD_MSIL1C.xml")][0]
+                metadata_file = [
+                    f for f in self.datafiles()
+                    if re.match(self.style_res['tile-md-re'], f)
+                ][0]
                 self.extract([metadata_file], path=tmpdir)
                 tree = ElementTree.parse(tmpdir + '/' + metadata_file)
-                root = tree.getroot()
+            root = tree.getroot()
+            nsre = r'^({.+})Level-1C_Tile_ID$'
+            cloud_cover_xpath = "./{}Quality_Indicators_Info/Image_Content_QI/CLOUDY_PIXEL_PERCENTAGE"
         else:
             scihub = "https://scihub.copernicus.eu/dhus/odata/v1"
             username = self.Repository.get_setting('username')
             password = self.Repository.get_setting('password')
-            asset_name = os.path.basename(self.filename)[0:-4]
+            if self.style == 'original':
+                asset_name = os.path.basename(self.filename)[6:-4]
+            else:
+                asset_name = os.path.basename(self.filename)[0:-4]
             query_url = "{}/Products?$filter=Name eq '{}'".format(scihub, asset_name)
             r = requests.get(query_url, auth=(username, password))
             r.raise_for_status()
@@ -473,17 +483,31 @@ class sentinel2Asset(Asset):
             product_id_el = root.find("./a:entry/m:properties/d:Id", namespaces)
             if product_id_el is None:
                 raise Exception("{} is not a valid asset".format(asset_name))
-            metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL1C.xml')/$value".format(
-                scihub, product_id_el.text, asset_name
-            )
+            if self.style == 'original':
+                mtd_file = asset_name.replace('PRD', 'MTD')
+                mtd_file = mtd_file.replace('MSIL1C', 'SAFL1C')
+                metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('{}.xml')/$value".format(
+                    scihub, product_id_el.text, asset_name, mtd_file
+                )
+            else:
+                metadata_url = "{}/Products('{}')/Nodes('{}.SAFE')/Nodes('MTD_MSIL1C.xml')/$value".format(
+                    scihub, product_id_el.text, asset_name
+                )
             r = requests.get(metadata_url, auth=(username, password))
             r.raise_for_status()
             root = ElementTree.fromstring(r.content)
+            nsre = r'^({.+})Level-1C_User_Product$'
+            cloud_cover_xpath = "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment"
 
-        ns = "{https://psd-14.sentinel2.eo.esa.int/PSD/User_Product_Level-1C.xsd}"
-        cloud_coverage_el = root.findall(
-            "./{}Quality_Indicators_Info/Cloud_Coverage_Assessment".format(ns)
-        )[0]
+        for el in root.iter():
+            match = re.match(nsre, el.tag)
+            ns = False
+            if match:
+                ns = match.group(1)
+                break
+            if not ns:
+                raise Exception("Tile metadata xml namespace could not be found")
+        cloud_coverage_el = root.findall(cloud_cover_xpath.format(ns))[0]
         self.meta['cloud-cover'] = float(cloud_coverage_el.text)
         return self.meta['cloud-cover']
 
@@ -732,6 +756,16 @@ class sentinel2Data(Data):
         'mtci':         'ref',
         's2rep':        'ref',
     }
+
+    @classmethod
+    def need_to_fetch(cls, a_type, tile, date, update):
+        if date < sentinel2Asset._2016_12_07:
+            # must be an original-style asset, which has many tiles at
+            # query time, so there's no easy way to tell if we can skip the
+            # download or not.  So, just assume the worst and fetch it.
+            return True
+        return super(sentinel2Data, cls).need_to_fetch(
+                a_type, tile, date, update)
 
     def plan_work(self, requested_products, overwrite):
         """Plan processing run using requested products & their dependencies.

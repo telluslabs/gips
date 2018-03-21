@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import logging
 import os
 import shutil
@@ -23,6 +25,28 @@ def orm(db, mocker):
     # Because tests should be isolated from the environment most of the time.
     mocker.patch('gips.data.core.orm.use_orm', return_value=True)
     yield db
+
+@pytest.fixture
+def mpo(mocker):
+    """Just to save typing."""
+    yield mocker.patch.object
+
+@pytest.fixture
+def mock_context_manager(mocker, mpo):
+    """Mocks a given context manager.
+
+    Generate the mock by calling the value of this fixture in situ:
+    'with location.cm_name() as return_value:'.  location should be a module,
+    cm_name is a string naming the context manager to mock, and return_value
+    is the mock value emitted by the context manager at runtime.
+    """
+    def inner(location, cm_name, return_value=None):
+        m_context_manager = mpo(location, cm_name).return_value
+        if return_value is not None:
+            m_context_manager.__enter__.return_value = return_value
+        return m_context_manager
+    return inner
+
 
 # pytest_* functions are hooks automatically detected by pytest
 def pytest_addoption(parser):
@@ -118,10 +142,10 @@ def pytest_configure(config):
         setup_data_repo()
         config.option.setup_repo = True
     elif config.getoption("setup_repo"):
-        _log.debug("--setup-repo detected; setting up data repo")
+        print("--setup-repo detected; setting up data repo")
         setup_data_repo()
     else:
-        print "Skipping repo setup per lack of --setup-repo."
+        print("Skipping repo setup per lack of --setup-repo.")
 
 
 def setup_data_repo():
@@ -132,7 +156,6 @@ def setup_data_repo():
     if gcp.status_code != 0:
         raise RuntimeError("config check via `gips_config print` failed",
                            gcp.std_out, gcp.std_err, gcp)
-    _log.debug("`gips_config print` check succeeded.")
 
     # set up data root if it isn't there already
     gcp = envoy.run("gips_config env")

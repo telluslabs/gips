@@ -182,8 +182,6 @@ class daymetAsset(Asset):
         data is daily for the entire run of the dataset and the URLs are
         deterministic, so all it really checks are date bounds.
         """
-        if not (cls.start_date(asset) <= date.date() <= cls.end_date(asset).date()):
-            return (None, None)
         source = cls._assets[asset]['source']
         url = (cls._assets[asset]['url'] + '/%s') % (date.year, tile, date.year, source)
         bn = cls._basename_pat.format(asset, tile, date.year, date.strftime('%j'))
@@ -192,9 +190,10 @@ class daymetAsset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         """Fetch a daymet asset and convert it to a gips-friendly format."""
-        asset_bn, url = cls.query_provider(asset, tile, date)
-        if (asset_bn, url) is (None, None):
-            return
+        qs_rv = cls.query_service(asset, tile, date)
+        if qs_rv is None:
+            return []
+        asset_bn, url = qs_rv['basename'], qs_rv['url']
         dataset = open_url(url)
         x0 = dataset['x'].data[0] - 500.0
         y0 = dataset['y'].data[0] + 500.0
@@ -228,6 +227,10 @@ class daymetData(Data):
     name = 'Daymet'
     version = _daymet_driver_version
     Asset = daymetAsset
+
+    @classmethod
+    def need_to_fetch(cls, *args, **kwargs):
+        return True
 
     _products = {
         'tmin': {

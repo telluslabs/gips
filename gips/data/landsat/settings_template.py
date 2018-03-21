@@ -4,5 +4,7 @@ REPOS['landsat'] = {
     '6S': False,            # atm correction for VIS/NIR/SWIR bands
     'MODTRAN': False,       # atm correction for LWIR
     'extract': False,       # extract files from tar.gz before processing instead of direct access
+    'username': USGS_USER,
+    'password': USGS_PASS,
     # 'ACOLITE_DIR':  '',   # ACOLITE installation for atm correction over water
 }

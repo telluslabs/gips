@@ -1,3 +1,4 @@
+# GIPS
 
 ## General
 
@@ -15,6 +16,16 @@ to install system packages, and may ask for authentication accordingly.  It
 runs apt-get, which may prompt you for confirmation of its actions.
 Finally, the script will show you how to set GIPS system settings with
 `gips_config`.
+
+## Configuration
+
+### GIPS Settings
+
+`STATS_FORMAT` controls the way `gips_stats` formats its output, and is passed
+in to python's `cvs.writer` as a dict of keyword options.
+
+`GIPS_ORM` controls whether the ORM is activated, and whether gips will keep
+an inventory of its content in the database configured in `DATABASES`.
 
 ### MODIS configuration note
 
@@ -81,10 +92,13 @@ disables the ORM.
 ## Authors and Contributors
 The following have been authors or contributers to GIPS
 
-    Matthew Hanson, matt.a.hanson@gmail.com
     Bobby Braswell (Rob), rbraswell@appliedgeosolutions.com
     Ian Cooke, icooke@appliedgeosolutions.com
+    Rick Emery, remery@appliedgeosolutions.com
+    Justin Fisk, jfisk@appliedgeosolutions.com
+    Matthew Hanson, matt.a.hanson@gmail.com
     Tom Olson, tolson@appliedgeosolutions.com
+    Nate Rubin, nrubing@appliedgeosolutions.com
 
 ## License (GPL v2)
 

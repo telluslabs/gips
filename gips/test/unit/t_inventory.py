@@ -14,10 +14,10 @@ from gips.data.modis.modis import modisData, modisAsset
 from gips.core import SpatialExtent, TemporalExtent
 
 @pytest.fixture
-def di_init_mocks(mocker, orm):
+def di_init_mocks(mpo, orm):
     """Appropriate mocks for DataInventory.__init__."""
-    modisData.fetch = mocker.Mock() # behavior not super important
-    modisData.Asset.archive = mocker.Mock() # has to return list of modisAssets
+    mpo(modisData, 'fetch') # behavior not super important
+    mpo(modisData.Asset, 'archive') # has to return list of modisAssets
     return (modisData.fetch,
             modisData.Asset.archive,
             mock.patch('gips.inventory.dbinv.add_asset'))
@@ -31,7 +31,7 @@ def t_data_inventory_db_save(di_init_mocks):
     assets = [modisAsset(fn) for fn in asset_filenames]
     # normally _archivefile would set this attrib:
     [setattr(asset, 'archived_filename', asset.filename) for asset in assets]
-    m_archive.return_value = assets
+    m_archive.return_value = assets, []
 
     # specify spatial & temporal
     tiles = ['h12v04', 'h13v05', 'h12v05', 'h13v04']
@@ -75,7 +75,7 @@ def t_data_inventory_load(orm):
 
     # instantiate the class under test
     tiles = ['h12v04', 'h12v05', 'h13v04', 'h13v05']
-    products = ['fsnow', 'temp8td', 'quality', 'landcover']
+    products = ['temp8td', 'quality', 'landcover']
     se = SpatialExtent(modisData, tiles, 0.0, 0.0)
     te = TemporalExtent('2012-12-01,2012-12-03')
     di = DataInventory(modisData, se, te, products)

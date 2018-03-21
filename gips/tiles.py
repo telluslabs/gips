@@ -88,19 +88,23 @@ class Tiles(object):
             # create data directory when it is needed
             mkdir(datadir)
             # TODO - this is assuming a tif file.  Use gippy FileExtension function when it is exposed
-            fout = os.path.join(datadir, '%s_%s_%s' % (bname, sensor, product)) + '.tif'
-            if not os.path.exists(fout) or overwrite:
-                with utils.error_handler("Error mosaicking " + fout + ". "
-                                         "Did you forget to specify a resolution (`--res x x`)?",
-                                         continuable=True):
+            fn = '{}_{}_{}.tif'.format(bname, sensor, product)
+            final_fp = os.path.join(datadir, fn)
+            if not os.path.exists(final_fp) or overwrite:
+                err_msg = ("Error mosaicking " + final_fp + ". Did you forget"
+                           " to specify a resolution (`--res x x`)?")
+                with utils.error_handler(err_msg, continuable=True), \
+                        utils.make_temp_dir(dir=datadir,
+                                            prefix='mosaic') as tmp_dir:
+                    tmp_fp = os.path.join(tmp_dir, fn) # for safety
                     filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
                     images = gippy.GeoImages(filenames)
-
                     if self.spatial.rastermask is not None:
-                        gridded_mosaic(images, fout, self.spatial.rastermask, interpolation)
+                        gridded_mosaic(images, tmp_fp,
+                                       self.spatial.rastermask, interpolation)
                     elif self.spatial.site is not None and res is not None:
                         CookieCutter(
-                            images, self.spatial.site, str(fout), res[0], res[1],
+                            images, self.spatial.site, str(tmp_fp), res[0], res[1],
                             crop, interpolation, {}, alltouch,
                         )
                     else:
@@ -109,8 +113,8 @@ class Tiles(object):
                             # get the product res, this will indicate that we want "alltouch"
                             affine = images[0].Affine()
                             product_res = (affine[1], affine[5])
-                        mosaic(images, fout, self.spatial.site, product_res=product_res)
-
+                        mosaic(images, tmp_fp, self.spatial.site, product_res=product_res)
+                    os.rename(tmp_fp, final_fp)
         t = datetime.now() - start
         VerboseOut('%s: created project files for %s tiles in %s' % (self.date, len(self.tiles), t), 2)
 
@@ -166,10 +170,9 @@ class Tiles(object):
             cov = asset_coverage[a]
             if cov > 0:
                 text = self._colorize_product(
-                    '  {:>4.1f}%   '.format(cov), colors
-                )
+                        '  {:>4.1f}%  '.format(cov), colors)
             else:
-                text = '          '
+                text = ' ' * 10
             sys.stdout.write(text)
 
         products = [p for t in self.tiles for p in self.tiles[t].products]
@@ -180,5 +183,5 @@ class Tiles(object):
                 prods.append(p)
         for p in sorted(set(prods)):
             text = self._colorize_product(p, colors)
-            sys.stdout.write('  ' + text)
+            sys.stdout.write(' ' + text)
         sys.stdout.write('\n')
