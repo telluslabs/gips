@@ -8,7 +8,20 @@ from . import merra_process
 from . import sentinel2_process
 
 expectations = {}
-mark_spec = {}
+
+# set up lite test marks
+lite_mark_spec = { k: util.lite for k in [
+    # consensus is that merra, chirps, & daymet don't need to be tested here
+    ('modis', 'ndvi'),
+    ('landsat', 'ndvi-toa'),
+    # ref-toa has to be here becuase evi-toa changes otherwise:
+    # https://gitlab.com/appliedgeosolutions/gips/issues/522
+    ('sentinel2', 'evi-toa'),
+    ('prism', 'ppt'),
+    #('sar', 'sign'), # TODO automate arttifact-* pytest.ini values
+]}
+
+mark_spec = lite_mark_spec.copy()
 
 expectations['modis'] = modis_process.expectations
 expectations['merra'] = merra_process.expectations
@@ -106,7 +119,10 @@ expectations['prism'] = collections.OrderedDict([
 
 ])
 
-mark_spec['landsat'] = util.slow
+# TODO some of these may be fast enough without --setup-repo
+for k in (('landsat', 'bqashadow'), ('landsat', 'ref-toa'),
+          ('landsat', 'acca'), ('landsat', 'rad-toa')):
+    mark_spec[k] = util.slow
 
 expectations['landsat'] = {
     # t_process[landsat-bqashadow] recording:

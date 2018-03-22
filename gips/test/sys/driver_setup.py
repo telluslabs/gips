@@ -21,7 +21,7 @@ STD_ARGS = {
     'landsat': ('landsat', '-s', nh_shp, '-d', '2017-08-01', '-v4'),
     # Here down, not NH shapefile:
     'aod': ('aod', '-s', util.NE_SHP_PATH, '-d', '2017-004,2017-006', '-v4'),
-    'sentinel2': ('sentinel2', '-s', util.DURHAM_SHP_PATH, '-d2017-010', '-v4'),
+    'sentinel2': ('sentinel2', '-s', util.DURHAM_SHP_PATH, '-d2017-183', '-v4'),
     'sar': ('sar', '-t', 'N07E099', 'N19E100', 'N00E099', '-d2009,2015', '-v4'),
     'modisndti': ('modis', '-s', nh_shp, '-d', '2012-336', '-v', '4', '-p', 'ndti'),
 }
@@ -80,5 +80,5 @@ def setup_repo_data(driver):
 
     args = STD_ARGS[driver] + ('--fetch',)
     print('Downloading', driver, 'data:  gips_inventory', *args)
-    outcome = sh.Command('gips_inventory')(*args)
+    outcome = sh.Command('gips_inventory')(*args, _err='/dev/stderr')
     print(driver, "data download complete.")
