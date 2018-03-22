@@ -20,6 +20,7 @@ RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
     python-scipy \
     python-gdal \
     swig2.0 \
+    wget \
     git \
     mg \
     && ln -s  /usr/bin/mg /usr/bin/emacs \
