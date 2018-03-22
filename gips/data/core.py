@@ -498,7 +498,7 @@ class Asset(object):
 
     @classmethod
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
-    def query_service(cls, asset, tile, date):
+    def query_service(cls, asset, tile, date, **fetch_kwargs):
         """Query the data provider for files matching the arguments.
 
         Drivers must override this method, or else query_provider, to contact a
@@ -510,7 +510,7 @@ class Asset(object):
         """
         if not cls.available(asset, date):
             return None
-        bn, url = cls.query_provider(asset, tile, date)
+        bn, url = cls.query_provider(asset, tile, date, **fetch_kwargs)
         if (bn, url) == (None, None):
             return None
         return {'basename': bn, 'url': url}
@@ -1143,36 +1143,39 @@ class Data(object):
         return set(assets)
 
     @classmethod
-    def need_to_fetch(cls, a_type, tile, date, update):
+    def need_to_fetch(cls, a_type, tile, date, update, **fetch_kwargs):
         local_ao = cls.Asset.discover_asset(a_type, tile, date)
         # we have something for this atd, and user doesn't want to update,
         # so the decision is easy
         if local_ao is not None and not update:
             return False
-        qs_rv = cls.Asset.query_service(a_type, tile, date)
+        qs_rv = cls.Asset.query_service(a_type, tile, date, **fetch_kwargs)
         if qs_rv is None: # nothing remote; done
             return False
         # if we don't have it already, or if `update` flag
         queried_ao = cls.Asset(qs_rv['basename'])
         return local_ao is None or (update and local_ao.updated(queried_ao))
 
+    need_fetch_kwargs = False # feature toggle:  set in driver's subclass
+
     @classmethod
-    def fetch(cls, products, tiles, textent, update=False):
+    def fetch(cls, products, tiles, textent, update=False, **kwargs):
         """ Download data for tiles and add to archive. update forces fetch """
         assets = cls.products2assets(products)
         fetched = []
+        fetch_kwargs = kwargs if cls.need_fetch_kwargs else {}
         # TODO rewrite this to back off the indentation
         for a in assets:
             for t in tiles:
                 asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                 for d in asset_dates: # we say dates but really datetimes
-                    if not cls.need_to_fetch(a, t, d, update):
+                    if not cls.need_to_fetch(a, t, d, update, **fetch_kwargs):
                         continue
                     with utils.error_handler(
                             'Problem fetching asset for {}, {}, {}'.format(
                                 a, t, d.strftime("%y-%m-%d")),
                             continuable=True):
-                        cls.Asset.fetch(a, t, d)
+                        cls.Asset.fetch(a, t, d, **fetch_kwargs)
                         # fetched may contain both fetched things and unfetchable things
                         fetched.append((a, t, d))
 
