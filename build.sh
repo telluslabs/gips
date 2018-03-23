@@ -1,3 +1,5 @@
+# build the docker image and run a simple test
+
 source credentials.sh
 
 wget -O sixs ftp://${AGSFTPCREDS}@agsftp.ags.io/gipsftp/sixs
