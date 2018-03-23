@@ -1,7 +1,9 @@
 from .. import util
 
+from . import std_process
+
+mark_spec = std_process.lite_mark_spec.copy()
 expectations = {}
-mark_spec = {}
 
 expectations['modis'] = {
     # t_stats[modis-satvi] recording:
