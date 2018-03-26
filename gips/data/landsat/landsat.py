@@ -312,6 +312,16 @@ class landsatAsset(Asset):
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
 
+    @classmethod
+    def cloud_cover_from_mtl_text(cls, text):
+        """Reads the text and returns the cloud cover percentage."""
+        cc_pattern = r".*CLOUD_COVER = (\d+.?\d*)"
+        cloud_cover = re.match(cc_pattern, text, flags=re.DOTALL)
+        if not cloud_cover:
+            raise ValueError("No match for '{}' found in MTL text".format(
+                cc_pattern))
+        return float(cloud_cover.group(1))
+
     def cloud_cover(self):
         """Returns the cloud cover for the current asset.
 
@@ -341,12 +351,7 @@ class landsatAsset(Asset):
                     text = mtlfile.read()
 
         if text is not None:
-            cc_pattern = r".*CLOUD_COVER = (\d+.?\d*)"
-            cloud_cover = re.match(cc_pattern, text, flags=re.DOTALL)
-            if not cloud_cover:
-                raise ValueError("No match for '{}' found in {}".format(
-                                    cc_pattern, mtlfilename))
-            self.meta['cloud-cover'] = float(cloud_cover.group(1))
+            self.meta['cloud-cover'] = self.cloud_cover_from_mtl_text(text)
             return self.meta['cloud-cover']
 
         # the MTL file didn't work out; attempt USGS API search instead
@@ -383,7 +388,14 @@ class landsatAsset(Asset):
 
         scene_cloud_cover = self.cloud_cover()
 
-        return scene_cloud_cover < pclouds
+        asset_passes_filter = scene_cloud_cover <= pclouds
+        if asset_passes_filter:
+            msg = ('Asset cloud cover is %{}, meets pclouds threshold of %{}')
+        else:
+            msg = ('Asset cloud cover is %{},'
+                   ' fails to meet pclouds threshold of %{}')
+        utils.verbose_out(msg.format(scene_cloud_cover, pclouds), 3)
+        return asset_passes_filter
 
     def load_c1s3_json(self):
         """Load the content from a C1S3 json asset and return it.
@@ -426,12 +438,12 @@ class landsatAsset(Asset):
     _query_s3_cache = (None, None) # prefix, search results
 
     @classmethod
-    def query_s3(cls, tile, date):
+    def query_s3(cls, tile, date, pclouds=100):
         """Handles AWS S3 queries for landsat data.
 
         Returns a filename suitable for naming the constructed asset,
         and a list of S3 keys.  Returns None if no asset found for the
-        given scene.
+        given scene.  Filters by the given cloud percentage.
         """
         # for finding assets matching the tile
         key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
@@ -486,8 +498,21 @@ class landsatAsset(Asset):
                         ' (C1S3, {}, {})'.format(tile, date), 4)
             return None
 
-        verbose_out('Found complete C1S3 asset for'
-                    ' (C1S3, {}, {})'.format(tile, date), 4)
+        if pclouds < 100:
+            mtl_content = requests.get(cls._s3_url + mtl_txt).text
+            cc = cls.cloud_cover_from_mtl_text(mtl_content)
+            if cc > pclouds:
+                cc_msg = ('C1S3 asset found for ({}, {}), but cloud cover'
+                          ' percentage (%{}) fails to meet threshold (%{})')
+                verbose_out(cc_msg.format(tile, date, cc, pclouds), 3)
+                return None
+            else:
+                cc_msg = ('C1S3 asset found for ({}, {}); cloud cover'
+                          ' percentage (%{}) meets threshold (%{})')
+                verbose_out(cc_msg.format(tile, date, cc, pclouds), 3)
+        else:
+            verbose_out('Found complete C1S3 asset for'
+                        ' ({}, {})'.format(tile, date), 3)
 
         # have to custom sort thanks to 'B1.TIF' instead of 'B01.TIF':
         def sort_key_f(key):
@@ -547,7 +572,7 @@ class landsatAsset(Asset):
 
     @classmethod
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
-    def query_service(cls, asset, tile, date, pcover=90.0):
+    def query_service(cls, asset, tile, date, pclouds=90.0, **fetch_kwargs):
         """As superclass with optional argument:
 
         Finds assets matching the arguments, where pcover is maximum
@@ -566,19 +591,19 @@ class landsatAsset(Asset):
                              " (expected 's3' or 'usgs')".format(data_src))
         # perform the query
         if (asset, data_src) == ('C1', 'usgs'):
-            return cls.query_c1(tile, date, pcover)
+            return cls.query_c1(tile, date, pclouds)
         if (asset, data_src) == ('C1S3', 's3'):
-            return cls.query_s3(tile, date)
+            return cls.query_s3(tile, date, pclouds)
         # source-asset-type mismatch, do nothing
         return None
 
     @classmethod
-    def fetch(cls, asset, tile, date):
+    def fetch(cls, asset, tile, date, **fetch_kwargs):
         """Fetch the asset given by the given parameters.
 
         Many arguments are unused, but must be present for compatibility.
         """
-        qs_rv = cls.query_service(asset, tile, date)
+        qs_rv = cls.query_service(asset, tile, date, **fetch_kwargs)
         if qs_rv is None:
             return []
         basename = qs_rv.pop('basename')
@@ -1466,6 +1491,8 @@ class landsatData(Data):
                     )
                 shutil.rmtree(aco_proc_dir)
                 ## end ACOLITE
+
+    need_fetch_kwargs = True
 
     @classmethod
     def add_filter_args(cls, parser):
