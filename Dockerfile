@@ -20,6 +20,7 @@ RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
     python-scipy \
     python-gdal \
     swig2.0 \
+    wget \
     mg \
     libcurl4-gnutls-dev \
     && ln -s  /usr/bin/mg /usr/bin/emacs \
@@ -32,7 +33,8 @@ COPY . /gips
 RUN cd /gips \
     && pip install -r dev_requirements.txt \
     && pip install --process-dependency-links -e . \
-    && mv sixs /usr/local/bin/sixs
+    && mv sixs /usr/local/bin/sixs \
+    && chmod +x /usr/local/bin/sixs
 
 RUN apt-get -y purge \
        gfortran \

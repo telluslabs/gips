@@ -22,12 +22,10 @@ run_tests:
   script:
     - docker run --rm gips_test_$CI_COMMIT_REF_SLUG pytest -vv -s -k unit # TODO both int & unit
     - docker run --rm -e GIPS_OVERRIDE_VERSION=0.8.2
-      gips_test_$CI_COMMIT_REF_SLUG 
-      pytest -vv --setup-repo --slow --sys -s -m lite
+      gips_test_$CI_COMMIT_REF_SLUG
+      pytest -vv --setup-repo --slow --sys -s -k '(sentinel2 and t_project)'
   tags:
     - gipsdev
   after_script:
     - docker image rm gips_test_$CI_COMMIT_REF_SLUG
     - docker system prune -f
-
-
