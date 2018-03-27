@@ -712,6 +712,7 @@ class sentinel2Data(Data):
             'description': 'Cloud, cloud shadow, and water classification',
             'assets': [_asset_type],
             'bands': {'name': 'cfmask', 'units': Data._unitless},
+            'toa': True,
         },
     }
 
