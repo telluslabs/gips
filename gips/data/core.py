@@ -809,7 +809,8 @@ class Data(object):
         f_value = float(raw_value)
         if not (0 <= f_value <= 100):
             raise argparse.ArgumentTypeError(
-                "Value '{}' is outside the range [%0, %100]".format(raw_value))
+                "Value '{}' is outside the range [0 %, 100 %]".format(
+                    raw_value))
         return f_value
 
     @classmethod

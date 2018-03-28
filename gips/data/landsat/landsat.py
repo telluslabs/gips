@@ -390,10 +390,10 @@ class landsatAsset(Asset):
 
         asset_passes_filter = scene_cloud_cover <= pclouds
         if asset_passes_filter:
-            msg = ('Asset cloud cover is %{}, meets pclouds threshold of %{}')
+            msg = 'Asset cloud cover is {} %, meets pclouds threshold of {} %'
         else:
-            msg = ('Asset cloud cover is %{},'
-                   ' fails to meet pclouds threshold of %{}')
+            msg = ('Asset cloud cover is {} %,'
+                   ' fails to meet pclouds threshold of {} %')
         utils.verbose_out(msg.format(scene_cloud_cover, pclouds), 3)
         return asset_passes_filter
 
@@ -503,12 +503,12 @@ class landsatAsset(Asset):
             cc = cls.cloud_cover_from_mtl_text(mtl_content)
             if cc > pclouds:
                 cc_msg = ('C1S3 asset found for ({}, {}), but cloud cover'
-                          ' percentage (%{}) fails to meet threshold (%{})')
+                          ' percentage ({} %) fails to meet threshold ({} %)')
                 verbose_out(cc_msg.format(tile, date, cc, pclouds), 3)
                 return None
             else:
                 cc_msg = ('C1S3 asset found for ({}, {}); cloud cover'
-                          ' percentage (%{}) meets threshold (%{})')
+                          ' percentage ({} %) meets threshold ({} %)')
                 verbose_out(cc_msg.format(tile, date, cc, pclouds), 3)
         else:
             verbose_out('Found complete C1S3 asset for'

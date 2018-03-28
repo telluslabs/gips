@@ -517,10 +517,10 @@ class sentinel2Asset(Asset):
         cc = self.cloud_cover()
         asset_passes_filter = pclouds >= 100 or cc <= pclouds
         if asset_passes_filter:
-            msg = ('Asset cloud cover is %{}, meets pclouds threshold of %{}')
+            msg = 'Asset cloud cover is {} %, meets pclouds threshold of {} %'
         else:
-            msg = ('Asset cloud cover is %{},'
-                   ' fails to meet pclouds threshold of %{}')
+            msg = ('Asset cloud cover is {} %,'
+                   ' fails to meet pclouds threshold of {} %')
         utils.verbose_out(msg.format(cc, pclouds), 3)
         return asset_passes_filter
 
