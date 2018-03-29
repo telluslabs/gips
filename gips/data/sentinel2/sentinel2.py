@@ -482,8 +482,20 @@ class sentinel2Asset(Asset):
         else:
             url_head = 'https://scihub.copernicus.eu/dhus/search?q='
             url_tail = '&orderby=ingestiondate desc&format=json'
-            url_search_string = "filename:S2?_MSIL1C_{}{:02}{:02}T?????_R???_T{}_*.SAFE"
-            search_url = url_head + url_search_string.format(self.date.year, self.date.month, self.date.day, self.tile) + url_tail
+            year, month, day = self.date.timetuple()[:3]
+            if self.style == 'original':
+                # compute the center coordinate of the tile
+                x0, x1, y0, y1 = self.Repository.tile_lat_lon(self.tile)
+                lat, lon = (y0 + y1)/2, (x0 + x1)/2
+                #                                                  year mon  day
+                url_search_string = ('filename:S2?_OPER_PRD_MSIL1C_*_{}{:02}{:02}T??????.SAFE'
+                                    '%20AND%20footprint:%22Intersects({},%20{})%22') # <-- lat/lon
+                search_url = url_head + url_search_string.format(year, month, day, lat, lon) + url_tail
+            else:
+                #                                      year mon  day                    tile
+                url_search_string = 'filename:S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'
+                search_url = url_head + url_search_string.format(year, month, day, self.tile) + url_tail
+
             username = self.Repository.get_setting('username')
             password = self.Repository.get_setting('password')
             auth = HTTPBasicAuth(username, password)
