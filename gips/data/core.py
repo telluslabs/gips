@@ -39,7 +39,6 @@ import commands
 from urllib import urlencode
 import urllib2
 from cookielib import CookieJar
-import argparse
 
 # from functools import lru_cache <-- python 3.2+ can do this instead
 from backports.functools_lru_cache import lru_cache
@@ -498,7 +497,7 @@ class Asset(object):
 
     @classmethod
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
-    def query_service(cls, asset, tile, date, **fetch_kwargs):
+    def query_service(cls, asset, tile, date):
         """Query the data provider for files matching the arguments.
 
         Drivers must override this method, or else query_provider, to contact a
@@ -510,7 +509,7 @@ class Asset(object):
         """
         if not cls.available(asset, date):
             return None
-        bn, url = cls.query_provider(asset, tile, date, **fetch_kwargs)
+        bn, url = cls.query_provider(asset, tile, date)
         if (bn, url) == (None, None):
             return None
         return {'basename': bn, 'url': url}
@@ -798,27 +797,6 @@ class Data(object):
                         #shutil.copyfile(fin, fout)
         procstr = 'copied' if site is None else 'warped'
         VerboseOut('%s tile %s: %s files %s' % (self.date, self.id, len(products.requested), procstr))
-
-    @classmethod
-    def natural_percentage(cls, raw_value):
-        """Callable used for argparse, defines a new type for %0.0 to %100.0.
-
-        Receives a string, return a float.  See also:
-        https://docs.python.org/2/library/argparse.html#type
-        """
-        f_value = float(raw_value)
-        if not (0 <= f_value <= 100):
-            raise argparse.ArgumentTypeError(
-                "Value '{}' is outside the range [0 %, 100 %]".format(
-                    raw_value))
-        return f_value
-
-    @classmethod
-    def add_filter_args(cls, parser):
-        """Override to add arguments to the command line suitable for filter().
-
-        parser is expected to be a python ArgumentParser."""
-        return
 
     def filter(self, **kwargs):
         """Permit child classes to implement filtering.
@@ -1144,39 +1122,36 @@ class Data(object):
         return set(assets)
 
     @classmethod
-    def need_to_fetch(cls, a_type, tile, date, update, **fetch_kwargs):
+    def need_to_fetch(cls, a_type, tile, date, update):
         local_ao = cls.Asset.discover_asset(a_type, tile, date)
         # we have something for this atd, and user doesn't want to update,
         # so the decision is easy
         if local_ao is not None and not update:
             return False
-        qs_rv = cls.Asset.query_service(a_type, tile, date, **fetch_kwargs)
+        qs_rv = cls.Asset.query_service(a_type, tile, date)
         if qs_rv is None: # nothing remote; done
             return False
         # if we don't have it already, or if `update` flag
         queried_ao = cls.Asset(qs_rv['basename'])
         return local_ao is None or (update and local_ao.updated(queried_ao))
 
-    need_fetch_kwargs = False # feature toggle:  set in driver's subclass
-
     @classmethod
-    def fetch(cls, products, tiles, textent, update=False, **kwargs):
+    def fetch(cls, products, tiles, textent, update=False):
         """ Download data for tiles and add to archive. update forces fetch """
         assets = cls.products2assets(products)
         fetched = []
-        fetch_kwargs = kwargs if cls.need_fetch_kwargs else {}
         # TODO rewrite this to back off the indentation
         for a in assets:
             for t in tiles:
                 asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
                 for d in asset_dates: # we say dates but really datetimes
-                    if not cls.need_to_fetch(a, t, d, update, **fetch_kwargs):
+                    if not cls.need_to_fetch(a, t, d, update):
                         continue
                     with utils.error_handler(
                             'Problem fetching asset for {}, {}, {}'.format(
                                 a, t, d.strftime("%y-%m-%d")),
                             continuable=True):
-                        cls.Asset.fetch(a, t, d, **fetch_kwargs)
+                        cls.Asset.fetch(a, t, d)
                         # fetched may contain both fetched things and unfetchable things
                         fetched.append((a, t, d))
 

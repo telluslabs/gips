@@ -231,10 +231,7 @@ class DataInventory(Inventory):
         self.update = update
 
         if fetch:
-            # command-line argument 'tiles' clashes with fetch argument 'tiles'
-            fetch_kwargs = {k: v for (k, v) in kwargs.items() if k != 'tiles'}
-            dataclass.fetch(self.products.base, self.spatial.tiles,
-                            self.temporal, self.update, **fetch_kwargs)
+            dataclass.fetch(self.products.base, self.spatial.tiles, self.temporal, self.update)
             archived_assets = dataclass.archive_assets(
                     Repository.path('stage'), update=self.update)
 
