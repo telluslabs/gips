@@ -481,6 +481,7 @@ class sentinel2Asset(Asset):
             results = self.query_scihub(self.style, self.tile, self.date)
 
             if 'entry' in results['feed']:
+                assert results['feed']['entry']['double']['name'] == 'cloudcoverpercentage'
                 return float(results['feed']['entry']['double']['content'])
             raise ValueError("%s doesn't exist locally or remotely" % self.filename)
 
