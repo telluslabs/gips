@@ -225,8 +225,9 @@ def find_files(path):
     A lot like running find(1) with no arguments.  Doesn't follow symlinks.
     Doesn't report errors (see os.walk docs for details).
     """
-    return [os.path.join(subpath, f)
+    found_files = [os.path.join(subpath, f)
             for subpath, _, filenames in os.walk(path) for f in filenames]
+    return found_files
 
 def generate_expectation(filename, base_path, e_type=None):
     """Return an expectation of the file's content, based on its file type.
@@ -362,14 +363,17 @@ def sys_test_wrapper(request, path):
     reports on files created in the path during the wait.
 
     Presently depends on the module of the test having an expectations name
-    that is a dict of dicts, and the test getting a 'driver' and 'product'
-    param.
+    that is a dict, or a dict of dicts, and the test getting a 'driver' param,
+    and optionally a 'product' param.
     """
     rp = record_path() # does the user want record mode?  If so, save it where?
     driver = request.node.callspec.params['driver']
-    product = request.node.callspec.params['product']
+    product = request.node.callspec.params.get('product', None)
     # expected is an array of tuples:  (filename, type, data, data, data . . .)
-    expected = request.module.expectations[driver][product]
+    if product is None:
+        expected = request.module.expectations[driver]
+    else:
+        expected = request.module.expectations[driver][product]
     expected_filenames = [e[0] for e in expected]
 
     if not rp:
@@ -397,15 +401,24 @@ def sys_test_wrapper(request, path):
         rel_cf = [os.path.relpath(fp, path) for fp in created_files]
 
         cf_expectations = [generate_expectation(fn, path) for fn in rel_cf]
-        print("Recording {} outcome to {}.".format(product, rp))
+        print("Recording {} outcome to {}.".format(product or driver, rp))
         with open(rp, 'a') as rfo:
-            print('\n# {}[{}-{}] recording:'.format(
-                    request.function.__name__, driver, product), file=rfo)
-            print("'{}':".format(product), file=rfo)
-            pretty_hashes = pprint.pformat(cf_expectations)
-            print('    ', end='', file=rfo)
-            print('\n    '.join(pretty_hashes.split('\n')), end='', file=rfo)
-            print(',', file=rfo)
+            if product is None:
+                # TODO one more level of indentation here
+                print('\n# {}[{}] recording:'.format(
+                    request.function.__name__, driver), file=rfo)
+                pretty_hashes = pprint.pformat(cf_expectations)
+                print(pretty_hashes, end='', file=rfo)
+                print(',', file=rfo)
+            else:
+                print('\n# {}[{}-{}] recording:'.format(
+                        request.function.__name__, driver, product), file=rfo)
+                print("'{}':".format(product), file=rfo)
+                pretty_hashes = pprint.pformat(cf_expectations)
+                print('    ', end='', file=rfo)
+                print('\n    '.join(pretty_hashes.split('\n')),
+                      end='', file=rfo)
+                print(',', file=rfo)
 
 @pytest.yield_fixture
 def repo_wrapper(request):
