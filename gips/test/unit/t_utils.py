@@ -242,3 +242,12 @@ def t_cli_error_handler_continuable_case(mocker):
     with utils.cli_error_handler('PREFIX', True):
         raise rte
     m_report_error.assert_called_once_with(rte, 'PREFIX')
+
+@pytest.mark.parametrize('input, expected', (
+    ({1: 2, 3: 4},          {1: 2, 3: 4}),
+    ({1: [], 3: 4},         {3: 4}),
+    ({1: (), 3: (4, [5])},  {1: ()}),
+))
+def t_prune_unhashable(mocker, input, expected):
+    actual = utils.prune_unhashable(input)
+    assert expected == actual

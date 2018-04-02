@@ -231,8 +231,11 @@ class DataInventory(Inventory):
         self.update = update
 
         if fetch:
-            # command-line argument 'tiles' clashes with fetch argument 'tiles'
-            fetch_kwargs = {k: v for (k, v) in kwargs.items() if k != 'tiles'}
+            # command-line arguments could have lists, which lru_cache chokes
+            # one due to being unhashable.  Also tiles is passed in, which
+            # conflicts with the explicit tiles argument.
+            fetch_kwargs = {k: v for (k, v) in
+                utils.prune_unhashable(kwargs).items() if k != 'tiles'}
             dataclass.fetch(self.products.base, self.spatial.tiles,
                             self.temporal, self.update, **fetch_kwargs)
             archived_assets = dataclass.archive_assets(
