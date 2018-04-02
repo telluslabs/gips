@@ -252,20 +252,11 @@ class sentinel2Asset(Asset):
             self.style_res['datastrip-md-re'] = sr['datastrip-md-re'].format(tileid=self.tile)
 
     @classmethod
-    def query_provider(cls, asset, tile, date, pclouds=100):
-        """Search for a matching asset in the Sentinel-2 servers.
-
-        Uses the given (asset, tile, date) tuple as a search key, and
-        returns a tuple (base-filename-of-asset, url-for-fetching).  If
-        no assets were found, returns (None, None).
-        """
-        # set up fetch params
-        year, month, day = date.timetuple()[:3]
+    def query_scihub(cls, style, tile, date):
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
 
-        style = 'original' if date < cls._2016_12_07 else cls._2016_12_07
-
+        year, month, day = date.timetuple()[:3]
         # search step:  locate the asset corresponding to (asset, tile, date)
         url_head = 'https://scihub.copernicus.eu/dhus/search?q='
         #                vvvvvvvv--- sort by processing date so always get the newest one
@@ -283,19 +274,26 @@ class sentinel2Asset(Asset):
             url_search_string = 'filename:S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'
             search_url = url_head + url_search_string.format(year, month, day, tile) + url_tail
 
+        auth = HTTPBasicAuth(username, password)
+        r = requests.get(search_url, auth=auth, verify=False)
+        r.raise_for_status()
+        return r.json()
+
+    @classmethod
+    def query_provider(cls, asset, tile, date, pclouds=100):
+        """Search for a matching asset in the Sentinel-2 servers.
+
+        Uses the given (asset, tile, date) tuple as a search key, and
+        returns a tuple (base-filename-of-asset, url-for-fetching).  If
+        no assets were found, returns (None, None).
+        """
+        # set up fetch params
+        style = 'original' if date < cls._2016_12_07 else cls._2016_12_07
+
         # search for the asset's URL with wget call (using a suprocess call to wget instead of a
         # more conventional call to a lib because available libs are perceived to be inferior).
-        search_cmd = (
-                'wget --no-verbose --no-check-certificate --user="{}" --password="{}" --timeout 30'
-                ' --output-document=/dev/stdout "{}"').format(username, password, search_url)
-        with utils.error_handler("Error performing asset search '({})'".format(search_url)):
-            args = shlex.split(search_cmd)
-            p = subprocess.Popen(args, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
-            (stdout_data, stderr_data) = p.communicate()
-            if p.returncode != 0:
-                utils.verbose_out(stderr_data, stream=sys.stderr)
-                raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-            results = json.loads(stdout_data)['feed'] # always top-level key
+        with utils.error_handler("Error performing asset search '({} {} {})'".format(asset, tile, date.strftime("%Y%j"))):
+            results = cls.query_scihub(style, tile, date)['feed'] # always top-level key
 
             result_count = int(results['opensearch:totalResults'])
             if result_count == 0:
@@ -309,7 +307,7 @@ class sentinel2Asset(Asset):
                 entry = results['entry'][0]
 
             if 'rel' in entry['link'][0]: # sanity check - the right one doesn't have a 'rel' attrib
-                raise IOError("Unexpected 'rel' attribute in search link", link)
+                raise IOError("Unexpected 'rel' attribute in search link")
             asset_url = entry['link'][0]['href']
             output_file_name = entry['title'] + '.zip'
 
@@ -480,31 +478,11 @@ class sentinel2Asset(Asset):
 
             return self.meta['cloud-cover']
         else:
-            url_head = 'https://scihub.copernicus.eu/dhus/search?q='
-            url_tail = '&orderby=ingestiondate desc&format=json'
-            year, month, day = self.date.timetuple()[:3]
-            if self.style == 'original':
-                # compute the center coordinate of the tile
-                x0, x1, y0, y1 = self.Repository.tile_lat_lon(self.tile)
-                lat, lon = (y0 + y1)/2, (x0 + x1)/2
-                #                                                  year mon  day
-                url_search_string = ('filename:S2?_OPER_PRD_MSIL1C_*_{}{:02}{:02}T??????.SAFE'
-                                    '%20AND%20footprint:%22Intersects({},%20{})%22') # <-- lat/lon
-                search_url = url_head + url_search_string.format(year, month, day, lat, lon) + url_tail
-            else:
-                #                                      year mon  day                    tile
-                url_search_string = 'filename:S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'
-                search_url = url_head + url_search_string.format(year, month, day, self.tile) + url_tail
-
-            username = self.Repository.get_setting('username')
-            password = self.Repository.get_setting('password')
-            auth = HTTPBasicAuth(username, password)
-            r = requests.get(search_url, auth=auth, verify=False)
-            r.raise_for_status()
-            results = r.json()
+            results = self.query_scihub(self.style, self.tile, self.date)
 
             if 'entry' in results['feed']:
                 return float(results['feed']['entry']['double']['content'])
+            raise ValueError("%s doesn't exist locally or remotely" % self.filename)
 
     def filter(self, pclouds=100, **kwargs):
         return pclouds >= 100 or self.cloud_cover() <= pclouds
