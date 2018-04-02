@@ -133,15 +133,13 @@ def c1s3_cache_control():
     yield
     landsat.landsatAsset._query_s3_cache = saved_cache
 
-def t_landsatAsset_query_service_c1s3_success_case(mocker, c1s3_cache_control):
-    """Confirms method works for the normal case."""
-    ### big pile o' mocks
+@pytest.fixture
+def m_query_s3(mocker):
     mocker.patch.object(landsat.landsatAsset.Repository, 'get_setting',
                         return_value='s3')
     mocker.patch.dict(landsat.os.environ, {
-            'AWS_SECRET_ACCESS_KEY': 'fake-secret-key',
-            'AWS_ACCESS_KEY_ID': 'fake-key-id'})
-
+        'AWS_SECRET_ACCESS_KEY': 'fake-secret-key',
+        'AWS_ACCESS_KEY_ID': 'fake-key-id'})
     # have to mock around a local import
     m_boto3 = sys.modules['boto3'] = mocker.MagicMock()
     m_s3 = m_boto3.resource.return_value
@@ -154,10 +152,40 @@ def t_landsatAsset_query_service_c1s3_success_case(mocker, c1s3_cache_control):
         filter_output.append(mm)
     m_s3.Bucket.return_value.objects.filter.return_value = filter_output
 
-    expected = sample_c1s3_keys.copy()
-    expected['basename'] = 'LC08_L1TP_027033_20170506_20170515_01_T1_S3.json'
-    actual = landsat.landsatAsset.query_service('C1S3', '027033',
-                                                datetime.date(2017, 5, 6))
+    return mocker.patch.object(landsat.requests, 'get')
+
+def cloud_cover_snippet(percentage):
+    """Returns a string that should match landsat's cloud cover detection.
+
+    Taken from LC08_L1TP_027033_20170506_20170515_01_T1_MTL.txt.
+    """
+    return """
+        RLUT_FILE_NAME = "LC08RLUT_20150303_20431231_01_12.h5"
+      END_GROUP = PRODUCT_METADATA
+      GROUP = IMAGE_ATTRIBUTES
+        CLOUD_COVER = {}
+        CLOUD_COVER_LAND = 0.03
+        IMAGE_QUALITY_OLI = 9
+    """.format(float(percentage))
+
+s3_qs_expected = sample_c1s3_keys.copy()
+s3_qs_expected['basename'] = \
+    'LC08_L1TP_027033_20170506_20170515_01_T1_S3.json'
+
+@pytest.mark.parametrize("pclouds, expected", [
+    (100.0, s3_qs_expected), # note cloud cover is fixed at 50%
+    (50.0, s3_qs_expected),
+    (49.99, None),
+    (25.0, None),
+])
+def t_landsatAsset_query_service_s3(
+        pclouds, expected, mocker, m_query_s3, c1s3_cache_control):
+    """Confirms method works for the normal case."""
+    m_get = m_query_s3
+    m_get().text = cloud_cover_snippet(50.0)
+
+    actual = landsat.landsatAsset.query_service(
+            'C1S3', '027033', datetime.date(2017, 5, 6), pclouds)
     assert expected == actual
 
 def t_landsatAsset_fetch_c1(mocker, m_query_service, m_ee_login, m_get_setting,
@@ -166,7 +194,6 @@ def t_landsatAsset_fetch_c1(mocker, m_query_service, m_ee_login, m_get_setting,
     asset_fn = 'fake-asset.tar.gz'
     m_query_service.return_value = {'basename': asset_fn,
                                     'scene_id': dc, 'dataset': dc}
-    # TODO here down
     mock_context_manager(landsat.utils, 'make_temp_dir', 'fake-temp-dir')
     m_get_setting.return_value = 'driver-dir'
     mocker.patch.object(landsat.homura, 'download')

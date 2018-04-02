@@ -320,7 +320,7 @@ class sentinel2Asset(Asset):
 
 
     @classmethod
-    def fetch(cls, asset, tile, date):
+    def fetch(cls, asset, tile, date, pclouds=100, **fetch_kwargs):
         """Fetch the asset corresponding to the given asset type, tile, and date."""
         qs_rv = cls.query_service(asset, tile, date)
         if qs_rv is None:
@@ -485,7 +485,15 @@ class sentinel2Asset(Asset):
             raise ValueError("%s doesn't exist locally or remotely" % self.filename)
 
     def filter(self, pclouds=100, **kwargs):
-        return pclouds >= 100 or self.cloud_cover() <= pclouds
+        cc = self.cloud_cover()
+        asset_passes_filter = pclouds >= 100 or cc <= pclouds
+        if asset_passes_filter:
+            msg = 'Asset cloud cover is {} %, meets pclouds threshold of {} %'
+        else:
+            msg = ('Asset cloud cover is {} %,'
+                   ' fails to meet pclouds threshold of {} %')
+        utils.verbose_out(msg.format(cc, pclouds), 3)
+        return asset_passes_filter
 
     def xml_subtree(self, md_file_type, subtree_tag):
         """Loads XML, then returns the given Element from it.
@@ -731,15 +739,17 @@ class sentinel2Data(Data):
         's2rep':        'ref',
     }
 
+    need_fetch_kwargs = True
+
     @classmethod
-    def need_to_fetch(cls, a_type, tile, date, update):
+    def need_to_fetch(cls, a_type, tile, date, update, **fetch_kwargs):
         if date < sentinel2Asset._2016_12_07:
             # must be an original-style asset, which has many tiles at
             # query time, so there's no easy way to tell if we can skip the
             # download or not.  So, just assume the worst and fetch it.
             return True
         return super(sentinel2Data, cls).need_to_fetch(
-                a_type, tile, date, update)
+                a_type, tile, date, update, **fetch_kwargs)
 
     def plan_work(self, requested_products, overwrite):
         """Plan processing run using requested products & their dependencies.
@@ -804,6 +814,14 @@ class sentinel2Data(Data):
             err_msg = "Tile string '{}' doesn't match MGRS format (eg '04QFJ')".format(tile_string)
             raise IOError(err_msg)
         return tile_string.upper()
+
+    @classmethod
+    def add_filter_args(cls, parser):
+        """Add custom filtering options for sentinel2."""
+        help_str = ('cloud percentage threshold; assets with cloud cover'
+                    ' percentages higher than this value will be filtered out')
+        parser.add_argument('--pclouds', help=help_str,
+                            type=cls.natural_percentage, default=100)
 
     def filter(self, pclouds=100, **kwargs):
         return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
