@@ -597,3 +597,18 @@ def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
         if setup_orm:
             orm.setup()
         return data_class
+
+def prune_unhashable(d):
+    """Returns a new dict containing only the hashable values from d.
+
+    Note that an object's hashability can't be determined without attempting
+    the hash computation.
+    """
+    rv = {}
+    for k, v in d.items():
+        try:
+            hash(v)
+        except TypeError: # unshashable things raise a TypeError
+            continue
+        rv[k] = v
+    return rv
