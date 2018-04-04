@@ -280,7 +280,7 @@ class sentinel2Asset(Asset):
         return r.json()
 
     @classmethod
-    def query_provider(cls, asset, tile, date, pclouds=100):
+    def query_provider(cls, asset, tile, date, pclouds=100, **fetch_kwargs):
         """Search for a matching asset in the Sentinel-2 servers.
 
         Uses the given (asset, tile, date) tuple as a search key, and
