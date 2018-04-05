@@ -5,6 +5,7 @@ import ftplib
 import tempfile
 import shutil
 import os
+import glob
 
 import pytest
 import sh
@@ -27,59 +28,40 @@ STD_ARGS = {
     'daymet' : ('daymet', '-d', '1993-1-18', '-s', util.DURHAM_SHP_PATH),
 }
 
-class CannotFetch(Exception):
-    pass
-
-
-sar_asset_fns = [
-    'KC_017-C25N00E099WB1ORSA1.tar.gz',
-    'KC_017-Y10N19E100FBDORSA1.tar.gz',
-    'KC_999-C019DRN07E099WBDORSA1.tar.gz',
-]
-
-def special_cases(driver):
-    # handle modis scheduled downtime case
-    if driver == 'modis' and datetime.datetime.today().date().weekday() == 2:
-        raise RuntimeError("It's Wednesday; modis downloads are likely to fail.")
-    # sar isn't fetchable; get it from the artifact server
-    # TODO emplace sar assets in the existing collection of system test artifacts
-    # and write code that works for all of these artifacts
-    if driver == 'sar':
-        username = pytest.config.getini('artifact-store-user')
-        password = pytest.config.getini('artifact-store-password')
-        host     = pytest.config.getini('artifact-store-host')
-        path     = pytest.config.getini('artifact-store-path')
-        url_head = 'ftp://{}:{}@{}/{}/{}/'.format(
-                                        username, password, host, path, driver)
-        bookmark = os.getcwd()
-        try:
-            temp_dir = tempfile.mkdtemp()
-            os.chdir(temp_dir)
-            [sh.wget(url_head + fn) for fn in sar_asset_fns]
-            sh.gips_archive('sar')
-        finally:
-            os.chdir(bookmark)
-            shutil.rmtree(temp_dir)
-
-        # sar fetch currently doesn't work; this fails:
-        # gips_inventory sar -t N07E099 N19E100 N00E099 -d 2009,2015 -v 4 --fetch
-        raise CannotFetch("sar assets can't be fetched (reason TBD);"
-                          " used artifact server.")
-
 setup_attempted = []
 
 def setup_repo_data(driver):
     """Use gips_inventory to ensure assets are present."""
     if driver in setup_attempted or not pytest.config.getoption('setup_repo'):
         return
-    setup_attempted.append(driver)
-    try:
-        special_cases(driver)
-    except CannotFetch as cf:
-        print(cf)
+
+    username, password, host, path = [pytest.config.getini(ini) for ini in (
+        'artifact-store-user', 'artifact-store-password',
+        'artifact-store-host', 'artifact-store-path')]
+    url_template = 'ftp://{}:{}@{}/{}/{}/'
+    url_head = url_template.format(username, password, host, path, driver)
+    sanitized_uh = url_template.format(
+        username, '<password>', host, path, driver)
+
+    # first check to see if assets exist already -- if they're in the gips
+    # data store, they're probably already cataloged by the ORM
+    ftps = ftplib.FTP_TLS(host, username, password)
+    ftps.prot_p()
+    ftps.cwd(path + '/' + driver)
+    remote_files = ftps.nlst()
+    local_files = [os.path.basename(fp) for fp in
+        glob.glob(os.path.join(
+            pytest.config.getini('data-repo'), driver, 'tiles', '*/*/*'))]
+    if set(remote_files).issubset(set(local_files)):
+        print(driver, 'asset files already present; no setup needed')
         return
 
-    args = STD_ARGS[driver] + ('--fetch',)
-    print('Downloading', driver, 'data:  gips_inventory', *args)
-    outcome = sh.Command('gips_inventory')(*args, _err='/dev/stderr')
-    print(driver, "data download complete.")
+    print('Installing', driver, 'assets from', sanitized_uh)
+    try:
+        temp_dir = tempfile.mkdtemp()
+        with sh.pushd(temp_dir):
+            sh.wget('--recursive', '--no-directories', url_head)
+            sh.gips_archive(driver)
+    finally:
+        shutil.rmtree(temp_dir)
+    print(driver, "data installation complete.")
