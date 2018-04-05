@@ -71,7 +71,7 @@ class GIPSParser(argparse.ArgumentParser):
     def add_inventory_parser(self, site_required=False):
         """This adds a parser with inventory options.
 
-        Note that arguments intended to modify fetching can't be hashable; see
+        Note that arguments intended to modify fetching must be hashable; see
         DataInventory.__init__ for details.
         """
         if self.datasources:

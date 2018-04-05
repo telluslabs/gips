@@ -24,6 +24,7 @@ STD_ARGS = {
     'sentinel2': ('sentinel2', '-s', util.DURHAM_SHP_PATH, '-d2017-183', '-v4'),
     'sar': ('sar', '-t', 'N07E099', 'N19E100', 'N00E099', '-d2009,2015', '-v4'),
     'modisndti': ('modis', '-s', nh_shp, '-d', '2012-336', '-v', '4', '-p', 'ndti'),
+    'daymet' : ('daymet', '-d', '1993-1-18', '-s', util.DURHAM_SHP_PATH),
 }
 
 class CannotFetch(Exception):
