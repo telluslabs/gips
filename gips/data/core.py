@@ -355,7 +355,9 @@ class Asset(object):
     def extract(self, filenames=tuple(), path=None):
         """Extract given files from asset (if it's a tar or zip).
 
-        Extracted files are placed in the same dir as the asset file.
+        Extracted files are placed in the same dir as the asset file.  Returns
+        a list of extracted files, plus any files that were not extracted due
+        to prior existence.
         """
         if tarfile.is_tarfile(self.filename):
             open_file = tarfile.open(self.filename)
@@ -367,17 +369,33 @@ class Asset(object):
             path = os.path.dirname(self.filename)
         if len(filenames) == 0:
             filenames = self.datafiles()
-        extracted_files = []
-        for f in filenames:
-            fname = os.path.join(path, f)
-            if not os.path.exists(fname):
+        extracted_fnames, extant_fnames = [], []
+
+        with utils.make_temp_dir(prefix='extract', dir=path) as tmp_dn:
+            utils.verbose_out("Extracting files from {} to {}".format(
+                self.filename, tmp_dn), 3)
+            for f in filenames:
+                final_fname = os.path.join(path, f)
+                if os.path.exists(final_fname):
+                    utils.verbose_out(f + ' exists, not extracting', 3)
+                    extant_fnames.append(final_fname)
+                    continue
                 utils.verbose_out("Extracting " + f, 3)
-                open_file.extract(f, path)
+                open_file.extract(f, tmp_dn)
+                tmp_fname = os.path.join(tmp_dn, f)
                 # this ensures we have permissions on extracted files
-                if not os.path.isdir(fname):
-                    os.chmod(fname, 0664)
-            extracted_files.append(fname)
-        return extracted_files
+                if not os.path.isdir(tmp_fname):
+                    os.chmod(tmp_fname, 0664)
+                extracted_fnames.append((tmp_fname, final_fname))
+            utils.verbose_out(
+                "Moving files from {} to {}".format(tmp_dn, path), 3)
+            for (tfn, ffn) in extracted_fnames:
+                dir_name = os.path.dirname(ffn)
+                if not os.path.exists(dir_name):
+                    os.makedirs(dir_name)
+                os.rename(tfn, ffn)
+
+        return extant_fnames + [ffn for (_, ffn) in extracted_fnames]
 
     ##########################################################################
     # Class methods
