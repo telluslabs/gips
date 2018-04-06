@@ -377,6 +377,7 @@ class Asset(object):
             for f in filenames:
                 final_fname = os.path.join(path, f)
                 if os.path.exists(final_fname):
+                    utils.verbose_out(f + ' exists, not extracting', 3)
                     extant_fnames.append(final_fname)
                     continue
                 utils.verbose_out("Extracting " + f, 3)
