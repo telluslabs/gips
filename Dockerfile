@@ -49,4 +49,5 @@ RUN apt-get -y purge \
     && apt-get -y autoclean
 
 VOLUME /archive
+VOLUME /gips
 WORKDIR /gips
