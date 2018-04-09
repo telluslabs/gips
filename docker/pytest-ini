@@ -1,0 +1,17 @@
+[pytest]
+# these will save time/prevent certain errors
+testpaths = gips/test
+norecursedirs = .venv data-root
+# GIPS' configured data repository:
+data-repo = /archive
+# a directory of your choice, used for output from, e.g., gips_project
+output-dir = /tmp/gips-testout
+# These should remain as they are (placing them in a committed file is a TODO):
+python_functions =  t_
+python_classes =    T_
+python_files =      t_*.py
+DJANGO_SETTINGS_MODULE=gips.inventory.orm.settings
+
+# config for artifact store
+artifact-store-host     = agsftp.ags.io
+artifact-store-path     = gipsftp/gips-sys-test-assets
