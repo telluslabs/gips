@@ -2,6 +2,7 @@ import datetime
 
 from gips.data.aod import aod
 
+# TODO revise
 def t_aodAsset_query_service_success_case(mocker):
     """Confirm aodAsset.query_service successfully reports a found asset."""
     m_ftp_obj = mocker.patch.object(aod.aodAsset, 'ftp_connect').return_value
@@ -10,7 +11,7 @@ def t_aodAsset_query_service_success_case(mocker):
                                        datetime.date(2015, 1, 1))
     assert {'basename': 'MOD08_D3-oh-hai.hdf'} == actual
 
-
+# TODO revise
 def t_aodAsset_fetch_success_case(mocker, mpo):
     """Mock I/O & confirm correct behavior by inspecting calls & output."""
     test_bn = 'test-base-name'
