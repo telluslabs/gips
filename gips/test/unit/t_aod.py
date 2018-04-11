@@ -2,26 +2,33 @@ import datetime
 
 from gips.data.aod import aod
 
-# TODO revise
-def t_aodAsset_query_service_success_case(mocker):
-    """Confirm aodAsset.query_service successfully reports a found asset."""
-    m_ftp_obj = mocker.patch.object(aod.aodAsset, 'ftp_connect').return_value
-    m_ftp_obj.nlst.return_value = ['MOD08_D3-oh-hai.hdf', 'MOD99-no-match.pdf']
-    actual = aod.aodAsset.query_service('MOD08', 'dontcare',
-                                       datetime.date(2015, 1, 1))
-    assert {'basename': 'MOD08_D3-oh-hai.hdf'} == actual
+# taken from https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/6/MOD08_D3/2017/145.json
+test_basename = 'MOD08_D3.A2017145.006.2017151134051.hdf'
+test_url = ('https://ladsweb.modaps.eosdis.nasa.gov/'
+            'archive/allData/6/MOD08_D3/2015/001/'
+            'MOD08_D3.A2017145.006.2017151134051.hdf')
 
-# TODO revise
-def t_aodAsset_fetch_success_case(mocker, mpo):
+def t_aodAsset_query_provider_success_case(mocker, mpo):
+    """Confirm aodAsset.query_service successfully reports a found asset."""
+    mpo(aod, 'requests').get.return_value.json.return_value = [{
+        u'name': u'MOD08_D3.A2017145.006.2017151134051.hdf'}]
+    actual_bn, actual_url = aod.aodAsset.query_provider(
+        'MOD08', 'dontcare', datetime.date(2015, 1, 1))
+    assert (test_basename, test_url) == (actual_bn, actual_url)
+
+def t_aodAsset_fetch_success_case(mocker, mpo, mock_context_manager):
     """Mock I/O & confirm correct behavior by inspecting calls & output."""
-    test_bn = 'test-base-name'
-    mpo(aod.aodAsset, 'query_service').return_value = {'basename': test_bn}
+    # technically make_temp_dir should be mocked, but it's harmless
+    mpo(aod.aodAsset, 'query_service').return_value = {
+        'basename': test_basename, 'url': test_url}
+    # should usually work regardless of gips config:
     mpo(aod.aodRepository, 'get_setting').return_value = 'fake-stage'
-    m_ftp_connect = mpo(aod.aodAsset, 'ftp_connect')
-    m_open = mpo(aod, 'open')
+    m_get = mpo(aod, 'requests').get
+    mpo(aod.os, 'rename')
+    mpo(aod, 'open')
+    mock_context_manager(aod.utils, 'make_temp_dir', 'fake-temp-dir')
 
     actual = aod.aodAsset.fetch('MOD08', 'h01v01', datetime.date(2015, 1, 1))
 
-    assert (mocker.call('MOD08', datetime.date(2015, 1, 1))
-                == m_ftp_connect.call_args
-            and ['fake-stage/stage/test-base-name'] == actual)
+    assert (mocker.call(test_url, stream=True) == m_get.call_args
+            and ['fake-stage/stage/' + test_basename] == actual)
