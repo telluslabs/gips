@@ -13,5 +13,4 @@ python_files =      t_*.py
 DJANGO_SETTINGS_MODULE=gips.inventory.orm.settings
 
 # config for artifact store
-artifact-store-host     = agsftp.ags.io
-artifact-store-path     = gipsftp/gips-sys-test-assets
+artifact-store-path = /artifact-store

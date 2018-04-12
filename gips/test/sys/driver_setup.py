@@ -35,6 +35,11 @@ def setup_repo_data(driver):
     if driver in setup_attempted or not pytest.config.getoption('setup_repo'):
         return
 
+    as_path = pytest.config.getini('artifact-store-path')
+
+    das_path = os.path.join(as_path, driver) # technically should be der_path
+
+    '''ftp method, not currently in use
     username, password, host, path = [pytest.config.getini(ini) for ini in (
         'artifact-store-user', 'artifact-store-password',
         'artifact-store-host', 'artifact-store-path')]
@@ -49,18 +54,26 @@ def setup_repo_data(driver):
     ftps.prot_p()
     ftps.cwd(path + '/' + driver)
     remote_files = ftps.nlst()
+    '''
+
+    remote_files = os.listdir(das_path)
+
     local_files = [os.path.basename(fp) for fp in
         glob.glob(os.path.join(
             pytest.config.getini('data-repo'), driver, 'tiles', '*/*/*'))]
+
     if set(remote_files).issubset(set(local_files)):
         print(driver, 'asset files already present; no setup needed')
         return
 
-    print('Installing', driver, 'assets from', sanitized_uh)
+    #print('Installing', driver, 'assets from', sanitized_uh)
+    print('Installing', driver, 'assets from', das_path)
     try:
         temp_dir = tempfile.mkdtemp()
         with sh.pushd(temp_dir):
-            sh.wget('--recursive', '--no-directories', url_head)
+            #sh.wget('--recursive', '--no-directories', url_head)
+            for fn in remote_files:
+                shutil.copy(os.path.join(das_path, fn), temp_dir)
             sh.gips_archive(driver)
     finally:
         shutil.rmtree(temp_dir)

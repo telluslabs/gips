@@ -31,11 +31,12 @@ RUN cd /gips \
 
 COPY docker/pytest-ini /gips/pytest.ini
 
-RUN echo "# set in the dockerfile" >>/gips/pytest.ini
-ARG AGSFTPUSERNAME=unset
-RUN echo "artifact-store-user = $AGSFTPUSERNAME" >>/gips/pytest.ini
-ARG AGSFTPPASSWORD=unset
-RUN echo "artifact-store-password = $AGSFTPPASSWORD" >>/gips/pytest.ini
+# defunct ftp fetch
+#RUN echo "# set in the dockerfile" >>/gips/pytest.ini
+#ARG AGSFTPUSERNAME=unset
+#RUN echo "artifact-store-user = $AGSFTPUSERNAME" >>/gips/pytest.ini
+#ARG AGSFTPPASSWORD=unset
+#RUN echo "artifact-store-password = $AGSFTPPASSWORD" >>/gips/pytest.ini
 
 USER gips
 WORKDIR /gips
