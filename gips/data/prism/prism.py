@@ -150,7 +150,7 @@ class prismAsset(Asset):
         assert bilzip == 'bil.zip', "didn't tokenize properly."
         scale = re.sub(r'(.+)D[0-9]+', r'\1', scalever)
         version = re.sub(r'.+(D[0-9]+)', r'\1', scalever)
-        self.date = datetime.strptime(date, '%Y%m%d')
+        self.date = datetime.strptime(date, '%Y%m%d').date()
         self.asset = '_' + variable
         self.sensor = 'prism'
         self.scale = scale

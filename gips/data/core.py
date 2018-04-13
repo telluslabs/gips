@@ -617,6 +617,7 @@ class Asset(object):
                 overwritten_assets.append(overwritten_ao)
             if link_count >= 0:
                 if not keep:
+                    # user wants to remove the original hardlink to the file
                     RemoveFiles([f], ['.index', '.aux.xml'])
             if link_count > 0:
                 numfiles = numfiles + 1
@@ -697,7 +698,7 @@ class Asset(object):
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
                         errmsg = 'Unable to remove existing version: ' + ef.filename
                         with utils.error_handler(errmsg):
-                            os.remove(ef.filename)
+                            RemoveFiles([ef.filename], ['.index', '.aux.xml'])
                     with utils.error_handler('Problem adding {} to archive'.format(filename)):
                         os.link(os.path.abspath(filename), newfilename)
                         asset.archived_filename = newfilename
@@ -991,7 +992,8 @@ class Data(object):
                 else:
                     date = datetime.strptime(parts[0 + offset], datedir).date()
                     if date != self.date:
-                        raise Exception('Mismatched dates: %s' % ' '.join(filenames))
+                        raise IOError('Mismatched dates: '
+                            'Expected {} but got {}'.format(self.date, date))
                 sensor = parts[1 + offset]
                 product = parts[2 + offset]
                 self.AddFile(sensor, product, f, add_to_db=False)
