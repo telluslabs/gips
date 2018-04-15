@@ -1153,15 +1153,15 @@ expectations['sentinel2'] = {
            'Center      (  343657.171, 4778186.481) ( 70d55\'20.91"W, 43d 8\'25.00"N)',
            'Band 1 Block=41x34 Type=Int16, ColorInterp=Gray',
            '  Description = crcm',
-           '  Minimum=-5889.000, Maximum=8617.000, Mean=4747.723, StdDev=1962.618',
+           '  Minimum=-6140.000, Maximum=7772.000, Mean=4096.808, StdDev=1860.358',
            '  NoData Value=-32768',
            '  Unit Type: other',
            '  Offset: 0,   Scale:0.0001',
            '  Metadata:',
-           '    STATISTICS_MAXIMUM=8617',
-           '    STATISTICS_MEAN=4747.72277227',
-           '    STATISTICS_MINIMUM=-5889',
-           '    STATISTICS_STDDEV=1962.61761732'])],
+           '    STATISTICS_MAXIMUM=7772',
+           '    STATISTICS_MEAN=4096.80763790',
+           '    STATISTICS_MINIMUM=-6140',
+           '    STATISTICS_STDDEV=1860.35763920'])],
 }
 
 mark_spec['landsat'] = util.slow
