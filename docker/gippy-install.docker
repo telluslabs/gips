@@ -25,7 +25,7 @@ RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
     mg \
     && ln -s  /usr/bin/mg /usr/bin/emacs \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install -U pip setuptools wheel \
+    && pip install -U pip==9.0.3 setuptools wheel \
     && pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy \
     && apt-get -y purge \
        gfortran \
