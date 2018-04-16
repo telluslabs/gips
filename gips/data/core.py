@@ -528,7 +528,10 @@ class Asset(object):
         """
         if not cls.available(asset, date):
             return None
+        utils.verbose_out('querying ATD {} {} {}'.format(asset, tile, date), 5)
         bn, url = cls.query_provider(asset, tile, date, **fetch_kwargs)
+        utils.verbose_out('queried ATD {} {} {}, found {} at {}'.format(
+                          asset, tile, date, bn, url), 5)
         if (bn, url) == (None, None):
             return None
         return {'basename': bn, 'url': url}
