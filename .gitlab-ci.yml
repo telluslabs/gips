@@ -16,8 +16,6 @@ make_image:
       #--build-arg AGSFTPPASSWORD=$AGSFTPPASSWORD
   tags:
     - gipsdev
-  after_script:
-   - docker system prune -f
 
 
 run_tests:
@@ -28,10 +26,13 @@ run_tests:
       --mount type=bind,source=/net/cluster/projects/gips-sys-test-assets/,destination=/artifact-store
       gips_test_$CI_COMMIT_REF_SLUG 
       pytest -vv --setup-repo --slow --sys -s -m lite
+    - docker image rm gips_test_$CI_COMMIT_REF_SLUG
   tags:
     - gipsdev
   after_script:
-    - docker image rm gips_test_$CI_COMMIT_REF_SLUG
-    - docker system prune -f
-
+    - test "$(docker image ls -q gips_test_$CI_COMMIT_REF_SLUG)" &&
+      echo "Image wasn't removed by script -- trying again" &&
+      docker image rm gips_test_$CI_COMMIT_REF_SLUG
+    - test "$(docker image ls -q gips_test_$CI_COMMIT_REF_SLUG)" &&
+      echo "cannot remove image"
 
