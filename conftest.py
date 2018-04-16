@@ -75,12 +75,15 @@ def pytest_addoption(parser):
     parser.addini('output-dir',
                   help="The directory housing output files from test runs.")
 
-    parser.addini('artifact-store-user', help="FTP artifact store username")
-    parser.addini('artifact-store-password',
-                  help="FTP artifact store password")
-    parser.addini('artifact-store-host', help="FTP artifact store hostname")
+    # old bits for ftp access
+    #parser.addini('artifact-store-user', help="FTP artifact store username")
+    #parser.addini('artifact-store-password',
+    #              help="FTP artifact store password")
+    #parser.addini('artifact-store-host', help="FTP artifact store hostname")
+
+    # local file store
     parser.addini('artifact-store-path',
-                  help="FTP artifact store root path; files are presumed to be"
+                  help="artifact store root path; files are presumed to be"
                        " stored driver-wise beneath this level,"
                        " eg path/sar/asset.tgz")
 

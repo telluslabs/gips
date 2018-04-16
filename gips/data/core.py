@@ -528,7 +528,10 @@ class Asset(object):
         """
         if not cls.available(asset, date):
             return None
+        utils.verbose_out('querying ATD {} {} {}'.format(asset, tile, date), 5)
         bn, url = cls.query_provider(asset, tile, date, **fetch_kwargs)
+        utils.verbose_out('queried ATD {} {} {}, found {} at {}'.format(
+                          asset, tile, date, bn, url), 5)
         if (bn, url) == (None, None):
             return None
         return {'basename': bn, 'url': url}
@@ -617,6 +620,7 @@ class Asset(object):
                 overwritten_assets.append(overwritten_ao)
             if link_count >= 0:
                 if not keep:
+                    # user wants to remove the original hardlink to the file
                     RemoveFiles([f], ['.index', '.aux.xml'])
             if link_count > 0:
                 numfiles = numfiles + 1
@@ -697,7 +701,7 @@ class Asset(object):
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
                         errmsg = 'Unable to remove existing version: ' + ef.filename
                         with utils.error_handler(errmsg):
-                            os.remove(ef.filename)
+                            RemoveFiles([ef.filename], ['.index', '.aux.xml'])
                     with utils.error_handler('Problem adding {} to archive'.format(filename)):
                         os.link(os.path.abspath(filename), newfilename)
                         asset.archived_filename = newfilename
@@ -991,7 +995,8 @@ class Data(object):
                 else:
                     date = datetime.strptime(parts[0 + offset], datedir).date()
                     if date != self.date:
-                        raise Exception('Mismatched dates: %s' % ' '.join(filenames))
+                        raise IOError('Mismatched dates: '
+                            'Expected {} but got {}'.format(self.date, date))
                 sensor = parts[1 + offset]
                 product = parts[2 + offset]
                 self.AddFile(sensor, product, f, add_to_db=False)

@@ -118,6 +118,7 @@ def remove_files(filenames, extensions=()):
     for f in (list(filenames) + [f + e for f in filenames for e in extensions]):
         with error_handler(continuable=True, msg_prefix="Error removing '{}'".format(f)):
             if os.path.isfile(f):
+                verbose_out('Removing ' + f, 5)
                 os.remove(f)
 
 RemoveFiles = remove_files # RemoveFiles name is deprecated

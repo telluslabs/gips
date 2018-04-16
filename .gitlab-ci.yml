@@ -2,15 +2,18 @@ make_image:
   stage: build
   script:
     - apt-get update && apt-get -y install wget git
-    - wget -O sixs ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/sixs
-    - wget -O gitlab_ci ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gitlab_ci
-    - wget -O gips_creds.sh.enc ftp://$AGSFTPCREDS@agsftp.ags.io/gipsftp/gips_creds.sh.enc
+    - wget -O sixs ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/sixs
+    - wget -O gitlab_ci ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gitlab_ci
+    - wget -O gips_creds.sh.enc ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gips_creds.sh.enc
     - git checkout $CI_COMMIT_REF_NAME
     - docker build -t gippy-0.3.x -f docker/gippy-install.docker docker
     - docker build --no-cache
       --build-arg GIPS_UID=$(id -u)
       -t gips_test_$CI_COMMIT_REF_SLUG
       -f docker/gips-ci.docker .
+      # defunct ftp artifact version
+      #--build-arg AGSFTPUSERNAME=$AGSFTPUSERNAME
+      #--build-arg AGSFTPPASSWORD=$AGSFTPPASSWORD
   tags:
     - gipsdev
   after_script:
@@ -21,9 +24,10 @@ run_tests:
   stage: test
   script:
     - docker run --rm gips_test_$CI_COMMIT_REF_SLUG pytest -vv -s -k unit # TODO both int & unit
-    - docker run --rm -e GIPS_OVERRIDE_VERSION=0.8.2
+    - docker run --dns=10.0.0.8 --rm -e GIPS_OVERRIDE_VERSION=0.8.2
+      --mount type=bind,source=/net/cluster/projects/gips-sys-test-assets/,destination=/artifact-store
       gips_test_$CI_COMMIT_REF_SLUG
-      pytest -vv --setup-repo --slow --sys -s -k '(sentinel2 and t_project)'
+      pytest -vv --setup-repo --slow --sys -s -m lite
   tags:
     - gipsdev
   after_script:
