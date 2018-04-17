@@ -45,3 +45,39 @@ def t_cdlData_legend(mocker):
     assert d.legend() == expected_legend and \
         d.get_code('class1') == 0 and \
         d.get_cropname(0) == 'class1'
+
+def t_cdlAsset_query_service_success_case(mocker):
+    """Confirm aodAsset.query_service successfully reports a found asset."""
+    fake_tile = 'fake-tile'
+    mocker.patch.object(cdl.utils, 'open_vector').return_value = {
+        'fake-tile': {'STATE_FIPS': 'hi mom!'}}
+    mocker.patch.object(cdl.requests, 'get').return_value.status_code = 200
+    expected_url = 'http://www.fluffy-bunnies-and-rainbows.mil/'
+    m_root = mocker.patch.object(cdl.ElementTree, 'fromstring').return_value
+    m_root.find.return_value.text = expected_url
+
+    actual = cdl.cdlAsset.query_service('cdl', fake_tile,
+                                        datetime.date(2015, 01, 01))
+    assert {'basename': 'fake-tile_2015_cdl_cdl.tif',
+            'url': expected_url} == actual
+
+def t_cdlAsset_fetch_success_case(mocker, mpo, mock_context_manager):
+    """Confirm good behavior through inspecting calls to mocked I/O APIs."""
+    test_url = 'http://himom.com/'
+    mpo(cdl.cdlAsset, 'query_service').return_value = {'url': test_url}
+    m_requests_get = mpo(cdl, 'requests').get
+    m_file_response = m_requests_get()
+    mock_context_manager(cdl.utils, 'make_temp_dir', 'fake-temp-dir')
+    m_open = mpo(cdl, 'open')
+    m_GeoImage = mpo(cdl, 'GeoImage')
+    m_shutil_copy = mpo(cdl.shutil, 'copy')
+    mpo(cdl.cdlRepository, 'get_setting').return_value = 'fake-stage'
+
+    cdl.cdlAsset.fetch('cdl', 'NH', datetime.date(2016, 1, 1))
+
+    expected_open_call = mocker.call('fake-temp-dir/NH_2016_cdl_cdl.tif', 'w')
+    expected_copy_call = mocker.call('fake-temp-dir/NH_2016_cdl_cdl.tif',
+                                     'fake-stage/stage')
+    assert (test_url == m_requests_get.call_args[0][0]
+            and expected_open_call == m_open.call_args
+            and expected_copy_call == m_shutil_copy.call_args)

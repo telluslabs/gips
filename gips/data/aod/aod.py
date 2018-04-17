@@ -26,8 +26,10 @@ import glob
 import traceback
 import re
 
+from backports.functools_lru_cache import lru_cache
 import gdal
 import numpy
+import requests
 
 import gippy
 from gips.data.core import Repository, Asset, Data
@@ -86,8 +88,8 @@ class aodAsset(Asset):
         'MOD08': {
             'pattern': r'^MOD08_D3.+?hdf$',
             'startdate': datetime.date(2000, 2, 18),
-            'path': '/allData/6/MOD08_D3',
-            'latency': -7,
+            'latency': 7,
+            'url': 'https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/6/MOD08_D3/',
         },
         #'MYD08': {
         #    'pattern': 'MYD08_D3*hdf',
@@ -134,40 +136,45 @@ class aodAsset(Asset):
         return datafiles
 
     @classmethod
-    def ftp_connect(cls, asset, date):
-        """As super, but make the working dir out of (asset, date)."""
-        wd = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%j'))
-        return super(aodAsset, cls).ftp_connect(wd)
-
-    @classmethod
     def query_provider(cls, asset, tile, date):
-        """Query the data provider for files matching the arguments.
-
-        Returns (filename, url), or (None, None) if nothing found.
-        """
-        utils.verbose_out('{}: query tile {} for {}'.format(asset, tile, date), 3)
+        """Find out from the NASA servers what AOD assets are available."""
         if asset not in cls._assets:
             raise ValueError('{} has no defined asset for {}'.format(cls.Repository.name, asset))
         with utils.error_handler("Error querying " + cls._host, continuable=True):
-            ftp = cls.ftp_connect(asset, date)
-            filenames = [fn for fn in ftp.nlst('*')
-                         if re.match(cls._assets[asset]['pattern'], fn)]
-            ftp.quit()
-            if len(filenames) > 1: # 0 assets happens all the time
-                raise ValueError("Expected one asset, found {}".format(len(filenames)))
-            return filenames[0], None # urls are not relevant for ftp
+            # example full json query URL:
+            # https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/6/MOD08_D3/2017/145.json
+            url_head = cls._assets[asset]['url'] + date.strftime('%Y/%j')
+            query_url = url_head + '.json'
+            utils.verbose_out('Downloading ' + query_url, 5)
+            resp = requests.get(query_url)
+            resp.raise_for_status() # some errors don't raise otherwise
+            found_assets = resp.json()
+            if len(found_assets) != 1:
+                raise ValueError('Expected one {} asset, found {}'.format(
+                    asset, len(resp)))
+            filename = str(found_assets[0]['name']) # str() to prevent unicode
+            return filename, url_head + '/' + filename
         return None, None
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        """ Fetch stub """
-        fname, _ = cls.query_provider(asset, tile, date)
-        if fname is None:
+        """Fetch the AOD asset matching the ATD."""
+        query_rv = cls.query_service(asset, tile, date)
+        if query_rv is None:
             return []
-        stage_fp = os.path.join(cls.Repository.path('stage'), fname)
-        ftp = cls.ftp_connect(asset, date)
-        ftp.retrbinary('RETR ' + fname, open(stage_fp, "wb").write)
-        ftp.quit()
+        bn, url = query_rv['basename'], query_rv['url']
+        stage_dn = cls.Repository.path('stage')
+        stage_fp = os.path.join(stage_dn, bn)
+        with utils.make_temp_dir(prefix='fetch', dir=stage_dn) as tmp_dn:
+            tmp_fp = os.path.join(tmp_dn, bn)
+            utils.verbose_out('Fetching from {}, saving in {}'.format(
+                url, tmp_fp), 5)
+            resp = requests.get(url, stream=True)
+            resp.raise_for_status()
+            with open(tmp_fp, 'w') as tmp_fo:
+                for chunk in resp.iter_content(chunk_size=(1024**2)):
+                    tmp_fo.write(chunk)
+            os.rename(tmp_fp, stage_fp)
         return [stage_fp]
 
     #@classmethod

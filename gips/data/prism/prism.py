@@ -99,20 +99,17 @@ class prismAsset(Asset):
         return super(prismAsset, cls).ftp_connect(wd)
 
     @classmethod
-    def query_provider(cls, asset, tile, date, conn=None):
+    def query_provider(cls, asset, tile, date):
         """Determine availability of data for the given (asset, tile, date).
 
         Re-use the given ftp connection if possible; Returns (basename,
         None) on success; (None, None) otherwise."""
         if asset not in cls._assets:
             raise ValueError('{} has no defined asset for {}'.format(cls.Repository.name, asset))
-        private_conn = conn is None # do we have a shared connection?
-        if private_conn:
-            conn = cls.ftp_connect(asset, date)
+        conn = cls.ftp_connect(asset, date)
         # get the list of filenames for the year, filter down to the specific date
         filenames = [fn for fn in conn.nlst() if date.strftime('%Y%m%d') in fn]
-        if private_conn:
-            conn.quit()
+        conn.quit()
         if 0 == len(filenames):
             return None, None
         # choose the one that has the most favorable stability & version values (usually only one)
@@ -126,19 +123,12 @@ class prismAsset(Asset):
         Returns a list with one item, the full path to the staged asset.
         """
         utils.verbose_out('%s: fetch tile %s for %s' % (asset, tile, date), 3)
-        msg = "Error downloading from " + cls._host
-        with utils.error_handler(msg, continuable=True):
+        qs_rv = cls.query_service(asset, tile, date)
+        if qs_rv is None:
+            return []
+        asset_fn = qs_rv['basename']
+        with utils.error_handler("Error downloading from " + cls._host, continuable=True):
             ftp = cls.ftp_connect(asset, date) # starts chdir'd to the right directory
-            asset_fn, _ = cls.query_provider(asset, tile, date, ftp)
-            remote_asset = cls(asset_fn)
-            existing_assets = cls.discover(tile, date, asset)
-            is_updated = [exa.updated(remote_asset) for exa in existing_assets]
-            if not any(is_updated):
-                utils.verbose_out("We have the newest version: {}"
-                                  .format(remote_asset.version_text()))
-                ftp.quit()
-                return []
-
             stage_dir_fp = cls.Repository.path('stage')
             stage_fp = os.path.join(stage_dir_fp, asset_fn)
             with utils.make_temp_dir(prefix='fetchtmp', dir=stage_dir_fp) as td_name:
@@ -160,7 +150,7 @@ class prismAsset(Asset):
         assert bilzip == 'bil.zip', "didn't tokenize properly."
         scale = re.sub(r'(.+)D[0-9]+', r'\1', scalever)
         version = re.sub(r'.+(D[0-9]+)', r'\1', scalever)
-        self.date = datetime.strptime(date, '%Y%m%d')
+        self.date = datetime.strptime(date, '%Y%m%d').date()
         self.asset = '_' + variable
         self.sensor = 'prism'
         self.scale = scale

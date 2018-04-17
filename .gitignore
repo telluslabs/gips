@@ -1,8 +1,6 @@
 *.pyc
 *~
 gips/settings.py
-Oceancolor
-oceancolor*
 epydoc
 \#*
 .\#*
@@ -11,3 +9,10 @@ build
 dist
 gips.egg-info
 pytest.ini
+.cache
+.coverage
+*venv
+aod.composites.tar.gz
+gips_creds.sh.enc
+ortho
+sixs

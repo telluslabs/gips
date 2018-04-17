@@ -73,7 +73,8 @@ def main():
 
         if args.rectify:
             if not orm.use_orm():
-                raise ValueError("--rectify can only be used if GIPS_ORM=true.")
+                raise ValueError("--rectify can only be used if"
+                                 " GIPS_ORM = True.")
             for k, v in vars(args).items():
                 # Let the user know not to expect other options to effect rectify
                 if v and k not in ('rectify', 'verbose', 'command'):

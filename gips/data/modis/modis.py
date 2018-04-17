@@ -56,14 +56,8 @@ class modisRepository(Repository):
     # NASA assets require special authentication
     _manager_url = "https://urs.earthdata.nasa.gov"
 
-    @classmethod
-    def feature2tile(cls, feature):
-        """ convert tile field attributes to tile identifier """
-        fldindex_h = feature.GetFieldIndex("h")
-        fldindex_v = feature.GetFieldIndex("v")
-        h = str(int(feature.GetField(fldindex_h))).zfill(2)
-        v = str(int(feature.GetField(fldindex_v))).zfill(2)
-        return "h%sv%s" % (h, v)
+    # the default tile ID
+    _tile_attribute = "tileid"
 
 
 class modisAsset(Asset):
@@ -82,77 +76,78 @@ class modisAsset(Asset):
     _asset_re_tail = '\.A.{7}\.h.{2}v.{2}\..{3}\..{13}\.hdf$'
 
     _assets = {
+        #Band info:  https://modis.gsfc.nasa.gov/about/specifications.php
         'MCD43A4': {
             'pattern': '^MCD43A4' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': -15
+            'latency': 15,
         },
         'MCD43A2': {
             'pattern': '^MCD43A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': -15
+            'latency': 15,
         },
         'MOD09Q1': {
             'pattern': '^MOD09Q1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': -7,
+            'latency': 7,
         },
         'MOD10A1': {
             'pattern': '^MOD10A1' + _asset_re_tail,
-            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A1.005',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A1.006',
             'startdate': datetime.date(2000, 2, 24),
-            'latency': -3
+            'latency': 3,
         },
         'MYD10A1': {
             'pattern': '^MYD10A1' + _asset_re_tail,
-            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A1.005',
+            'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A1.006',
             'startdate': datetime.date(2002, 7, 4),
-            'latency': -3
+            'latency': 3,
         },
         'MOD11A1': {
             'pattern': '^MOD11A1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A1.006',
             'startdate': datetime.date(2000, 3, 5),
-            'latency': -1
+            'latency': 1,
         },
         'MYD11A1': {
             'pattern': '^MYD11A1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A1.006',
             'startdate': datetime.date(2002, 7, 8),
-            'latency': -1
+            'latency': 1,
         },
         'MOD11A2': {
             'pattern': '^MOD11A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.006',
             'startdate': datetime.date(2000, 3, 5),
-            'latency': -7
+            'latency': 7,
         },
         'MYD11A2': {
             'pattern': '^MYD11A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLA/MYD11A2.006',
             'startdate': datetime.date(2002, 7, 4),
-            'latency': -7
+            'latency': 7,
         },
         'MOD10A2': {
             'pattern': '^MOD10A2' + _asset_re_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOST/MOD10A2.006',
             'startdate': datetime.date(2000, 2, 24),
-            'latency': -3
+            'latency': 3,
         },
         'MYD10A2': {
             'pattern': '^MYD10A2' + _asset_re_tail,
             'url': 'https://n5eil01u.ecs.nsidc.org/MOSA/MYD10A2.006',
             'startdate': datetime.date(2002, 7, 4),
-            'latency': -3
+            'latency': 3,
         },
         'MCD12Q1': {
             'pattern': '^MCD12Q1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
             'startdate': datetime.date(2002, 7, 4),
-            'latency': -3
+            'latency': 3,
         },
 
     }
@@ -176,23 +171,23 @@ class modisAsset(Asset):
         self.date = datetime.datetime.strptime(year + doy, "%Y%j").date()
 
         collection = int(parts[3])
-        file_version = int(parts[4])
+        file_version = int(parts[4]) # datetimestamp near end of the filename
         self._version = float('{}.{}'.format(collection, file_version))
 
 
     @classmethod
-    def query_service(cls, asset, tile, date):
+    def query_provider(cls, asset, tile, date):
         """Find out from the modis servers what assets are available.
 
         Uses the given (asset, tile, date) tuple as a search key, and
-        returns a list of dicts:  {'basename': base-filename, 'url': url}
+        returns a tuple:  base-filename, url
         """
         year, month, day = date.timetuple()[:3]
 
         if asset == "MCD12Q1" and (month, day) != (1, 1):
             utils.verbose_out("Cannot fetch MCD12Q1:  Land cover data"
                               " are only available for Jan. 1", 1, stream=sys.stderr)
-            return []
+            return None, None
 
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (
@@ -207,9 +202,8 @@ class modisAsset(Asset):
         with utils.error_handler(err_msg):
             response = cls.Repository.managed_request(mainurl, verbosity=2)
             if response is None:
-                return []
+                return None, None
 
-        available = []
         for item in response.readlines():
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
@@ -219,36 +213,54 @@ class modisAsset(Asset):
                     continue
                 basename = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', basename])
-                available.append({'basename': basename, 'url': url})
-
-        if len(available) == 0:
-            err_msg = 'Unable to find remote match for {} at {}'.format(pattern, mainurl)
-            utils.verbose_out(err_msg, 4)
-        return available
-
+                return basename, url
+        utils.verbose_out('Unable to find remote match for '
+                          '{} at {}'.format(pattern, mainurl), 4)
+        return None, None
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        available_assets = cls.query_service(asset, tile, date)
-        retrieved_filenames = []
-        # TODO does modis ever have more than one asset per (a,t,d)?  If not, unloop this method.
-        for asset_info in available_assets:
-            basename = asset_info['basename']
-            url = asset_info['url']
+        qs_rv = cls.query_service(asset, tile, date)
+        if qs_rv is None:
+            return []
+        basename, url = qs_rv['basename'], qs_rv['url']
+        with utils.error_handler(
+                "Asset fetch error ({})".format(url), continuable=True):
+            response = cls.Repository.managed_request(url)
+            if response is None:
+                return []
             outpath = os.path.join(cls.Repository.path('stage'), basename)
+            with open(outpath, 'wb') as fd:
+                fd.write(response.read())
+            utils.verbose_out('Retrieved ' + basename, 2)
+            return [outpath]
+        return []
 
-            with utils.error_handler(
-                    "Asset fetch error ({})".format(asset_info), continuable=True):
-                response = cls.Repository.managed_request(url)
-                if response is None:
-                    return retrieved_filenames # give up now as the rest
-                with open(outpath, 'wb') as fd:
-                    fd.write(response.read())
+# index product types and descriptions
+_index_products = [
+    # duplicated in sentinel2 and landsat; may be worth it to DRY out
+    ('ndvi',   'Normalized Difference Vegetation Index'),
+    ('evi',    'Enhanced Vegetation Index'),
+    ('lswi',   'Land Surface Water Index'),
+    ('ndsi',   'Normalized Difference Snow Index'),
+    ('bi',     'Brightness Index'),
+    ('satvi',  'Soil-Adjusted Total Vegetation Index'),
+    ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
+    ('vari',   'Visible Atmospherically Resistant Index'),
+    ('brgt',   'VIS and NIR reflectance, weighted by'
+               'solar energy distribution.'),
+    ('ndti',   'Normalized Difference Tillage Index'),
+    ('crc',    'Crop Residue Cover (uses BLUE)'),
+    ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
+    ('isti',   'Inverse Standard Tillage Index'),
+    ('sti',    'Standard Tillage Index'),
+]
 
-                utils.verbose_out('Retrieved %s' % basename, 2)
-                retrieved_filenames.append(outpath)
-
-        return retrieved_filenames
+_index_product_entries = {
+    pt: {'bands': [pt], 'description': descr,
+         'assets': ['MCD43A4'], 'sensor': 'MCD',
+         'startdate': datetime.date(2000, 2, 18), 'latency': 15}
+    for pt, descr in _index_products}
 
 
 class modisData(Data):
@@ -258,18 +270,22 @@ class modisData(Data):
     Asset = modisAsset
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
-        "Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
+        #"Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],
+        "Terra/Aqua Daily": ['temp', 'obstime'],
         "Terra 8-day": ['ndvi8', 'temp8tn', 'temp8td'],
+        "Index": [pt for (pt, _) in _index_products],
     }
-    _products = {
+
+    _products = { # note indices products are added in below
         # MCD Products
         'indices': {
-            'description': 'Land indices',
+            'description': 'Land indices (deprecated,'
+                           ' see indices product group)',
             'assets': ['MCD43A4'],
             'sensor': 'MCD',
             'bands': ['ndvi', 'lswi', 'vari', 'brgt', 'satvi', 'evi'],
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15
+            'latency': 15,
         },
         'quality': {
             'description': 'MCD Product Quality',
@@ -288,22 +304,23 @@ class modisData(Data):
             'latency': 3
         },
         # Daily
-        'fsnow': {
-            'description': 'Fractional snow cover data',
-            'assets': ['MOD10A1', 'MYD10A1'],
-            'sensor': 'MCD',
-            'bands': ['fractional-snow-cover'],
-            'startdate': datetime.date(2000, 2, 24),
-            'latency': 3
-        },
-        'snow': {
-            'description': 'Snow and ice cover data',
-            'assets': ['MOD10A1', 'MYD10A1'],
-            'sensor': 'MCD',
-            'bands': ['snow-cover', 'fractional-snow-cover'],
-            'startdate': datetime.date(2000, 2, 24),
-            'latency': 3
-        },
+        # fsnow and snow removed due to collection 6 incompatibility; use ndsi
+        # 'fsnow': {
+        #     'description': 'Fractional snow cover data',
+        #     'assets': ['MOD10A1', 'MYD10A1'],
+        #     'sensor': 'MCD',
+        #     'bands': ['fractional-snow-cover'],
+        #     'startdate': datetime.date(2000, 2, 24),
+        #     'latency': 3
+        # },
+        # 'snow': {
+        #     'description': 'Snow and ice cover data',
+        #     'assets': ['MOD10A1', 'MYD10A1'],
+        #     'sensor': 'MCD',
+        #     'bands': ['snow-cover', 'fractional-snow-cover'],
+        #     'startdate': datetime.date(2000, 2, 24),
+        #     'latency': 3
+        # },
         'temp': {
             'description': 'Surface temperature data',
             'assets': ['MOD11A1', 'MYD11A1'],
@@ -366,6 +383,39 @@ class modisData(Data):
         }
     }
 
+    _products.update(_index_product_entries)
+
+    def asset_check(self, prod_type):
+        """Is an asset available for the current scene and product?
+
+        Returns the last found asset, or else None, its version, the
+        complete lists of missing and available assets, and lastly, an array
+        of pseudo-filepath strings suitable for consumption by gdal/gippy.
+        """
+        # return values
+        asset = None
+        version = None
+        missingassets = []
+        availassets = []
+        allsds = []
+
+        for asset in self._products[prod_type]['assets']:
+            # many asset types won't be found for the current scene
+            if asset not in self.assets:
+                missingassets.append(asset)
+                continue
+            try:
+                sds = self.assets[asset].datafiles()
+            except Exception as e:
+                utils.report_error(e, 'Error reading datafiles for ' + asset)
+                missingassets.append(asset)
+            else:
+                availassets.append(asset)
+                allsds.extend(sds)
+                version = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
+
+        return asset, version, missingassets, availassets, allsds
+
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
         """Produce requested products."""
@@ -375,33 +425,17 @@ class modisData(Data):
 
         bname = os.path.join(self.path, self.basename)
 
-        # example products.requested: {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
-        # Note that val[0] is the only usage of val in this method.
+        # example products.requested:
+        # {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
+        # key is only used once far below, and val is only used for val[0].
         for key, val in products.requested.items():
+            # TODO replace val[0] below with this more meaningful name
+            prod_type = val[0]
+            if prod_type in self._productgroups['Index']:
+                continue # indices handled differently below
             start = datetime.datetime.now()
-
-            # Check for asset availability
-            assets = self._products[val[0]]['assets']
-            missingassets = []
-            availassets = []
-            allsds = []
-
-            versions = {}
-
-            for asset in assets:
-                # many asset types won't be found for the current date/spatial constraint
-                if asset not in self.assets:
-                    missingassets.append(asset)
-                    continue
-                try:
-                    sds = self.assets[asset].datafiles()
-                except Exception as e:
-                    utils.report_error(e, 'Error reading datafiles for ' + asset)
-                    missingassets.append(asset)
-                else:
-                    availassets.append(asset)
-                    allsds.extend(sds)
-                    versions[asset] = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
+            asset, version, missingassets, availassets, allsds = \
+                self.asset_check(prod_type)
 
             if not availassets:
                 # some products aren't available for every day but this is trying every day
@@ -412,7 +446,6 @@ class modisData(Data):
             meta = self.meta_dict()
             meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
 
-            prod_type = val[0]
             sensor = self._products[prod_type]['sensor']
             fname = self.temp_product_filename(sensor, prod_type) # moved to archive at end of loop
 
@@ -420,27 +453,8 @@ class modisData(Data):
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
-            if val[0] == "refl":
-                # NOTE this code is unreachable (no refl entry in _products)
-                if versions[asset] != 6:
-                    raise Exception('product version not supported')
-                sensor = 'MCD'
-                fname = '%s_%s_%s.tif' % (bname, sensor, key)
-                img = gippy.GeoImage(sds[7:])
-                nodata = img[0].NoDataValue()
-                gain = img[0].Gain()
-                offset = img[0].Offset()
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
-                imgout.SetNoData(nodata)
-                imgout.SetOffset(offset)
-                imgout.SetGain(gain)
-                for i in range(6):
-                    data = img[i].Read()
-                    imgout[i].Write(data)
-                del img
-
             if val[0] == "quality":
-                if versions[asset] != 6:
+                if version != 6:
                     raise Exception('product version not supported')
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
@@ -448,12 +462,15 @@ class modisData(Data):
             # LAND VEGETATION INDICES PRODUCT
             # now with QC layer!
             if val[0] == "indices":
+                depr_msg = ("'indices' is deprecated, and may be removed in"
+                    " the future.  See the Index product group instead.")
+                utils.verbose_out(depr_msg, 2, stream=sys.stderr)
                 VERSION = "2.0"
                 meta['VERSION'] = VERSION
                 refl = gippy.GeoImage(allsds)
                 missing = 32767
 
-                if versions[asset] == 6:
+                if version == 6:
                     redimg = refl[7].Read()
                     nirimg = refl[8].Read()
                     bluimg = refl[9].Read()
@@ -469,6 +486,7 @@ class modisData(Data):
                 else:
                     raise Exception('product version not supported')
 
+                # wherever the value is too small, set it to a minimum of 0
                 redimg[redimg < 0.0] = 0.0
                 nirimg[nirimg < 0.0] = 0.0
                 bluimg[bluimg < 0.0] = 0.0
@@ -476,6 +494,7 @@ class modisData(Data):
                 mirimg[mirimg < 0.0] = 0.0
                 swrimg[swrimg < 0.0] = 0.0
 
+                # wherever the value is too saturated, set it to a max of 1.0
                 redimg[(redimg != missing) & (redimg > 1.0)] = 1.0
                 nirimg[(nirimg != missing) & (nirimg > 1.0)] = 1.0
                 bluimg[(bluimg != missing) & (bluimg > 1.0)] = 1.0
@@ -484,7 +503,10 @@ class modisData(Data):
                 swrimg[(swrimg != missing) & (swrimg > 1.0)] = 1.0
 
                 # red, nir
+                # first setup a blank array with everything set to missing
                 ndvi = missing + np.zeros_like(redimg)
+                # compute the ndvi only where neither input is missing, AND
+                # no divide-by-zero error will occur
                 wg = np.where((redimg != missing) & (nirimg != missing) & (redimg + nirimg != 0.0))
                 ndvi[wg] = (nirimg[wg] - redimg[wg]) / (nirimg[wg] + redimg[wg])
 
@@ -570,39 +592,38 @@ class modisData(Data):
                 imgout.SetBandName('EVI', 6)
                 imgout.SetBandName('QC', 7)
 
-            # CLOUD MASK PRODUCT
             if val[0] == "clouds":
-                VERSION = "1.0"
-                meta['VERSION'] = VERSION
-
+                # cloud mask product
+                meta['VERSION'] = '1.0'
                 img = gippy.GeoImage(allsds)
 
                 data = img[0].Read()
                 clouds = np.zeros_like(data)
 
-                clouds[data == 0] = 127
-                clouds[data == 1] = 127
-                clouds[data == 11] = 127
-                clouds[data == 25] = 0
-                clouds[data == 37] = 0
-                clouds[data == 39] = 0
-                clouds[data == 50] = 1
-                clouds[data == 100] = 0
-                clouds[data == 200] = 0
-                clouds[data == 254] = 127
-                clouds[data == 255] = 127
+                # See table 3 in the user guide:
+                # https://nsidc.org/sites/nsidc.org/files/files/
+                #   MODIS-snow-user-guide-C6.pdf
+                nodata = 127
+                for v in [200, 201, 211, 254, 255]:
+                    clouds[data == v] = nodata
+                clouds[data == 237] = 0
+                clouds[data == 239] = 0
+                clouds[data == 250] = 1
 
                 # create output gippy image
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
                 del img
-                imgout.SetNoData(127)
+                imgout.SetNoData(nodata)
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
                 imgout.SetBandName('Cloud Cover', 1)
                 imgout[0].Write(clouds)
 
-            # SNOW/ICE COVER PRODUCT - FRACTIONAL masked with binary
-            if val[0] == "fsnow":
+            if val[0] in ('snow', 'fsnow'):
+                # (fsnow was removed entirely due to being a big copypasta
+                # of the snow block; what follows is snow)
+                raise NotImplementedError("not compatible with collection 6; "
+                                          "use NDSI instead")
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
 
@@ -624,10 +645,13 @@ class modisData(Data):
                 for iband, band in enumerate(availbands):
 
                     # get the data values for both bands
-                    cover = img[2 * iband].Read()
-                    frac = img[2 * iband + 1].Read()
+                    # for both MOD10A1 and MYD10A1, bands 0 & 3 are --v
+                    cover = img[2 * iband].Read()       # Snow_Cover_Daily_Tile
+                    frac = img[2 * iband + 1].Read()    # Fractional_Snow_Cover
 
                     # check out frac
+                    # meanings of special values, see C5 user guide, table 4:
+                    # https://modis-snow-ice.gsfc.nasa.gov/uploads/sug_c5.pdf
                     wbad1 = np.where((frac == 200) | (frac == 201) | (frac == 211) |
                                      (frac == 250) | (frac == 254) | (frac == 255))
                     wsurface1 = np.where((frac == 225) | (frac == 237) | (frac == 239))
@@ -639,130 +663,8 @@ class modisData(Data):
                     assert nbad1 + nsurface1 + nvalid1 == frac.size, "frac contains invalid values"
 
                     # check out cover
-                    wbad2 = np.where((cover == 0) | (cover == 1) | (cover == 11) |
-                                     (cover == 50) | (cover == 254) | (cover == 255))
-                    wsurface2 = np.where((cover == 25) | (cover == 37) | (cover == 39))
-                    wvalid2 = np.where((cover == 100) | (cover == 200))
-
-                    nbad2 = len(wbad2[0])
-                    nsurface2 = len(wsurface2[0])
-                    nvalid2 = len(wvalid2[0])
-                    assert nbad2 + nsurface2 + nvalid2 == cover.size, "cover contains invalid values"
-
-                    # assign output data here
-                    coverout = np.zeros_like(cover, dtype=np.uint8)
-                    fracout = np.zeros_like(frac, dtype=np.uint8)
-
-                    fracout[wvalid1] = frac[wvalid1]
-                    fracout[wsurface1] = 0
-                    fracout[wbad1] = 127
-                    coverout[wvalid2] = 100
-                    coverout[wsurface2] = 0
-                    coverout[wbad2] = 127
-
-                    if len(availbands) == 2:
-                        if iband == 0:
-                            fracout1 = np.copy(fracout)
-                            coverout1 = np.copy(coverout)
-                        else:
-                            # both the current and previous are valid
-                            w = np.where((fracout != 127) & (fracout1 != 127))
-                            fracout[w] = np.mean(np.array([fracout[w], fracout1[w]]), axis=0).astype('uint8')
-
-                            # the current is not valid but previous is valid
-                            w = np.where((fracout == 127) & (fracout1 != 127))
-                            fracout[w] = fracout1[w]
-
-                            # both the current and previous are valid
-                            w = np.where((coverout != 127) & (coverout1 != 127))
-                            coverout[w] = np.mean(np.array([coverout[w], coverout1[w]]), axis=0).astype('uint8')
-
-                            # the current is not valid but previous is valid
-                            w = np.where((coverout == 127) & (coverout1 != 127))
-                            coverout[w] = coverout1[w]
-
-                fracmissingcoverclear = np.sum((fracout == 127) & (coverout == 0))
-                fracmissingcoversnow = np.sum((fracout == 127) & (coverout == 100))
-                fracclearcovermissing = np.sum((fracout == 0) & (coverout == 127))
-                fracclearcoversnow = np.sum((fracout == 0) & (coverout == 100))
-                fracsnowcovermissing = np.sum((fracout > 0) & (fracout <= 100) & (coverout == 127))
-                fracsnowcoverclear = np.sum((fracout > 0) & (fracout <= 100) & (coverout == 0))
-                # fracmostlycoverclear = np.sum((fracout > 50) & (fracout <= 100) & (coverout == 0))
-                totsnowfrac = int(0.01 * np.sum(fracout[fracout <= 100]))
-                totsnowcover = int(0.01 * np.sum(coverout[coverout <= 100]))
-                numvalidfrac = np.sum(fracout != 127)
-                numvalidcover = np.sum(coverout != 127)
-
-                # mask fractional product with binary
-                mask = np.where((coverout == 0) | (coverout == 50))
-                fracout[mask] = 0
-
-                if totsnowcover == 0 or totsnowfrac == 0:
-                    print("no snow or ice: skipping", str(self.date), str(self.id), str(missingassets))
-
-                meta['FRACMISSINGCOVERCLEAR'] = fracmissingcoverclear
-                meta['FRACMISSINGCOVERSNOW'] = fracmissingcoversnow
-                meta['FRACCLEARCOVERMISSING'] = fracclearcovermissing
-                meta['FRACCLEARCOVERSNOW'] = fracclearcoversnow
-                meta['FRACSNOWCOVERMISSING'] = fracsnowcovermissing
-                meta['FRACSNOWCOVERCLEAR'] = fracsnowcoverclear
-                meta['FRACMOSTLYCOVERCLEAR'] = np.sum((fracout > 50) & (fracout <= 100) & (coverout == 0))
-                meta['TOTSNOWFRAC'] = totsnowfrac
-                meta['TOTSNOWCOVER'] = totsnowcover
-                meta['NUMVALIDFRAC'] = numvalidfrac
-                meta['NUMVALIDCOVER'] = numvalidcover
-
-                # create output gippy image
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
-                del img
-                imgout.SetNoData(127)
-                imgout.SetOffset(0.0)
-                imgout.SetGain(1.0)
-                # imgout.SetBandName('Snow Cover', 1)
-                imgout.SetBandName('Fractional Snow Cover', 1)
-
-                # imgout[0].Write(coverout)
-                imgout[0].Write(fracout)
-
-            ###################################################################
-            # SNOW/ICE COVER PRODUCT
-            if val[0] == "snow":
-                VERSION = "1.0"
-                meta['VERSION'] = VERSION
-
-                if not missingassets:
-                    availbands = [0, 1]
-                    snowsds = [allsds[0], allsds[3], allsds[4], allsds[7]]
-                elif missingassets[0] == 'MYD10A1':
-                    availbands = [0]
-                    snowsds = [allsds[0], allsds[3]]
-                elif missingassets[0] == 'MOD10A1':
-                    availbands = [1]
-                    snowsds = [allsds[0], allsds[3]]
-                else:
-                    raise
-
-                img = gippy.GeoImage(snowsds)
-
-                # there are two snow bands
-                for iband, band in enumerate(availbands):
-
-                    # get the data values for both bands
-                    cover = img[2 * iband].Read()
-                    frac = img[2 * iband + 1].Read()
-
-                    # check out frac
-                    wbad1 = np.where((frac == 200) | (frac == 201) | (frac == 211) |
-                                     (frac == 250) | (frac == 254) | (frac == 255))
-                    wsurface1 = np.where((frac == 225) | (frac == 237) | (frac == 239))
-                    wvalid1 = np.where((frac >= 0) & (frac <= 100))
-
-                    nbad1 = len(wbad1[0])
-                    nsurface1 = len(wsurface1[0])
-                    nvalid1 = len(wvalid1[0])
-                    assert nbad1 + nsurface1 + nvalid1 == frac.size, "frac contains invalid values"
-
-                    # check out cover
+                    # meanings of special values, see C5 user guide, table 3:
+                    # https://modis-snow-ice.gsfc.nasa.gov/uploads/sug_c5.pdf
                     wbad2 = np.where((cover == 0) | (cover == 1) | (cover == 11) |
                                      (cover == 50) | (cover == 254) | (cover == 255))
                     wsurface2 = np.where((cover == 25) | (cover == 37) | (cover == 39))
@@ -1035,3 +937,46 @@ class modisData(Data):
             del imgout  # to cover for GDAL's internal problems
             utils.verbose_out(' -> {}: processed in {}'.format(
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
+
+        # process some index products (not all, see above)
+        requested_ipt = products.groups()['Index'].keys()
+        if requested_ipt:
+            model_pt = requested_ipt[0] # all should be similar
+            asset, version, _, _, allsds = self.asset_check(model_pt)
+            if asset is None:
+                raise IOError('Found no assets for {}'.format(
+                    requested_ipt))
+            if version < 6:
+                raise IOError('index products require MCD43A4 version 6,'
+                              ' but found {}'.format(version))
+            img = gippy.GeoImage(allsds[7:]) # don't need the QC bands
+
+            # GIPPY uses expected band names to find data:
+            """
+            index (ie img[i])
+            |  band num
+            |   |   wavelength  name
+            0   1   620 - 670   RED
+            1   2   841 - 876   NIR
+            2   3   459 - 479   BLUE
+            3   4   545 - 565   GREEN
+            4   5   1230 - 1250 CIRRUS (not used by gippy)
+            5   6   1628 - 1652 SWIR1
+            6   7   2105 - 2155 SWIR2
+            """
+            # SetBandName goes by band number, not index
+            [img.SetBandName(name, i) for (name, i) in [
+                ('RED',   1), ('NIR',   2), ('BLUE',  3),
+                ('GREEN', 4), ('SWIR1', 6), ('SWIR2', 7)]]
+
+            sensor = self._products[model_pt]['sensor']
+            prod_spec = {pt: self.temp_product_filename(sensor, pt)
+                         for pt in requested_ipt}
+
+            metadata = self.meta_dict()
+            metadata['VERSION'] = '1.0'
+            pt_to_temp_fps = Indices(img, prod_spec, metadata)
+
+            for pt, temp_fp in pt_to_temp_fps.items():
+                archived_fp = self.archive_temp_path(temp_fp)
+                self.AddFile(sensor, pt, archived_fp)

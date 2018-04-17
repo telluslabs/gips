@@ -44,12 +44,6 @@ def setup_landsat_data(pytestconfig):
         raise RuntimeError(err_msg)
 
 
-def t_info(repo_env, expected):
-    """Test `gips_info modis` and confirm recorded output is given."""
-    actual = repo_env.run('gips_info', 'landsat')
-    assert expected == actual
-
-
 def t_login():
     """Test `gips_info modis` and confirm recorded output is given."""
     from gips.data import landsat
@@ -69,18 +63,6 @@ def t_query_service():
     logger.debug(str(resp))
     assert len(resp) == 1
 
-def t_inventory(setup_landsat_data, repo_env, expected):
-    """Test `gips_inventory` to confirm it notices the emplaced data file."""
-    actual = repo_env.run('gips_inventory', *STD_ARGS)
-    assert expected == actual
-
-@slow
-def t_process(setup_landsat_data, repo_env, expected):
-    """Test gips_process on landsat data."""
-    actual = repo_env.run('gips_process', *STD_PROD_ARGS)
-    assert expected == actual
-
-
 @slow
 @acolite
 def t_process_acolite(repo_env, expected):
@@ -98,20 +80,13 @@ def t_process_acolite(repo_env, expected):
     actual = repo_env.run('gips_process', *ACOLITE_PROD_ARGS)
     assert expected == actual
 
-
-def t_project(setup_landsat_data, clean_repo_env, output_tfe, expected):
-    """Test gips_project landsat with warping."""
-    args = STD_PROD_ARGS + ('--res', '30', '30', '--outdir', OUTPUT_DIR, '--notld')
-    actual = output_tfe.run('gips_project', *args)
-    assert expected == actual
-
-
+'''
 def t_project_no_warp(setup_landsat_data, clean_repo_env, output_tfe, expected):
     """Test gips_project modis without warping."""
     args = STD_PROD_ARGS + ('--outdir', OUTPUT_DIR, '--notld')
     actual = output_tfe.run('gips_project', *args)
     assert expected == actual
-
+'''
 
 def t_tiles(setup_landsat_data, clean_repo_env, output_tfe, expected):
     """Test gips_tiles modis with warping."""
@@ -127,19 +102,4 @@ def t_tiles_copy(setup_landsat_data, clean_repo_env, output_tfe, expected):
     args = ('landsat', '-t', '012030', '-d', '2015-352', '-v', '4',
             '--outdir', OUTPUT_DIR, '--notld') + product_args
     actual = output_tfe.run('gips_tiles', *args)
-    assert expected == actual
-
-
-def t_stats(setup_landsat_data, clean_repo_env, output_tfe, expected):
-    """Test gips_stats on projected files."""
-    # generate data needed for stats computation
-    args = STD_PROD_ARGS + ('--res', '30', '30', '--outdir', OUTPUT_DIR, '--notld')
-    prep_run = output_tfe.run('gips_project', *args)
-    assert prep_run.exit_status == 0 # confirm it worked; not really in the test
-
-    # compute stats
-    gtfe = GipsTestFileEnv(OUTPUT_DIR, start_clear=False)
-    actual = gtfe.run('gips_stats', OUTPUT_DIR)
-
-    # check for correct stats content
     assert expected == actual

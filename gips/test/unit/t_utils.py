@@ -111,20 +111,19 @@ def t_set_error_handler(restore_error_handler):
     assert utils.error_handler is fake_handler
 
 
-@pytest.mark.parametrize('verbosity, print_exc_call_cnt', (
-    (utils._traceback_verbosity - 3, 0),
-    (utils._traceback_verbosity + 0, 1),
-    (utils._traceback_verbosity + 3, 1)))
-def t_report_error(mocker, verbosity, print_exc_call_cnt):
+@pytest.mark.parametrize('verbosity, verbose_out_call_cnt', (
+    (utils._traceback_verbosity - 3, 1),
+    (utils._traceback_verbosity + 0, 2),
+    (utils._traceback_verbosity + 3, 2)))
+def t_report_error(mocker, verbosity, verbose_out_call_cnt):
     """Test GIPS' general purpose error reporting."""
     mocker.patch.object(utils.gippy.Options, 'Verbose').return_value = verbosity
-    m_print_exc = mocker.patch.object(utils.traceback, 'print_exc')
     m_verbose_out = mocker.patch.object(utils, 'verbose_out')
 
     utils.report_error(Exception('blarg'), 'error message here')
 
-    assert (m_print_exc.call_count == print_exc_call_cnt and
-            m_verbose_out.call_count == 1)
+    # call count is how it's known which branch it took
+    assert m_verbose_out.call_count == verbose_out_call_cnt
 
 
 # for t_gips_exit
@@ -243,3 +242,12 @@ def t_cli_error_handler_continuable_case(mocker):
     with utils.cli_error_handler('PREFIX', True):
         raise rte
     m_report_error.assert_called_once_with(rte, 'PREFIX')
+
+@pytest.mark.parametrize('input, expected', (
+    ({1: 2, 3: 4},          {1: 2, 3: 4}),
+    ({1: [], 3: 4},         {3: 4}),
+    ({1: (), 3: (4, [5])},  {1: ()}),
+))
+def t_prune_unhashable(mocker, input, expected):
+    actual = utils.prune_unhashable(input)
+    assert expected == actual

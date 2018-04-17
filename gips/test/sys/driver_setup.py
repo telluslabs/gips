@@ -1,0 +1,80 @@
+from __future__ import print_function
+
+import datetime
+import ftplib
+import tempfile
+import shutil
+import os
+import glob
+
+import pytest
+import sh
+
+import util
+
+nh_shp = util.NH_SHP_PATH
+
+STD_ARGS = {
+    'modis': ('modis', '-s', nh_shp, '-d', '2012-12-01,2012-12-03', '-v', '4'),
+    'merra': ('merra', '-s', nh_shp, '-d', '2015-135', '-v', '4'),
+    'prism': ('prism', '-s', nh_shp, '-d', '1982-12-01,1982-12-03', '-v4'),
+    'cdl': ('cdl', '-s', nh_shp, '-d', '2015', '--days', '1,1', '-t', 'NH', '-v4'),
+    'landsat': ('landsat', '-s', nh_shp, '-d', '2017-08-01', '-v4'),
+    # Here down, not NH shapefile:
+    'aod': ('aod', '-s', util.NE_SHP_PATH, '-d', '2017-004,2017-006', '-v4'),
+    'sentinel2': ('sentinel2', '-s', util.DURHAM_SHP_PATH, '-d2017-183', '-v4'),
+    'sar': ('sar', '-t', 'N07E099', 'N19E100', 'N00E099', '-d2009,2015', '-v4'),
+    'modisndti': ('modis', '-s', nh_shp, '-d', '2012-336', '-v', '4', '-p', 'ndti'),
+    'daymet' : ('daymet', '-d', '1993-1-18', '-s', util.DURHAM_SHP_PATH),
+}
+
+setup_attempted = []
+
+def setup_repo_data(driver):
+    """Use gips_inventory to ensure assets are present."""
+    if driver in setup_attempted or not pytest.config.getoption('setup_repo'):
+        return
+
+    as_path = pytest.config.getini('artifact-store-path')
+
+    das_path = os.path.join(as_path, driver) # technically should be der_path
+
+    '''ftp method, not currently in use
+    username, password, host, path = [pytest.config.getini(ini) for ini in (
+        'artifact-store-user', 'artifact-store-password',
+        'artifact-store-host', 'artifact-store-path')]
+    url_template = 'ftp://{}:{}@{}/{}/{}/'
+    url_head = url_template.format(username, password, host, path, driver)
+    sanitized_uh = url_template.format(
+        username, '<password>', host, path, driver)
+
+    # first check to see if assets exist already -- if they're in the gips
+    # data store, they're probably already cataloged by the ORM
+    ftps = ftplib.FTP_TLS(host, username, password)
+    ftps.prot_p()
+    ftps.cwd(path + '/' + driver)
+    remote_files = ftps.nlst()
+    '''
+
+    remote_files = os.listdir(das_path)
+
+    local_files = [os.path.basename(fp) for fp in
+        glob.glob(os.path.join(
+            pytest.config.getini('data-repo'), driver, 'tiles', '*/*/*'))]
+
+    if set(remote_files).issubset(set(local_files)):
+        print(driver, 'asset files already present; no setup needed')
+        return
+
+    #print('Installing', driver, 'assets from', sanitized_uh)
+    print('Installing', driver, 'assets from', das_path)
+    try:
+        temp_dir = tempfile.mkdtemp()
+        with sh.pushd(temp_dir):
+            #sh.wget('--recursive', '--no-directories', url_head)
+            for fn in remote_files:
+                shutil.copy(os.path.join(das_path, fn), temp_dir)
+            sh.gips_archive(driver)
+    finally:
+        shutil.rmtree(temp_dir)
+    print(driver, "data installation complete.")

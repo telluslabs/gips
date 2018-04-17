@@ -36,6 +36,13 @@ import traceback
 import ftplib
 import shutil
 import commands
+from urllib import urlencode
+import urllib2
+from cookielib import CookieJar
+import argparse
+
+# from functools import lru_cache <-- python 3.2+ can do this instead
+from backports.functools_lru_cache import lru_cache
 
 import gippy
 from gippy.algorithms import CookieCutter
@@ -44,10 +51,6 @@ from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File,
         basename, mkdir, open_vector)
 from gips import utils
 from ..inventory import dbinv, orm
-
-from cookielib import CookieJar
-from urllib import urlencode
-import urllib2
 
 
 """
@@ -66,6 +69,8 @@ class Repository(object):
     _tile_attribute = 'tile'
     # valid sub directories in repo
     _subdirs = ['tiles', 'stage', 'quarantine', 'composites']
+
+    default_settings = {}
 
     @classmethod
     def feature2tile(cls, feature):
@@ -110,21 +115,28 @@ class Repository(object):
     ##########################################################################
     @classmethod
     def get_setting(cls, key):
-        """ Get value from repo settings """
-        dataclass = cls.__name__[:-10]
+        """Get given setting from settings.REPOS[driver].
+
+        If the key isn't found, it attempts to load a default from
+        cls.default_settings, a dict of such things.  If still not found,
+        resorts to magic for 'driver' and 'tiles', ValueError otherwise.
+        """
+        dataclass = cls.__name__[:-10] # name of a class, not the class object
         r = settings().REPOS[dataclass]
-        if key not in r.keys():
-            # not in settings file, use defaults
-            exec('import gips.data.%s as clsname' % dataclass)
-            driverpath = os.path.dirname(clsname.__file__)
-            if key == 'driver':
-                return driverpath
-            elif key == 'tiles':
-                return os.path.join(driverpath, 'tiles.shp')
-            else:
-                raise Exception('%s is not a valid setting!' % key)
-        else:
+        if key in r:
             return r[key]
+        if key in cls.default_settings:
+            return cls.default_settings[key]
+
+        # not in settings file nor default, so resort to magic
+        exec('import gips.data.%s as clsname' % dataclass)
+        driverpath = os.path.dirname(clsname.__file__)
+        if key == 'driver':
+            return driverpath
+        if key == 'tiles':
+            return os.path.join(driverpath, 'tiles.shp')
+        raise ValueError("'{}' is not a valid setting for"
+                         " {} driver".format(key, cls.name))
 
     @classmethod
     def managed_request(cls, url, verbosity=1, debuglevel=0):
@@ -353,7 +365,9 @@ class Asset(object):
     def extract(self, filenames=tuple(), path=None):
         """Extract given files from asset (if it's a tar or zip).
 
-        Extracted files are placed in the same dir as the asset file.
+        Extracted files are placed in the same dir as the asset file.  Returns
+        a list of extracted files, plus any files that were not extracted due
+        to prior existence.
         """
         if tarfile.is_tarfile(self.filename):
             open_file = tarfile.open(self.filename)
@@ -365,17 +379,33 @@ class Asset(object):
             path = os.path.dirname(self.filename)
         if len(filenames) == 0:
             filenames = self.datafiles()
-        extracted_files = []
-        for f in filenames:
-            fname = os.path.join(path, f)
-            if not os.path.exists(fname):
+        extracted_fnames, extant_fnames = [], []
+
+        with utils.make_temp_dir(prefix='extract', dir=path) as tmp_dn:
+            utils.verbose_out("Extracting files from {} to {}".format(
+                self.filename, tmp_dn), 3)
+            for f in filenames:
+                final_fname = os.path.join(path, f)
+                if os.path.exists(final_fname):
+                    utils.verbose_out(f + ' exists, not extracting', 3)
+                    extant_fnames.append(final_fname)
+                    continue
                 utils.verbose_out("Extracting " + f, 3)
-                open_file.extract(f, path)
+                open_file.extract(f, tmp_dn)
+                tmp_fname = os.path.join(tmp_dn, f)
                 # this ensures we have permissions on extracted files
-                if not os.path.isdir(fname):
-                    os.chmod(fname, 0664)
-            extracted_files.append(fname)
-        return extracted_files
+                if not os.path.isdir(tmp_fname):
+                    os.chmod(tmp_fname, 0664)
+                extracted_fnames.append((tmp_fname, final_fname))
+            utils.verbose_out(
+                "Moving files from {} to {}".format(tmp_dn, path), 3)
+            for (tfn, ffn) in extracted_fnames:
+                dir_name = os.path.dirname(ffn)
+                if not os.path.exists(dir_name):
+                    os.makedirs(dir_name)
+                os.rename(tfn, ffn)
+
+        return extant_fnames + [ffn for (_, ffn) in extracted_fnames]
 
     ##########################################################################
     # Class methods
@@ -394,52 +424,39 @@ class Asset(object):
         date:   datetime.date object to limit search in temporal dimension
         asset:  Asset type string, eg for modis could be 'MCD43A2'
         """
-        criteria = {'driver': cls.Repository.name.lower(), 'tile': tile, 'date': date}
-        if asset is not None:
-            criteria['asset'] = asset
+        a_types = cls._assets.keys() if asset is None else [asset]
+        found = [cls.discover_asset(a, tile, date) for a in a_types]
+        return [a for a in found if a is not None] # lastly filter Nones
+
+    @classmethod
+    def discover_asset(cls, asset_type, tile, date):
+        """Finds an asset for the a-t-d trio and returns an object for it."""
         if orm.use_orm():
             # search for ORM Assets to use for making GIPS Assets
-            return [cls(a.name) for a in dbinv.asset_search(**criteria)]
+            results = dbinv.asset_search(driver=cls.Repository.name.lower(),
+                                    asset=asset_type, tile=tile, date=date)
+            if len(results) == 0:
+                return None
+            assert len(results) == 1 # sanity check; DB should enforce
+            return cls(results[0].name)
 
         # The rest of this fn uses the filesystem inventory
-        tpath = cls.Repository.data_path(tile, date)
-        if not os.path.isdir(tpath):
-            return []
-        if asset is not None:
-            assets = [asset]
-        else:
-            assets = cls._assets.keys()
-        found = []
-        for a in assets:
-            files = utils.find_files(cls._assets[a]['pattern'], tpath)
-            # more than 1 asset??
-            if len(files) > 1:
-                fv = sorted(
-                    [(f, cls(f)._version) for f in files],
-                    key=lambda x: -x[1]
-                )
-                if fv[0][1] not in zip(*fv[1:])[1]:
-                   # greatest version is not duplicated
-                    # remove lesser versions
-                    utils.verbose_out('fn,                                version')
-                    for fn, ver in fv:
-                        utils.verbose_out('{},{}'.format(fn, ver))
-                    keep = fv[0][0]
-                    rm = zip(*fv[1:])[0]
-                    RemoveFiles(rm)
-                    files = keep
-                else:
-                    # greatest version has duplicates
-                    raise Exception("Duplicate(?) assets found: {}".format(files))
+        d_path = cls.Repository.data_path(tile, date)
+        if not os.path.isdir(d_path):
+            return None
+        files = utils.find_files(cls._assets[asset_type]['pattern'], d_path)
+        # Confirm only one asset
+        if len(files) > 1:
+            raise IOError("Duplicate(?) assets found: {}".format(files))
+        if len(files) == 1:
+            return cls(files[0])
+        return None
 
-            if len(files) == 1:
-                found.append(cls(files[0]))
-        return found
 
     @classmethod
     def start_date(cls, asset):
-        """ Get starting date for this asset """
-        return cls._assets[asset].get('startdate', None)
+        """Get starting date for this asset type."""
+        return cls._assets[asset]['startdate']
 
     @classmethod
     def end_date(cls, asset):
@@ -453,29 +470,46 @@ class Asset(object):
         a_info = cls._assets[asset]
         if 'enddate' in a_info:
             return a_info['enddate']
-        return datetime.now() - timedelta(a_info['latency'])
+        return datetime.now().date() - timedelta(a_info['latency'])
 
     @classmethod
     def available(cls, asset, date):
-        # TODO this method never seems to be called?
-        """ Check availability of an asset for given date """
-        date1 = cls._assets[asset].get(['startdate'], None)
-        date2 = cls._assets[asset].get(['enddate'], None)
-        if date2 is None:
-            date2 = datetime.now() - timedelta(cls._asssets[asset]['latency'])
-        if date1 is None or date2 is None:
-            return False
-        if date < date1 or date > date2:
-            return False
-        return True
+        """Check availability of an asset for given date.
+
+        Accepts both dates and datetimes for the `date` parameter."""
+        d = date.date() if type(date) is datetime else date
+        return cls.start_date(asset) <= d <= cls.end_date(asset)
 
     # TODO - combine this with fetch to get all dates
     @classmethod
-    def dates(cls, asset, tile, dates, days):
-        """ For a given asset get all dates possible (in repo or not) - used for fetch """
+    def dates(cls, asset_type, tile, dates, days):
+        """For a given asset type get all dates possible (in repo or not).
+
+        Also prunes dates outside the bounds of the asset's valid date range,
+        as given by start_date and end_date.
+        """
+        # TODO tile arg isn't used
         from dateutil.rrule import rrule, DAILY
+        req_start_dt, req_end_dt = dates
+
+        # if the dates are outside asset availability dates, use those instead
+        a_start_dt = cls.start_date(asset_type)
+        a_end_dt   = cls.end_date(asset_type)
+        start_dt = a_start_dt if a_start_dt > req_start_dt else req_start_dt
+        end_dt   = a_end_dt   if a_end_dt   < req_end_dt   else req_end_dt
+
+        # degenerate case:  There is no valid date range; notify user
+        if start_dt > end_dt:
+            utils.verbose_out("For {}, requested dates, {} - {},"
+                              " are not in the valid range of {} - {}.".format(
+                                    asset_type, req_start_dt, req_end_dt,
+                                    a_start_dt, a_end_dt))
+            return []
+        utils.verbose_out('Computed date range for processing: {} - {}'.format(
+                start_dt, end_dt), 5)
+
         # default assumes daily regardless of asset or tile
-        datearr = rrule(DAILY, dtstart=dates[0], until=dates[1])
+        datearr = rrule(DAILY, dtstart=start_dt, until=end_dt)
         dates = [dt for dt in datearr if days[0] <= int(dt.strftime('%j')) <= days[1]]
         return dates
 
@@ -492,24 +526,30 @@ class Asset(object):
         raise NotImplementedError('query_provider not supported for' + cls.__name__)
 
     @classmethod
-    def query_service(cls, asset, tile, date):
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
+    def query_service(cls, asset, tile, date, **fetch_kwargs):
         """Query the data provider for files matching the arguments.
 
-        Drivers must override this method, or else query_provider, to
-        contact a data source regarding the given arguments, and report
-        on whether anything is available for fetching. Must return a
-        list of dicts containing available asset filenames and where to
-        find them:  [{'basename': bn, 'url': url}, ...]. When nothing is
-        avilable, must return [].
+        Drivers must override this method, or else query_provider, to contact a
+        data source regarding the given arguments, and report on whether
+        anything is available for fetching. Must return a dict containing an
+        available asset filename.  The dict is passed to the driver's
+        Asset.fetch method so additional data can be passed along in other
+        keys. When nothing is available, must return None.
         """
-        bn, url = cls.query_provider(asset, tile, date)
+        if not cls.available(asset, date):
+            return None
+        utils.verbose_out('querying ATD {} {} {}'.format(asset, tile, date), 5)
+        bn, url = cls.query_provider(asset, tile, date, **fetch_kwargs)
+        utils.verbose_out('queried ATD {} {} {}, found {} at {}'.format(
+                          asset, tile, date, bn, url), 5)
         if (bn, url) == (None, None):
-            return []
-        return [{'basename': bn, 'url': url}]
+            return None
+        return {'basename': bn, 'url': url}
 
 
     @classmethod
-    def fetch(cls, asset, tile, date):
+    def fetch(cls, *args, **kwargs):
         """ Fetch stub """
         raise NotImplementedError("Fetch not supported for this data source")
 
@@ -518,9 +558,11 @@ class Asset(object):
         """Connect to an FTP server and chdir according to the args.
 
         Returns the ftplib connection object."""
+        utils.verbose_out('Connecting to {}'.format(cls._host), 5)
         conn = ftplib.FTP(cls._host)
         conn.login('anonymous', settings().EMAIL)
         conn.set_pasv(True)
+        utils.verbose_out('Changing to {}'.format(working_directory), 5)
         conn.cwd(working_directory)
         return conn
 
@@ -547,7 +589,7 @@ class Asset(object):
             ftp.close()
 
     @classmethod
-    def archive(cls, path='.', recursive=False, keep=False, update=False, **kwargs):
+    def archive(cls, path, recursive=False, keep=False, update=False):
         """Move asset into the archive.
 
         Pass in a path to a file or a directory.  If a directory, its
@@ -557,6 +599,10 @@ class Asset(object):
         then removed, unless `keep`. If a found asset would replace an
         extant archived asset, replacement is only performed if
         `update`.  kwargs is unused and likely without purpose.
+
+        Returns a pair of lists:  A list of Asset objects that were archived,
+        and a list of asset objects whose files have been overwritten (by the
+        update flag).
         """
         start = datetime.now()
 
@@ -575,28 +621,42 @@ class Asset(object):
         numlinks = 0
         numfiles = 0
         assets = []
+        overwritten_assets = []
+        if not fnames:
+            utils.verbose_out('No files found; nothing to archive.')
         for f in fnames:
-            archived = cls._archivefile(f, update)
-            if archived[1] >= 0:
+            (asset_obj, link_count, overwritten_ao) = cls._archivefile(f,
+                                                                       update)
+            if overwritten_ao is not None:
+                overwritten_assets.append(overwritten_ao)
+            if link_count >= 0:
                 if not keep:
+                    # user wants to remove the original hardlink to the file
                     RemoveFiles([f], ['.index', '.aux.xml'])
-            if archived[1] > 0:
+            if link_count > 0:
                 numfiles = numfiles + 1
-                numlinks = numlinks + archived[1]
-                assets.append(archived[0])
+                numlinks = numlinks + link_count
+                assets.append(asset_obj)
 
         # Summarize
         if numfiles > 0:
             VerboseOut('%s files (%s links) from %s added to archive in %s' %
-                      (numfiles, numlinks, os.path.abspath(path), datetime.now() - start))
+                      (numfiles, numlinks, path, datetime.now() - start))
         if numfiles != len(fnames):
             VerboseOut('%s files not added to archive' % (len(fnames) - numfiles))
-        return assets
+        return assets, overwritten_assets
 
     @classmethod
     def _archivefile(cls, filename, update=False):
-        """ archive specific file """
+        """Move the named file into the archive.
+
+        If update == True, replace any old versions and associated files.
+        Returns a 3-tuple:  An Asset object if anything was archived, or
+        None, a count of hardlinks made, believed to be just 1 or 0, and
+        an asset object for any asset file that was overwritten.
+        """
         bname = os.path.basename(filename)
+        overwritten_ao = None
         try:
             asset = cls(filename)
         except Exception, e:
@@ -605,7 +665,7 @@ class Asset(object):
             qname = os.path.join(cls.Repository.path('quarantine'), bname)
             if not os.path.exists(qname):
                 os.link(os.path.abspath(filename), qname)
-            return (None, 0)
+            return (None, 0, None)
 
         # make an array out of asset.date if it isn't already
         dates = asset.date
@@ -647,16 +707,12 @@ class Asset(object):
                             )
                             # NOTE: This return makes sense iff len(existing)
                             # cannot be greater than 1
-                            return (None, 0)
+                            return (None, 0, None)
+                        overwritten_ao = cls(ef.filename)
                         VerboseOut('\t%s' % os.path.basename(ef.filename), 1)
                         errmsg = 'Unable to remove existing version: ' + ef.filename
                         with utils.error_handler(errmsg):
-                            os.remove(ef.filename)
-                    files = glob.glob(os.path.join(tpath, '*'))
-                    for f in set(files).difference([ef.filename]):
-                        msg = 'Unable to remove product {} from {}'.format(f, tpath)
-                        with utils.error_handler(msg, continuable=True):
-                            os.remove(f)
+                            RemoveFiles([ef.filename], ['.index', '.aux.xml'])
                     with utils.error_handler('Problem adding {} to archive'.format(filename)):
                         os.link(os.path.abspath(filename), newfilename)
                         asset.archived_filename = newfilename
@@ -675,10 +731,20 @@ class Asset(object):
                         numlinks = numlinks + 1
             else:
                 VerboseOut('%s already in archive' % filename, 2)
+
+        # newly created asset should have only automagical products, and those
+        # would have paths in stage with the existing asset.  Re-instantiation
+        # using archived_filename rectifies this.
+        if len(asset.products) > 0 and hasattr(asset, 'archived_filename'):
+            new_asset_obj = cls(asset.archived_filename)
+            # next line is strange, but is used by DataInventory.fetch
+            new_asset_obj.archived_filename = asset.archived_filename
+            asset = new_asset_obj
+
         if otherversions and numlinks == 0:
-            return (asset, -1)
+            return (asset, -1, overwritten_ao)
         else:
-            return (asset, numlinks)
+            return (asset, numlinks, overwritten_ao)
         # should return asset instance
 
 
@@ -766,6 +832,27 @@ class Data(object):
         procstr = 'copied' if site is None else 'warped'
         VerboseOut('%s tile %s: %s files %s' % (self.date, self.id, len(products.requested), procstr))
 
+    @classmethod
+    def natural_percentage(cls, raw_value):
+        """Callable used for argparse, defines a new type for %0.0 to %100.0.
+
+        Receives a string, return a float.  See also:
+        https://docs.python.org/2/library/argparse.html#type
+        """
+        f_value = float(raw_value)
+        if not (0 <= f_value <= 100):
+            raise argparse.ArgumentTypeError(
+                "Value '{}' is outside the range [0 %, 100 %]".format(
+                    raw_value))
+        return f_value
+
+    @classmethod
+    def add_filter_args(cls, parser):
+        """Override to add arguments to the command line suitable for filter().
+
+        parser is expected to be a python ArgumentParser."""
+        return
+
     def filter(self, **kwargs):
         """Permit child classes to implement filtering.
 
@@ -827,7 +914,13 @@ class Data(object):
             self.basename = self.id + '_' + self.date.strftime(self.Repository._datedir)
             if search:
                 [self.add_asset(a) for a in self.Asset.discover(tile, date)] # Find all assets
-                self.ParseAndAddFiles() # Find products
+                fn_to_add = None
+                if orm.use_orm():
+                    search = {'driver': self.Repository.name.lower(),
+                              'date': date, 'tile': tile}
+                    fn_to_add = [str(p.name)
+                                 for p in dbinv.product_search(**search)]
+                self.ParseAndAddFiles(fn_to_add)
 
     def add_asset(self, asset):
         """Add an Asset object to self.assets and:
@@ -913,7 +1006,8 @@ class Data(object):
                 else:
                     date = datetime.strptime(parts[0 + offset], datedir).date()
                     if date != self.date:
-                        raise Exception('Mismatched dates: %s' % ' '.join(filenames))
+                        raise IOError('Mismatched dates: '
+                            'Expected {} but got {}'.format(self.date, date))
                 sensor = parts[1 + offset]
                 product = parts[2 + offset]
                 self.AddFile(sensor, product, f, add_to_db=False)
@@ -1051,13 +1145,25 @@ class Data(object):
 
     @classmethod
     def inventory(cls, site=None, key='', where='', tiles=None, pcov=0.0,
-                  ptile=0.0, dates=None, days=None, **kwargs):
+                  ptile=0.0, dates=None, days=None, rastermask=None, **kwargs):
         """ Return list of inventories (size 1 if not looping through geometries) """
         from gips.inventory import DataInventory
         from gips.core import SpatialExtent, TemporalExtent
-        spatial = SpatialExtent.factory(cls, site=site, key=key, where=where, tiles=tiles,
-                                        pcov=pcov, ptile=ptile)
+
+        spatial = SpatialExtent.factory(
+            cls, site=site, rastermask=rastermask, key=key, where=where, tiles=tiles,
+            pcov=pcov, ptile=ptile
+        )
         temporal = TemporalExtent(dates, days)
+        if len(spatial) > 1:
+            raise ValueError(
+                '{}.inventory: site (or rastermask) may only specify 1'
+                '     feature via this API call ({} provided in {})'
+                .format(
+                    cls.__name__, len(spatial),
+                    str((site, key, where)) if site else rastermask
+                )
+            )
         return DataInventory(cls, spatial[0], temporal, **kwargs)
 
     @classmethod
@@ -1072,22 +1178,42 @@ class Data(object):
         return set(assets)
 
     @classmethod
-    def fetch(cls, products, tiles, textent, update=False):
+    def need_to_fetch(cls, a_type, tile, date, update, **fetch_kwargs):
+        local_ao = cls.Asset.discover_asset(a_type, tile, date)
+        # we have something for this atd, and user doesn't want to update,
+        # so the decision is easy
+        if local_ao is not None and not update:
+            return False
+        qs_rv = cls.Asset.query_service(a_type, tile, date, **fetch_kwargs)
+        if qs_rv is None: # nothing remote; done
+            return False
+        # if we don't have it already, or if `update` flag
+        queried_ao = cls.Asset(qs_rv['basename'])
+        return local_ao is None or (update and local_ao.updated(queried_ao))
+
+    need_fetch_kwargs = False # feature toggle:  set in driver's subclass
+
+    @classmethod
+    def fetch(cls, products, tiles, textent, update=False, **kwargs):
         """ Download data for tiles and add to archive. update forces fetch """
         assets = cls.products2assets(products)
         fetched = []
+        fetch_kwargs = kwargs if cls.need_fetch_kwargs else {}
+        # TODO rewrite this to back off the indentation
         for a in assets:
             for t in tiles:
                 asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                for d in asset_dates:
-                    # if we don't have it already, or if update (force) flag
-                    if not cls.Asset.discover(t, d, a) or update == True:
-                        date_str = d.strftime("%y-%m-%d")
-                        msg_prefix = 'Problem fetching asset for {}, {}, {}'.format(a, t, date_str)
-                        with utils.error_handler(msg_prefix, continuable=True):
-                            cls.Asset.fetch(a, t, d)
-                            # fetched may contain both fetched things and unfetchable things
-                            fetched.append((a, t, d))
+                for d in asset_dates: # we say dates but really datetimes
+                    if not cls.need_to_fetch(a, t, d, update, **fetch_kwargs):
+                        continue
+                    with utils.error_handler(
+                            'Problem fetching asset for {}, {}, {}'.format(
+                                a, t, d.strftime("%y-%m-%d")),
+                            continuable=True):
+                        cls.Asset.fetch(a, t, d, **fetch_kwargs)
+                        # fetched may contain both fetched things and unfetchable things
+                        fetched.append((a, t, d))
+
         return fetched
 
     @classmethod
@@ -1194,3 +1320,38 @@ class Data(object):
     def temp_product_filename(self, sensor, prod_type):
         """Generates a product filename within the managed temp dir."""
         return self.generate_temp_path(self.product_filename(sensor, prod_type))
+
+    @classmethod
+    def archive_assets(cls, path, recursive=False, keep=False, update=False):
+        """Adds asset files found in the given path to the repo.
+
+        For arguments see Asset.archive."""
+        archived_aol, overwritten_aol = cls.Asset.archive(
+                path, recursive, keep, update)
+        if overwritten_aol:
+            utils.verbose_out('Updated {} assets, checking for stale '
+                              'products.'.format(len(overwritten_aol)), 2)
+            deletable_p_files = {}
+            for asset_obj in overwritten_aol:
+                data_obj = cls(asset_obj.tile, asset_obj.date, search=True)
+                deletable_p_types = [pt for pt in cls._products
+                        if asset_obj.asset in data_obj._products[pt]['assets']]
+                #    v-- as usual don't care about the sensor
+                for (_, raw_p_type), full_path in data_obj.filenames.items():
+                    p_type = raw_p_type.split('-')[0] # take out eg '-toa'
+                    if p_type in deletable_p_types:
+                        # need to know the key to delete from the ORM
+                        p_key = (cls.Asset.Repository.name.lower(), raw_p_type,
+                                 asset_obj.tile, asset_obj.date)
+                        deletable_p_files[p_key] = full_path
+
+            utils.verbose_out('Found {} stale products:'.format(
+                                len(deletable_p_files)), 2)
+            for p_key, full_path in deletable_p_files.items():
+                utils.verbose_out('Deleting ' + full_path, 2)
+                if orm.use_orm():
+                    dr, p, t, dt = p_key
+                    dbinv.delete_product(driver=dr, product=p, tile=t, date=dt)
+                os.remove(full_path)
+
+        return archived_aol

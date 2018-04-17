@@ -95,7 +95,6 @@ class daymetAsset(Asset):
     _latency = 0
     _startdate = datetime.date(1980, 1, 1)
     _url = "https://thredds.daac.ornl.gov/thredds/dodsC/ornldaac/1328/tiles/%d/%s_%d"
-    _basename_pat = 'daymet_{}_{}_{}{}.tif'
 
     # daymet assets are named just like products: tile_date_sensor_asset/product.tif
     _asset_template = '{}_{}_{}_{}.tif' # for generating filenames
@@ -178,19 +177,19 @@ class daymetAsset(Asset):
         data is daily for the entire run of the dataset and the URLs are
         deterministic, so all it really checks are date bounds.
         """
-        if not (cls.start_date(asset) <= date.date() <= cls.end_date(asset).date()):
-            return (None, None)
         source = cls._assets[asset]['source']
         url = (cls._assets[asset]['url'] + '/%s') % (date.year, tile, date.year, source)
-        bn = cls._basename_pat.format(asset, tile, date.year, date.strftime('%j'))
+        bn = cls._asset_template.format(
+                tile, date.strftime('%Y%j'), cls._sensor, asset)
         return (bn, url)
 
     @classmethod
     def fetch(cls, asset, tile, date):
         """Fetch a daymet asset and convert it to a gips-friendly format."""
-        asset_bn, url = cls.query_provider(asset, tile, date)
-        if (asset_bn, url) is (None, None):
-            return
+        qs_rv = cls.query_service(asset, tile, date)
+        if qs_rv is None:
+            return []
+        asset_bn, url = qs_rv['basename'], qs_rv['url']
         dataset = open_url(url)
         x0 = dataset['x'].data[0] - 500.0
         y0 = dataset['y'].data[0] + 500.0
@@ -214,7 +213,7 @@ class daymetAsset(Asset):
             imgout.SetProjection(PROJ)
             imgout.SetAffine(geo)
             imgout[0].Write(data)
-            imgout.SetMeta(cls.generate_metadata(asset, tile, date, loc))
+            imgout.SetMeta(cls.generate_metadata(asset, tile, date, url))
             os.rename(temp_fp, stage_fp)
             return [stage_fp]
 
@@ -224,6 +223,10 @@ class daymetData(Data):
     name = 'Daymet'
     version = _daymet_driver_version
     Asset = daymetAsset
+
+    @classmethod
+    def need_to_fetch(cls, *args, **kwargs):
+        return True
 
     _products = {
         'tmin': {

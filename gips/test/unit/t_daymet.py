@@ -38,3 +38,23 @@ def t_daymetAsset_constructor_error_case(fn, message):
     """Confirm malformed files cause exceptions."""
     with pytest.raises(ValueError, message=message):
         a = daymet.daymetAsset(fn)
+
+def t_daymetAsset_fetch_query_service_call(mocker, mpo):
+    """Test just enough of daymet's fetch to prove that:
+
+    query_service's output is used correctly."""
+    a_type, tile, date = 'fake-asset', 'fake-tile', 'fake-date'
+    url = 'http://himom.com/'
+    m_query_service = mpo(daymet.daymetAsset, 'query_service')
+    m_query_service.return_value = {'basename': 'fake-basename', 'url': url}
+    m_open_url = mpo(daymet, 'open_url')
+    # intentionally short-circuit daymet's fetch, to avoid mocking the world
+    m_open_url.side_effect = RuntimeError('aaaaaah!')
+
+    try:
+        daymet.daymetAsset.fetch(a_type, tile, date)
+    except RuntimeError:
+        pass
+
+    assert (mocker.call(a_type, tile, date) == m_query_service.call_args
+            and mocker.call(url) == m_open_url.call_args)

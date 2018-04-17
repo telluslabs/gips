@@ -1,0 +1,42 @@
+FROM gippy-0.3.x
+
+ARG GIPS_UID
+RUN apt-get update \
+    && apt-get -y install libcurl4-gnutls-dev
+
+COPY . /gips
+COPY gitlab_ci /root/.ssh/gitlab_ci
+COPY sixs /usr/local/bin/sixs
+COPY gips_creds.sh.enc /root/gips_creds.sh.enc
+
+RUN cd /gips \
+    && chmod +x /usr/local/bin/sixs \
+    && pip install -r dev_requirements.txt \
+    && pip install --process-dependency-links -e . \
+    && rm -f /gips/gips/settings.py /gips/pytest.ini \
+    && gips_config env -r /archive -e icooke@ags.io \
+    && openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh  -pass file:/root/.ssh/gitlab_ci \
+    && eval $(cat gips_creds.sh) \
+    && sed -i~ \
+ 	   -e "s/^EARTHDATA_USER.*/EARTHDATA_USER = \"${EARTHDATA_USER}\"/" \
+ 	   -e "s/^EARTHDATA_PASS.*/EARTHDATA_PASS = \"${EARTHDATA_PASS}\"/" \
+	   -e "s/^USGS_USER.*/USGS_USER = \"${USGS_USER}\"/" \
+ 	   -e "s/^USGS_PASS.*/USGS_PASS = \"${USGS_PASS}\"/" \
+	   -e "s/^ESA_USER.*/ESA_USER = \"${ESA_USER}\"/" \
+ 	   -e "s/^ESA_PASS.*/ESA_PASS = \"${ESA_PASS}\"/" \
+	   /gips/gips/settings.py \
+    && groupadd -g $GIPS_UID gips \
+    && useradd -m -r -u $GIPS_UID -g gips gips \
+    && chown -R gips:gips /gips /archive
+
+COPY docker/pytest-ini /gips/pytest.ini
+
+# defunct ftp fetch
+#RUN echo "# set in the dockerfile" >>/gips/pytest.ini
+#ARG AGSFTPUSERNAME=unset
+#RUN echo "artifact-store-user = $AGSFTPUSERNAME" >>/gips/pytest.ini
+#ARG AGSFTPPASSWORD=unset
+#RUN echo "artifact-store-password = $AGSFTPPASSWORD" >>/gips/pytest.ini
+
+USER gips
+WORKDIR /gips

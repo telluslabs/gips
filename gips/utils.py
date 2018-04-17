@@ -118,6 +118,7 @@ def remove_files(filenames, extensions=()):
     for f in (list(filenames) + [f + e for f in filenames for e in extensions]):
         with error_handler(continuable=True, msg_prefix="Error removing '{}'".format(f)):
             if os.path.isfile(f):
+                verbose_out('Removing ' + f, 5)
                 os.remove(f)
 
 RemoveFiles = remove_files # RemoveFiles name is deprecated
@@ -162,7 +163,10 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
     try:
         yield absolute_pathname
     finally:
-        shutil.rmtree(absolute_pathname)
+        if 'GIPS_DEBUG' not in os.environ:
+            shutil.rmtree(absolute_pathname)
+        else:
+            print('GIPS_DEBUG: Orphaning {}'.format(absolute_pathname))
 
 
 def find_files(regex, path='.'):
@@ -206,12 +210,12 @@ def create_environment_settings(repos_path, email=''):
     if src[-1] == 'c':
         src = src[:-1]
     if os.path.exists(cfgfile):
-        return cfgfile
+        return False, cfgfile
     with open(cfgfile, 'w') as fout:
         with open(src, 'r') as fin:
             for line in fin:
                 fout.write(line.replace('$TLD', repos_path).replace('$EMAIL', email))
-    return cfgfile
+    return True, cfgfile
 
 
 def create_user_settings(email=''):
@@ -224,12 +228,12 @@ def create_user_settings(email=''):
         os.mkdir(cfgpath)
     cfgfile = os.path.join(cfgpath, 'settings.py')
     if os.path.exists(cfgfile):
-        raise Exception('User settings file already exists: %s' % cfgfile)
+        return False, cfgfile
     with open(cfgfile, 'w') as fout:
         with open(src, 'r') as fin:
             for line in fin:
                 fout.write(line)
-    return cfgfile
+    return True, cfgfile
 
 
 def create_repos():
@@ -476,8 +480,9 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
         " ".join(filenames),
         outfile
     )
-    result = commands.getstatusoutput(cmd)
-    verbose_out('{}: {}'.format(cmd, result, 4))
+    status, output = commands.getstatusoutput(cmd)
+    verbose_out(' COMMAND: {}\n exit_status: {}\n output: {}'
+                .format(cmd, status, output ), 4)
 
     imgout = gippy.GeoImage(outfile, True)
     for b in range(0, images[0].NumBands()):
@@ -531,7 +536,8 @@ def report_error(error, msg_prefix, show_tb=True):
     it via the GIPS global verbosity setting."""
     if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
         verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
-        traceback.print_exc()
+        error_text = getattr(error, 'tb_text', 'Error text not found.')
+        verbose_out(error_text, 1, stream=sys.stderr)
     else:
         verbose_out(msg_prefix + ': ' + str(error), 1, stream=sys.stderr)
 
@@ -543,6 +549,7 @@ def lib_error_handler(msg_prefix='Error', continuable=False):
         yield
     except Exception as e:
         if continuable and not _stop_on_error:
+            e.tb_text = traceback.format_exc()
             report_error(e, msg_prefix)
         else:
             raise
@@ -571,6 +578,7 @@ def cli_error_handler(msg_prefix='Error', continuable=False):
         yield
     except Exception as e:
         e.msg_prefix = msg_prefix # for use by gips_exit
+        e.tb_text = traceback.format_exc()
         _accumulated_errors.append(e)
         if continuable and not _stop_on_error:
             report_error(e, msg_prefix)
@@ -590,3 +598,18 @@ def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
         if setup_orm:
             orm.setup()
         return data_class
+
+def prune_unhashable(d):
+    """Returns a new dict containing only the hashable values from d.
+
+    Note that an object's hashability can't be determined without attempting
+    the hash computation.
+    """
+    rv = {}
+    for k, v in d.items():
+        try:
+            hash(v)
+        except TypeError: # unshashable things raise a TypeError
+            continue
+        rv[k] = v
+    return rv

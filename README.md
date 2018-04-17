@@ -1,7 +1,7 @@
 # GIPS
 
 See http://gipit.github.io/gips/ for documentation, but know it is not
-necessarily current.
+~~necessarily~~ current.
 
 ## Installation
 
@@ -11,6 +11,16 @@ to install system packages, and may ask for authentication accordingly.  It
 runs apt-get, which may prompt you for confirmation of its actions.
 Finally, the script will show you how to set GIPS system settings with
 `gips_config`.
+
+## Configuration
+
+### GIPS Settings
+
+`STATS_FORMAT` controls the way `gips_stats` formats its output, and is passed
+in to python's `cvs.writer` as a dict of keyword options.
+
+`GIPS_ORM` controls whether the ORM is activated, and whether gips will keep
+an inventory of its content in the database configured in `DATABASES`.
 
 ### MODIS configuration note
 
@@ -36,20 +46,47 @@ https://lpdaac.usgs.gov/about/news_archive/important_changes_lp_daac_data_access
 
 For information on setting up automated testing, see `gips/test/README.md`.
 
-## Environment
+### Landsat S3 Configuration Note
 
-`GIPS_ORM` controls whether or not the GIPS ORM is activated.  The ORM is
-enabled by default, and if `GIPS_ORM` is set to either "true" (regardless of
-case) or any non-zero number.  Setting it to "false", 0, or any other value
-disables the ORM.
+GIPS supports Landsat data access via AWS S3:
+
+https://aws.amazon.com/public-datasets/landsat/
+
+Most GIPS products are supported if you have API access to AWS:
+
+https://aws.amazon.com/premiumsupport/knowledge-center/create-access-key/
+
+Provide the special access tokens via environment variable:
+
+```
+export AWS_ACCESS_KEY_ID='your-id'
+export AWS_SECRET_ACCESS_KEY='your-key'
+```
+
+Finally set `settings.py` to tell gips to fetch C1 assets from S3:
+
+```
+REPOS = {
+    'landsat': {
+        # . . .
+        'source': 's3', # default is 'usgs'
+    }
+}
+```
+
+After this is done, `gips_inventory --fetch`, `gips_inventory`, and
+`gips_process -p <product-list-here>` should work for S3 assets.
 
 ## Authors and Contributors
 The following have been authors or contributers to GIPS
 
-    Matthew Hanson, matt.a.hanson@gmail.com
     Bobby Braswell (Rob), rbraswell@appliedgeosolutions.com
     Ian Cooke, icooke@appliedgeosolutions.com
+    Rick Emery, remery@appliedgeosolutions.com
+    Justin Fisk, jfisk@appliedgeosolutions.com
+    Matthew Hanson, matt.a.hanson@gmail.com
     Tom Olson, tolson@appliedgeosolutions.com
+    Nate Rubin, nrubing@appliedgeosolutions.com
 
 ## License (GPL v2)
 
