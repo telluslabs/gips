@@ -25,9 +25,16 @@ run_tests:
   script:
     - docker run --rm gips_test_$CI_COMMIT_REF_SLUG pytest -vv -s -k unit # TODO both int & unit
     - docker run --dns=10.0.0.8 --rm -e GIPS_OVERRIDE_VERSION=0.8.2
-      --mount type=bind,source=/net/cluster/projects/gips-sys-test-assets/,destination=/artifact-store
       gips_test_$CI_COMMIT_REF_SLUG 
-      pytest -vv --setup-repo --slow --sys -s -m lite
+      pytest -r es -vv --setup-repo --slow --sys -s -k 't_fetch['
+    - docker run --dns=10.0.0.8 --rm -e GIPS_OVERRIDE_VERSION=0.8.2
+      -v /net/cluster/projects/gips-sys-test-assets:/artifact-store
+      gips_test_$CI_COMMIT_REF_SLUG
+      pytest -r es -vv --setup-repo --slow --sys -s -k t_project
+    - docker run --dns=10.0.0.8 --rm -e GIPS_OVERRIDE_VERSION=0.8.2
+      -v /net/cluster/projects/gips-sys-test-assets:/artifact-store
+      gips_test_$CI_COMMIT_REF_SLUG
+      pytest -r es -vv --setup-repo --slow --sys -s -k t_stats
   tags:
     - gipsdev
   after_script:
