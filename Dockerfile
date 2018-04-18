@@ -15,15 +15,13 @@ RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
     libgnutls-dev \
     libatlas-base-dev \
     libgdal-dev \
+    libcurl4-gnutls-dev \
     gdal-bin \
     python-numpy \
     python-scipy \
     python-gdal \
     swig2.0 \
     wget \
-    mg \
-    libcurl4-gnutls-dev \
-    && ln -s  /usr/bin/mg /usr/bin/emacs \
     && rm -rf /var/lib/apt/lists/* \
     && pip install -U pip==9.0.3 setuptools wheel \
     && pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy
@@ -34,9 +32,7 @@ RUN cd /gips \
     && pip install -r dev_requirements.txt \
     && pip install --process-dependency-links -e . \
     && mv sixs /usr/local/bin/sixs \
-    && chmod +x /usr/local/bin/sixs \
-    && mkdir /archive \
-    && bash authorize.sh
+    && chmod +x /usr/local/bin/sixs
 
 RUN apt-get -y purge \
        gfortran \
@@ -51,3 +47,23 @@ RUN apt-get -y purge \
 VOLUME /archive
 VOLUME /gips
 WORKDIR /gips
+
+ARG UID
+ARG UNAME
+RUN groupadd -g $UID $UNAME \
+    && useradd -m -r -u $UID -g $UNAME $UNAME \
+    && chown -R $UNAME:$UNAME /gips /archive
+
+
+#ARG GID
+#ARG GNAME
+
+#RUN groupadd -g $GID $GNAME \
+#    && useradd -m -r -u $UID -g $GID $UNAME \
+#    && chown -R $UNAME:$GNAME /gips /archive
+#USER $UNAME
+
+#RUN useradd -m -r -u $UID -g 20 $UNAME \
+#    && chown -R $UNAME:staff /gips /archive
+
+#USER $UNAME

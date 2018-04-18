@@ -1084,6 +1084,7 @@ class sentinel2Data(Data):
             "-a", "%s/allbands.vrt" % self._temp_proc_dir,
             "-z", "%s/angles.img" % self._temp_proc_dir,
             "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
+            "--cloudprobthreshold", "10",
             "-v",
         ]
         # Temp dir for intermediaries that pyfmask generates in the current
