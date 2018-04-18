@@ -286,6 +286,16 @@ class Asset(object):
                 self._version < newasset._version)
 
 
+    def version_text(self):
+        """string representation of the asset version.
+
+        Example overrides include:
+            prism: D1-early D2-early D2-provisional D2-stable
+            landsat: T1-YYYYMMDD
+        """
+        return str(self._version)
+
+
     def get_geometry(self):
         """Get the geometry of the asset
 
@@ -441,6 +451,7 @@ class Asset(object):
         if len(files) == 1:
             return cls(files[0])
         return None
+
 
     @classmethod
     def start_date(cls, asset):

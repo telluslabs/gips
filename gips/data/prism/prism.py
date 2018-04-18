@@ -88,8 +88,8 @@ class prismAsset(Asset):
     }
     _stab_score = {
         'stable': 3,
-        'early': 2,
-        'provisional': 1,
+        'provisional': 2,
+        'early': 1,
     }
 
     @classmethod
@@ -159,6 +159,9 @@ class prismAsset(Asset):
         self._version = self._stab_score[self.stability] * .01 + int(self.version[1:])
         # only one tile
         self.tile = 'CONUS'
+
+    def version_text(self):
+        return '{v}-{s}'.format(v=self.version, s=self.stability)
 
     def datafiles(self):
         datafiles = super(prismAsset, self).datafiles()

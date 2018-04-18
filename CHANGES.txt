@@ -19,6 +19,26 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
+v0.10.0
+- modis using gippy.algorithms.Indices
+- changed system tests to use gdalinfo based comparator
+- added Sentinel2 MTCI and S2REP products
+- CDL fetch enabled
+- copious amounts of tempdir usage to prevent bad data pollution
+- MODIS updated to use Collection 6 (where avalable  some products lag)
+- integrated AROP for coregistration of Landsat to Sentinel-2 grid.
+- Gridded exports use integral mask to define spatial extent and resolution of
+  exports (CLI `-r rastermask`)
+- added support for pulling Landsat from AWS S3 storage.
+- `gips_stats` now has CSV formatting and is tweakable via settings.
+- drivers can pass arguments out to the CLI (`--pclouds N` allows filtering
+  based on MSIL1C and Landsat C1 metadata)
+- system tests now include `-m lite` for running small subset of system tests
+- Docker files for use with .gitlab-ci.yml
+- gips_project deprecated and functionality moved to gips_export script.
+- MOD08_D3 shutdown their FTP..moved to https
+- System tests now use artifact store, instead of fetching repeatedly.
+
 v0.9.2
 - PR#448 from Applied-GeoSolutions/445-get-geometry
 - PR#440 from Applied-GeoSolutions/433-sentinel2-gain
