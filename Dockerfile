@@ -49,11 +49,17 @@ VOLUME /gips
 WORKDIR /gips
 
 ARG UID
-ARG UNAME
-RUN groupadd -g $UID $UNAME \
-    && useradd -m -r -u $UID -g $UNAME $UNAME \
-    && chown -R $UNAME:$UNAME /gips /archive
+RUN groupadd -g $UID gips \
+    && useradd -m -r -u $UID -g gips gips \
+    && chown -R gips:gips /gips /archive
 
+
+
+#ARG UID
+#ARG UNAME
+#RUN groupadd -g $UID $UNAME \
+#    && useradd -m -r -u $UID -g $UNAME $UNAME \
+#    && chown -R $UNAME:$UNAME /gips /archive
 
 #ARG GID
 #ARG GNAME
