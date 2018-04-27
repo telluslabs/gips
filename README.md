@@ -34,7 +34,7 @@ REPOS['modis'].update(
     {
         'username': 'YOUR-EARTHDATA-USERNAME',
         'password': 'YOUR-EARTHDATA-PASSWORD', # Use os.environ to avoid saving
-                                           # a password in a file.
+                                               # a password in a file.
     }
 )
 ```
