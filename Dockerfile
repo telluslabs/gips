@@ -44,14 +44,17 @@ RUN apt-get -y purge \
     && apt-get -y autoremove \
     && apt-get -y autoclean
 
+ARG UID
+#ARG GID
+RUN groupadd -g $UID gips \
+    && mkdir /archive \
+    && useradd -m -r -u $UID -g gips gips \
+    && chown -R gips:gips /gips /archive
+
 VOLUME /archive
 VOLUME /gips
 WORKDIR /gips
-
-ARG UID
-RUN groupadd -g $UID gips \
-    && useradd -m -r -u $UID -g gips gips \
-    && chown -R gips:gips /gips /archive
+USER gips
 
 
 
