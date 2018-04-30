@@ -26,7 +26,9 @@ RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
     && pip install -U pip setuptools wheel \
     && pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy
 
+
 COPY . /gips
+
 
 RUN cd /gips \
     && pip install -r dev_requirements.txt \
@@ -49,13 +51,13 @@ ARG UID
 RUN groupadd -g $UID gips \
     && mkdir /archive \
     && useradd -m -r -u $UID -g gips gips \
+    && mkdir /archive \
     && chown -R gips:gips /gips /archive
 
 VOLUME /archive
 VOLUME /gips
 WORKDIR /gips
 USER gips
-
 
 
 #ARG UID

@@ -1,8 +1,14 @@
 docker build -t gips --no-cache -f Dockerfile \
     --build-arg UID=$(id -u) \
-    --squash .
+    .
+
 
 docker run --rm \
-    -v /Users/braswell/repo/gips-rb:/gips \
-    -v /Users/braswell/data/gips:/archive \
+    -v /home/braswell/repo/gips-rb:/gips \
+    -v /data/gips:/archive \
     gips bash initialize.sh
+
+#docker run --rm \
+#    -v /home/braswell/repo/gips-rb:/gips \
+#    -v /data/gips:/archive \
+#    gips bash initialize.sh
