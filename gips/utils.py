@@ -446,6 +446,10 @@ def mosaic(images, outfile, vector):
     result = commands.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
     imgout = gippy.GeoImage(outfile, True)
+    imgout.SetMeta(
+        'GIPS_MOSAIC_SOURCES',
+        ';'.join([os.path.basename(f) for f in filenames])
+    )
     for b in range(0, images[0].NumBands()):
         imgout[b].CopyMeta(images[0][b])
     imgout.CopyColorTable(images[0])
@@ -485,6 +489,10 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
                 .format(cmd, status, output ), 4)
 
     imgout = gippy.GeoImage(outfile, True)
+    imgout.SetMeta(
+        'GIPS_GRIDDED_MOSAIC_SOURCES',
+        ';'.join([os.path.basename(f) for f in filenames])
+    )
     for b in range(0, images[0].NumBands()):
         imgout[b].CopyMeta(images[0][b])
     imgout.AddMask(mask_img[0])
