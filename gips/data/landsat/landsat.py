@@ -1131,10 +1131,11 @@ class landsatData(Data):
                                 utils.verbose_out(
                                     'No Sentinel found for co-registration', 4)
                                 pass
-                            except CantAlignError:
+                            except CantAlignError as cae:
                                 # fall through and use the image unshifted
                                 utils.verbose_out(
-                                    'Unknown co-registration error', 4)
+                                    'Co-registration error (FALLBACK):' + str(cae),
+                                    4)
                                 pass
 
                 try:
@@ -1879,7 +1880,7 @@ class landsatData(Data):
             with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
                 xcoef_re = re.compile(r"x' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
                 ycoef_re = re.compile(r"y' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
-
+                xcoef = ycoef = None
                 for line in log:
                     x_match = xcoef_re.match(line)
                     if x_match:
@@ -1887,7 +1888,9 @@ class landsatData(Data):
                     y_match = ycoef_re.match(line)
                     if y_match:
                         ycoef = float(y_match.group(1))
-
+                if xcoef is None:
+                    raise CantAlignError('AROP: no coefs found in cp_log --> '
+                                         + repr((warp_tile, warp_date)))
             x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
             y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
 
