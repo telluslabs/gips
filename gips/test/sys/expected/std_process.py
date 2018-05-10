@@ -14,8 +14,6 @@ lite_mark_spec = { k: util.lite for k in [
     # consensus is that merra, chirps, & daymet don't need to be tested here
     ('modis', 'ndvi'),
     ('landsat', 'ndvi-toa'),
-    # ref-toa has to be here becuase evi-toa changes otherwise:
-    # https://gitlab.com/appliedgeosolutions/gips/issues/522
     ('sentinel2', 'evi-toa'),
     ('prism', 'ppt'),
     #('sar', 'sign'), # TODO automate arttifact-* pytest.ini values
