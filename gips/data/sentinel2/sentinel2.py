@@ -827,11 +827,9 @@ class sentinel2Data(Data):
     def filter(self, pclouds=100, **kwargs):
         return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
-    @classmethod
-    def meta_dict(cls):
-        """Assemble GIPS & driver version for embedding in output files."""
-        meta = super(sentinel2Data, cls).meta_dict()
-        meta['GIPS-sentinel2 Version'] = cls.version
+    def prep_meta(self, additional=None):
+        meta = super(sentinel2Data, self).prep_meta(
+            self.current_asset().filename, additional)
         return meta
 
     def load_metadata(self):

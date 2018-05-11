@@ -607,6 +607,10 @@ def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
             orm.setup()
         return data_class
 
+##############################################################################
+# misc
+##############################################################################
+
 def prune_unhashable(d):
     """Returns a new dict containing only the hashable values from d.
 
@@ -621,3 +625,15 @@ def prune_unhashable(d):
             continue
         rv[k] = v
     return rv
+
+def stringify_meta_dict(md):
+    """Mostly return {str(k): str(v)...}, except for non-dict iterables."""
+    def stringify(o):
+        if isinstance(o, (basestring, dict)):
+            return str(o)
+        try:
+            return ','.join(str(i) for i in o)
+        except TypeError: # emitted when iter(o) fails
+            return str(o)
+
+    return {str(k): stringify(v) for (k, v) in md.items()}
