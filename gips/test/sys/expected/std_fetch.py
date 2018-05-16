@@ -61,15 +61,7 @@ expectations = {
         [('aod/tiles/2017/004/MOD08_D3.A2017004.006.2017014024715.hdf',
           'hash',
           'sha256',
-          'e854f583f44a04c59dfa621bcd2332f75eab3828b3b3dbbd050a23cd65675c07'),
-         ('aod/tiles/2017/006/MOD08_D3.A2017006.006.2017014033030.hdf',
-          'hash',
-          'sha256',
-          '2780aaf877ec6fc87795afb592d23adfb8836b953c07b380b0b39abd2058c8be'),
-         ('aod/tiles/2017/005/MOD08_D3.A2017005.006.2017014023603.hdf',
-          'hash',
-          'sha256',
-          'ff0f8a470e435be5b75ba2e7d5ac6b6444d0475dce8d0163bcaaed53ea859961')],
+          'e854f583f44a04c59dfa621bcd2332f75eab3828b3b3dbbd050a23cd65675c07')],
 
     # t_fetch[cdl] recording:
     'cdl':
