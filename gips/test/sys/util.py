@@ -400,7 +400,9 @@ def sys_test_wrapper(request, path):
         # when recording the path, don't capture the directory of interest
         rel_cf = [os.path.relpath(fp, path) for fp in created_files]
 
-        cf_expectations = [generate_expectation(fn, path) for fn in rel_cf]
+        # generate expectations but ignore index files
+        cf_expectations = [generate_expectation(fn, path) for fn in rel_cf
+                           if not fn.endswith('.index')]
         print("Recording {} outcome to {}.".format(product or driver, rp))
         with open(rp, 'a') as rfo:
             if product is None:

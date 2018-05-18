@@ -43,16 +43,11 @@ class Algorithm(object):
             self.nproc = kwargs['nproc']
 
     def run_command(self, **kwargs):
-        """ Calls "run" function, or "command" if algorithm uses subparser """
-        #start = datetime.now()
-        if 'command' not in kwargs:
-            command = 'run'
-        else:
-            command = kwargs['command']
-            #VerboseOut('Running %s' % command, 2)
-        exec('self.%s(**kwargs)' % command)
-        #VerboseOut('Completed %s in %s' % (command, datetime.now()-start), 2)
-        pass
+        """Calls "run" function, or "command" if algorithm uses subparser """
+        command = kwargs.get('command', 'run')
+        cmd_func = getattr(self, command)
+        utils.verbose_out('Running %s' % command, 2)
+        cmd_func(**kwargs)
 
     def run(self, **kwargs):
         pass
