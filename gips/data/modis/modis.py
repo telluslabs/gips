@@ -637,7 +637,8 @@ class modisData(Data):
                     availbands = [1]
                     snowsds = [allsds[0], allsds[3]]
                 else:
-                    raise
+                    raise IOError("Missing both MOD10A1 and MYD10A1; can't "
+                                  "continue")
 
                 img = gippy.GeoImage(snowsds)
 
@@ -768,7 +769,8 @@ class modisData(Data):
                     qcsds = [allsds[1], allsds[5]]
                     hoursds = [allsds[2], allsds[6]]
                 else:
-                    raise
+                    raise IOError("Missing both MOD11A1 and MYD11A1; can't "
+                                  "continue")
 
                 tempbands = gippy.GeoImage(tempsds)
                 qcbands = gippy.GeoImage(qcsds)
@@ -872,7 +874,8 @@ class modisData(Data):
                     availbands = [2, 3]
                     hoursds = [allsds[2], allsds[6]]
                 else:
-                    raise
+                    raise IOError("Missing both MOD11A1 and MYD11A1; can't "
+                                  "continue")
 
                 hourbands = gippy.GeoImage(hoursds)
 

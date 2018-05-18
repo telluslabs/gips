@@ -612,7 +612,7 @@ class Asset(object):
         elif recursive:
             for root, subdirs, files in os.walk(path):
                 for a in cls._assets.values():
-                    files = utils.find_files(a['pattern'], path)
+                    files = utils.find_files(a['pattern'], root)
                     fnames.extend(files)
         else:
             for a in cls._assets.values():
