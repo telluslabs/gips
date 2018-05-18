@@ -1,4 +1,8 @@
+#!/usr/bin/env bash
+
+source credentials.sh
+
 docker run -it --rm --name gips -h gips \
-    -v /Users/braswell/repo/gips-rb:/gips \
-    -v /Users/braswell/data/gips:/archive \
+    -v ${GIPSDIR}:/gips \
+    -v ${ARCHIVEDIR}:/archive \
     --user gips gips
