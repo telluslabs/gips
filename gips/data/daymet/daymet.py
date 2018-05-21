@@ -160,8 +160,8 @@ class daymetAsset(Asset):
     def generate_metadata(cls, asset, tile, date, url):
         """Returns a dict suitable to pass to GeoImage.SetMeta()."""
         return {
-            'GIPS Version': gips.__version__,
-            'GIPS DAYMET Driver Version': _daymet_driver_version,
+            'GIPS_Version': gips.__version__,
+            'GIPS_Daymet_Version': _daymet_driver_version,
             'ASSET': asset,
             'TILE': tile,
             'DATE': str(date.date()),

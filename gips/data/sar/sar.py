@@ -379,11 +379,7 @@ class sarData(Data):
 
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
-        """
-        Make sure all products have been pre-processed.
-        
-        TODO: add metadata to output images.
-        """
+        """Produce products."""
         products = super(sarData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
@@ -397,7 +393,6 @@ class sarData(Data):
         #datafiles = self.assets[asset].datafiles()
         self.basename = self.basename + '_' + sensor
         for key, val in products.requested.items():
-            #fname = os.path.join(self.path, self.basename + '_' + key)
             fname = self.temp_product_filename(sensor, key)
             jo = lambda fps: self.assets[asset]._jaxa_opener(
                     fps, path=self._temp_proc_dir)
@@ -407,6 +402,9 @@ class sarData(Data):
                 imgout = mask.Process(fname)
                 imgout[0].SetNoData(0)
                 imgout.Process()
+                # Sometimes the I/O seems to be put off until garbage
+                # collection time, so trick gippy into getting on with it:
+                del imgout
             elif val[0] == 'sign':
                 # extract all data from archive
                 bands = [datafiles[b] for b in ["sl_HH", "sl_HV"] if b in datafiles]
@@ -433,6 +431,7 @@ class sarData(Data):
                         self.assets[asset].get_meta_dict()['CF']
                     ).Process(imgout[b])
                 fname = imgout.Filename()
+                del imgout
             elif val[0] == 'linci':
                 # Note the linci product DOES NOT mask by date
                 img = gippy.GeoImage(datafiles['linci'])
@@ -443,6 +442,9 @@ class sarData(Data):
                 img.Process(fname)
             else:
                 raise Exception('Unrecognized product: ' + key)
+            # True = r/w mode, otherwise SetMeta silently does nothing
+            smi = gippy.GeoImage(fname, True)
+            smi.SetMeta(self.prep_meta(self.assets[asset].filename))
             archive_fp = self.archive_temp_path(fname)
             self.AddFile(sensor, key, archive_fp)
         # Remove unused files

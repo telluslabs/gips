@@ -35,8 +35,10 @@ from backports.functools_lru_cache import lru_cache
 from dbfread import DBF
 import requests
 
+import gips
 from gips.data.core import Repository, Asset, Data
 from gips import utils
+from gips.utils import verbose_out
 from gippy import GeoImage, GeoImages
 from osgeo import gdal
 
@@ -112,24 +114,27 @@ class cdlAsset(Asset):
         # We don't want to clutter up the output with SSL warnings.
         import urllib3; urllib3.disable_warnings()
 
-        if asset == _cdl:
-            utils.verbose_out("Fetching tile for {} on {}".format(tile, date.year), 2)
-            query_rv = cls.query_service(asset, tile, date)
-            if query_rv is None:
-                utils.verbose_out("No CDL data for {} on {}".format(tile, date.year), 2)
-                return []
-            file_response = requests.get(query_rv['url'], verify=False, stream=True)
-            with utils.make_temp_dir(prefix='fetch', dir=cls.Repository.path('stage')) as tmp_dir:
-                fname = "{}_{}_cdl_cdl.tif".format(tile, date.year)
-                tmp_fname = tmp_dir + '/' + fname
-                with open(tmp_fname, 'w') as asset:
-                    asset.write(file_response.content)
-                imgout = GeoImage(tmp_fname, True)
-                imgout.SetNoData(0)
-                imgout = None
-                shutil.copy(tmp_fname, cls.Repository.path('stage'))
-        else:
-            utils.verbose_out("Fetching not supported for cdlmkii", 2)
+        if asset == _cdlmkii:
+            verbose_out("Fetching not supported for cdlmkii", 2)
+            return []
+        verbose_out("Fetching tile for {} on {}".format(tile, date.year), 2)
+        query_rv = cls.query_service(asset, tile, date)
+        if query_rv is None:
+            verbose_out("No CDL data for {} on {}".format(tile, date.year), 2)
+            return []
+        file_response = requests.get(
+            query_rv['url'], verify=False, stream=True)
+        with utils.make_temp_dir(
+                prefix='fetch', dir=cls.Repository.path('stage')) as tmp_dir:
+            fname = "{}_{}_cdl_cdl.tif".format(tile, date.year)
+            tmp_fname = tmp_dir + '/' + fname
+            with open(tmp_fname, 'w') as asset:
+                asset.write(file_response.content)
+            imgout = GeoImage(tmp_fname, True)
+            imgout.SetNoData(0)
+            imgout.SetMeta('GIPS_Version', gips.__version__)
+            imgout = None
+            shutil.copy(tmp_fname, cls.Repository.path('stage'))
 
     
 class cdlData(Data):
