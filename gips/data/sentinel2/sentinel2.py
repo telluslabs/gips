@@ -827,11 +827,14 @@ class sentinel2Data(Data):
     def filter(self, pclouds=100, **kwargs):
         return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
-    @classmethod
-    def meta_dict(cls):
-        """Assemble GIPS & driver version for embedding in output files."""
-        meta = super(sentinel2Data, cls).meta_dict()
-        meta['GIPS-sentinel2 Version'] = cls.version
+    def prep_meta(self, additional=None):
+        meta = super(sentinel2Data, self).prep_meta(
+            self.current_asset().filename, additional)
+        return meta
+
+    def prep_meta(self, additional=None):
+        meta = super(sentinel2Data, self).prep_meta(
+            self.current_asset().filename, additional)
         return meta
 
     def load_metadata(self):
@@ -894,7 +897,6 @@ class sentinel2Data(Data):
                 raise IOError("Expected gdalbuildvrt exit status 0, got {}"
                               .format(p.returncode))
             vrt_img = gippy.GeoImage(vrt_filename)
-            vrt_img.SetMeta(self.meta_dict())
             vrt_img.SetNoData(0)
             vrt_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
             # eg:   3        '08'
@@ -969,7 +971,7 @@ class sentinel2Data(Data):
 
         self._time_report('Starting indices processing for: {}'.format(indices.keys()))
 
-        metadata = self.meta_dict()
+        metadata = self.prep_meta()
         if mode != 'toa':
             image = self.load_image('ref')
             # this faff is needed because gippy shares metadata across images behind your back
@@ -1000,10 +1002,7 @@ class sentinel2Data(Data):
         # let acolite use a subdirectory in this run's tempdir:
         aco_tmp_dir = self.generate_temp_path('acolite')
         os.mkdir(aco_tmp_dir)
-        acolite_product_spec = {
-            # TODO refactor 'meta' into an argument; it's pop()'ed out anyway
-            'meta': self.meta_dict(),
-        }
+        acolite_product_spec = {'meta': self.prep_meta()}
         for p in aco_prods:
             # TODO use tempdirs to match current gips practices
             fn = os.path.join(self.path, self.product_filename(sensor, p))
@@ -1245,7 +1244,7 @@ class sentinel2Data(Data):
                 source_image = self._product_images[prod_type]
                 output_image = gippy.GeoImage(temp_fp, source_image)
                 output_image.SetNoData(0)
-                output_image.SetMeta(self.meta_dict()) # add standard metadata
+                output_image.SetMeta(self.prep_meta())
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)

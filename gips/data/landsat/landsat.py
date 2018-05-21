@@ -938,7 +938,8 @@ class landsatData(Data):
         else:
             product_info['latency'] = float("inf")
 
-    def _process_indices(self, image, metadata, sensor, indices, coreg_shift=None):
+    def _process_indices(self, image, asset_fn, metadata, sensor, indices,
+                         coreg_shift=None):
         """Process the given indices and add their files to the inventory.
 
         Image is a GeoImage suitable for generating the indices.
@@ -956,7 +957,8 @@ class landsatData(Data):
             gippy_input[pt_split[0]] = temp_fp
             tempfps_to_ptypes[temp_fp] = prod_type
 
-        prodout = Indices(image, gippy_input, metadata)
+        prodout = Indices(image, gippy_input,
+                          self.prep_meta(asset_fn, metadata))
 
         if coreg_shift:
             for key, val in prodout.iteritems():
@@ -1008,7 +1010,6 @@ class landsatData(Data):
 
         # TODO: De-hack this
         # Better approach, but needs some thought, is to loop over assets
-        # Ian, you are right. I just don't have enough time to do it.
 
         if asset == 'SR':
 
@@ -1093,7 +1094,7 @@ class landsatData(Data):
             meta = self.assets[asset].meta['bands']
             visbands = self.assets[asset].visbands
             lwbands = self.assets[asset].lwbands
-            md = self.meta_dict()
+            md = {}
 
             product_is_coreg = [(v and 'coreg' in v) for v in products.requested.values()]
             coreg = all(product_is_coreg)
@@ -1179,6 +1180,8 @@ class landsatData(Data):
 
             # This is landsat, so always just one sensor for a given date
             sensor = self.sensors[asset]
+
+            asset_fn = self.assets[asset].filename
 
             # Process standard products (this is in the 'DN' block)
             for key, val in groups['Standard'].items():
@@ -1394,7 +1397,7 @@ class landsatData(Data):
                         os.remove(abfn + '.tif')
 
                     fname = imgout.Filename()
-                    imgout.SetMeta(md)
+                    imgout.SetMeta(self.prep_meta(asset_fn, md))
 
                     if coreg:
                         self._time_report("Setting affine of product")
@@ -1431,14 +1434,16 @@ class landsatData(Data):
 
                 # Run TOA
                 if len(indices_toa) > 0:
-                    self._process_indices(reflimg, md, sensor, indices_toa, coreg_shift)
+                    self._process_indices(reflimg, asset_fn, md, sensor,
+                                          indices_toa, coreg_shift)
 
                 # Run atmospherically corrected
                 if len(indices) > 0:
                     for col in visbands:
                         img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
                                 ) * (1.0 / atm6s.results[col][2])
-                    self._process_indices(img, md, sensor, indices, coreg_shift)
+                    self._process_indices(img, asset_fn, md, sensor, indices,
+                                          coreg_shift)
                 verbose_out(' -> %s: processed %s in %s' % (
                         self.basename, indices0.keys(), datetime.now() - start), 1)
             img = None
@@ -1630,13 +1635,11 @@ class landsatData(Data):
         #self.metadata.update(smeta)
         return self.metadata
 
-    @classmethod
-    def meta_dict(cls):
-        meta = super(landsatData, cls).meta_dict()
-        meta['GIPS-landsat Version'] = cls.version
-        return meta
-
     def _readqa(self, asset_type):
+        """Returns a gippy GeoImage containing a QA band.
+
+        The QA band belongs to the asset corresponding to the given asset type.
+        """
         md = self.meta(asset_type)
         if asset_type == 'C1S3':
             return gippy.GeoImage(md['qafilename'])
@@ -1652,7 +1655,11 @@ class landsatData(Data):
         return qaimg
 
     def _readraw(self, asset_type):
-        """ Read in Landsat bands using original tar.gz file """
+        """Return a gippy GeoImage containing raster bands.
+
+        The bands are read from the asset corresponding to the given
+        asset type.
+        """
         start = datetime.now()
         asset_obj = self.assets[asset_type]
 

@@ -9,6 +9,8 @@ COPY gitlab_ci /root/.ssh/gitlab_ci
 COPY sixs /usr/local/bin/sixs
 COPY gips_creds.sh.enc /root/gips_creds.sh.enc
 
+ENV GIPS_OVERRIDE_VERSION='0.0.0-dev'
+
 RUN cd /gips \
     && chmod +x /usr/local/bin/sixs \
     && pip install -r dev_requirements.txt \

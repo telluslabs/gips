@@ -766,10 +766,6 @@ class Data(object):
     _products = {}
     _productgroups = {}
 
-    def meta(self):
-        """ Retrieve metadata for this tile """
-        return {}
-
     def needed_products(self, products, overwrite):
         """ Make sure all products exist and return those that need processing """
         # TODO calling RequestedProducts twice is strange; rework into something clean
@@ -861,11 +857,33 @@ class Data(object):
         """
         return True
 
-    @classmethod
-    def meta_dict(cls):
-        return {
-            'GIPS Version': __version__,
+    def meta_dict(self, src_afns=None, additional=None):
+        """Returns assembled metadata dict.
+
+        returned value contains standard metadata + asset filenames +
+        optional additional content.  Asset filenames can be a string or
+        iterable of strings; it'll be converted to a list of basenames.  If
+        defaulted to None, self.assets' filenames is used instead.
+        """
+        sa = src_afns
+        if src_afns is None:
+            sa = [ao.filename for ao in self.assets.values()]
+        elif isinstance(src_afns, basestring):
+            sa = [src_afns]
+        md = {
+            'GIPS_Version': __version__,
+            'GIPS_Source_Assets': [os.path.basename(fn) for fn in sa]
         }
+        with utils.error_handler("Can't set driver version metadata", True):
+            gdn = 'GIPS_' + self.Repository.name.capitalize() + '_Version'
+            md[gdn] = self.version
+        if additional is not None:
+            md.update(additional)
+        return md
+
+    def prep_meta(self, src_afns, additional=None):
+        """Prepare product metadata for consumption by GeoImage.SetMeta()."""
+        return utils.stringify_meta_dict(self.meta_dict(src_afns, additional))
 
     def find_files(self):
         """Search path for non-asset files, usually product files.
