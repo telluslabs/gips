@@ -405,22 +405,21 @@ def sys_test_wrapper(request, path):
                            if not fn.endswith('.index')]
         print("Recording {} outcome to {}.".format(product or driver, rp))
         with open(rp, 'a') as rfo:
+            indent = ' '
             if product is None:
-                # TODO one more level of indentation here
-                print('\n# {}[{}] recording:'.format(
-                    request.function.__name__, driver), file=rfo)
-                pretty_hashes = pprint.pformat(cf_expectations)
-                print(pretty_hashes, end='', file=rfo)
-                print(',', file=rfo)
+                comment = '\n{}# {}[{}] recording:'.format(
+                    indent, request.function.__name__, driver)
+                pf_lines = pprint.pformat(
+                    (driver, cf_expectations)).splitlines()
             else:
-                print('\n# {}[{}-{}] recording:'.format(
-                        request.function.__name__, driver, product), file=rfo)
-                print("'{}':".format(product), file=rfo)
-                pretty_hashes = pprint.pformat(cf_expectations)
-                print('    ', end='', file=rfo)
-                print('\n    '.join(pretty_hashes.split('\n')),
-                      end='', file=rfo)
-                print(',', file=rfo)
+                comment = '\n{}# {}[{}-{}] recording:'.format(
+                    indent, request.function.__name__, driver, product)
+                pf_lines = pprint.pformat(
+                    (product, cf_expectations)).splitlines()
+            print(comment, file=rfo)
+            pf_str = '\n'.join(indent + l for l in pf_lines)
+            print(pf_str, end='', file=rfo)
+            print(',', file=rfo)
 
 @pytest.yield_fixture
 def repo_wrapper(request):

@@ -443,8 +443,8 @@ class modisData(Data):
                            % (str(missingassets), str(self.date), str(self.id), ), 5)
                 continue
 
-            meta = self.meta_dict()
-            meta['AVAILABLE_ASSETS'] = ' '.join(availassets)
+            meta = {'AVAILABLE_ASSETS': ' '.join(availassets)} # TODO obselete?
+            a_fnames = [self.assets[at].filename for at in availassets]
 
             sensor = self._products[prod_type]['sensor']
             fname = self.temp_product_filename(sensor, prod_type) # moved to archive at end of loop
@@ -907,7 +907,6 @@ class modisData(Data):
             ###################################################################
             # NDVI (8-day) - Terra only
             if val[0] == "ndvi8":
-                # NOTE this code is unreachable currently; see _products above.
                 VERSION = "1.0"
                 meta['VERSION'] = VERSION
 
@@ -931,8 +930,7 @@ class modisData(Data):
                 imgout = gippy.GeoImage(fname)
 
             # set metadata
-            meta = {k: str(v) for k, v in meta.iteritems()}
-            imgout.SetMeta(meta)
+            imgout.SetMeta(self.prep_meta(a_fnames, meta))
 
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
@@ -945,7 +943,7 @@ class modisData(Data):
         requested_ipt = products.groups()['Index'].keys()
         if requested_ipt:
             model_pt = requested_ipt[0] # all should be similar
-            asset, version, _, _, allsds = self.asset_check(model_pt)
+            asset, version, _, availassets, allsds = self.asset_check(model_pt)
             if asset is None:
                 raise IOError('Found no assets for {}'.format(
                     requested_ipt))
@@ -976,9 +974,9 @@ class modisData(Data):
             prod_spec = {pt: self.temp_product_filename(sensor, pt)
                          for pt in requested_ipt}
 
-            metadata = self.meta_dict()
-            metadata['VERSION'] = '1.0'
-            pt_to_temp_fps = Indices(img, prod_spec, metadata)
+            a_fnames = [self.assets[at].filename for at in availassets]
+            pt_to_temp_fps = Indices(img, prod_spec,
+                    self.prep_meta(a_fnames, {'VERSION': '1.0'}))
 
             for pt, temp_fp in pt_to_temp_fps.items():
                 archived_fp = self.archive_temp_path(temp_fp)
