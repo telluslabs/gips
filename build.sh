@@ -7,10 +7,11 @@ docker build -t gips --no-cache -f Dockerfile \
     .
 
 
-docker run --rm \
-    -v ${GIPSDIR}:/gips \
-    -v ${ARCHIVEDIR}:/archive \
-    gips bash initialize.sh
+#docker run --rm \
+#    -v ${GIPSDIR}:/gips \
+#    -v ${ARCHIVEDIR}:/archive \
+#    gips bash initialize.sh
+
 
 #docker run --rm \
 #    -v /home/braswell/repo/gips-rb:/gips \

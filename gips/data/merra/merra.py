@@ -445,6 +445,7 @@ class merraData(Data):
         imgout.SetNoData(missing)
         imgout.SetProjection(self._projection)
         imgout.SetAffine(np.array(self._geotransform))
+        imgout.SetMeta(self.prep_meta(assetfile, meta))
 
 
     @Data.proc_temp_dir_manager
@@ -543,6 +544,7 @@ class merraData(Data):
                 imgout.SetNoData(missing)
                 imgout.SetProjection(self._projection)
                 imgout.SetAffine(np.array(self._geotransform))
+                imgout.SetMeta(self.prep_meta(assetfile, meta))
 
             elif val[0] == "frland":
                 startdate = merraAsset._assets[self._products[val[0]]['assets'][0]]['startdate']
@@ -572,6 +574,7 @@ class merraData(Data):
                 imgout.SetNoData(missing)
                 imgout.SetProjection(self._projection)
                 imgout.SetAffine(np.array(self._geotransform))
+                imgout.SetMeta(self.prep_meta(assetfile, meta))
 
             """
             if val[0] == "temp_modis":
