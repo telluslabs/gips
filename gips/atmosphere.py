@@ -519,7 +519,7 @@ def process_acolite(asset, aco_proc_dir, products,
         'int16': (gippy.GDT_Int16, -32768),
         'uint8': (gippy.GDT_Byte, 1),
     }
-    imeta = products.pop('meta')
+    imeta = products.pop('meta') # TODO refactor into an argument
 
     # TODO: add 'outdir' to `gips.data.core.Asset.extract` method
     # EXTRACT ASSET
