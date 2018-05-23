@@ -2,9 +2,11 @@
 
 source credentials.sh
 
-docker build -t gips --no-cache -f Dockerfile \
-    --build-arg UID=$(id -u) \
-    .
+#docker build -t gips --no-cache -f Dockerfile \
+#    --build-arg UID=$(id -u) .
+
+docker build -t gips -f Dockerfile \
+    --build-arg UID=$(id -u) .
 
 
 #docker run --rm \
