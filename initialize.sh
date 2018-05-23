@@ -1,4 +1,5 @@
-rm -rf /archive/*
+#rm -rf /archive/*
+
 bash authorize.sh
 gips_config env
 
