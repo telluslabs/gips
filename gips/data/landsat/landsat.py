@@ -209,12 +209,12 @@ class landsatAsset(Asset):
         'C1': {
             'sensors': ['LT5', 'LE7', 'LC8'],
             'pattern': _c1_base_pattern + r'\.tar\.gz$',
-            'latency': 12,
+            'latency': 0,
         },
         'C1S3': {
             'sensors': ['LC8'],
             'pattern': _c1_base_pattern + r'_S3\.json$',
-            'latency': 12,
+            'latency': 0,
         },
     }
 
@@ -695,7 +695,7 @@ class landsatData(Data):
             'description': 'Surface-leaving radiance',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             # units given by https://landsat.usgs.gov/landsat-8-l8-data-users-handbook-section-5
             'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
@@ -704,7 +704,7 @@ class landsatData(Data):
             'description': 'Surface reflectance',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands(*__visible_bands_union)
         },
         'temp': {
@@ -712,7 +712,7 @@ class landsatData(Data):
             'description': 'Brightness (apparent) temperature',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             # units given by https://landsat.usgs.gov/landsat-8-l8-data-users-handbook-section-5
             'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
@@ -727,7 +727,7 @@ class landsatData(Data):
             'nargs': '*',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             # percentage, so unitless, per landsat docs:
             # https://landsat.usgs.gov/how-percentage-cloud-cover-calculated
             'bands': unitless_bands('finalmask', 'cloudmask', 'ambclouds', 'pass1'),
@@ -738,7 +738,7 @@ class landsatData(Data):
             'nargs': '*',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('finalmask', 'cloudmask',
                                     'PCP', 'clearskywater', 'clearskyland'),
         },
@@ -747,7 +747,7 @@ class landsatData(Data):
             'description': 'Cloud (and shadow) mask product based on cloud bits of the quality band',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('cloudmask'),
         },
         'tcap': {
@@ -755,7 +755,7 @@ class landsatData(Data):
             'description': 'Tassled cap transformation',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6'),
         },
         'dn': {
@@ -763,7 +763,7 @@ class landsatData(Data):
             'description': 'Raw digital numbers',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
         'volref': {
@@ -771,7 +771,7 @@ class landsatData(Data):
             'description': 'Volumetric water reflectance - valid for water only',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             # reflectance is unitless therefore volref should be unitless
             'bands': unitless_bands(*__visible_bands_union),
         },
@@ -781,7 +781,7 @@ class landsatData(Data):
             # It's not really TOA, but the product code will take care of atm correction itself
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
         'bqashadow': {
@@ -795,7 +795,7 @@ class landsatData(Data):
             'nargs': '*',
             'toa': True,
             'startdate': _lc8_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('bqashadow'),
         },
         #'Indices': {
@@ -804,7 +804,7 @@ class landsatData(Data):
             'description': 'Brightness Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('bi'),
         },
         'evi': {
@@ -812,7 +812,7 @@ class landsatData(Data):
             'description': 'Enhanced Vegetation Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('evi'),
         },
         'lswi': {
@@ -820,7 +820,7 @@ class landsatData(Data):
             'description': 'Land Surface Water Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('lswi'),
         },
         'msavi2': {
@@ -828,7 +828,7 @@ class landsatData(Data):
             'description': 'Modified Soil-Adjusted Vegetation Index (revised)',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('msavi2'),
         },
         'ndsi': {
@@ -836,7 +836,7 @@ class landsatData(Data):
             'description': 'Normalized Difference Snow Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndsi'),
         },
         'ndvi': {
@@ -844,7 +844,7 @@ class landsatData(Data):
             'description': 'Normalized Difference Vegetation Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndvi'),
         },
         'ndwi': {
@@ -852,7 +852,7 @@ class landsatData(Data):
             'description': 'Normalized Difference Water Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndwi'),
         },
         'satvi': {
@@ -860,7 +860,7 @@ class landsatData(Data):
             'description': 'Soil-Adjusted Total Vegetation Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('satvi'),
         },
         'vari': {
@@ -868,7 +868,7 @@ class landsatData(Data):
             'description': 'Visible Atmospherically Resistant Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('vari'),
         },
         #'Tillage Indices': {
@@ -877,7 +877,7 @@ class landsatData(Data):
             'description': 'Normalized Difference Tillage Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndti'),
         },
         'crc': {
@@ -885,7 +885,7 @@ class landsatData(Data):
             'description': 'Crop Residue Cover',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('crc'),
         },
         'sti': {
@@ -893,7 +893,7 @@ class landsatData(Data):
             'description': 'Standard Tillage Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('sti'),
         },
         'isti': {
@@ -901,7 +901,7 @@ class landsatData(Data):
             'description': 'Inverse Standard Tillage Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('isti'),
         },
         # NEW!!!
@@ -909,14 +909,14 @@ class landsatData(Data):
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
             'startdate': _lc8_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndvi8sr'),
         },
         'landmask': {
             'assets': ['SR'],
             'description': 'Land mask from LC8SR',
             'startdate': _lc8_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('landmask'),
         },
     }
