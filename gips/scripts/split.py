@@ -60,7 +60,7 @@ def main():
                     img = inv[date].open(p)
                     fname = img.Filename()
 
-                    if args.prodname not in fname:
+                    if not fname.endswith("{}.tif".format(args.prodname)):
                         continue
                     
                     bnames = img.BandNames()
