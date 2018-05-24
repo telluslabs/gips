@@ -14,7 +14,7 @@ DATE=$(date -d "yesterday" '+%Y-%m-%d')
 OUTDIR="/archive/"${OUTNAME}${DATE}
 
 # fetch and process reflectance and cloud mask
-gips_process landsat -p ref fmask -s ${SHPPATH} -v4 -d ${DATE} --fetch
+gips_process landsat -p ref fmask -s ${INSHPPATH} -v4 -d ${DATE} --fetch
 
 # export feature rasters for ARD tiles
 gips_export landsat -p ref fmask -s ${OUTSHPPATH} -v4 -d ${DATE} --outdir ${OUTDIR} --notld --res 30 30
