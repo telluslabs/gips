@@ -30,9 +30,7 @@ COPY . /gips
 
 RUN cd /gips \
     && pip install -r dev_requirements.txt \
-    && pip install --process-dependency-links -e . \
-    && mv sixs /usr/local/bin/sixs \
-    && chmod +x /usr/local/bin/sixs
+    && pip install --process-dependency-links -e .
 
 RUN apt-get -y purge \
        gfortran \
@@ -46,4 +44,5 @@ RUN apt-get -y purge \
 
 VOLUME /archive
 VOLUME /gips
+VOLUME /conf
 WORKDIR /gips
