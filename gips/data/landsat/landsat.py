@@ -41,7 +41,7 @@ from xml.etree import ElementTree
 from backports.functools_lru_cache import lru_cache
 import numpy
 # once gippy==1.0, switch to GeoRaster.erode
-from scipy.ndimage import binary_erosion
+from scipy.ndimage import binary_dilation
 
 import osr
 import gippy
@@ -744,7 +744,8 @@ class landsatData(Data):
         },
         'cloudmask': {
             'assets': ['C1'],
-            'description': 'Cloud (and shadow) mask product based on cloud bits of the quality band',
+            'description': ('Cloud (and shadow) mask product based on cloud '
+                            'bits of the quality band'),
             'toa': True,
             'startdate': _lt5_startdate,
             'latency': 0,
@@ -1222,10 +1223,17 @@ class landsatData(Data):
                         qaimg = self._readqa(asset)
                         npqa = qaimg.Read()  # read image file into numpy array
                         # https://landsat.usgs.gov/collectionqualityband
-                        # cloudmaskmask = (cloud and (cc_med or cc_high)) or csc_med or csc_high
+                        # cloudmaskmask = (cloud and
+                        #                  (cc_low or cc_med or cc_high)
+                        #                 ) or csc_high
                         # cloud iff bit 4
-                        # (cc_med or cc_high) iff bit 6
-                        # (csc_med or csc_high) iff bit 8
+                        # (cc_low or cc_med or cc_high) iff bit 5 or bit 6
+                        # (csc_high) iff bit 8 ***
+                        #  NOTE: from USGS tables as of 2018-05-22, cloud
+                        #  shadow conficence is either high(3) or low(1).
+                        #  No pixels get medium (2).  And only no-data pixels
+                        #  ever get no (0) confidence. 
+
 
                         # GIPPY 1.0 note: rewrite this whole product after
                         # adding get_bit method to GeoRaster
@@ -1234,18 +1242,21 @@ class landsatData(Data):
                             """Return an array with the ith bit extracted from each cell."""
                             return (np_array >> i) & 0b1
 
-                        np_cloudmask = numpy.logical_not(
-                            get_bit(npqa, 4) &
-                            get_bit(npqa, 6) |
-                            get_bit(npqa, 8)
-                        )
+                        np_cloudmask = (
+                            get_bit(npqa, 8) # shadow
+                            | (get_bit(npqa, 4) & # cloud
+                               ( # with at least low(1) confidence
+                                   get_bit(npqa, 5) | get_bit(npqa, 6)
+                               )
+                            )
+                        ).astype('uint8')
 
-                        erosion_width = 10
-                        elem = numpy.ones((erosion_width,) * 2, dtype='uint8')
-                        np_cloudmask_eroded = binary_erosion(
+                        dilation_width = 20
+                        elem = numpy.ones((dilation_width,) * 2, dtype='uint8')
+                        np_cloudmask_dilated = binary_dilation(
                             np_cloudmask, structure=elem,
                         ).astype('uint8')
-                        np_cloudmask_eroded *= (npqa != 1)
+                        np_cloudmask_dilated *= (npqa != 1)
                         #
 
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
@@ -1253,15 +1264,20 @@ class landsatData(Data):
                         imgout.SetBandName(
                             self._products[val[0]]['bands'][0]['name'], 1
                         )
-                        imgout.SetMeta('GIPS_LANDSAT_VERSION', self.version)
-                        imgout.SetMeta('GIPS_C1_ERODED_PIXELS', str(erosion_width))
-
+                        md.update(
+                            {
+                                'GIPS_LANDSAT_VERSION': self.version,
+                                'GIPS_C1_DILATED_PIXELS': str(dilation_width),
+                                'GIPS_LANDSAT_CLOUDMASK_CLOUD_VALUE': '1',
+                                'GIPS_LANDSAT_CLOUDMASK_CLEAR_OR_NODATA_VALUE': '0',
+                            }
+                        )
                         ####################
                         # GIPPY1.0 note: replace this block with
                         # imgout[0].set_nodata(0.)
-                        # imout[0].write_raw(np_cloudmask_eroded)
+                        # imout[0].write_raw(np_cloudmask_dilated)
                         imgout[0].Write(
-                            np_cloudmask_eroded
+                            np_cloudmask_dilated
                         )
                         imgout = None
                         imgout = gippy.GeoImage(fname, True)
