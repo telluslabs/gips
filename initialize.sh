@@ -21,3 +21,4 @@ sed -i~ \
 gips_config env
 tar xfvz /conf/aod.composites.tgz -C /archive
 mkdir /archive/vector
+mkdir /archive/export
