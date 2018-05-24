@@ -7,7 +7,6 @@ epydoc
 .eggs
 build
 dist
-gips.egg-info
 pytest.ini
 .cache
 .coverage

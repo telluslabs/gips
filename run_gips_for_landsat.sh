@@ -3,10 +3,10 @@
 # run this from inside the gips container
 
 DATE="2018-05-22"
-OUTDIR="/archive/export_landsat_ard_"${DATE}
+OUTDIR="/archive/export_landsat_ard_indigo_"${DATE}
 
 # fetch and process reflectance and cloud mask
-gips_process landsat -p ref fmask -s /archive/vector/fields_temp_buffer.shp -v4 -d ${DATE} --fetch
+gips_process landsat -p ref fmask -s /archive/vector/indigo_temp_buffer.shp -v4 -d ${DATE} --fetch
 
 # export feature rasters
 gips_export landsat -p ref fmask -s /archive/vector/conus_ard_grid.shp -v4 -d ${DATE} --outdir ${OUTDIR} --notld --res 30 30
