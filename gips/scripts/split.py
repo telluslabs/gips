@@ -70,9 +70,14 @@ def main():
                         fnameout = "{}_{}.tif".format(
                             os.path.splitext(fname)[0], bname)
 
-                        imgout = gippy.GeoImage(fnameout, img, gippy.GDT_Float32, 1)
                         data = img[i].Read()
+
+                        imgout = gippy.GeoImage(fnameout, img, gippy.GDT_Int16, 1)
+                        imgout.SetNoData(-32768)
+                        imgout.SetOffset(0.0)
+                        imgout.SetGain(0.0001)
                         imgout[0].Write(data)
+                        imgout.SetBandName(bname, 1)
                         imgout = None
                         
                     img = None
