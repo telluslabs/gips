@@ -90,8 +90,6 @@ def main():
                         dtype = gdal.GDT_Int16
                         
                         write_raster(fnameout, data, proj, geo, nodata, dtype)
-
-                        set_trace()
                         
                         #data[notmissing] = data[]
                         # do gdal stuff here
