@@ -11,7 +11,7 @@ OUTSHPPATH="/archive/vector/"${ARGS[2]}
 DATE=$(date -d "yesterday" '+%Y-%m-%d')
 
 # the outdir from container perspective
-OUTDIR="/archive/export/"${OUTNAME}${DATE}
+OUTDIR="/archive/export/"${OUTNAME}"_"${DATE}
 
 # fetch and process reflectance and cloud mask
 gips_process landsat -p ref fmask -s ${INSHPPATH} -v4 -d ${DATE} --fetch
