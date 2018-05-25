@@ -71,7 +71,7 @@ def main():
                             os.path.splitext(fname)[0], bname)
 
                         data = img[i].Read()
-
+                        
                         imgout = gippy.GeoImage(fnameout, img, gippy.GDT_Int16, 1)
                         imgout.SetNoData(-32768)
                         imgout.SetOffset(0.0)
