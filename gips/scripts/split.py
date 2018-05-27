@@ -82,10 +82,11 @@ def main():
 
                         data = imgdata[i,:,:].squeeze()
                         
+
                         nodata = -32768
                         scale = 10000
-                        notmissing = np.where(data!=nodata)
-                        data[notmissing] = data[notmissing]*scale
+                        #notmissing = np.where(data!=nodata)
+                        #data[notmissing] = data[notmissing]*scale
                         data = data.astype('int16')
                         dtype = gdal.GDT_Int16
                         
