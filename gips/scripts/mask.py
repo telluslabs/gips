@@ -72,6 +72,9 @@ def main():
                     meta = ''
                     update = True if args.original else False
                     img = inv[date].open(p, update=update)
+                    fname = img.Filename()
+                    if args.pmask in fname:
+                        continue
                     if args.filemask is not None:
                         img.AddMask(mask_file[0])
                         meta = basename(args.filemask) + ' '
