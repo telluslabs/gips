@@ -7,20 +7,27 @@ OUTNAME=${ARGS[0]}
 INSHPPATH="/archive/vector/"${ARGS[1]}
 OUTSHPPATH="/archive/vector/"${ARGS[2]}
 
-# the date is always yesterday
-DATE=$(date -d "yesterday" '+%Y-%m-%d')
+# the default date is yesterday
+DEFAULTDATE=$(date -d "yesterday" '+%Y-%m-%d')
+DATE=${ARGS[3]:-$(date +%F -d "yesterday")}
 
 # the outdir from container perspective
 OUTDIR="/archive/export/"${OUTNAME}"_"${DATE}
 
+echo "$OUTNAME $OUTSHPPATH $DATE $OUTDIR"
+
 # fetch and process reflectance and cloud mask
+echo "gips_process landsat -p ref fmask -s ${INSHPPATH} -v4 -d ${DATE} --fetch"
 gips_process landsat -p ref fmask -s ${INSHPPATH} -v4 -d ${DATE} --fetch
 
 # export feature rasters for output tiles
+echo "gips_export landsat -p ref fmask -s ${OUTSHPPATH} -v4 -d ${DATE} --outdir ${OUTDIR} --notld --res 30 30"
 gips_export landsat -p ref fmask -s ${OUTSHPPATH} -v4 -d ${DATE} --outdir ${OUTDIR} --notld --res 30 30
 
 # apply cloud mask to reflectance images
+echo "gips_mask ${OUTDIR}/* --pmask fmask"
 gips_mask ${OUTDIR}/* --pmask fmask
 
 # hackily split out separate bands
+echo "gips_split ${OUTDIR}/* --prodname ref-masked"
 gips_split ${OUTDIR}/* --prodname ref-masked
