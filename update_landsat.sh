@@ -14,8 +14,6 @@ DATE=${ARGS[3]:-$(date +%F -d "yesterday")}
 # the outdir from container perspective
 OUTDIR="/archive/export/"${OUTNAME}"_"${DATE}
 
-echo "$OUTNAME $OUTSHPPATH $DATE $OUTDIR"
-
 # fetch and process reflectance and cloud mask
 echo "gips_process landsat -p ref fmask -s ${INSHPPATH} -v4 -d ${DATE} --fetch"
 gips_process landsat -p ref fmask -s ${INSHPPATH} -v4 -d ${DATE} --fetch
