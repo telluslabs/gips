@@ -189,7 +189,7 @@ class landsatAsset(Asset):
         # DN & SR assets are no longer fetchable
         'DN': {
             'sensors': ['LT5', 'LE7', 'LC8'],
-            'enddate': date(2017, 4, 30),
+            'enddate': date.today(),
             'pattern': (
                 r'^L(?P<sensor>[A-Z])(?P<satellie>\d)'
                 r'(?P<path>\d{3})(?P<row>\d{3})'
