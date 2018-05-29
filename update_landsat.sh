@@ -6,10 +6,8 @@ ARGS=("$@")
 OUTNAME=${ARGS[0]}
 INSHPPATH="/archive/vector/"${ARGS[1]}
 OUTSHPPATH="/archive/vector/"${ARGS[2]}
-
-# the default date is yesterday
-DEFAULTDATE=$(date -d "yesterday" '+%Y-%m-%d')
-DATE=${ARGS[3]:-$(date +%F -d "yesterday")}
+OUTSHPKEY=${ARGS[3]}
+DATE=${ARGS[4]}
 
 # the outdir from container perspective
 OUTDIR="/archive/export/"${OUTNAME}"_"${DATE}
