@@ -27,7 +27,7 @@ run_tests:
     - docker run --dns=10.0.4.1 --rm
       -v /net/cluster/projects/gips-dev/sys-test-assets/:/artifact-store
       gips_test_$CI_COMMIT_REF_SLUG 
-      pytest -vv --setup-repo --slow --sys -s -m lite
+      pytest -vv --setup-repo --slow --sys -s -k 'sentinel2 and (cfmask or cloudmask)'
   tags:
     - gipsdev
   after_script:
