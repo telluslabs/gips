@@ -113,7 +113,7 @@ class aodAsset(Asset):
         # collection number is encoded in the filename as 005, 006, 051, or
         # 055.  So, we take it as a float, and then divide by the order of
         # magnitude to get the modis_collection number
-        self.modis_collection = collection_number / (
+        self._version = collection_number / (
                 10**numpy.floor(numpy.log10(collection_number)))
         prefix = 'HDF4_EOS:EOS_GRID:"'
         sds = {
@@ -121,7 +121,7 @@ class aodAsset(Asset):
             6: 'Aerosol_Optical_Depth_Land_Ocean_Mean',
         }
         self.products['aod'] = (prefix + filename + '":mod08:{}'.format(
-            sds[int(self.modis_collection)]))
+            sds[int(self._version)]))
 
     def datafiles(self):
         indexfile = self.filename + '.index'
