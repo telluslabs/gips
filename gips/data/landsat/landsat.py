@@ -1155,7 +1155,8 @@ class landsatData(Data):
                 start = datetime.now()
 
                 if not settings().REPOS[self.Repository.name.lower()]['6S']:
-                    raise Exception('6S is required for atmospheric correction')
+                    raise ValueError("atmospheric correction requested but"
+                        " settings.REPOS['landsat']['6S'] is False.")
                 with utils.error_handler('Problem running 6S atmospheric model'):
                     wvlens = [(meta[b]['wvlen1'], meta[b]['wvlen2']) for b in visbands]
                     geo = self.metadata['geometry']
