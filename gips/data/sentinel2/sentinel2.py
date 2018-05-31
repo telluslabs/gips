@@ -694,6 +694,11 @@ class sentinel2Data(Data):
             'bands': {'name': 'cfmask', 'units': Data._unitless},
             'toa': True,
         },
+        'cloudmask': {
+            'description': 'Cloud mask',
+            'assets': [_asset_type],
+            'bands': {'name': 'cloudmask', 'units': Data._unitless},
+        },
     }
 
     # add index products to _products
@@ -738,6 +743,7 @@ class sentinel2Data(Data):
         's2rep-toa':    'ref-toa',
         'mtci':         'ref',
         's2rep':        'ref',
+	'cloudmask':	'cfmask',
     }
 
     need_fetch_kwargs = True
@@ -1112,6 +1118,32 @@ class sentinel2Data(Data):
         self._product_images['cfmask'] = fmask_image
 
 
+    def cloudmask_geoimage(self):
+        fmask_image = self.load_image('cfmask')
+        npfm = fmask_image.Read()
+        # cfmask values:
+        # 0 = NoData
+        # 1 = Land
+        # 2 = Cloud
+        # 3 = Cloud Shadow
+        # 4 = Snow
+        # 5 = Water
+
+        # Set cfmask 2 and 3 to 1's, everything else to 0's
+        np_cloudmask = numpy.logical_or( npfm == 2, npfm == 3).astype('uint8')
+        
+        # cloudmask.tif is taken by cfmask
+        cloudmask_filename = "%s/cloudmask2.tif" % self._temp_proc_dir
+        cloudmask_img = gippy.GeoImage(
+            cloudmask_filename,
+            fmask_image,
+            gippy.GDT_Byte,
+            1
+        )
+        cloudmask_img[0].Write(np_cloudmask)
+        self._product_images['cloudmask'] = cloudmask_img
+
+
     def mtci_geoimage(self, mode):
         """Generate Python implementation of MTCI."""
         # test this with eg:
@@ -1221,6 +1253,8 @@ class sentinel2Data(Data):
             self.ref_geoimage(asset_type, sensor)
         if 'cfmask' in work:
             self.fmask_geoimage(asset_type)
+        if 'cloudmask' in work:
+            self.cloudmask_geoimage()
         if 'mtci-toa' in work:
             self.mtci_geoimage('toa')
         if 's2rep-toa' in work:
