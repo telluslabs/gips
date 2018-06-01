@@ -31,7 +31,7 @@ def write_raster(outfile, outdata, proj, geo, nodata, dtype):
     tfh.SetProjection(proj)
     tfh.SetGeoTransform(geo)
     tband = tfh.GetRasterBand(1)
-    tband.SetNoDataValue(nodata)    
+    tband.SetNoDataValue(nodata)
     tband.WriteArray(outdata)
     tfh = None
 
@@ -43,7 +43,7 @@ def main():
 
     parser = GIPSParser(datasources=False, description=title)
     parser.add_projdir_parser()
-    
+
     group = parser.add_argument_group('splitting options')
     group.add_argument('--prodname', help='Pattern of the target images')
     args = parser.parse_args()
@@ -62,7 +62,7 @@ def main():
                 for p in inv.products(date):
 
                     VerboseOut(p)
-                    
+
                     img = inv[date].open(p)
                     fname = img.Filename()
 
@@ -72,7 +72,7 @@ def main():
                     bnames = img.BandNames()
 
                     imgdata, proj, geo = read_raster(fname)
-                        
+
                     for i,bname in enumerate(bnames):
 
                         fnameout = "{}_{}.tif".format(
@@ -80,21 +80,18 @@ def main():
 
                         #data = img[i].Read()
 
-                        data = imgdata[i,:,:].squeeze()
-                        
+                        try:
+                            data = imgdata[i,:,:].squeeze()
+                        except:
+                            data = imgdata[:,:]
 
                         nodata = -32768
                         scale = 10000
-                        #notmissing = np.where(data!=nodata)
-                        #data[notmissing] = data[notmissing]*scale
                         data = data.astype('int16')
                         dtype = gdal.GDT_Int16
-                        
+
                         write_raster(fnameout, data, proj, geo, nodata, dtype)
-                        
-                        #data[notmissing] = data[]
-                        # do gdal stuff here
-                        
+
                         #imgout = gippy.GeoImage(fnameout, img, gippy.GDT_Int16, 1)
                         #imgout.SetNoData(-32768)
                         #imgout.SetOffset(0.0)
@@ -102,7 +99,7 @@ def main():
                         #imgout[0].Write(data)
                         #imgout.SetBandName(bname, 1)
                         #imgout = None
-                        
+
                     img = None
 
     utils.gips_exit()
