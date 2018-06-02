@@ -30,7 +30,8 @@ COPY . /gips
 
 RUN cd /gips \
     && pip install -r dev_requirements.txt \
-    && pip install --process-dependency-links -e .
+    && pip install --process-dependency-links -e . \
+    && echo "stty cols 240 rows 60" >> .bashrc
 
 RUN apt-get -y purge \
        gfortran \
