@@ -213,6 +213,11 @@ class prismData(Data):
         },
     }
 
+    @classmethod
+    def normalize_tile_string(cls, tile_string):
+        """'conus' is invalid, but 'CONUS' is valid, so help the user out."""
+        return tile_string.upper()
+
     def process(self, *args, **kwargs):
         """Deduce which products need producing, then produce them."""
         products = super(prismData, self).process(*args, **kwargs)
