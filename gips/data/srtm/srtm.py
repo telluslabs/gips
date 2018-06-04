@@ -21,11 +21,11 @@ class srtmAsset(Asset):
     Repository = srtmRepository
 
     _sensors = {
-        'srtm': {'description': ''},
+        'srtm': {'description': 'Shuttle Radar Topography Mission'},
     }
 
     _assets = {
-        'srtm': {
+        'SRTMGL1': {
             'pattern': r'^(?P<tile>[NS]\d{2}[WE]\d{3})_2000042_srtm_srtm.tif$',
             'startdate': datetime.date(2000, 2, 1),
             'latency': 0,
@@ -95,8 +95,8 @@ class srtmData(Data):
     Asset = srtmAsset
 
     _products = {
-        'srtm': {
+        'dem': {
             'description': '',
-            'assets': ['srtm'],
+            'assets': ['SRTMGL1'],
         },
     }
