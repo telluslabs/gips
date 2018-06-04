@@ -145,7 +145,7 @@ class modisAsset(Asset):
         },
         'MCD12Q1': {
             'pattern': '^MCD12Q1' + _asset_re_tail,
-            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.051',
+            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD12Q1.006',
             'startdate': datetime.date(2002, 7, 4),
             'latency': 3,
         },
