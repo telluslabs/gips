@@ -25,7 +25,7 @@ sed -i~ \
 gips_config env
 
 # put long term mean AOD data in the right place
-tar xfvz /conf/aod.composites.tgz -C /archive
+tar xfvz /conf/aod.composites.tgz -C /archive > /dev/null
 
 # create an export folder for the project outputs
 mkdir /archive/export; chmod ogu+rwx /archive/export
