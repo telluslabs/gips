@@ -225,7 +225,7 @@ expectations['aod'] = {
         [('aod_stats.txt',
           'text-full',
           ['date,band,min,max,mean,sd,skew,count\r\n',
-           '2017-004,,45.0,107.0,68.2053,27.2408,0.683439,2.70847e+06\r\n'])],
+           '2017-004,,44.0,109.0,68.1837,28.6349,0.688931,2.70847e+06\r\n'])],
 }
 
 expectations['prism'] = {
