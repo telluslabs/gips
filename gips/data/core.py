@@ -400,9 +400,7 @@ class Asset(object):
             utils.verbose_out(
                 "Moving files from {} to {}".format(tmp_dn, path), 3)
             for (tfn, ffn) in extracted_fnames:
-                dir_name = os.path.dirname(ffn)
-                if not os.path.exists(dir_name):
-                    os.makedirs(dir_name)
+                utils.mkdir(os.path.dirname(ffn))
                 os.rename(tfn, ffn)
 
         return extant_fnames + [ffn for (_, ffn) in extracted_fnames]
@@ -721,9 +719,8 @@ class Asset(object):
 
                 else:
                     # 'normal' case:  Just add the asset to the archive; no other work needed
-                    if not os.path.exists(tpath):
-                        with utils.error_handler('Unable to make data directory ' + tpath):
-                            os.makedirs(tpath)
+                    with utils.error_handler('Unable to make data directory ' + tpath):
+                        utils.mkdir(tpath)
                     with utils.error_handler('Problem adding {} to archive'.format(filename)):
                         os.link(os.path.abspath(filename), newfilename)
                         asset.archived_filename = newfilename

@@ -89,7 +89,8 @@ class aodAsset(Asset):
             'pattern': r'^MOD08_D3.+?hdf$',
             'startdate': datetime.date(2000, 2, 18),
             'latency': 7,
-            'url': 'https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/6/MOD08_D3/',
+            'url': 'https://ladsweb.modaps.eosdis.nasa.gov/'
+                   'archive/allData/61/MOD08_D3/',
         },
         #'MYD08': {
         #    'pattern': 'MYD08_D3*hdf',
@@ -112,16 +113,15 @@ class aodAsset(Asset):
         # collection number is encoded in the filename as 005, 006, 051, or
         # 055.  So, we take it as a float, and then divide by the order of
         # magnitude to get the modis_collection number
-        self.modis_collection = collection_number / 10 ** numpy.floor(
-            numpy.log10(collection_number)
-        )
+        self._version = collection_number / (
+                10**numpy.floor(numpy.log10(collection_number)))
         prefix = 'HDF4_EOS:EOS_GRID:"'
         sds = {
             5: 'Optical_Depth_Land_And_Ocean_Mean',
             6: 'Aerosol_Optical_Depth_Land_Ocean_Mean',
         }
-        self.products['aod'] = (
-                prefix + filename + '":mod08:{}'.format(sds[int(self.modis_collection)]))
+        self.products['aod'] = (prefix + filename + '":mod08:{}'.format(
+            sds[int(self._version)]))
 
     def datafiles(self):
         indexfile = self.filename + '.index'

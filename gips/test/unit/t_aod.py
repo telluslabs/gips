@@ -5,7 +5,7 @@ from gips.data.aod import aod
 # taken from https://ladsweb.modaps.eosdis.nasa.gov/archive/allData/6/MOD08_D3/2017/145.json
 test_basename = 'MOD08_D3.A2017145.006.2017151134051.hdf'
 test_url = ('https://ladsweb.modaps.eosdis.nasa.gov/'
-            'archive/allData/6/MOD08_D3/2015/001/'
+            'archive/allData/61/MOD08_D3/2015/001/'
             'MOD08_D3.A2017145.006.2017151134051.hdf')
 
 def t_aodAsset_query_provider_success_case(mocker, mpo):

@@ -133,9 +133,12 @@ def basename(str):
 
 
 def mkdir(dname):
-    """ Create a directory if it doesn't exist """
-    if not os.path.exists(dname):
+    """Create a directory, if it doesn't exist."""
+    try:
         os.makedirs(dname)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
     return dname
 
 
@@ -242,10 +245,7 @@ def create_repos():
     for key in repos.keys():
         repo = import_repository_class(key)
         for d in repo._subdirs:
-            path = os.path.join(repos[key]['repository'], d)
-            if not os.path.isdir(path):
-                os.makedirs(path)
-
+            mkdir(os.path.join(repos[key]['repository'], d))
 
 def data_sources():
     """ Get enabled data sources (and verify) from settings """
