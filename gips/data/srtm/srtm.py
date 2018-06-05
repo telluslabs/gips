@@ -2,13 +2,10 @@ import datetime
 import re
 import os
 import subprocess
-from zipfile import ZipFile
 
 from gips.data.core import Repository, Asset, Data
 from gips import utils
 from gips.utils import settings
-
-import homura
 
 
 class srtmRepository(Repository):
@@ -26,8 +23,8 @@ class srtmAsset(Asset):
 
     _assets = {
         'SRTMGL1': {
-            'pattern': r'^(?P<tile>[NS]\d{2}[WE]\d{3})_2000042_srtm_srtm.tif$',
-            'startdate': datetime.date(2000, 2, 1),
+            'pattern': r'^(?P<tile>[NS]\d{2}[WE]\d{3})\.SRTMGL1\.hgt\.zip$',
+            'startdate': datetime.date(2000, 2, 11),
             'latency': 0,
         },
     }
@@ -36,13 +33,14 @@ class srtmAsset(Asset):
         super(srtmAsset, self).__init__(filename)
 
         fname = os.path.basename(filename)
-        pattern_re = re.compile(self._assets['srtm']['pattern'])
+        pattern_re = re.compile(self._assets['SRTMGL1']['pattern'])
         match = pattern_re.match(fname)
 
         if not match:
             msg = "No matching SRTM asset type for '{}'".format(fname)
             raise RuntimeError(msg, filename)
 
+        self.asset = 'SRTMGL1'
         self.tile = match.group('tile')
         self.date = datetime.datetime(2000, 2, 11)
 
@@ -52,7 +50,7 @@ class srtmAsset(Asset):
         if date == datetime.datetime(2000, 2, 11):
             return {
                 'url': url_base.format(tile),
-                'basename': '{}_2000042_srtm_srtm.tif'.format(tile),
+                'basename': '{}.SRTMGL1.hgt.zip'.format(tile),
                 'download_name': '{}.SRTMGL1.hgt.zip'.format(tile),
             }
         return None
@@ -63,7 +61,6 @@ class srtmAsset(Asset):
         if qs_rv is None:
             return []
         url = qs_rv.pop('url')
-        basename = qs_rv.pop('basename')
         download_name = qs_rv.pop('download_name')
 
         stage_dir = cls.Repository.path('stage')
@@ -79,15 +76,9 @@ class srtmAsset(Asset):
                 "--output-document", zip_filename,
                 url
             ])
-
-            zip_file = ZipFile(zip_filename)
-            hgt_filename = zip_file.extract(zip_file.filelist[0], dldir)
-            tif_filename = os.path.join(dldir, basename)
-            subprocess.call(["gdal_translate", "-of", "GTiff", hgt_filename, tif_filename])
-
-            os.rename(tif_filename,
-                      os.path.join(stage_dir, os.path.basename(tif_filename)))
-            fetched.append(os.path.join(stage_dir, os.path.basename(tif_filename)))
+            os.rename(zip_filename,
+                      os.path.join(stage_dir, os.path.basename(zip_filename)))
+            fetched.append(os.path.join(stage_dir, os.path.basename(zip_filename)))
         return fetched
 
 
@@ -95,8 +86,15 @@ class srtmData(Data):
     Asset = srtmAsset
 
     _products = {
-        'dem': {
+        'gl1': {
             'description': '',
             'assets': ['SRTMGL1'],
         },
     }
+
+    @Data.proc_temp_dir_manager
+    def process(self, *args, **kwargs):
+        sensor = 'srtm'
+        fname = self.temp_product_filename(sensor, 'gl1')
+        os.symlink(self.assets['SRTMGL1'].datafiles()[0], fname)
+        self.archive_temp_path(fname)
