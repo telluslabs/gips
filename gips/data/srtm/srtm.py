@@ -96,5 +96,6 @@ class srtmData(Data):
     def process(self, *args, **kwargs):
         sensor = 'srtm'
         fname = self.temp_product_filename(sensor, 'gl1')
-        os.symlink(self.assets['SRTMGL1'].datafiles()[0], fname)
+        link_name = "/vsizip/{}/{}".format(self.assets['SRTMGL1'].filename, self.assets['SRTMGL1'].datafiles()[0])
+        os.symlink(link_name, fname)
         self.archive_temp_path(fname)
