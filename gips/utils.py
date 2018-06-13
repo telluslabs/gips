@@ -133,9 +133,12 @@ def basename(str):
 
 
 def mkdir(dname):
-    """ Create a directory if it doesn't exist """
-    if not os.path.exists(dname):
+    """Create a directory, if it doesn't exist."""
+    try:
         os.makedirs(dname)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
     return dname
 
 
@@ -242,10 +245,7 @@ def create_repos():
     for key in repos.keys():
         repo = import_repository_class(key)
         for d in repo._subdirs:
-            path = os.path.join(repos[key]['repository'], d)
-            if not os.path.isdir(path):
-                os.makedirs(path)
-
+            mkdir(os.path.join(repos[key]['repository'], d))
 
 def data_sources():
     """ Get enabled data sources (and verify) from settings """
@@ -446,6 +446,10 @@ def mosaic(images, outfile, vector):
     result = commands.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
     imgout = gippy.GeoImage(outfile, True)
+    imgout.SetMeta(
+        'GIPS_MOSAIC_SOURCES',
+        ';'.join([os.path.basename(f) for f in filenames])
+    )
     for b in range(0, images[0].NumBands()):
         imgout[b].CopyMeta(images[0][b])
     imgout.CopyColorTable(images[0])
@@ -485,6 +489,10 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
                 .format(cmd, status, output ), 4)
 
     imgout = gippy.GeoImage(outfile, True)
+    imgout.SetMeta(
+        'GIPS_GRIDDED_MOSAIC_SOURCES',
+        ';'.join([os.path.basename(f) for f in filenames])
+    )
     for b in range(0, images[0].NumBands()):
         imgout[b].CopyMeta(images[0][b])
     imgout.AddMask(mask_img[0])
@@ -599,6 +607,10 @@ def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
             orm.setup()
         return data_class
 
+##############################################################################
+# misc
+##############################################################################
+
 def prune_unhashable(d):
     """Returns a new dict containing only the hashable values from d.
 
@@ -613,3 +625,15 @@ def prune_unhashable(d):
             continue
         rv[k] = v
     return rv
+
+def stringify_meta_dict(md):
+    """Mostly return {str(k): str(v)...}, except for non-dict iterables."""
+    def stringify(o):
+        if isinstance(o, (basestring, dict)):
+            return str(o)
+        try:
+            return ','.join(str(i) for i in o)
+        except TypeError: # emitted when iter(o) fails
+            return str(o)
+
+    return {str(k): stringify(v) for (k, v) in md.items()}

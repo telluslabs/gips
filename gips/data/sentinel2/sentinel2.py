@@ -694,6 +694,11 @@ class sentinel2Data(Data):
             'bands': {'name': 'cfmask', 'units': Data._unitless},
             'toa': True,
         },
+        'cloudmask': {
+            'description': 'Cloud mask',
+            'assets': [_asset_type],
+            'bands': {'name': 'cloudmask', 'units': Data._unitless},
+        },
     }
 
     # add index products to _products
@@ -738,6 +743,7 @@ class sentinel2Data(Data):
         's2rep-toa':    'ref-toa',
         'mtci':         'ref',
         's2rep':        'ref',
+	'cloudmask':	'cfmask',
     }
 
     need_fetch_kwargs = True
@@ -827,11 +833,14 @@ class sentinel2Data(Data):
     def filter(self, pclouds=100, **kwargs):
         return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
-    @classmethod
-    def meta_dict(cls):
-        """Assemble GIPS & driver version for embedding in output files."""
-        meta = super(sentinel2Data, cls).meta_dict()
-        meta['GIPS-sentinel2 Version'] = cls.version
+    def prep_meta(self, additional=None):
+        meta = super(sentinel2Data, self).prep_meta(
+            self.current_asset().filename, additional)
+        return meta
+
+    def prep_meta(self, additional=None):
+        meta = super(sentinel2Data, self).prep_meta(
+            self.current_asset().filename, additional)
         return meta
 
     def load_metadata(self):
@@ -894,7 +903,6 @@ class sentinel2Data(Data):
                 raise IOError("Expected gdalbuildvrt exit status 0, got {}"
                               .format(p.returncode))
             vrt_img = gippy.GeoImage(vrt_filename)
-            vrt_img.SetMeta(self.meta_dict())
             vrt_img.SetNoData(0)
             vrt_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
             # eg:   3        '08'
@@ -969,7 +977,7 @@ class sentinel2Data(Data):
 
         self._time_report('Starting indices processing for: {}'.format(indices.keys()))
 
-        metadata = self.meta_dict()
+        metadata = self.prep_meta()
         if mode != 'toa':
             image = self.load_image('ref')
             # this faff is needed because gippy shares metadata across images behind your back
@@ -1000,10 +1008,7 @@ class sentinel2Data(Data):
         # let acolite use a subdirectory in this run's tempdir:
         aco_tmp_dir = self.generate_temp_path('acolite')
         os.mkdir(aco_tmp_dir)
-        acolite_product_spec = {
-            # TODO refactor 'meta' into an argument; it's pop()'ed out anyway
-            'meta': self.meta_dict(),
-        }
+        acolite_product_spec = {'meta': self.prep_meta()}
         for p in aco_prods:
             # TODO use tempdirs to match current gips practices
             fn = os.path.join(self.path, self.product_filename(sensor, p))
@@ -1084,6 +1089,7 @@ class sentinel2Data(Data):
             "-a", "%s/allbands.vrt" % self._temp_proc_dir,
             "-z", "%s/angles.img" % self._temp_proc_dir,
             "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
+            "--cloudprobthreshold", "5",
             "-v",
         ]
         # Temp dir for intermediaries that pyfmask generates in the current
@@ -1110,6 +1116,32 @@ class sentinel2Data(Data):
         DEVNULL.close()
         fmask_image = gippy.GeoImage("%s/cloudmask.tif" % self._temp_proc_dir)
         self._product_images['cfmask'] = fmask_image
+
+
+    def cloudmask_geoimage(self):
+        fmask_image = self.load_image('cfmask')
+        npfm = fmask_image.Read()
+        # cfmask values:
+        # 0 = NoData
+        # 1 = Land
+        # 2 = Cloud
+        # 3 = Cloud Shadow
+        # 4 = Snow
+        # 5 = Water
+
+        # Set cfmask 2 and 3 to 1's, everything else to 0's
+        np_cloudmask = numpy.logical_or( npfm == 2, npfm == 3).astype('uint8')
+        
+        # cloudmask.tif is taken by cfmask
+        cloudmask_filename = "%s/cloudmask2.tif" % self._temp_proc_dir
+        cloudmask_img = gippy.GeoImage(
+            cloudmask_filename,
+            fmask_image,
+            gippy.GDT_Byte,
+            1
+        )
+        cloudmask_img[0].Write(np_cloudmask)
+        self._product_images['cloudmask'] = cloudmask_img
 
 
     def mtci_geoimage(self, mode):
@@ -1221,6 +1253,8 @@ class sentinel2Data(Data):
             self.ref_geoimage(asset_type, sensor)
         if 'cfmask' in work:
             self.fmask_geoimage(asset_type)
+        if 'cloudmask' in work:
+            self.cloudmask_geoimage()
         if 'mtci-toa' in work:
             self.mtci_geoimage('toa')
         if 's2rep-toa' in work:
@@ -1244,7 +1278,7 @@ class sentinel2Data(Data):
                 source_image = self._product_images[prod_type]
                 output_image = gippy.GeoImage(temp_fp, source_image)
                 output_image.SetNoData(0)
-                output_image.SetMeta(self.meta_dict()) # add standard metadata
+                output_image.SetMeta(self.prep_meta())
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)

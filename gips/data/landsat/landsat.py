@@ -41,7 +41,7 @@ from xml.etree import ElementTree
 from backports.functools_lru_cache import lru_cache
 import numpy
 # once gippy==1.0, switch to GeoRaster.erode
-from scipy.ndimage import binary_erosion
+from scipy.ndimage import binary_dilation
 
 import osr
 import gippy
@@ -744,7 +744,8 @@ class landsatData(Data):
         },
         'cloudmask': {
             'assets': ['C1'],
-            'description': 'Cloud (and shadow) mask product based on cloud bits of the quality band',
+            'description': ('Cloud (and shadow) mask product based on cloud '
+                            'bits of the quality band'),
             'toa': True,
             'startdate': _lt5_startdate,
             'latency': 1,
@@ -938,7 +939,8 @@ class landsatData(Data):
         else:
             product_info['latency'] = float("inf")
 
-    def _process_indices(self, image, metadata, sensor, indices, coreg_shift=None):
+    def _process_indices(self, image, asset_fn, metadata, sensor, indices,
+                         coreg_shift=None):
         """Process the given indices and add their files to the inventory.
 
         Image is a GeoImage suitable for generating the indices.
@@ -956,7 +958,8 @@ class landsatData(Data):
             gippy_input[pt_split[0]] = temp_fp
             tempfps_to_ptypes[temp_fp] = prod_type
 
-        prodout = Indices(image, gippy_input, metadata)
+        prodout = Indices(image, gippy_input,
+                          self.prep_meta(asset_fn, metadata))
 
         if coreg_shift:
             for key, val in prodout.iteritems():
@@ -1008,7 +1011,6 @@ class landsatData(Data):
 
         # TODO: De-hack this
         # Better approach, but needs some thought, is to loop over assets
-        # Ian, you are right. I just don't have enough time to do it.
 
         if asset == 'SR':
 
@@ -1093,7 +1095,7 @@ class landsatData(Data):
             meta = self.assets[asset].meta['bands']
             visbands = self.assets[asset].visbands
             lwbands = self.assets[asset].lwbands
-            md = self.meta_dict()
+            md = {}
 
             product_is_coreg = [(v and 'coreg' in v) for v in products.requested.values()]
             coreg = all(product_is_coreg)
@@ -1131,10 +1133,11 @@ class landsatData(Data):
                                 utils.verbose_out(
                                     'No Sentinel found for co-registration', 4)
                                 pass
-                            except CantAlignError:
+                            except CantAlignError as cae:
                                 # fall through and use the image unshifted
                                 utils.verbose_out(
-                                    'Unknown co-registration error', 4)
+                                    'Co-registration error (FALLBACK):' + str(cae),
+                                    4)
                                 pass
 
                 try:
@@ -1152,7 +1155,8 @@ class landsatData(Data):
                 start = datetime.now()
 
                 if not settings().REPOS[self.Repository.name.lower()]['6S']:
-                    raise Exception('6S is required for atmospheric correction')
+                    raise ValueError("atmospheric correction requested but"
+                        " settings.REPOS['landsat']['6S'] is False.")
                 with utils.error_handler('Problem running 6S atmospheric model'):
                     wvlens = [(meta[b]['wvlen1'], meta[b]['wvlen2']) for b in visbands]
                     geo = self.metadata['geometry']
@@ -1178,6 +1182,8 @@ class landsatData(Data):
 
             # This is landsat, so always just one sensor for a given date
             sensor = self.sensors[asset]
+
+            asset_fn = self.assets[asset].filename
 
             # Process standard products (this is in the 'DN' block)
             for key, val in groups['Standard'].items():
@@ -1218,10 +1224,17 @@ class landsatData(Data):
                         qaimg = self._readqa(asset)
                         npqa = qaimg.Read()  # read image file into numpy array
                         # https://landsat.usgs.gov/collectionqualityband
-                        # cloudmaskmask = (cloud and (cc_med or cc_high)) or csc_med or csc_high
+                        # cloudmaskmask = (cloud and
+                        #                  (cc_low or cc_med or cc_high)
+                        #                 ) or csc_high
                         # cloud iff bit 4
-                        # (cc_med or cc_high) iff bit 6
-                        # (csc_med or csc_high) iff bit 8
+                        # (cc_low or cc_med or cc_high) iff bit 5 or bit 6
+                        # (csc_high) iff bit 8 ***
+                        #  NOTE: from USGS tables as of 2018-05-22, cloud
+                        #  shadow conficence is either high(3) or low(1).
+                        #  No pixels get medium (2).  And only no-data pixels
+                        #  ever get no (0) confidence. 
+
 
                         # GIPPY 1.0 note: rewrite this whole product after
                         # adding get_bit method to GeoRaster
@@ -1230,18 +1243,21 @@ class landsatData(Data):
                             """Return an array with the ith bit extracted from each cell."""
                             return (np_array >> i) & 0b1
 
-                        np_cloudmask = numpy.logical_not(
-                            get_bit(npqa, 4) &
-                            get_bit(npqa, 6) |
-                            get_bit(npqa, 8)
-                        )
+                        np_cloudmask = (
+                            get_bit(npqa, 8) # shadow
+                            | (get_bit(npqa, 4) & # cloud
+                               ( # with at least low(1) confidence
+                                   get_bit(npqa, 5) | get_bit(npqa, 6)
+                               )
+                            )
+                        ).astype('uint8')
 
-                        erosion_width = 10
-                        elem = numpy.ones((erosion_width,) * 2, dtype='uint8')
-                        np_cloudmask_eroded = binary_erosion(
+                        dilation_width = 20
+                        elem = numpy.ones((dilation_width,) * 2, dtype='uint8')
+                        np_cloudmask_dilated = binary_dilation(
                             np_cloudmask, structure=elem,
                         ).astype('uint8')
-                        np_cloudmask_eroded *= (npqa != 1)
+                        np_cloudmask_dilated *= (npqa != 1)
                         #
 
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
@@ -1249,15 +1265,20 @@ class landsatData(Data):
                         imgout.SetBandName(
                             self._products[val[0]]['bands'][0]['name'], 1
                         )
-                        imgout.SetMeta('GIPS_LANDSAT_VERSION', self.version)
-                        imgout.SetMeta('GIPS_C1_ERODED_PIXELS', str(erosion_width))
-
+                        md.update(
+                            {
+                                'GIPS_LANDSAT_VERSION': self.version,
+                                'GIPS_C1_DILATED_PIXELS': str(dilation_width),
+                                'GIPS_LANDSAT_CLOUDMASK_CLOUD_VALUE': '1',
+                                'GIPS_LANDSAT_CLOUDMASK_CLEAR_OR_NODATA_VALUE': '0',
+                            }
+                        )
                         ####################
                         # GIPPY1.0 note: replace this block with
                         # imgout[0].set_nodata(0.)
-                        # imout[0].write_raw(np_cloudmask_eroded)
+                        # imout[0].write_raw(np_cloudmask_dilated)
                         imgout[0].Write(
-                            np_cloudmask_eroded
+                            np_cloudmask_dilated
                         )
                         imgout = None
                         imgout = gippy.GeoImage(fname, True)
@@ -1393,7 +1414,7 @@ class landsatData(Data):
                         os.remove(abfn + '.tif')
 
                     fname = imgout.Filename()
-                    imgout.SetMeta(md)
+                    imgout.SetMeta(self.prep_meta(asset_fn, md))
 
                     if coreg:
                         self._time_report("Setting affine of product")
@@ -1430,14 +1451,16 @@ class landsatData(Data):
 
                 # Run TOA
                 if len(indices_toa) > 0:
-                    self._process_indices(reflimg, md, sensor, indices_toa, coreg_shift)
+                    self._process_indices(reflimg, asset_fn, md, sensor,
+                                          indices_toa, coreg_shift)
 
                 # Run atmospherically corrected
                 if len(indices) > 0:
                     for col in visbands:
                         img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
                                 ) * (1.0 / atm6s.results[col][2])
-                    self._process_indices(img, md, sensor, indices, coreg_shift)
+                    self._process_indices(img, asset_fn, md, sensor, indices,
+                                          coreg_shift)
                 verbose_out(' -> %s: processed %s in %s' % (
                         self.basename, indices0.keys(), datetime.now() - start), 1)
             img = None
@@ -1629,13 +1652,11 @@ class landsatData(Data):
         #self.metadata.update(smeta)
         return self.metadata
 
-    @classmethod
-    def meta_dict(cls):
-        meta = super(landsatData, cls).meta_dict()
-        meta['GIPS-landsat Version'] = cls.version
-        return meta
-
     def _readqa(self, asset_type):
+        """Returns a gippy GeoImage containing a QA band.
+
+        The QA band belongs to the asset corresponding to the given asset type.
+        """
         md = self.meta(asset_type)
         if asset_type == 'C1S3':
             return gippy.GeoImage(md['qafilename'])
@@ -1651,7 +1672,11 @@ class landsatData(Data):
         return qaimg
 
     def _readraw(self, asset_type):
-        """ Read in Landsat bands using original tar.gz file """
+        """Return a gippy GeoImage containing raster bands.
+
+        The bands are read from the asset corresponding to the given
+        asset type.
+        """
         start = datetime.now()
         asset_obj = self.assets[asset_type]
 
@@ -1879,7 +1904,7 @@ class landsatData(Data):
             with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
                 xcoef_re = re.compile(r"x' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
                 ycoef_re = re.compile(r"y' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
-
+                xcoef = ycoef = None
                 for line in log:
                     x_match = xcoef_re.match(line)
                     if x_match:
@@ -1887,7 +1912,9 @@ class landsatData(Data):
                     y_match = ycoef_re.match(line)
                     if y_match:
                         ycoef = float(y_match.group(1))
-
+                if xcoef is None:
+                    raise CantAlignError('AROP: no coefs found in cp_log --> '
+                                         + repr((warp_tile, warp_date)))
             x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
             y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
 

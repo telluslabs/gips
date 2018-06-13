@@ -388,7 +388,10 @@ def sys_test_wrapper(request, path):
         print("command line: `{} {}`".format(cmd_string, ' '.join(args)))
         if rp:
             initial_files.extend(find_files(path))
-        outcome = sh.Command(cmd_string)(*args, _err='/dev/stderr')
+        # TODO can't pdb within a system test's subprocess; think settinng _in
+        # might help, but `_in=sys.stdin` doesn't work:
+        outcome = sh.Command(cmd_string)(
+            *args, _err='/dev/stderr', _out='/dev/stdout')
         return outcome, [generate_expectation(e[0], path, e[1])
                          for e in expected]
 
@@ -400,25 +403,26 @@ def sys_test_wrapper(request, path):
         # when recording the path, don't capture the directory of interest
         rel_cf = [os.path.relpath(fp, path) for fp in created_files]
 
-        cf_expectations = [generate_expectation(fn, path) for fn in rel_cf]
+        # generate expectations but ignore index files
+        cf_expectations = [generate_expectation(fn, path) for fn in rel_cf
+                           if not fn.endswith('.index')]
         print("Recording {} outcome to {}.".format(product or driver, rp))
         with open(rp, 'a') as rfo:
+            indent = ' '
             if product is None:
-                # TODO one more level of indentation here
-                print('\n# {}[{}] recording:'.format(
-                    request.function.__name__, driver), file=rfo)
-                pretty_hashes = pprint.pformat(cf_expectations)
-                print(pretty_hashes, end='', file=rfo)
-                print(',', file=rfo)
+                comment = '\n{}# {}[{}] recording:'.format(
+                    indent, request.function.__name__, driver)
+                pf_lines = pprint.pformat(
+                    (driver, cf_expectations)).splitlines()
             else:
-                print('\n# {}[{}-{}] recording:'.format(
-                        request.function.__name__, driver, product), file=rfo)
-                print("'{}':".format(product), file=rfo)
-                pretty_hashes = pprint.pformat(cf_expectations)
-                print('    ', end='', file=rfo)
-                print('\n    '.join(pretty_hashes.split('\n')),
-                      end='', file=rfo)
-                print(',', file=rfo)
+                comment = '\n{}# {}[{}-{}] recording:'.format(
+                    indent, request.function.__name__, driver, product)
+                pf_lines = pprint.pformat(
+                    (product, cf_expectations)).splitlines()
+            print(comment, file=rfo)
+            pf_str = '\n'.join(indent + l for l in pf_lines)
+            print(pf_str, end='', file=rfo)
+            print(',', file=rfo)
 
 @pytest.yield_fixture
 def repo_wrapper(request):

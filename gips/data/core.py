@@ -400,9 +400,7 @@ class Asset(object):
             utils.verbose_out(
                 "Moving files from {} to {}".format(tmp_dn, path), 3)
             for (tfn, ffn) in extracted_fnames:
-                dir_name = os.path.dirname(ffn)
-                if not os.path.exists(dir_name):
-                    os.makedirs(dir_name)
+                utils.mkdir(os.path.dirname(ffn))
                 os.rename(tfn, ffn)
 
         return extant_fnames + [ffn for (_, ffn) in extracted_fnames]
@@ -612,7 +610,7 @@ class Asset(object):
         elif recursive:
             for root, subdirs, files in os.walk(path):
                 for a in cls._assets.values():
-                    files = utils.find_files(a['pattern'], path)
+                    files = utils.find_files(a['pattern'], root)
                     fnames.extend(files)
         else:
             for a in cls._assets.values():
@@ -721,9 +719,8 @@ class Asset(object):
 
                 else:
                     # 'normal' case:  Just add the asset to the archive; no other work needed
-                    if not os.path.exists(tpath):
-                        with utils.error_handler('Unable to make data directory ' + tpath):
-                            os.makedirs(tpath)
+                    with utils.error_handler('Unable to make data directory ' + tpath):
+                        utils.mkdir(tpath)
                     with utils.error_handler('Problem adding {} to archive'.format(filename)):
                         os.link(os.path.abspath(filename), newfilename)
                         asset.archived_filename = newfilename
@@ -765,10 +762,6 @@ class Data(object):
     _pattern = '*.tif'
     _products = {}
     _productgroups = {}
-
-    def meta(self):
-        """ Retrieve metadata for this tile """
-        return {}
 
     def needed_products(self, products, overwrite):
         """ Make sure all products exist and return those that need processing """
@@ -861,11 +854,33 @@ class Data(object):
         """
         return True
 
-    @classmethod
-    def meta_dict(cls):
-        return {
-            'GIPS Version': __version__,
+    def meta_dict(self, src_afns=None, additional=None):
+        """Returns assembled metadata dict.
+
+        returned value contains standard metadata + asset filenames +
+        optional additional content.  Asset filenames can be a string or
+        iterable of strings; it'll be converted to a list of basenames.  If
+        defaulted to None, self.assets' filenames is used instead.
+        """
+        sa = src_afns
+        if src_afns is None:
+            sa = [ao.filename for ao in self.assets.values()]
+        elif isinstance(src_afns, basestring):
+            sa = [src_afns]
+        md = {
+            'GIPS_Version': __version__,
+            'GIPS_Source_Assets': [os.path.basename(fn) for fn in sa]
         }
+        with utils.error_handler("Can't set driver version metadata", True):
+            gdn = 'GIPS_' + self.Repository.name.capitalize() + '_Version'
+            md[gdn] = self.version
+        if additional is not None:
+            md.update(additional)
+        return md
+
+    def prep_meta(self, src_afns, additional=None):
+        """Prepare product metadata for consumption by GeoImage.SetMeta()."""
+        return utils.stringify_meta_dict(self.meta_dict(src_afns, additional))
 
     def find_files(self):
         """Search path for non-asset files, usually product files.

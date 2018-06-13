@@ -213,6 +213,11 @@ class prismData(Data):
         },
     }
 
+    @classmethod
+    def normalize_tile_string(cls, tile_string):
+        """'conus' is invalid, but 'CONUS' is valid, so help the user out."""
+        return tile_string.upper()
+
     def process(self, *args, **kwargs):
         """Deduce which products need producing, then produce them."""
         products = super(prismData, self).process(*args, **kwargs)
@@ -295,8 +300,11 @@ class prismData(Data):
                     )
                     continue  # go to next product to process
                 imgs = []
+                asset_fns = [] # have to grab filenames for multiple days
                 for tileobj in inv.data.values():
                     datobj = tileobj.tiles.values()[0]
+                    asset_fns.append(
+                        os.path.basename(datobj.assets['_ppt'].filename))
                     imgs.append(GeoImage(get_bil_vsifile(datobj, '_ppt')))
 
                 with self.make_temp_proc_dir() as tmp_dir:
@@ -306,6 +314,7 @@ class prismData(Data):
                     oimg.SetBandName(
                         description + '({} day window)'.format(lag), 1
                     )
+                    oimg.SetMeta(self.prep_meta(sorted(asset_fns)))
                     for chunk in oimg.Chunks():
                         oarr = oimg[0].Read(chunk) * 0.0 # wat
                         for img in imgs:
