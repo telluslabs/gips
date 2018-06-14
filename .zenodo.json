@@ -1,0 +1,59 @@
+{
+  "@context": "https://schema.org/", 
+  "@id": "https://doi.org/10.5281/zenodo.1288882", 
+  "@type": "SoftwareSourceCode", 
+  "creator": [
+    {
+      "@type": "Person", 
+      "affiliation": "@developmentseed", 
+      "name": "Matthew Hanson"
+    }, 
+    {
+      "@id": "https://orcid.org/0000-0002-9204-1488", 
+      "@type": "Person", 
+      "affiliation": "@Applied-GeoSolutions", 
+      "name": "Ian Cooke"
+    }, 
+    {
+      "@type": "Person", 
+      "affiliation": "@Applied-GeoSolutions", 
+      "name": "Tom Olson"
+    }, 
+    {
+      "@id": "https://orcid.org/0000-0002-4061-9516", 
+      "@type": "Person", 
+      "affiliation": "@Tellus-Labs", 
+      "name": "Bobby Braswell"
+    }, 
+    {
+      "@type": "Person", 
+      "affiliation": "@Applied-GeoSolutions", 
+      "name": "Nate Rubin"
+    }, 
+    {
+      "@type": "Person", 
+      "affiliation": "@Applied-GeoSolutions", 
+      "name": "Justin Fisk"
+    }, 
+    {
+      "@type": "Person", 
+      "affiliation": "@Applied-GeoSolutions", 
+      "name": "Rick Emery"
+    }, 
+    {
+      "@type": "Person", 
+      "affiliation": "@Applied-GeoSolutions", 
+      "name": "Pavel Dorovskoy"
+    }, 
+    {
+      "@type": "Person", 
+      "affiliation": "@Applied-GeoSolutions", 
+      "name": "Diya Chowdhury"
+    }
+  ], 
+  "description": "The GIPS project is an open-source library and collection of command line utilties to support the retrieval, management, inventorying, and processing of geospatial raster data.", 
+  "identifier": "https://doi.org/10.5281/zenodo.1288882", 
+  "license": "http://www.opensource.org/licenses/GPL-2.0", 
+  "name": "Geospatial Image Processing System", 
+  "url": "https://zenodo.org/record/1288882", 
+}
