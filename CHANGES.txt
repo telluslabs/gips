@@ -19,6 +19,16 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
+
+v0.11.0
+- Documentation (README) improved
+- aod-6.1
+- file system race conditions in directory creation addresseed (Thanks for
+  finding that AWS)
+- MODIS MCD12Q1 to collection 006
+- `cloudmask` products for s2 and landsat inverted (1=cloud, 0=nodata)
+- Provenance improved (add "SOURCE_ASSET" and always add metadata, not subtract)
+
 v0.10.0
 - modis using gippy.algorithms.Indices
 - changed system tests to use gdalinfo based comparator
