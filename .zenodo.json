@@ -3,57 +3,57 @@
    "license": "gpl-2.0", 
    "title": "Geospatial Image Processing System", 
    "upload_type": "software",
-   "creator": [
+   "creators": [
     {
       "affiliation": "@developmentseed",
-      "name": "Matthew Hanson"
+      "name": "Hanson, Matthew"
     },
     {
       "orcid": "0000-0002-9204-1488",
       "affiliation": "@Applied-GeoSolutions",
-      "name": "Ian Cooke"
+      "name": "Cooke, Ian"
     },
     {
       "affiliation": "@Applied-GeoSolutions",
-      "name": "Tom Olson"
+      "name": "Olson, Tom"
     },
     {
       "orcid": "0000-0002-4061-9516",
       "affiliation": "@Tellus-Labs",
-      "name": "Bobby Braswell"
+      "name": "Braswell, Bobby"
     },
     {
       "affiliation": "@Applied-GeoSolutions",
-      "name": "Nate Rubin"
+      "name": "Rubin, Nate"
     },
     {
       "affiliation": "@Applied-GeoSolutions",
-      "name": "Justin Fisk"
+      "name": "Fisk, Justin"
     },
     {
       "affiliation": "@Applied-GeoSolutions",
-      "name": "Rick Emery"
+      "name": "Emery, Rick"
     },
     {
       "affiliation": "@Applied-GeoSolutions",
-      "name": "Pavel Dorovskoy"
+      "name": "Dorovskoy, Pavel"
     },
     {
       "affiliation": "@Applied-GeoSolutions",
-      "name": "Diya Chowdhury"
+      "name": "Chowdhury, Diya"
     }
   ],
   "access_right": "open", 
   "related_identifiers": [
       {
-          "scheme": "url", 
-          "identifier": "https://github.com/Applied-GeoSolutions/gips/tree/v0.10.0", 
-          "relation": "isSupplementTo"
-      }, 
-      {
           "scheme": "doi", 
           "identifier": "10.5281/zenodo.1288881", 
-          "relation": "isVersionOf"
+          "relation": "isNewVersionOf"
+      },
+      {
+          "scheme": "doi", 
+          "identifier": "10.5281/zenodo.48142", 
+          "relation": "isNewVersionOf"
       }
   ]
 }
