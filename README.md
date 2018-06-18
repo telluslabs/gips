@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.1289915.svg)](https://doi.org/10.5281/zenodo.1289915)
+
 # GIPS
 
 See http://gipit.github.io/gips/ for documentation, but know it is not
