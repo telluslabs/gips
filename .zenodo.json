@@ -1,0 +1,59 @@
+{
+  "description": "The GIPS project is an open-source library and collection of command line utilties to support the retrieval, management, inventorying, and processing of geospatial raster data.",
+   "license": "gpl-2.0", 
+   "title": "Geospatial Image Processing System", 
+   "upload_type": "software",
+   "creators": [
+    {
+      "affiliation": "@developmentseed",
+      "name": "Hanson, Matthew"
+    },
+    {
+      "orcid": "0000-0002-9204-1488",
+      "affiliation": "@Applied-GeoSolutions",
+      "name": "Cooke, Ian"
+    },
+    {
+      "affiliation": "@Applied-GeoSolutions",
+      "name": "Olson, Tom"
+    },
+    {
+      "orcid": "0000-0002-4061-9516",
+      "affiliation": "@Tellus-Labs",
+      "name": "Braswell, Bobby"
+    },
+    {
+      "affiliation": "@Applied-GeoSolutions",
+      "name": "Rubin, Nate"
+    },
+    {
+      "affiliation": "@Applied-GeoSolutions",
+      "name": "Fisk, Justin"
+    },
+    {
+      "affiliation": "@Applied-GeoSolutions",
+      "name": "Emery, Rick"
+    },
+    {
+      "affiliation": "@Applied-GeoSolutions",
+      "name": "Dorovskoy, Pavel"
+    },
+    {
+      "affiliation": "@Applied-GeoSolutions",
+      "name": "Chowdhury, Diya"
+    }
+  ],
+  "access_right": "open", 
+  "related_identifiers": [
+      {
+          "scheme": "doi", 
+          "identifier": "10.5281/zenodo.1288881", 
+          "relation": "isNewVersionOf"
+      },
+      {
+          "scheme": "doi", 
+          "identifier": "10.5281/zenodo.48142", 
+          "relation": "isNewVersionOf"
+      }
+  ]
+}

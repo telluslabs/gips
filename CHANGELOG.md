@@ -19,7 +19,31 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
-v0.10.0
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+### Added
+- added DOI badge to README.md
+
+### Changed
+- migrated CHANGES.txt to CHANGELOG.md 
+
+
+## v0.11.0
+- Documentation (README) improved
+- aod-6.1
+- file system race conditions in directory creation addresseed (Thanks for
+  finding that AWS)
+- MODIS MCD12Q1 to collection 006
+- `cloudmask` products for s2 and landsat inverted (1=cloud, 0=nodata)
+- Provenance improved (add "SOURCE_ASSET" and always add metadata, not subtract)
+
+## v0.10.0
 - modis using gippy.algorithms.Indices
 - changed system tests to use gdalinfo based comparator
 - added Sentinel2 MTCI and S2REP products
@@ -39,7 +63,7 @@ v0.10.0
 - MOD08_D3 shutdown their FTP..moved to https
 - System tests now use artifact store, instead of fetching repeatedly.
 
-v0.9.2
+## v0.9.2
 - PR#448 from Applied-GeoSolutions/445-get-geometry
 - PR#440 from Applied-GeoSolutions/433-sentinel2-gain
 - PR#447 from Applied-GeoSolutions/444-install
@@ -57,7 +81,7 @@ v0.9.2
 - PR#402 from Applied-GeoSolutions/113-numprocs-toplevel
 - proposed fix for IEEE_UNDERFLOW_FLAG and DENORMAL issues
 
-v0.9.1
+## v0.9.1
 - Optional database inventory using the Django ORM, currently used for
   managing metadata for products and assets.
 - Sentinel-2 support
@@ -70,12 +94,12 @@ v0.9.1
 - Switched to regular expressions for asset pattern specification.
 - Reusable EarthData authentication for drivers
 
-v0.8.4
+## v0.8.4
 - ndvi8 re-enabled
 - cleaned up all gippy HDF subdataset(sds) images (appear to be a limited number of
   SDS handles in gdal1.x).
 
-v0.8.2
+## v0.8.2
 - landsat assets now tagged as 'DN' and 'SR' for USGS downloaded surface
   reflectance.
 - added landsat 'bqashadow' product that uses `gippy.algorithms.AddShadowMask`
@@ -83,10 +107,10 @@ v0.8.2
 - enabled `--sensors` filter for landsat.
 - fixed: `gips.tiles.Tiles.pprint` TypeError when `colors` is None
 
-v0.8.1
+## v0.8.1
 - added support for `alltouch` paramter in CookieCutter (gippy==0.3.6)
 
-v0.8.0
+## v0.8.0
 - Indvidual data utilities deprecated (e.g., landsat), replaced with gips_ scripts
 - New gips scripts, each with more specific functionatlity: gips_inventory, gips_warptiles, gips_process
 - Refactor of core inventory and tiles for streamlined code reuse
@@ -117,7 +141,7 @@ AOD
 - updated to be in-line with new gips.utils.settings framework
 
 
-v0.7.1
+## v0.7.1
 - Better internal handling of sensors for data where there can be multiple sensors on a single day
 - Tile projects (no shapefile or nomosaic set) now creates subdirectories for each tile in project folder
 - Project inventories (gips_project inventory) doesn't fail if directory has extraneous files
@@ -139,7 +163,7 @@ MODIS
 - fixed segfault in indices and cleaned up extraneous printing
 - fixed nodata value in ndvi8 product
 
-v0.7.0
+## v0.7.0
 - Refactoring of inventory classes and printing
 - Renaming of products to replace underscores (_) with dashes (-) in the product name
 - Addition of gips_project script (print inventory, create browse images)
@@ -161,7 +185,7 @@ SARannual
 MODIS
 - Refactored code and implemented product naming convention
 
-v0.6.8
+## v0.6.8
 - added Algorithm base class and updated scripts to utilize Algorithm class
 - additional algorithm scripts added (gips_tclass, gips_truth, gips_mask)
 
@@ -169,7 +193,7 @@ landsat:
 - fixed check of negative reflectances (was converted to NoData)
 - fixed bug where AOD was not calculating long term average if data not available
 
-v0.6.7
+## v0.6.7
 - changed library name to GIPS
 - added algorithms module back to main GIPS
 - bumped GIPPY dependency to 0.9.7
@@ -179,7 +203,7 @@ landsat:
 - reflectance not allowed to be negative (capped at 0)
 
 
-v0.6.6
+## v0.6.6
 - removed masking feature from 'project' command (replaced with gip_mask)
 - changed file naming for project files.  Directory named with shape or tileid and resolution, files named  date_sensor_product
 - added gip.py script for general purpose processing on project data directories
