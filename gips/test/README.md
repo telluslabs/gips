@@ -25,10 +25,7 @@ python_files =      t_*.py
 DJANGO_SETTINGS_MODULE=gips.inventory.orm.settings
 
 # config for artifact store
-artifact-store-user     = ask
-artifact-store-password = for
-artifact-store-host     = these
-artifact-store-path     = values
+artifact-store-path     = /ask/for/this/value
 ```
 
 Library Dependencies
@@ -141,21 +138,30 @@ version that is expected to be output.  You should also have a correct
 your data repo directory; some system tests need to operate destructively on
 it.
 
-It's not normal to retain state in between test runs, but the pattern of GIPS
-operations require it for efficiency, mostly downloading data files via
-`gips_inventory --fetch`.  Once a certain set of these files are in place, they
-are not downloaded again to improve performance.  Use options to control this
-behavior:
+System tests check gips' ability to process input files into output files, and
+ultimately depend on data downloaded from official sources, such as landsat
+images.  To avoid excess fetching from official servers, the test suite uses a
+shared artifact store, which the gips system tests know to access if required:
 
 ```
-py.test --sys              # run tests without fetching data files first; may fail
-py.test --sys --setup-repo # fetch data files then run tests
-py.test --sys              # now this will work since data files are retained
-py.test --sys --clear-repo # delete the entire repo, then fetch data files,
-                           # then run tests
+# be sure to set artifact-store-path in pytest.ini; see above.
+py.test --sys              # run tests without emplacing artifacts first
+py.test --sys --setup-repo # emplace artifacts then run tests
+py.test --sys              # artifacts are retained for subsequent runs
 # a more realistic system test run, with several useful options specified:
 # (see py.test --help for details; several are GIPS-custom options):
-py.test --ll debug -s -x -vv --sys --setup-repo -k prism
+py.test -s -x -vv --sys --setup-repo -k prism
+```
+
+If you don't have access to the artifact store, it can be built by running
+gips commands and copying artifacts into place, eg:
+
+```
+$ gips_inventory $DRIVER -d $DATES -s $SHAPEFILE --fetch # see driver_setup.py
+$ grep artifact-store-path pytest.ini # to know where to put artifacts
+$ # repeat as necessary:
+$ cp /path/to/gips/repo/$DRIVER/tiles/$TILE/$DATE/$ARTIFACT \
+> $ARTIFACT_STORE_PATH/$DRIVER
 ```
 
 Note that specifying the log level with `--ll` and `--log-level` is supported
@@ -167,6 +173,23 @@ mostly tests of `gips_inventory --fetch`, will always be skipped without the
 `--src-altering` option.  Some other tests may not run unless `--slow` is
 given.  Note also that the source-altering tests may leave the repo in a state
 that requires `--setup-repo` or `--clear-repo` for the other tests to pass.
+
+Testing Within Docker Containers
+--------------------------------
+Gips can be built into a docker container; crib the approach in
+`.gitlab-ci.yml`; it's suggested to `docker build -t gips_test` for
+convenience.  Note exposing the artifact store to the container:
+
+```
+$ docker run --rm -it \
+> -v /net/cluster/projects/gips-dev/sys-test-assets:/artifact-store \
+> gips_test /bin/bash
+gips@c6fa60790073:/gips$ pytest -k aod --sys --setup-repo -s -vv
+```
+
+The working copy of gips can be tested without rebuilding the docker image by
+adding `-v /path/to/src/gips:/gips`.  This is also useful for saving
+recordings of new expectations; see `--record` below.
 
 Writing System Tests:  Testing a New Driver
 ===========================================
@@ -266,9 +289,9 @@ Quick Start
 py.test # run unit tests (after activating your virtualenv)
 
 # realistically, a system test run for a specific driver looks like this:
-py.test --ll debug -s -x -vv --sys --setup-repo -k prism
+py.test -s -x -vv --sys --setup-repo -k prism
 
 # the help message for pytest includes help for custom options, such as
-# --ll, --sys, and --setup-repo:
+# --sys, and --setup-repo:
 py.test --help
 ```

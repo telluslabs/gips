@@ -29,3 +29,6 @@ tar xfvz /conf/aod.composites.tgz -C /archive > /dev/null
 
 # create an export folder for the project outputs
 mkdir /archive/export; chmod ogu+rwx /archive/export
+
+# move initial vector data into a shared location
+cp -r /conf/vector /archive/
