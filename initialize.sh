@@ -2,6 +2,13 @@
 
 # this runs inside a new container
 
+# the GIPS container needs some content that is not in the GIPS repo:
+# data center credentials, sixs, long term mean AOD, project-specific vector data
+CONFDIR=${PWD}/conf
+mkdir -p $CONFDIR/vector
+aws s3 sync s3://rob-scratch/gips/conf ${CONFDIR}
+aws s3 sync s3://rob-scratch/gips/vector ${CONFDIR}/vector
+
 # there must be a conf dir with a copy of sixs
 cp /conf/sixs /usr/local/bin/sixs
 chmod +x /usr/local/bin/sixs
