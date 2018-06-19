@@ -1,0 +1,10 @@
+data/
+conf/
+.git
+.github
+.idea
+venv
+travis.yml
+docker-compose.yml
+.bash_history
+.DS_Store
