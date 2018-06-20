@@ -502,6 +502,7 @@ def process_acolite(asset, aco_proc_dir, products,
         roi:  Region of interest; lat/lon bounding box to crop data and thus
             reduce processing; defaults to entire scene being processed.
             Format is floats, in decimal degrees: s_lat, w_lon, n_lat, e_lon.
+        band:  A string to match against the 'band' group in model_layer_re
 
     Returns:  A mapping of product type strings to generated filenames
         in the tiles/ directory; Data.AddFile() ready.
