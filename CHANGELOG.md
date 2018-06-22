@@ -33,6 +33,13 @@ and this project adheres to
 ### Changed
 - migrated CHANGES.txt to CHANGELOG.md 
 
+### Fixed
+- Various items in Sentinel-2's ACOLITE processing:
+    - Fix #506 by always keying off band 1 for resolution.
+    - Fix #548/#437, wastefully processing entire datastrips, by using acolite's
+      limit config/param
+    - Fix #438, off-by-one errors in tile selection, by shrinking the limit
+      down to avoid overlap (thanks MGRS!).
 
 ## v0.11.0
 - Documentation (README) improved

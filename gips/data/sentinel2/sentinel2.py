@@ -36,6 +36,7 @@ import glob
 from xml.etree import ElementTree, cElementTree
 
 import numpy
+import pyproj
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -771,6 +772,7 @@ class sentinel2Data(Data):
         """
         surf_indices = self._productgroups['Index']
         toa_indices  = [i + '-toa' for i in self._productgroups['Index']]
+        acolite_products = self._productgroups['ACOLITE']
         _pd = self._product_dependencies
         work = set()
         for rp in requested_products:
@@ -779,6 +781,8 @@ class sentinel2Data(Data):
                 prereq = 'indices'
             elif rp in toa_indices:
                 prereq = 'indices-toa'
+            elif rp in acolite_products:
+                prereq = None
             else:
                 if rp not in _pd:
                     raise ValueError(
@@ -1002,6 +1006,22 @@ class sentinel2Data(Data):
 
         self._time_report(' -> %s: processed %s' % (self.basename, indices))
 
+    def shrunk_bbox(self, tile):
+        w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(tile)
+        latlon = pyproj.Proj(init='epsg:4326')
+        utm = pyproj.Proj(init='epsg:326{}'.format(tile[0:2]))
+
+        w_lon_utm, s_lat_utm = pyproj.transform(latlon, utm, w_lon, s_lat)
+        e_lon_utm, n_lat_utm = pyproj.transform(latlon, utm, e_lon, n_lat)
+
+        lon_diff = (w_lon_utm - e_lon_utm) / 16
+        lat_diff = (n_lat_utm - s_lat_utm) / 16
+
+        w_lon_shrunk, s_lat_shrunk = pyproj.transform(utm, latlon, w_lon_utm + lon_diff, s_lat_utm + lat_diff)
+        e_lon_shrunk, n_lat_shrunk = pyproj.transform(utm, latlon, e_lon_utm - lon_diff, n_lat_utm - lat_diff)
+
+        return w_lon_shrunk, e_lon_shrunk, s_lat_shrunk, n_lat_shrunk
+
     def process_acolite(self, aco_prods):
         a_obj, sensor = self.current_asset(), self.current_sensor()
         self._time_report("Starting acolite processing") # for {}".format(x.keys()))
@@ -1016,10 +1036,14 @@ class sentinel2Data(Data):
             aps_p.update(self._products[p])
             aps_p.pop('assets')
 
+        w_lon, e_lon, s_lat, n_lat = self.shrunk_bbox(a_obj.tile)
+
         prodout = atmosphere.process_acolite(
                 a_obj, aco_tmp_dir, acolite_product_spec,
-                a_obj.style_res['raster-re'].format(tileid=a_obj._tile_re),
-                '*.SAFE')
+                a_obj.style_res['raster-re'].format(tileid=self.id),
+                extracted_asset_glob='*.SAFE',
+                roi=(s_lat, w_lon, n_lat, e_lon),
+                band='02')
 
         [self.AddFile(sensor, pt, fn) for pt, fn in prodout.items()]
         self._time_report(' -> {}: processed {}'.format(
