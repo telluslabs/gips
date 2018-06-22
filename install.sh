@@ -21,9 +21,9 @@ virtualenv --system-site-packages venv
 
 source venv/bin/activate
 
-pip install -r requirements.txt
-
 pip install --process-dependency-links -e .
+
+pip install -r dev_requirements.txt # if you wish to run the test suite; CF docker/
 
 gips_config env -r $ARCHIVEDIR -e $EMAIL
 gips_config user

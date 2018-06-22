@@ -55,6 +55,12 @@ setup(
     packages=find_packages(),
     package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf']},
     install_requires=[
+        'six>=1.9.0',
+        'requests',
+        'django==1.10',
+        'netCDF4',
+        'boto3<=1.5', # last tested on 1.4.x series; optional: only needed for S3 fetches
+        'pyproj',
         'Py6S>=1.7.0',
         'shapely',
         'gippy>=0.3.11,<0.4',
