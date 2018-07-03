@@ -1,5 +1,27 @@
 import collections
 
+
+# TODO port to new system test infrastructure
+#def t_gridded_export(setup_modis_data, clean_repo_env, output_tfe, expected):
+#    """Test gips_project using rastermask spatial spec"""
+#    rastermask = os.path.join(TEST_DATA_DIR, 'site_mask.tif')
+#    args = ('modis', '-p', 'indices', '-r', rastermask, '--fetch',
+#            '-d', '2005-01-01',
+#            '--outdir', OUTPUT_DIR, '--notld')
+#
+#    actual = output_tfe.run('gips_project', *args)
+#    assert expected == actual
+#
+#def t_cubic_gridded_export(setup_modis_data, clean_repo_env, output_tfe, expected):
+#    """Test gips_project using rastermask spatial spec"""
+#    rastermask = os.path.join(TEST_DATA_DIR, 'site_mask.tif')
+#    args = ('modis', '-p', 'indices', '-r', rastermask, '--fetch',
+#            '-d', '2005-01-01', '--interpolation', "2",
+#            '--outdir', OUTPUT_DIR, '--notld')
+#
+#    actual = output_tfe.run('gips_project', *args)
+#    assert expected == actual
+
 expectations = collections.OrderedDict([
  # t_project[modis-brgt] recording:
  ('brgt',

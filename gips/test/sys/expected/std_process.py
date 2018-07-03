@@ -124,6 +124,25 @@ for k in (('landsat', 'bqashadow'), ('landsat', 'ref-toa'),
           ('landsat', 'acca'), ('landsat', 'rad-toa')):
     mark_spec[k] = util.slow
 
+# TODO landsat's old acolite test, maybe keep?
+#@slow
+#@acolite
+#def t_process_acolite(repo_env, expected):
+#    """Test processing landsat data with ACOLITE."""
+#    # TODO we're trying not to do significant work on the system tests right
+#    # now, it won't automatically download the needed asset (find it on volga)
+#
+#    # just a quick check to confirm it's there
+#    asset_fp = os.path.join(DATA_REPO_ROOT,
+#            'landsat/tiles/012030/2017213/'
+#            'LC08_L1TP_012030_20170801_20170811_01_T1.tar.gz')
+#    assert os.path.exists(asset_fp)
+#    if orm.use_orm(): # if you're using the ORM you're on your own
+#        logger.warning("asset is present but may not be in DB; test may fail")
+#    ACOLITE_PROD_ARGS = ('landsat -s ' + NH_SHP_PATH + ' -d 2017-08-01 -v4 '
+#        '-p rhow fai oc2chl oc3chl spm655 turbidity acoflags').split()
+#    actual = repo_env.run('gips_process', *ACOLITE_PROD_ARGS)
+#    assert expected == actual
 expectations['landsat'] = collections.OrderedDict([
  # t_process[landsat-acca] recording:
  ('acca',

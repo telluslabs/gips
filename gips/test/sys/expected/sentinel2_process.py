@@ -6,6 +6,9 @@
 # rhow        Water-Leaving Radiance-Reflectance
 # spm655      Suspended Sediment Concentration 655nm
 # turbidity   Blended Turbidity
+# run is going to look something like this:
+#aco_args = (normal_args_list +
+#   '-p rhow fai oc2chl oc3chl spm655 turbidity acoflags'.split())
 
 # all the index products are made by the same gippy call so given how
 # slow sentinel2 is, skip most of them; it probably exercises the code

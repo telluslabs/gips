@@ -53,7 +53,7 @@ setup(
     author='Matthew Hanson',
     author_email='matt.a.hanson@gmail.com',
     packages=find_packages(),
-    package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf']},
+    package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf', '*.csv']},
     install_requires=[
         'six>=1.9.0',
         'requests',
