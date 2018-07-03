@@ -1139,8 +1139,13 @@ class Data(object):
                 VerboseOut(f, 4)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
-                    with utils.error_handler('Error parsing product date', continuable=True):
+                    #with utils.error_handler('Error parsing product date', continuable=True):
+                    # TODO: need to modify error handler to allow random junk in the project dir
+                    try:
                         datetime.strptime(parts[len(parts) - 3], datedir)
+                    except:
+                        pass
+                    else:
                         files.append(f)
 
         datas = []

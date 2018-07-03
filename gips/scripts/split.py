@@ -80,9 +80,6 @@ def main():
 
                         VerboseOut("splitting {}".format(fnameout))
 
-                        #data = img[i].Read()
-
-
                         try:
                             data = imgdata[i,:,:].squeeze()
                         except:
