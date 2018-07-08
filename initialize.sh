@@ -21,14 +21,16 @@ sed -i~ \
     -e "s/^ESA_PASS.*/ESA_PASS = \"${ESA_PASS}\"/" \
     gips/settings.py
 
+# create an export folder for the project outputs
+rm -rf /archive/export
+mkdir /archive/export
+chmod ogu+rwx /archive/export
+
 # create and initialize a db file if there isn't one
 gips_config env
 
 # put long term mean AOD data in the right place
 tar xfvz /conf/aod.composites.tgz -C /archive > /dev/null
-
-# create an export folder for the project outputs
-mkdir /archive/export; chmod ogu+rwx /archive/export
 
 # move initial vector data into a shared location
 cp -r /conf/vector /archive/
