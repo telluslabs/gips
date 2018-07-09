@@ -40,7 +40,7 @@ def upload(sensor, date, s3prefix):
             tile_v = str(int(basename.split('/')[-1][2:]))
 
             s3path = S3PATTERN.format(
-                S3PREFIX, bandname, date, tile_h, tile_v, sensorname)
+                s3prefix, bandname, date, tile_h, tile_v, sensorname)
 
             cmd = "aws s3 cp {} {}".format(filepath, s3path)
             status = os.system(cmd)
