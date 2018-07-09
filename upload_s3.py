@@ -39,6 +39,7 @@ def upload(sensor, date, s3prefix):
             tile_h = str(int(basename.split('/')[-1][:2]))
             tile_v = str(int(basename.split('/')[-1][2:]))
 
+            s3prefix = 's3://' + s3prefix
             s3path = S3PATTERN.format(
                 s3prefix, bandname, date, tile_h, tile_v, sensorname)
 
