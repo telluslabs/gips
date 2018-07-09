@@ -19,6 +19,7 @@ S3PATTERN = "{0}/{5}/{1}/conus_ard/{2}/{5}_{1}_conus_ard_{2}_{3}_{4}.tif"
 @click.option('--date', required=True)
 @click.option('--s3prefix', required=True)
 def upload(sensor, date, s3prefix):
+    s3prefix = 's3://' + s3prefix
     startpath = STARTPATH.format(sensor, date)
     for basename, _, filenames in os.walk(startpath):
 
@@ -39,7 +40,6 @@ def upload(sensor, date, s3prefix):
             tile_h = str(int(basename.split('/')[-1][:2]))
             tile_v = str(int(basename.split('/')[-1][2:]))
 
-            s3prefix = 's3://' + s3prefix
             s3path = S3PATTERN.format(
                 s3prefix, bandname, date, tile_h, tile_v, sensorname)
 
