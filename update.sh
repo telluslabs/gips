@@ -6,7 +6,7 @@ OUTDIR=$3
 
 gips_process landsat -p ref temp fmask -s $SHPFILE -d $DATE -v4 --fetch
 
-gips_export landsat -p ref temp fmask -s $SHPFILE -d $DATE -v4 --outdir $OUTDIR --notld --res 30 30
+gips_export landsat -p ref temp fmask -s $SHPFILE -d $DATE -v4 --outdir $OUTDIR --notld --res 30 30 --key tileid
 
 gips_mask ${OUTDIR}/* --pmask fmask
 
