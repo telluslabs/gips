@@ -1,5 +1,3 @@
-!#/usr/bin/env bash
-
 SHPFILE=$1
 DATE=$2
 OUTDIR=$3
