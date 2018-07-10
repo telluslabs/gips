@@ -22,7 +22,7 @@ sed -i~ \
     gips/settings.py
 
 # create an export folder for the project outputs
-rm -rf /archive/export
+rm -rf /archive/*
 mkdir /archive/export
 chmod ogu+rwx /archive/export
 
