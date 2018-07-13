@@ -400,8 +400,10 @@ class Asset(object):
             utils.verbose_out(
                 "Moving files from {} to {}".format(tmp_dn, path), 3)
             for (tfn, ffn) in extracted_fnames:
-                utils.mkdir(os.path.dirname(ffn))
-                os.rename(tfn, ffn)
+                # tfn's parent dir may be earlier in the list
+                if not os.path.exists(ffn):
+                    utils.mkdir(os.path.dirname(ffn))
+                    os.rename(tfn, ffn)
 
         return extant_fnames + [ffn for (_, ffn) in extracted_fnames]
 

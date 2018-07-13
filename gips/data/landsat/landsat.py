@@ -257,7 +257,7 @@ class landsatAsset(Asset):
             self.date = datetime.strptime(fname[9:16], "%Y%j")
 
         elif dn_match:
-            verbose_out('DN asset', 2)
+            verbose_out('DN asset', 4)
             self.tile = dn_match.group('path') + dn_match.group('row')
             year = dn_match.group('acq_year')
             doy = dn_match.group('acq_day')
@@ -1503,7 +1503,11 @@ class landsatData(Data):
                         amd[p].update(self._products[p])
                         amd[p].pop('assets')
                     prodout = gips.atmosphere.process_acolite(
-                            self.assets[asset], aco_proc_dir, amd)
+                        self.assets[asset],
+                        aco_proc_dir,
+                        amd,
+                        model_layer_re=r'.*_B1\.(tif|TIF)$'
+                    )
                     endtime = datetime.now()
                     for k, fn in prodout.items():
                         self.AddFile(sensor, k, fn)

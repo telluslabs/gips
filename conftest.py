@@ -1,6 +1,5 @@
 from __future__ import print_function
 
-import logging
 import os
 import shutil
 
@@ -9,15 +8,6 @@ import pytest
 from _pytest.assertion.util import _compare_eq_dict, _diff_text
 
 from gips.test.sys.util import GipsProcResult, set_constants
-
-# configure logging (can config in command-line & config file, see below)
-log_format = '%(levelname)-8s %(asctime)s %(filename)s:%(lineno)d: %(message)s'
-root_logger = logging.getLogger()
-root_streamer = logging.StreamHandler()
-root_streamer.setFormatter(logging.Formatter(log_format))
-root_logger.addHandler(root_streamer)
-
-_log = logging.getLogger(__name__)
 
 @pytest.fixture
 def orm(db, mocker):
@@ -50,16 +40,7 @@ def mock_context_manager(mocker, mpo):
 
 # pytest_* functions are hooks automatically detected by pytest
 def pytest_addoption(parser):
-    """Add custom options & settings to py.test.
-
-    These set up the data repo & configure log level."""
-    help_str = ("Set log level to one of:  'debug', 'info', 'warning', "
-                "'error', or 'critical'.  Default is 'warning'.")
-    parser.addoption("--log-level", dest='log_level', help=help_str)
-    parser.addoption(
-        "--ll",        dest='log_level', help='Alias for --log-level'
-    )
-
+    """Add custom options & settings to py.test."""
     help_str = "Set up a test data repo & download data for test purposes."
     parser.addoption("--setup-repo", action="store_true", help=help_str)
 
@@ -118,10 +99,6 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     """Process user config & command-line options."""
-    raw_level = config.getoption("log_level")
-    level = ('warning' if raw_level is None else raw_level).upper()
-    root_logger.setLevel(level)
-
     record_path = config.getoption('record')
     if record_path and os.path.lexists(record_path):
         raise IOError("Record file already exists at {}".format(record_path))
@@ -129,17 +106,12 @@ def pytest_configure(config):
     dr = str(config.getini('data-repo'))
     if not dr:
         raise ValueError("No value specified for 'data-repo' in pytest.ini")
-    else:
-        _log.debug("value detected for data-repo: " + dr)
 
     set_constants(config)
 
-    if config.getoption("slow"):
-        _log.debug("--slow detected; will not skip @slow tests")
-
     if config.getoption("clear_repo"):
-        _log.debug("--clear-repo detected; trashing and rebuilding data"
-                   " repo & inventory DB")
+        print("--clear-repo detected; trashing and rebuilding data"
+              " repo & inventory DB")
         path = config.getini('data-repo')
         os.path.lexists(path) and shutil.rmtree(path)
         setup_data_repo()
@@ -163,13 +135,11 @@ def setup_data_repo():
     # set up data root if it isn't there already
     gcp = envoy.run("gips_config env")
     if gcp.status_code != 0:
-        _log.error("data root setup via `gips_config env` failed; stdout:")
-        [_log.error(line) for line in gcp.std_out.split('\n')]
-        _log.error("data root setup via `gips_config env` failed; stderr:")
-        [_log.error(line) for line in gcp.std_err.split('\n')]
+        print("data root setup via `gips_config env` failed; stdout:")
+        print(gcp.std_out)
+        print("data root setup via `gips_config env` failed; stderr:")
+        print(gcp.std_err)
         raise RuntimeError("data root setup via `gips_config env` failed")
-    _log.debug("`gips_config env` succeeded; data repo (possibly) created")
-
 
 def pytest_assertrepr_compare(config, op, left, right):
     """
