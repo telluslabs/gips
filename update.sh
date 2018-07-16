@@ -17,5 +17,6 @@ gips_split ${OUTDIR}/* --prodname ref-masked
 
 gips_split ${OUTDIR}/* --prodname temp-masked
 
-#python upload_s3.py --sensor landsat --date $DATE --s3prefix $S3PREFIX
 python upload_s3.py --startpath $OUTDIR --s3prefix $S3PREFIX
+
+rm -rf /archive/gips
