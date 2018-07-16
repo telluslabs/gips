@@ -348,7 +348,10 @@ class aodData(Data):
         roi = gippy.Recti(pixx - 1, pixy - 1, 3, 3)
         # try reading actual data file first
         aod = numpy.nan
-        with utils.error_handler('Unable to load aod values', continuable=True):
+
+        #with utils.error_handler('Unable to load aod values', continuable=True):
+
+        try:
             # this is just for fetching the data
             inv = cls.inventory(dates=date.strftime('%Y-%j'), fetch=fetch, products=['aod'])
             img = inv[date].tiles[cls.Asset.Repository._the_tile].open('aod')
@@ -362,6 +365,9 @@ class aodData(Data):
             if numpy.isnan(aod) and numpy.any(~numpy.isnan(vals)):
                 aod = numpy.mean(vals[~numpy.isnan(vals)])
                 source = 'MODIS (MOD08_D3) spatial average'
+        except:
+            print('WARNING: Can not fetch AOD')
+            aod = numpy.nan
 
         # Calculate best estimate from multiple sources
         if numpy.isnan(aod):

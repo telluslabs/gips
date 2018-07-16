@@ -400,8 +400,10 @@ class Asset(object):
             utils.verbose_out(
                 "Moving files from {} to {}".format(tmp_dn, path), 3)
             for (tfn, ffn) in extracted_fnames:
-                utils.mkdir(os.path.dirname(ffn))
-                os.rename(tfn, ffn)
+                # tfn's parent dir may be earlier in the list
+                if not os.path.exists(ffn):
+                    utils.mkdir(os.path.dirname(ffn))
+                    os.rename(tfn, ffn)
 
         return extant_fnames + [ffn for (_, ffn) in extracted_fnames]
 
@@ -1139,8 +1141,13 @@ class Data(object):
                 VerboseOut(f, 4)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
-                    with utils.error_handler('Error parsing product date', continuable=True):
+                    #with utils.error_handler('Error parsing product date', continuable=True):
+                    # TODO: need to modify error handler to allow random junk in the project dir
+                    try:
                         datetime.strptime(parts[len(parts) - 3], datedir)
+                    except:
+                        pass
+                    else:
                         files.append(f)
 
         datas = []

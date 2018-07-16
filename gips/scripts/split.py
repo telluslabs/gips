@@ -78,7 +78,7 @@ def main():
                         fnameout = "{}_{}.tif".format(
                             os.path.splitext(fname)[0], bname)
 
-                        #data = img[i].Read()
+                        VerboseOut("splitting {}".format(fnameout))
 
                         try:
                             data = imgdata[i,:,:].squeeze()

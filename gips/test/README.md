@@ -164,9 +164,6 @@ $ cp /path/to/gips/repo/$DRIVER/tiles/$TILE/$DATE/$ARTIFACT \
 > $ARTIFACT_STORE_PATH/$DRIVER
 ```
 
-Note that specifying the log level with `--ll` and `--log-level` is supported
-for some tests, but may be deprecated for new tests.
-
 Also some specially-marked tests are skipped unless command-line options are
 given; this is for performance and safety reasons.  The repo-altering tests,
 mostly tests of `gips_inventory --fetch`, will always be skipped without the
@@ -278,10 +275,10 @@ parttern, you can place these in their own test file, eg:
 
 Caveats & Tips
 ==============
-If you want to view logger output or `print` statements, or if you want to run
-the debugger (`import pdb; pdb.set_trace()`) you _must_ specify `py.test -s`.
-This is due to pytest's somewhat draconian defaults regarding the brevity of
-test run output by default.
+If you want to view `print` statements, or if you want to run the debugger
+(`import pdb; pdb.set_trace()`) you _must_ specify `py.test -s`. This is due to
+pytest's somewhat draconian defaults regarding the brevity of test run output
+by default.
 
 Quick Start
 ===========

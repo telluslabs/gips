@@ -1,6 +1,8 @@
 from __future__ import print_function
 
-import logging, os, shutil, re
+import os
+import shutil
+import re
 import importlib
 import hashlib
 import pprint
@@ -11,9 +13,6 @@ import envoy # deprecated
 import sh
 
 from gips.inventory import orm # believed to be safe even though it's the code under test
-
-_log = logging.getLogger(__name__)
-
 
 def set_constants(config):
     """Use pytest config API to set globals pointing at needed file paths."""
@@ -48,79 +47,6 @@ def extract_timestamps(files):
     `files` should be a dict in a result object from TestFileEnvironment.run().
     Directories' don't have hashes so use None instead."""
     return {k: getattr(v, 'hash', None) for k, v in files.items()}
-
-
-class GipsTestFileEnv(scripttest.TestFileEnvironment):
-    """As superclass but customized for GIPS use case.
-
-    Captured values from the process under test:
-        standard output
-        standard error
-        Created files & checksums (for a configured directory-under-test)
-        Updated files & checksums (for a configured directory-under-test)
-        Deleted files & checksums(?) (for a configured directory-under-test)
-        exit status
-    Saves ProcResult objects in self.proc_result."""
-    proc_result = None
-
-    @staticmethod
-    def log_findings(description, files):
-        """If user asks for debug output, log post-run file findings.
-
-        Logs in a format suitable for updating known good values when tests
-        need to be updated to match code changes."""
-        _log.debug("{}: {}".format(description, pprint.pformat(files)))
-
-    def run(self, *args, **kwargs):
-        """As super().run but store result & prevent premature exits."""
-        logging.debug("command line: `{}`".format(' '.join(args)))
-        self.proc_result = super(GipsTestFileEnv, self).run(
-            *args, expect_error=True, expect_stderr=True, **kwargs)
-        self.gips_proc_result = gpr = GipsProcResult(self.proc_result)
-        logging.debug("standard output: {}".format(
-            gpr.stdout if gpr.stdout != '' else '(None)'))
-        logging.debug("standard error: {}".format(
-            gpr.stderr if gpr.stderr != '' else '(None)'))
-        if pytest.config.getoption("--expectation-format"):
-            print ('standard output (expectation format): """' +
-                   re.sub('\\\\n', '\n', repr(gpr.stdout))[2:-1] + '"""')
-            print ('standard error (expectation format):  """' +
-                   re.sub('\\\\n', '\n', repr(gpr.stderr))[2:-1] + '"""')
-        self.log_findings("Created files", gpr.created)
-        self.log_findings("Updated files", gpr.updated)
-        self.log_findings("Deleted files", gpr.deleted)
-        return gpr
-
-    def remove_created(self, strict=False):
-        """Remove files & directories created by test run."""
-        if self.proc_result is None:
-            msg = "No previous run to clean up from."
-            if strict:
-                raise RuntimeError(msg)
-            else:
-                _log.warning("Can't remove_created: " + msg)
-                return
-
-        created = self.proc_result.files_created
-        # first remove all the files
-        fn = [n for (n, t) in created.items() if isinstance(t, scripttest.FoundFile)]
-        [os.remove(os.path.join(DATA_REPO_ROOT, n)) for n in fn]
-        # then remove all the directories (which should now be empty)
-        dn = [n for (n, t) in created.items() if isinstance(t, scripttest.FoundDir)]
-        for n in dn:
-            # dirs are complex because they can exist inside eachother
-            full_n = os.path.join(DATA_REPO_ROOT, n)
-            if os.path.lexists(full_n):
-                shutil.rmtree(full_n)
-
-    def _find_files(self, *args, **kwargs):
-        """As super, but log that the checksums are being computed.
-
-        Logs are needed because the process takes time for large assets."""
-        _log.debug("Starting file detection & checksumming")
-        rv = super(GipsTestFileEnv, self)._find_files(*args, **kwargs)
-        _log.debug("Completed file detection & checksumming")
-        return rv
 
 
 class GipsProcResult(object):
@@ -446,47 +372,6 @@ def export_wrapper(request):
     # https://stackoverflow.com/questions/11197186/
     for rv in sys_test_wrapper(request, working_dir):
         yield rv + (working_dir,)
-
-@pytest.yield_fixture
-def repo_env(request):
-    """Provide means to test files created by run & clean them up after."""
-    if not orm.use_orm():
-        _log.warning("ORM is deactivated; check GIPS_ORM.")
-    gtfe = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
-    yield gtfe
-    # This step isn't effective if DATA_REPO_ROOT isn't right; in that case it
-    # ruins further test runs because files already exist when the test starts.
-    # Maybe add self-healing by having setup_modis_data run in a TFE and
-    # detecting which files are present when it starts.
-    gtfe.remove_created()
-    rectify(request.module.driver)
-
-
-@pytest.yield_fixture(scope='module')
-def clean_repo_env(request):
-    """Keep data repo clean without having to run anything in it.
-
-    This emulates tfe.run()'s checking the directory before and after a run,
-    then working out how the directory has changed.  Unfortunately half the
-    work is done in tfe, the other half in ProcResult."""
-    if not orm.use_orm():
-        _log.warning("ORM is deactivated; check GIPS_ORM.")
-    file_env = GipsTestFileEnv(DATA_REPO_ROOT, start_clear=False)
-    before = file_env._find_files()
-    _log.debug("Generating file env: {}".format(file_env))
-    yield file_env
-    after = file_env._find_files()
-    file_env.proc_result = scripttest.ProcResult(file_env, ['N/A'], '', '', '', 0, before, after)
-    file_env.remove_created()
-    rectify(request.module.driver)
-    _log.debug("Finalized file env: {}".format(file_env))
-
-
-@pytest.fixture
-def output_tfe():
-    """Provide means to test files created by run & clean them up after."""
-    gtfe = GipsTestFileEnv(OUTPUT_DIR)
-    return gtfe
 
 def load_expectation_module(name):
     """Use introspection to find known-good values for test assertions.
