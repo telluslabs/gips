@@ -15,12 +15,14 @@ S3PATTERN = "{0}/{5}/{1}/conus_ard/{2}/{5}_{1}_conus_ard_{2}_{3}_{4}.tif"
 
 
 @click.command()
-@click.option('--sensor', required=True)
-@click.option('--date', required=True)
+#@click.option('--sensor', required=True)
+#@click.option('--date', required=True)
+@click.option('--startpath', required=True)
 @click.option('--s3prefix', required=True)
-def upload(sensor, date, s3prefix):
+def upload(startpath,  s3prefix):
     s3prefix = 's3://' + s3prefix
-    startpath = STARTPATH.format(sensor, date)
+    #startpath = STARTPATH.format(sensor, date)
+
     for basename, _, filenames in os.walk(startpath):
 
         for filename in filenames:
