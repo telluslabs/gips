@@ -34,3 +34,4 @@ tar xfvz /conf/aod.composites.tgz -C /archive > /dev/null
 
 # move initial vector data into a shared location
 cp -r /conf/vector /archive/
+rm -rf conf

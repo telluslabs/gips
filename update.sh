@@ -1,3 +1,5 @@
+# perform processing for a single day
+
 SHPFILE=$1
 DATE=$2
 OUTDIR=$3
