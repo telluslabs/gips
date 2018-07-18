@@ -1835,7 +1835,13 @@ class landsatData(Data):
 
         with utils.make_temp_dir() as tmpdir:
             warp_data = landsatData(warp_tile, warp_date, "%Y%j")
-            warp_band_filenames = [f for f in warp_data.assets['C1'].datafiles() if f.endswith("B5.TIF")]
+            nir_band = self.Asset._sensors[warp_data.assets['C1'].sensor]['bands'][
+                self.Asset._sensors[warp_data.assets['C1'].sensor]['colors'].index('NIR')
+            ]
+            warp_band_filenames = [
+                f for f in warp_data.assets['C1'].datafiles()
+                        if f.endswith("B{}.TIF".format(nir_band))
+            ]
             warp_data.assets['C1'].extract(filenames=warp_band_filenames, path=tmpdir)
 
             warp_bands_bin = []
