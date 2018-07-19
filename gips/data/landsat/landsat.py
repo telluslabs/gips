@@ -1842,6 +1842,7 @@ class landsatData(Data):
                 f for f in warp_data.assets['C1'].datafiles()
                         if f.endswith("B{}.TIF".format(nir_band))
             ]
+            print("WARP BANDS:", warp_band_filenames)
             warp_data.assets['C1'].extract(filenames=warp_band_filenames, path=tmpdir)
 
             warp_bands_bin = []
@@ -1858,7 +1859,10 @@ class landsatData(Data):
                 template = input_template.read()
 
             base_band_img = gippy.GeoImage(base_band_filename)
-            warp_base_band_filename = [f for f in warp_bands_bin if f.endswith("B5.bin")][0]
+            warp_base_band_filename = [
+                f for f in warp_bands_bin
+                        if f.endswith("B{}.bin".format(nir_band))
+            ][0]
             warp_base_band_img = gippy.GeoImage(os.path.join(tmpdir, warp_base_band_filename))
             base_pixel_size = abs(base_band_img.Resolution().x())
             warp_pixel_size = abs(warp_base_band_img.Resolution().x())
