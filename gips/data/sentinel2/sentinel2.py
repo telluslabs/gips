@@ -1006,21 +1006,23 @@ class sentinel2Data(Data):
 
         self._time_report(' -> %s: processed %s' % (self.basename, indices))
 
-    def shrunk_bbox(self, tile):
-        w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(tile)
-        latlon = pyproj.Proj(init='epsg:4326')
-        utm = pyproj.Proj(init='epsg:326{}'.format(tile[0:2]))
+    # this function creates a geolocation error
+    #def shrunk_bbox(self, tile):
+        #w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(tile)
+        #latlon = pyproj.Proj(init='epsg:4326')
+        #utm = pyproj.Proj(init='epsg:326{}'.format(tile[0:2]))
 
-        w_lon_utm, s_lat_utm = pyproj.transform(latlon, utm, w_lon, s_lat)
-        e_lon_utm, n_lat_utm = pyproj.transform(latlon, utm, e_lon, n_lat)
+        #w_lon_utm, s_lat_utm = pyproj.transform(latlon, utm, w_lon, s_lat)
+        #e_lon_utm, n_lat_utm = pyproj.transform(latlon, utm, e_lon, n_lat)
 
-        lon_diff = (w_lon_utm - e_lon_utm) / 16
-        lat_diff = (n_lat_utm - s_lat_utm) / 16
+        #lon_diff = (e_lon_utm - w_lon_utm) / 16
+        #lat_diff = (n_lat_utm - s_lat_utm) / 16
 
-        w_lon_shrunk, s_lat_shrunk = pyproj.transform(utm, latlon, w_lon_utm + lon_diff, s_lat_utm + lat_diff)
-        e_lon_shrunk, n_lat_shrunk = pyproj.transform(utm, latlon, e_lon_utm - lon_diff, n_lat_utm - lat_diff)
+        #w_lon_shrunk, s_lat_shrunk = pyproj.transform(utm, latlon, w_lon_utm + lon_diff, s_lat_utm + lat_diff)
+        #e_lon_shrunk, n_lat_shrunk = pyproj.transform(utm, latlon, e_lon_utm - lon_diff, n_lat_utm - lat_diff)
 
-        return w_lon_shrunk, e_lon_shrunk, s_lat_shrunk, n_lat_shrunk
+        #return w_lon_shrunk, e_lon_shrunk, s_lat_shrunk, n_lat_shrunk
+        
 
     def process_acolite(self, aco_prods):
         a_obj, sensor = self.current_asset(), self.current_sensor()
@@ -1036,7 +1038,7 @@ class sentinel2Data(Data):
             aps_p.update(self._products[p])
             aps_p.pop('assets')
 
-        w_lon, e_lon, s_lat, n_lat = self.shrunk_bbox(a_obj.tile)
+        w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(a_obj.tile)
 
         prodout = atmosphere.process_acolite(
                 a_obj, aco_tmp_dir, acolite_product_spec,
