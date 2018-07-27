@@ -966,13 +966,22 @@ class landsatData(Data):
                 self._time_report("coregistering index")
                 xcoreg = coreg_shift.get('x', 0.0)
                 ycoreg = coreg_shift.get('y', 0.0)
+
+
                 self._time_report("coreg (x, y) = ({:.3f}, {:.3f})"
                                   .format(xcoreg, ycoreg))
                 img = gippy.GeoImage(val, True)
-                affine = img.Affine()
-                affine[0] += xcoreg
-                affine[3] += ycoreg
-                img.SetAffine(affine)
+
+                insane = (xcoreg ** 2 + ycoreg ** 2) ** 0.5 > 75
+
+                if insane:
+                    img.SetMeta("INSANE COREG SHIFT", "True")
+                    # TODO: Proper fix
+                else:
+                    affine = img.Affine()
+                    affine[0] += xcoreg
+                    affine[3] += ycoreg
+                    img.SetAffine(affine)
                 img.Process()
                 img = None
 
