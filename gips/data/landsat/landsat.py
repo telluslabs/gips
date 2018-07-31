@@ -971,10 +971,10 @@ class landsatData(Data):
                                   .format(xcoreg, ycoreg))
                 img = gippy.GeoImage(val, True)
 
-                coleridge_mag = (xcoreg ** 2 + ycoreg ** 2) ** 0.5
-                insane =  coleridge_mag > 75  # TODO: actual fix
+                coreg_mag = (xcoreg ** 2 + ycoreg ** 2) ** 0.5
+                insane =  coreg_mag > 75  # TODO: actual fix
 
-                img.SetMeta("COLERIDGE_MAGNITUDE", str(coleridge_mag))
+                img.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
 
                 if not insane:
                     affine = img.Affine()
@@ -1425,10 +1425,10 @@ class landsatData(Data):
                     imgout.SetMeta(self.prep_meta(asset_fn, md))
 
                     if coreg:
-                        coleridge_mag = (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5
-                        insane =  coleridge_mag > 75  # TODO: actual fix
+                        coreg_mag = (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5
+                        insane =  coreg_mag > 75  # TODO: actual fix
 
-                        imgout.SetMeta("COLERIDGE_MAGNITUDE", str(coleridge_mag))
+                        imgout.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
 
                         if not insane:
                             self._time_report("Setting affine of product")
@@ -1912,7 +1912,7 @@ class landsatData(Data):
 
             try:
                 # subprocess has a timeout option as of python 3.3
-                ORTHO_TIMEOUT = 20 * 60
+                ORTHO_TIMEOUT = 5 * 60
                 cmd = ["timeout", str(ORTHO_TIMEOUT),
                        "ortho", "-r", parameter_file]
                 returnstatus = subprocess.check_call(args=cmd, cwd=tmpdir)
