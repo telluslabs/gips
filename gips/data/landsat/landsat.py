@@ -967,17 +967,16 @@ class landsatData(Data):
                 xcoreg = coreg_shift.get('x', 0.0)
                 ycoreg = coreg_shift.get('y', 0.0)
 
-
                 self._time_report("coreg (x, y) = ({:.3f}, {:.3f})"
                                   .format(xcoreg, ycoreg))
                 img = gippy.GeoImage(val, True)
 
-                insane = (xcoreg ** 2 + ycoreg ** 2) ** 0.5 > 75
+                coleridge_mag = (xcoreg ** 2 + ycoreg ** 2) ** 0.5
+                insane =  coleridge_mag > 75  # TODO: actual fix
 
-                if insane:
-                    img.SetMeta("INSANE COREG SHIFT", "True")
-                    # TODO: Proper fix
-                else:
+                img.SetMeta("COLERIDGE_MAGNITUDE", str(coleridge_mag))
+
+                if not insane:
                     affine = img.Affine()
                     affine[0] += xcoreg
                     affine[3] += ycoreg
@@ -1426,11 +1425,17 @@ class landsatData(Data):
                     imgout.SetMeta(self.prep_meta(asset_fn, md))
 
                     if coreg:
-                        self._time_report("Setting affine of product")
-                        affine = imgout.Affine()
-                        affine[0] += coreg_xshift
-                        affine[3] += coreg_yshift
-                        imgout.SetAffine(affine)
+                        coleridge_mag = (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5
+                        insane =  coleridge_mag > 75  # TODO: actual fix
+
+                        imgout.SetMeta("COLERIDGE_MAGNITUDE", str(coleridge_mag))
+
+                        if not insane:
+                            self._time_report("Setting affine of product")
+                            affine = imgout.Affine()
+                            affine[0] += coreg_xshift
+                            affine[3] += coreg_yshift
+                            imgout.SetAffine(affine)
                         imgout.Process()
 
                     imgout = None
@@ -1907,7 +1912,7 @@ class landsatData(Data):
 
             try:
                 # subprocess has a timeout option as of python 3.3
-                ORTHO_TIMEOUT = 5 * 60
+                ORTHO_TIMEOUT = 20 * 60
                 cmd = ["timeout", str(ORTHO_TIMEOUT),
                        "ortho", "-r", parameter_file]
                 returnstatus = subprocess.check_call(args=cmd, cwd=tmpdir)
