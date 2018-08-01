@@ -966,13 +966,21 @@ class landsatData(Data):
                 self._time_report("coregistering index")
                 xcoreg = coreg_shift.get('x', 0.0)
                 ycoreg = coreg_shift.get('y', 0.0)
+
                 self._time_report("coreg (x, y) = ({:.3f}, {:.3f})"
                                   .format(xcoreg, ycoreg))
                 img = gippy.GeoImage(val, True)
-                affine = img.Affine()
-                affine[0] += xcoreg
-                affine[3] += ycoreg
-                img.SetAffine(affine)
+
+                coreg_mag = (xcoreg ** 2 + ycoreg ** 2) ** 0.5
+                insane =  coreg_mag > 75  # TODO: actual fix
+
+                img.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
+
+                if not insane:
+                    affine = img.Affine()
+                    affine[0] += xcoreg
+                    affine[3] += ycoreg
+                    img.SetAffine(affine)
                 img.Process()
                 img = None
 
@@ -1417,11 +1425,17 @@ class landsatData(Data):
                     imgout.SetMeta(self.prep_meta(asset_fn, md))
 
                     if coreg:
-                        self._time_report("Setting affine of product")
-                        affine = imgout.Affine()
-                        affine[0] += coreg_xshift
-                        affine[3] += coreg_yshift
-                        imgout.SetAffine(affine)
+                        coreg_mag = (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5
+                        insane =  coreg_mag > 75  # TODO: actual fix
+
+                        imgout.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
+
+                        if not insane:
+                            self._time_report("Setting affine of product")
+                            affine = imgout.Affine()
+                            affine[0] += coreg_xshift
+                            affine[3] += coreg_yshift
+                            imgout.SetAffine(affine)
                         imgout.Process()
 
                     imgout = None
