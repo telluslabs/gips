@@ -1001,24 +1001,20 @@ class landsatData(Data):
 
         start = datetime.now()
 
-        if set(self.assets.keys()) == set(['C1', 'DN']):
-            if 'C1' in self.assets: # prefer C1
-                asset = 'C1'
-            elif 'DN' in self.assets:
-                asset = 'DN'
-            else:
-                raise ValueError(
-                    'No valid asset found for C1 nor DN for {} {}'.format(
-                        self.basename))
-        else:
-            if len(self.assets) > 1:
-                # TODO document the reason why not
-                raise ValueError("Cannot create products from"
-                                 " this combination of assets:  {}".format(assets))
-            asset = self.assets.keys()[0]
+        # figure out which asset should be used for processing
+        asset = self.assets.keys()[0] # really an asset type string, eg 'SR'
+        if len(self.assets) > 1:
+            # if there's more than one, have to choose:
+            # prefer local over fetching from S3, and prefer C1 over DN
+            asset = next(at for at in ['C1', 'C1S3', 'DN'] if at in self.assets)
+            if 'SR' in self.assets:
+                # this method is structured poorly; handle an odd error case:
+                p_types = set(v[0] for v in products.requested.values())
+                if p_types & {'landmask', 'ndvi8sr'}:
+                    raise NotImplementedError(
+                            "Can't process SR alongside non-SR")
 
-        # TODO: De-hack this
-        # Better approach, but needs some thought, is to loop over assets
+        # TODO: De-hack this to loop over products & handle the SR case --^
 
         if asset == 'SR':
 
