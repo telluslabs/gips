@@ -88,9 +88,20 @@ def main():
                         except:
                             data = imgdata[:,:]
 
+
                         if FORCE_OUTPUT_DIM is not None:
-                            xd, yd = FORCE_OUTPUT_DIM
-                            data = data[:yd, :xd]
+                            if data.shape != FORCE_OUTPUT_DIM:
+                                yf, xf = FORCE_OUTPUT_DIM
+                                yd, xd = data.shape
+                                if xd > xf:
+                                    data = data[:,:xf]
+                                elif xd < xf:
+                                    data = np.hstack((data, np.zeros((data.shape[0], 1), dtype=data.dtype)))
+                                if yd > yf:
+                                    data = data[:yf,:]
+                                elif yd < yf:
+                                    data = np.vstack((data, np.zeros((1, data.shape[1]), dtype=data.dtype)))
+
 
                         nodata = -32768
                         scale = 10000
