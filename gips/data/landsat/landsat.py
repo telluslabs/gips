@@ -1111,6 +1111,9 @@ class landsatData(Data):
                 raise ValueError("Mixing coreg and non-coreg products is not allowed")
 
             if coreg:
+                if asset != 'C1':
+                    raise ValueError('Coreg produces require C1 assets, but'
+                                     ' got ' + asset)
 
                 # If possible, use AROP 'ortho' command to co-register this landsat scene
                 # against a reference Sentinel2 scene. When AROP is successful it creates
@@ -1945,7 +1948,9 @@ class landsatData(Data):
 
         asset = self.assets['C1']
         any_band = [band for band in asset.datafiles() if band.endswith("TIF")][0]
-        ps = subprocess.Popen(["gdalinfo", "/vsitar/" + asset.filename + "/" + any_band], stdout=subprocess.PIPE)
+        ps = subprocess.Popen(
+            ["gdalinfo", "/vsitar/" + asset.filename + "/" + any_band],
+            stdout=subprocess.PIPE)
         ps.wait()
         info = ps.stdout.read()
         utm_zone_re = re.compile(".+UTM[ _][Z|z]one[ _](\d{2})[N|S].+", flags=re.DOTALL)
