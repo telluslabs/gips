@@ -1,3 +1,8 @@
+#!/bin/bash
+
+# Make sure we fail on errors
+set -e
+
 # perform processing for a single day
 
 SHPFILE=$1

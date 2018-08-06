@@ -10,6 +10,7 @@ dist
 pytest.ini
 .cache
 .coverage
+.idea
 *venv
 aod.composites.tar.gz
 gips_creds.sh.enc
