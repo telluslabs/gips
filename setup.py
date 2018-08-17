@@ -53,7 +53,14 @@ setup(
     author='Matthew Hanson',
     author_email='matt.a.hanson@gmail.com',
     packages=find_packages(),
-    package_data={'': ['*.shp', '*.prj', '*.shx', '*.dbf', '*.csv']},
+    package_data={
+        '': ['*.shp', '*.prj', '*.shx', '*.dbf', '*.csv'],
+        'gips': [
+            'acolite.cfg',
+            'data/landsat/input_file_tmp.inp',
+            'data/landsat/lndortho.cps_par.ini',
+        ],
+    },
     install_requires=[
         'six>=1.9.0',
         'requests',
