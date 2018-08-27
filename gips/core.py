@@ -118,7 +118,7 @@ class SpatialExtent(object):
                                        tiles=tiles, pcov=pcov, ptile=ptile))
         return extents
 
-    def __init__(self, dataclass, tiles, pcov, ptile,
+    def __init__(self, dataclass, tiles, pcov=None, ptile=None,
                  feature=None, rastermask=None):
         """ Create spatial extent with a GeoFeature instance or list of tiles """
         self.repo = dataclass.Asset.Repository
