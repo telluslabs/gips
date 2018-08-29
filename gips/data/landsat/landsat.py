@@ -1248,10 +1248,6 @@ class landsatData(Data):
                 raise ValueError("Mixing coreg and non-coreg products is not allowed")
 
             if coreg:
-                if asset != 'C1':
-                    raise ValueError('Coreg produces require C1 assets, but'
-                                     ' got ' + asset)
-
                 # If possible, use AROP 'ortho' command to co-register this landsat scene
                 # against a reference Sentinel2 scene. When AROP is successful it creates
                 # a text file with parameters in it that is needed to apply an offset.
