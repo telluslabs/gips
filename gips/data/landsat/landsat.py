@@ -24,6 +24,7 @@
 from __future__ import print_function
 
 from contextlib import contextmanager
+import sys
 import os
 import re
 from datetime import datetime, date, timedelta
@@ -84,12 +85,59 @@ class landsatRepository(Repository):
     description = 'Landsat 5 (TM), 7 (ETM+), 8 (OLI)'
     _tile_attribute = 'PR'
 
-    default_settings = {'source': 'usgs'}
+    default_settings = {
+        'source': 'usgs',
+        'asset-preference': ('C1', 'C1S3', 'C1GS', 'DN'),
+    }
 
     @classmethod
     def feature2tile(cls, feature):
         tile = super(landsatRepository, cls).feature2tile(feature)
         return tile.zfill(6)
+
+_c1_sources = ('s3', 'usgs', 'gs')
+_c1_correction_levels = ('L1TP', 'L1GT', 'L1GS') # in desc order of preference
+_c1_tiers = ('T1', 'T2', 'RT')
+
+_c1gs_query_url = ('https://www.googleapis.com/storage/v1/b/'
+                   'gcp-public-data-landsat/o')
+_c1gs_object_url = 'http://storage.googleapis.com/gcp-public-data-landsat/'
+
+def _gs_api_search(prefix, delimiter='/'):
+    """Convenience wrapper for searching in google cloud storage."""
+    r = requests.get(_c1gs_query_url,
+                 params=dict(delimiter=delimiter, prefix=prefix))
+    r.raise_for_status()
+    return r.json()
+
+def _gs_prefix_search(tile, acq_date):
+    """Locates the best prefix for the given arguments.
+
+    Docs:  https://cloud.google.com/storage/docs/json_api/v1/objects/list
+    """
+    # we identify a sensor as eg 'LC8' but in the filename it's 'LC08';
+    # prefer the latest sensor that has data for the scene
+    sensors = reversed([s for s in landsatAsset._assets['C1GS']['sensors']])
+    ads = acq_date.strftime('%Y%m%d')
+    path, row = path_row(tile)
+
+    # sample full key (highly redundant, unfortunately):
+    # we're searching up to here ---------------v
+    # ('LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/
+    #                       'LC08_L1GT_044034_20130330_20170310_01_T2_MTL.txt')
+    p_template = '{{}}/01/{}/{}/{{}}_{{}}_{}_{}_'.format(path, row, tile, ads)
+
+    # more indentation = better engineering
+    for s in sensors:
+        c = landsatAsset._sensors[s]['code']
+        for cl in _c1_correction_levels:
+            search_prefix = p_template.format(c, c, cl)
+            full_prefixes = _gs_api_search(search_prefix).get('prefixes', [])
+            for t in _c1_tiers:
+                for p in full_prefixes:
+                    if p.endswith(t + '/'):
+                        return s, p
+    return None, None
 
 class landsatAsset(Asset):
     """ Landsat asset (original raw tar file) """
@@ -111,6 +159,7 @@ class landsatAsset(Asset):
         #    'description': 'Landsat 4',
         #},
         'LT5': {
+            'code': 'LT05',
             'description': 'Landsat 5',
             'ee_dataset': 'LANDSAT_TM_C1',
             'startdate': date(1984, 3, 1),
@@ -127,6 +176,7 @@ class landsatAsset(Asset):
             'tcap': _tcapcoef,
         },
         'LE7': {
+            'code': 'LE07',
             'description': 'Landsat 7',
             'ee_dataset': 'LANDSAT_EMT_C1',
             'startdate': date(1999, 4, 15),
@@ -142,6 +192,7 @@ class landsatAsset(Asset):
             'tcap': _tcapcoef,
         },
         'LC8': {
+            'code': 'LC08',
             'description': 'Landsat 8',
             'ee_dataset': 'LANDSAT_8_C1',
             'startdate': date(2013, 4, 1),
@@ -180,8 +231,7 @@ class landsatAsset(Asset):
     # example:  LC08_L1TP_013030_20151225_20170224_01_T1
     _c1_base_pattern = (
         r'^L(?P<sensor>\w)(?P<satellite>\d{2})_'
-        r'(?P<correction_level>.{4})_(?P<path>\d{3})(?P<row>\d{3})_'
-        r'(?P<acq_year>\d{4})(?P<acq_month>\d{2})(?P<acq_day>\d{2})_'
+        r'(?P<correction_level>.{4})_(?P<pathrow>\d{6})_(?P<acq_date>\d{8})_'
         r'(?P<processing_date>\d{8})_'
         r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})')
 
@@ -192,8 +242,7 @@ class landsatAsset(Asset):
             'enddate': date(2017, 4, 30),
             'pattern': (
                 r'^L(?P<sensor>[A-Z])(?P<satellie>\d)'
-                r'(?P<path>\d{3})(?P<row>\d{3})'
-                r'(?P<acq_year>\d{4})(?P<acq_day>\d{3})'
+                r'(?P<pathrow>\d{6})(?P<acq_date>\d{7})'
                 r'(?P<gsi>[A-Z]{3})(?P<version>\d{2})\.tar\.gz$'
             ),
         },
@@ -214,6 +263,11 @@ class landsatAsset(Asset):
         'C1S3': {
             'sensors': ['LC8'],
             'pattern': _c1_base_pattern + r'_S3\.json$',
+            'latency': 12,
+        },
+        'C1GS': {
+            'sensors': ['LT5', 'LE7', 'LC8'],
+            'pattern': _c1_base_pattern + r'_gs\.json$',
             'latency': 12,
         },
     }
@@ -238,47 +292,31 @@ class landsatAsset(Asset):
 
         verbose_out("Attempting to load " + fname, 2)
 
-        sr_pattern_re = re.compile(self._assets['SR']['pattern'])
-        dn_pattern_re = re.compile(self._assets['DN']['pattern'])
-        c1_pattern_re = re.compile(self._assets['C1']['pattern'])
-        c1s3_pattern_re = re.compile(self._assets['C1S3']['pattern'])
+        # determine asset type
+        match = None
+        for at, ad in self._assets.items():
+            match = re.match(ad['pattern'], fname)
+            if match:
+                break
+        if match is None:
+            raise RuntimeError(
+                "No valid landsat asset type for '{}'".format(fname), filename)
+        self.asset = at
 
-        sr_match = sr_pattern_re.match(fname)
-        dn_match = dn_pattern_re.match(fname)
-        c1_match = c1_pattern_re.match(fname)
-        c1s3_match = c1s3_pattern_re.match(fname)
-
-        if sr_match:
-            verbose_out('SR asset', 2)
-            self.asset = 'SR'
+        # set attribs according to asset type
+        if at == 'SR':
             self.sensor = 'LC8SR'
-            self.version = int(fname[20:22])
             self.tile = fname[3:9]
             self.date = datetime.strptime(fname[9:16], "%Y%j")
-
-        elif dn_match:
-            verbose_out('DN asset', 4)
-            self.tile = dn_match.group('path') + dn_match.group('row')
-            year = dn_match.group('acq_year')
-            doy = dn_match.group('acq_day')
-            self.date = datetime.strptime(year + doy, "%Y%j")
-
-            self.asset = 'DN'
+            self.version = int(fname[20:22])
+        elif at == 'DN':
             self.sensor = fname[0:3]
+            self.date = datetime.strptime(match.group('acq_date'), "%Y%j")
             self.version = int(fname[19:21])
-        elif c1_match or c1s3_match:
-            self.asset = 'C1' if c1_match else 'C1S3'
-            match = c1_match or c1s3_match
-            utils.verbose_out(self.asset + ' asset', 2)
-
-            self.tile = match.group('path') + match.group('row')
-            year = match.group('acq_year')
-            month = match.group('acq_month')
-            day = match.group('acq_day')
-            self.date = datetime.strptime(year + month + day, "%Y%m%d")
-
+        else: # C1 flavors
             self.sensor = "L{}{}".format(match.group('sensor'),
                                          int(match.group('satellite')))
+            self.date = datetime.strptime(match.group('acq_date'), "%Y%m%d")
             self.collection_number = match.group('coll_num')
             self.collection_category = match.group('coll_cat')
             processing_date = datetime.strptime(match.group('processing_date'),
@@ -286,11 +324,9 @@ class landsatAsset(Asset):
             self.version = 1e6 * int(self.collection_number) + \
                     (processing_date - datetime(2017, 1, 1)).days + \
                     {'RT': 0, 'T2': 0.5, 'T1': 0.9}[self.collection_category]
-        else:
-            msg = "No matching landsat asset type for '{}'".format(fname)
-            raise RuntimeError(msg, filename)
 
-        if self.asset in ['DN', 'C1', 'C1S3']:
+        if self.asset != 'SR':
+            self.tile = match.group('pathrow')
             smeta = self._sensors[self.sensor]
             self.meta = {}
             self.meta['bands'] = {}
@@ -312,6 +348,21 @@ class landsatAsset(Asset):
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
 
+    cloud_storage_a_types = ('C1S3', 'C1GS') # in order of current preference
+
+    def in_cloud_storage(self):
+        """Is this asset's data fetched from the cloud on-demand?"""
+        return self.asset in self.cloud_storage_a_types
+
+    def band_paths(self):
+        if not self.in_cloud_storage():
+            raise NotImplementedError(
+                'porting local files to this method is a TODO')
+        spectral_bands = self.load_c1_json()[
+            {'C1S3': '30m-bands', 'C1GS': 'spectral-bands'}[self.asset]]
+        # json module insists on returning unicode, which gippy no likey
+        return [p.encode('ascii','ignore') for p in spectral_bands]
+
     @classmethod
     def cloud_cover_from_mtl_text(cls, text):
         """Reads the text and returns the cloud cover percentage."""
@@ -332,7 +383,7 @@ class landsatAsset(Asset):
         text = None
         if self.asset == 'C1S3':
             if os.path.exists(self.filename):
-                c1s3_content = self.load_c1s3_json()
+                c1s3_content = self.load_c1_json()
                 text = requests.get(c1s3_content['mtl']).text
             else:
                 query_results = self.query_s3(self.tile, self.date)
@@ -397,11 +448,9 @@ class landsatAsset(Asset):
         utils.verbose_out(msg.format(scene_cloud_cover, pclouds), 3)
         return asset_passes_filter
 
-    def load_c1s3_json(self):
-        """Load the content from a C1S3 json asset and return it.
-
-        Returns None if the current asset type isn't C1S3."""
-        if self.asset != 'C1S3':
+    def load_c1_json(self):
+        """Load the content from a C1 json asset and return it."""
+        if not self.in_cloud_storage():
             return None
         with open(self.filename) as aof:
             return json.load(aof)
@@ -430,7 +479,7 @@ class landsatAsset(Asset):
             for ds in ['LANDSAT_8_C1', 'LANDSAT_ETM_C1', 'LANDSAT_TM_C1']
         }
 
-    _bucket_name = 'landsat-pds'
+    _s3_bucket_name = 'landsat-pds'
     _s3_url = 'https://landsat-pds.s3.amazonaws.com/'
 
     # take advantage of gips' search order (tile is outer, date is inner)
@@ -469,7 +518,7 @@ class landsatAsset(Asset):
             # find the layer and metadata files matching the current scene
             import boto3 # import here so it only breaks if it's actually needed
             s3 = boto3.resource('s3')
-            bucket = s3.Bucket(cls._bucket_name)
+            bucket = s3.Bucket(cls._s3_bucket_name)
             keys = [o.key for o in bucket.objects.filter(Prefix=key_prefix)]
             cls._query_s3_cache = key_prefix, keys
             verbose_out("Found {} S3 keys while searching for for key fragment"
@@ -526,6 +575,57 @@ class landsatAsset(Asset):
         return {'basename': filename,
                 '_30m_tifs': _30m_tifs, '_15m_tif': _15m_tif,
                 'qa_tif': qa_tif, 'mtl_txt': mtl_txt}
+
+    @classmethod
+    def query_gs(cls, tile, date, pclouds=100):
+        """Query for assets in google cloud storage.
+
+        Returns {'basename': '...', 'urls': [...]}, else None.
+        """
+        sensor, prefix = _gs_prefix_search(tile, date)
+        if prefix is None:
+            return None
+        raw_keys = [i['name'] for i in _gs_api_search(prefix)['items']]
+
+        # sort and organize the URLs, and check for missing ones
+        # TODO need to test 7 & 5
+        keys = {'spectral-bands': []}
+        missing_suffixes = []
+        band_suffixes = ['B{}.TIF'.format(b)
+                         for b in cls._sensors[sensor]['bands']]
+        for bs in band_suffixes:
+            try:
+                keys['spectral-bands'].append(
+                    next(u for u in raw_keys if u.endswith(bs)))
+            except StopIteration:
+                missing_suffixes.append(bs)
+        for k, s in [('mtl', 'MTL.txt'), ('qa-band', 'BQA.TIF')]:
+            try:
+                keys[k] = next(u for u in raw_keys if u.endswith(s))
+            except StopIteration:
+                missing_suffixes.append(s)
+
+        # sanity check that we have all the band keys & metatadata key
+        if missing_suffixes:
+            err_msg = ("Found GS asset wasn't complete for (C1GS, {}, {});"
+                       " missing files with these suffixes: {}")
+            verbose_out(err_msg.format(tile, date, missing_suffixes), 4)
+            return None
+
+        # handle pclouds
+        if pclouds < 100:
+            r = requests.get(_c1gs_object_url + keys['mtl'])
+            r.raise_for_status()
+            cc = cls.cloud_cover_from_mtl_text(r.text)
+            if cc > pclouds:
+                cc_msg = ('C1GS asset found for ({}, {}), but cloud cover'
+                          ' percentage ({}%) fails to meet threshold ({}%)')
+                verbose_out(cc_msg.format(tile, date, cc, pclouds), 3)
+                return None
+
+        verbose_out('Found complete C1GS asset for'
+                    ' ({}, {})'.format(tile, date), 3)
+        return dict(basename=(prefix.split('/')[-2] + '_gs.json'), keys=keys)
 
     @classmethod
     def query_c1(cls, tile, date, pcover):
@@ -585,17 +685,16 @@ class landsatAsset(Asset):
             verbose_out('Landsat "{}" assets are no longer fetchable'.format(
                     asset), 6)
             return None
-        data_src = cls.Repository.get_setting('source')
-        if data_src not in ('s3', 'usgs'):
-            raise ValueError("Data source '{}' is not known"
-                             " (expected 's3' or 'usgs')".format(data_src))
-        # perform the query
-        if (asset, data_src) == ('C1', 'usgs'):
-            return cls.query_c1(tile, date, pclouds)
-        if (asset, data_src) == ('C1S3', 's3'):
-            return cls.query_s3(tile, date, pclouds)
-        # source-asset-type mismatch, do nothing
-        return None
+        data_src = cls.get_setting('source')
+        if data_src not in _c1_sources:
+            raise ValueError("Invalid data source '{}'; valid sources:"
+                             " {}".format(data_src, _c1_sources))
+        # perform the query, but on a_type-source mismatch, do nothing
+        return {
+            ('C1', 'usgs'): cls.query_c1,
+            ('C1S3', 's3'): cls.query_s3,
+            ('C1GS', 'gs'): cls.query_gs,
+        }.get((asset, data_src), lambda *_: None)(tile, date, pclouds)
 
     @classmethod
     def fetch(cls, asset, tile, date, **fetch_kwargs):
@@ -612,6 +711,8 @@ class landsatAsset(Asset):
             return cls.fetch_c1(**qs_rv)
         if asset == 'C1S3':
             return cls.fetch_s3(basename, **qs_rv)
+        if asset == 'C1GS':
+            return cls.fetch_gs(basename, **qs_rv)
         raise ValueError('Unfetchable asset type: {}'.format(asset))
 
     @classmethod
@@ -642,7 +743,7 @@ class landsatAsset(Asset):
         #   /LC08_L1TP_013030_20171128_20171207_01_T1
         #   /LC08_L1TP_013030_20171128_20171207_01_T1_B10.TIF
         # see also:  http://www.gdal.org/gdal_virtual_file_systems.html
-        vsi_prefix = '/vsis3_streaming/{}/'.format(cls._bucket_name)
+        vsi_prefix = '/vsis3_streaming/{}/'.format(cls._s3_bucket_name)
         asset_content = {
             # can/should add metadata/versioning info here
             '30m-bands': [vsi_prefix + t for t in _30m_tifs],
@@ -657,6 +758,28 @@ class landsatAsset(Asset):
             with open(tmp_fp, 'w') as tfo:
                 json.dump(asset_content, tfo)
             shutil.copy(tmp_fp, cls.Repository.path('stage'))
+
+    @classmethod
+    def fetch_gs(cls, basename, keys):
+        """Assembles C1 assets that link into Google Cloud Storage.
+
+        Constructs a json file containing /vsicurl_streaming/ paths,
+        similarly to S3 assets."""
+        # first add the vsi prefix to everything
+        vsi_prefix = '/vsicurl_streaming/' + _c1gs_object_url
+        urls = {
+            'mtl':     _c1gs_object_url + keys['mtl'],
+            'qa-band': vsi_prefix + keys['qa-band'],
+            'spectral-bands': [vsi_prefix + u for u in keys['spectral-bands']],
+        }
+
+        # TODO refactor - same code in query_s3
+        stage_dn = cls.Repository.path('stage')
+        with utils.make_temp_dir(prefix='fetch', dir=stage_dn) as tmp_dir:
+            tmp_fp = tmp_dir + '/' + basename
+            with open(tmp_fp, 'w') as tfo:
+                json.dump(urls, tfo)
+            shutil.copy(tmp_fp, stage_dn)
 
 def unitless_bands(*bands):
     return [{'name': b, 'units': Data._unitless} for b in bands]
@@ -686,7 +809,7 @@ class landsatData(Data):
     __toastring = 'toa: use top of the atmosphere reflectance'
     __visible_bands_union = [color for color in Asset._sensors['LC8']['colors'] if 'LWIR' not in color]
 
-    # note C1 products are also C1S3 products; they're added in below
+    # note C1 products can be made with multiple asset types; see below
     # TODO don't use manual tables of repeated information in the first place
     _products = {
         #'Standard':
@@ -926,7 +1049,7 @@ class landsatData(Data):
 
     for pname, pdict in _products.items():
         if 'C1' in pdict['assets']:
-            pdict['assets'].append('C1S3')
+            pdict['assets'] += ['C1S3', 'C1GS']
 
     for product, product_info in _products.iteritems():
         product_info['startdate'] = min(
@@ -966,13 +1089,21 @@ class landsatData(Data):
                 self._time_report("coregistering index")
                 xcoreg = coreg_shift.get('x', 0.0)
                 ycoreg = coreg_shift.get('y', 0.0)
+
                 self._time_report("coreg (x, y) = ({:.3f}, {:.3f})"
                                   .format(xcoreg, ycoreg))
                 img = gippy.GeoImage(val, True)
-                affine = img.Affine()
-                affine[0] += xcoreg
-                affine[3] += ycoreg
-                img.SetAffine(affine)
+
+                coreg_mag = (xcoreg ** 2 + ycoreg ** 2) ** 0.5
+                insane =  coreg_mag > 75  # TODO: actual fix
+
+                img.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
+
+                if not insane:
+                    affine = img.Affine()
+                    affine[0] += xcoreg
+                    affine[3] += ycoreg
+                    img.SetAffine(affine)
                 img.Process()
                 img = None
 
@@ -985,21 +1116,26 @@ class landsatData(Data):
         if getattr(self, '_preferred_asset', None):
             return self._preferred_asset
 
-        if set(self.assets.keys()) == set(['C1', 'DN']):
-            if 'C1' in self.assets: # prefer C1
-                self._preferred_asset = 'C1'
-            elif 'DN' in self.assets:
-                self._preferred_asset = 'DN'
-            else:
-                raise ValueError(
-                    'No valid asset found for C1 nor DN for {} {}'.format(
-                        self.basename))
-        else:
-            if len(self.assets) > 1:
-                # TODO document the reason why not
-                raise ValueError("Cannot create products from"
-                                 " this combination of assets:  {}".format(assets))
-            self._preferred_asset = self.assets.keys()[0]
+        # figure out which asset should be used for processing
+        self._preferred_asset = self.assets.keys()[0] # really an asset type string, eg 'SR'
+        if len(self.assets) > 1:
+            # if there's more than one, have to choose:
+            # prefer local over fetching from the cloud, and prefer C1 over DN
+            at_pref = self.get_setting('asset-type-preference')
+            try:
+                self._preferred_asset = next(at for at in at_pref if at in self.assets)
+            except StopIteration:
+                verbose_out('No preferred asset types ({}) found in'
+                    ' available assets ({})'.format(self.assets, at_pref),
+                    2, sys.stderr)
+                self._preferred_asset = None
+            if 'SR' in self.assets:
+                # this method is structured poorly; handle an odd error case:
+                p_types = set(v[0] for v in products.requested.values())
+                if p_types & {'landmask', 'ndvi8sr'}:
+                    raise NotImplementedError(
+                        "Can't process SR alongside non-SR")
+
         return self._preferred_asset
 
 
@@ -1017,9 +1153,7 @@ class landsatData(Data):
         start = datetime.now()
         asset = self.preferred_asset
 
-
-        # TODO: De-hack this
-        # Better approach, but needs some thought, is to loop over assets
+        # TODO: De-hack this to loop over products & handle the SR case --^
 
         if asset == 'SR':
 
@@ -1091,9 +1225,7 @@ class landsatData(Data):
                 archive_fp = self.archive_temp_path(fname)
                 self.AddFile(sensor, key, archive_fp)
 
-        elif asset in ('DN', 'C1', 'C1S3'):
-            # This block contains everything that existed in the first generation Landsat driver
-
+        else: # C1 types & DN
             # Add the sensor for this date to the basename
             self.basename = self.basename + '_' + self.sensors[asset]
 
@@ -1116,6 +1248,9 @@ class landsatData(Data):
                 raise ValueError("Mixing coreg and non-coreg products is not allowed")
 
             if coreg:
+                if asset != 'C1':
+                    raise ValueError('Coreg produces require C1 assets, but'
+                                     ' got ' + asset)
 
                 # If possible, use AROP 'ortho' command to co-register this landsat scene
                 # against a reference Sentinel2 scene. When AROP is successful it creates
@@ -1426,11 +1561,17 @@ class landsatData(Data):
                     imgout.SetMeta(self.prep_meta(asset_fn, md))
 
                     if coreg:
-                        self._time_report("Setting affine of product")
-                        affine = imgout.Affine()
-                        affine[0] += coreg_xshift
-                        affine[3] += coreg_yshift
-                        imgout.SetAffine(affine)
+                        coreg_mag = (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5
+                        insane =  coreg_mag > 75  # TODO: actual fix
+
+                        imgout.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
+
+                        if not insane:
+                            self._time_report("Setting affine of product")
+                            affine = imgout.Affine()
+                            affine[0] += coreg_xshift
+                            affine[3] += coreg_yshift
+                            imgout.SetAffine(affine)
                         imgout.Process()
 
                     imgout = None
@@ -1560,15 +1701,18 @@ class landsatData(Data):
         """Read in Landsat metadata file and return it as a dict.
 
          Also saves it to self.metadata."""
+        # TODO this belongs in landsatAsset
         # test if metadata already read in, if so, return
         if hasattr(self, 'metadata'):
             return self.metadata
 
         asset_obj = self.assets[asset_type]
-        c1s3_content = asset_obj.load_c1s3_json()
-        if c1s3_content:
-            text = requests.get(c1s3_content['mtl']).text
-            qafn = c1s3_content['qa-band'].encode('ascii', 'ignore')
+        c1_json = asset_obj.load_c1_json()
+        if c1_json:
+            r = requests.get(c1_json['mtl'])
+            r.raise_for_status()
+            text = r.text
+            qafn = c1_json['qa-band'].encode('ascii', 'ignore')
         else:
             datafiles = asset_obj.datafiles()
             # save for later; defaults to None
@@ -1671,7 +1815,7 @@ class landsatData(Data):
         The QA band belongs to the asset corresponding to the given asset type.
         """
         md = self.meta(asset_type)
-        if asset_type == 'C1S3':
+        if self.assets[asset_type].in_cloud_storage():
             return gippy.GeoImage(md['qafilename'])
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract files
@@ -1690,29 +1834,22 @@ class landsatData(Data):
         The bands are read from the asset corresponding to the given
         asset type.
         """
+        # TODO this belongs in landsatAsset
         start = datetime.now()
         asset_obj = self.assets[asset_type]
 
         md = self.meta(asset_type)
 
-        data_src = self.Repository.get_setting('source')
-        s3_mode = (data_src, asset_type) == ('s3', 'C1S3')
-        if s3_mode:
-            asset_json = asset_obj.load_c1s3_json()
-            # json module insists on returning unicode, which gippy no likey
-            ascii_paths = [p.encode('ascii','ignore')
-                           for p in asset_json['30m-bands']]
-            image = gippy.GeoImage(ascii_paths)
-        else:
-            if settings().REPOS[self.Repository.name.lower()]['extract']:
-                # Extract all files
-                datafiles = asset_obj.extract(md['filenames'])
+        try:
+            paths = asset_obj.band_paths()
+        except NotImplementedError:
+            # Extract files, use tarball directly via GDAL's virtual filesystem?
+            if self.get_setting('extract'):
+                paths = self.extract(md['filenames'])
             else:
-                # Use tar.gz directly using GDAL's virtual filesystem
-                datafiles = [os.path.join('/vsitar/' + asset_obj.filename, f)
-                        for f in md['filenames']]
-            image = gippy.GeoImage(datafiles)
-
+                paths = [os.path.join('/vsitar/' + asset_obj.filename, f)
+                         for f in md['filenames']]
+        image = gippy.GeoImage(paths)
         image.SetNoData(0)
 
         # TODO - set appropriate metadata
@@ -1765,7 +1902,7 @@ class landsatData(Data):
         tmpdir is a directory name
         """
         from gips.data.sentinel2 import sentinel2Asset, sentinel2Data
-        landsat_shp = landsatRepository.get_setting('tiles')
+        landsat_shp = self.get_setting('tiles')
         spatial_extent = SpatialExtent.factory(
             sentinel2Data, site=landsat_shp,
             where="pr = '{}'".format(self.id),

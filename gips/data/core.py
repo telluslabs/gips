@@ -271,6 +271,11 @@ class Asset(object):
         # (which may differ from 'version' already used by some drivers)
         self._version = 1
 
+    @classmethod
+    def get_setting(cls, key):
+        """Convenience method to acces Repository's get_setting."""
+        return cls.Repository.get_setting(key)
+
     def updated(self, newasset):
         '''
         Return:
@@ -309,7 +314,7 @@ class Asset(object):
         except:
             tile_num = self.tile
 
-        v = gippy.GeoVector(self.Repository.get_setting("tiles"))
+        v = gippy.GeoVector(self.get_setting("tiles"))
         v.SetPrimaryKey(self.Repository._tile_attribute)
         feat = v[tile_num]
 
@@ -764,6 +769,11 @@ class Data(object):
     _pattern = '*.tif'
     _products = {}
     _productgroups = {}
+
+    @classmethod
+    def get_setting(cls, key):
+        """Convenience method to acces Repository's get_setting."""
+        return cls.Asset.Repository.get_setting(key)
 
     def needed_products(self, products, overwrite):
         """ Make sure all products exist and return those that need processing """
