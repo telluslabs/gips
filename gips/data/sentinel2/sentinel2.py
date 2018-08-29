@@ -487,8 +487,10 @@ class sentinel2Asset(Asset):
             raise ValueError("%s doesn't exist locally or remotely" % self.filename)
 
     def filter(self, pclouds=100, **kwargs):
+        if pclouds >= 100:
+            return True
         cc = self.cloud_cover()
-        asset_passes_filter = pclouds >= 100 or cc <= pclouds
+        asset_passes_filter = cc <= pclouds
         if asset_passes_filter:
             msg = 'Asset cloud cover is {} %, meets pclouds threshold of {} %'
         else:
@@ -1022,7 +1024,7 @@ class sentinel2Data(Data):
         #e_lon_shrunk, n_lat_shrunk = pyproj.transform(utm, latlon, e_lon_utm - lon_diff, n_lat_utm - lat_diff)
 
         #return w_lon_shrunk, e_lon_shrunk, s_lat_shrunk, n_lat_shrunk
-        
+
 
     def process_acolite(self, aco_prods):
         a_obj, sensor = self.current_asset(), self.current_sensor()
@@ -1042,7 +1044,7 @@ class sentinel2Data(Data):
         roi = None
         if a_obj.style == 'original':
             roi = (s_lat, w_lon, n_lat, e_lon)
-        
+
         prodout = atmosphere.process_acolite(
                 a_obj, aco_tmp_dir, acolite_product_spec,
                 a_obj.style_res['raster-re'].format(tileid=self.id),
@@ -1160,7 +1162,7 @@ class sentinel2Data(Data):
 
         # Set cfmask 2 and 3 to 1's, everything else to 0's
         np_cloudmask = numpy.logical_or( npfm == 2, npfm == 3).astype('uint8')
-        
+
         # cloudmask.tif is taken by cfmask
         cloudmask_filename = "%s/cloudmask2.tif" % self._temp_proc_dir
         cloudmask_img = gippy.GeoImage(
