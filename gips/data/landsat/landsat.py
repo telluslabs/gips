@@ -980,6 +980,29 @@ class landsatData(Data):
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
 
+    @property
+    def preferred_asset(self):
+        if getattr(self, '_preferred_asset', None):
+            return self._preferred_asset
+
+        if set(self.assets.keys()) == set(['C1', 'DN']):
+            if 'C1' in self.assets: # prefer C1
+                self._preferred_asset = 'C1'
+            elif 'DN' in self.assets:
+                self._preferred_asset = 'DN'
+            else:
+                raise ValueError(
+                    'No valid asset found for C1 nor DN for {} {}'.format(
+                        self.basename))
+        else:
+            if len(self.assets) > 1:
+                # TODO document the reason why not
+                raise ValueError("Cannot create products from"
+                                 " this combination of assets:  {}".format(assets))
+            self._preferred_asset = self.assets.keys()[0]
+        return self._preferred_asset
+
+
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
         """ Make sure all products have been processed """
@@ -992,22 +1015,8 @@ class landsatData(Data):
             return
 
         start = datetime.now()
+        asset = self.preferred_asset
 
-        if set(self.assets.keys()) == set(['C1', 'DN']):
-            if 'C1' in self.assets: # prefer C1
-                asset = 'C1'
-            elif 'DN' in self.assets:
-                asset = 'DN'
-            else:
-                raise ValueError(
-                    'No valid asset found for C1 nor DN for {} {}'.format(
-                        self.basename))
-        else:
-            if len(self.assets) > 1:
-                # TODO document the reason why not
-                raise ValueError("Cannot create products from"
-                                 " this combination of assets:  {}".format(assets))
-            asset = self.assets.keys()[0]
 
         # TODO: De-hack this
         # Better approach, but needs some thought, is to loop over assets
@@ -1832,18 +1841,18 @@ class landsatData(Data):
         """
         warp_tile = self.id
         warp_date = self.date
+        asset_type = self.preferred_asset
+        asset = self.assets[asset_type]
 
         with utils.make_temp_dir() as tmpdir:
-            warp_data = landsatData(warp_tile, warp_date, "%Y%j")
-            nir_band = self.Asset._sensors[warp_data.assets['C1'].sensor]['bands'][
-                self.Asset._sensors[warp_data.assets['C1'].sensor]['colors'].index('NIR')
+            nir_band = asset._sensors[asset.sensor]['bands'][
+                asset._sensors[asset.sensor]['colors'].index('NIR')
             ]
             warp_band_filenames = [
-                f for f in warp_data.assets['C1'].datafiles()
+                f for f in asset.datafiles()
                         if f.endswith("B{}.TIF".format(nir_band))
             ]
-            print("WARP BANDS:", warp_band_filenames)
-            warp_data.assets['C1'].extract(filenames=warp_band_filenames, path=tmpdir)
+            asset.extract(filenames=warp_band_filenames, path=tmpdir)
 
             warp_bands_bin = []
             for band in warp_band_filenames:
@@ -1942,14 +1951,18 @@ class landsatData(Data):
         """
         if getattr(self, 'utm_zone_number', None):
             return self.utm_zone_number
+        self.utm_zone_number = None
 
-        asset = self.assets['C1']
-        any_band = [band for band in asset.datafiles() if band.endswith("TIF")][0]
-        ps = subprocess.Popen(["gdalinfo", "/vsitar/" + asset.filename + "/" + any_band], stdout=subprocess.PIPE)
-        ps.wait()
-        info = ps.stdout.read()
-        utm_zone_re = re.compile(".+UTM[ _][Z|z]one[ _](\d{2})[N|S].+", flags=re.DOTALL)
-        self.utm_zone_number = utm_zone_re.match(info).group(1)
+        asset = self.assets[self.preferred_asset]
+        mtl = asset.extract([f for f in asset.datafiles() if f.endswith("MTL.txt")])[0]
+        with open(mtl, 'r') as mtl_file:
+            l = mtl_file.readline()
+            while l:
+                match = re.search("UTM_ZONE = (\d+)", l)
+                if match:
+                    self.utm_zone_number = match.group(1)
+                    break
+                l = mtl_file.readline()
 
         return self.utm_zone_number
 
