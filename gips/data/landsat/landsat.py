@@ -1111,6 +1111,34 @@ class landsatData(Data):
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
 
+    @property
+    def preferred_asset(self):
+        if getattr(self, '_preferred_asset', None):
+            return self._preferred_asset
+
+        # figure out which asset should be used for processing
+        self._preferred_asset = self.assets.keys()[0] # really an asset type string, eg 'SR'
+        if len(self.assets) > 1:
+            # if there's more than one, have to choose:
+            # prefer local over fetching from the cloud, and prefer C1 over DN
+            at_pref = self.get_setting('asset-type-preference')
+            try:
+                self._preferred_asset = next(at for at in at_pref if at in self.assets)
+            except StopIteration:
+                verbose_out('No preferred asset types ({}) found in'
+                    ' available assets ({})'.format(self.assets, at_pref),
+                    2, sys.stderr)
+                self._preferred_asset = None
+            if 'SR' in self.assets:
+                # this method is structured poorly; handle an odd error case:
+                p_types = set(v[0] for v in products.requested.values())
+                if p_types & {'landmask', 'ndvi8sr'}:
+                    raise NotImplementedError(
+                        "Can't process SR alongside non-SR")
+
+        return self._preferred_asset
+
+
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
         """ Make sure all products have been processed """
@@ -1123,26 +1151,7 @@ class landsatData(Data):
             return
 
         start = datetime.now()
-
-        # figure out which asset should be used for processing
-        asset = self.assets.keys()[0] # really an asset type string, eg 'SR'
-        if len(self.assets) > 1:
-            # if there's more than one, have to choose:
-            # prefer local over fetching from the cloud, and prefer C1 over DN
-            at_pref = self.get_setting('asset-type-preference')
-            try:
-                asset = next(at for at in at_pref if at in self.assets)
-            except StopIteration:
-                verbose_out('No preferred asset types ({}) found in'
-                    ' available assets ({})'.format(self.assets, at_pref),
-                    2, sys.stderr)
-                return
-            if 'SR' in self.assets:
-                # this method is structured poorly; handle an odd error case:
-                p_types = set(v[0] for v in products.requested.values())
-                if p_types & {'landmask', 'ndvi8sr'}:
-                    raise NotImplementedError(
-                            "Can't process SR alongside non-SR")
+        asset = self.preferred_asset
 
         # TODO: De-hack this to loop over products & handle the SR case --^
 
@@ -1239,10 +1248,6 @@ class landsatData(Data):
                 raise ValueError("Mixing coreg and non-coreg products is not allowed")
 
             if coreg:
-                if asset != 'C1':
-                    raise ValueError('Coreg produces require C1 assets, but'
-                                     ' got ' + asset)
-
                 # If possible, use AROP 'ortho' command to co-register this landsat scene
                 # against a reference Sentinel2 scene. When AROP is successful it creates
                 # a text file with parameters in it that is needed to apply an offset.
@@ -1969,11 +1974,18 @@ class landsatData(Data):
         """
         warp_tile = self.id
         warp_date = self.date
+        asset_type = self.preferred_asset
+        asset = self.assets[asset_type]
 
         with utils.make_temp_dir() as tmpdir:
-            warp_data = landsatData(warp_tile, warp_date, "%Y%j")
-            warp_band_filenames = [f for f in warp_data.assets['C1'].datafiles() if f.endswith("B5.TIF")]
-            warp_data.assets['C1'].extract(filenames=warp_band_filenames, path=tmpdir)
+            nir_band = asset._sensors[asset.sensor]['bands'][
+                asset._sensors[asset.sensor]['colors'].index('NIR')
+            ]
+            warp_band_filenames = [
+                f for f in asset.datafiles()
+                        if f.endswith("B{}.TIF".format(nir_band))
+            ]
+            asset.extract(filenames=warp_band_filenames, path=tmpdir)
 
             warp_bands_bin = []
             for band in warp_band_filenames:
@@ -1989,7 +2001,10 @@ class landsatData(Data):
                 template = input_template.read()
 
             base_band_img = gippy.GeoImage(base_band_filename)
-            warp_base_band_filename = [f for f in warp_bands_bin if f.endswith("B5.bin")][0]
+            warp_base_band_filename = [
+                f for f in warp_bands_bin
+                        if f.endswith("B{}.bin".format(nir_band))
+            ][0]
             warp_base_band_img = gippy.GeoImage(os.path.join(tmpdir, warp_base_band_filename))
             base_pixel_size = abs(base_band_img.Resolution().x())
             warp_pixel_size = abs(warp_base_band_img.Resolution().x())
@@ -2069,16 +2084,18 @@ class landsatData(Data):
         """
         if getattr(self, 'utm_zone_number', None):
             return self.utm_zone_number
+        self.utm_zone_number = None
 
-        asset = self.assets['C1']
-        any_band = [band for band in asset.datafiles() if band.endswith("TIF")][0]
-        ps = subprocess.Popen(
-            ["gdalinfo", "/vsitar/" + asset.filename + "/" + any_band],
-            stdout=subprocess.PIPE)
-        ps.wait()
-        info = ps.stdout.read()
-        utm_zone_re = re.compile(".+UTM[ _][Z|z]one[ _](\d{2})[N|S].+", flags=re.DOTALL)
-        self.utm_zone_number = utm_zone_re.match(info).group(1)
+        asset = self.assets[self.preferred_asset]
+        mtl = asset.extract([f for f in asset.datafiles() if f.endswith("MTL.txt")])[0]
+        with open(mtl, 'r') as mtl_file:
+            l = mtl_file.readline()
+            while l:
+                match = re.search("UTM_ZONE = (\d+)", l)
+                if match:
+                    self.utm_zone_number = match.group(1)
+                    break
+                l = mtl_file.readline()
 
         return self.utm_zone_number
 
