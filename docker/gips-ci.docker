@@ -26,7 +26,7 @@ RUN cd /gips \
  	   -e "s/^USGS_PASS.*/USGS_PASS = \"${USGS_PASS}\"/" \
 	   -e "s/^ESA_USER.*/ESA_USER = \"${ESA_USER}\"/" \
  	   -e "s/^ESA_PASS.*/ESA_PASS = \"${ESA_PASS}\"/" \
-	   /gips/gips/settings.py \
+           /gips/gips/settings.py \
     && groupadd -g $GIPS_UID gips \
     && useradd -m -r -u $GIPS_UID -g gips gips \
     && chown -R gips:gips /gips /archive
