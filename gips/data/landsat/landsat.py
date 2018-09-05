@@ -381,17 +381,19 @@ class landsatAsset(Asset):
             return self.meta['cloud-cover']
         # first attempt to find or download an MTL file and get the CC value
         text = None
-        if self.asset == 'C1S3':
+        if self.in_cloud_storage():
             if os.path.exists(self.filename):
-                c1s3_content = self.load_c1_json()
-                text = requests.get(c1s3_content['mtl']).text
+                c1json_content = self.load_c1_json()
+                utils.verbose_out('requesting ' + c1json_content['mtl'], 4)
+                text = requests.get(c1json_content['mtl']).text
             else:
-                query_results = self.query_s3(self.tile, self.date)
+                query_results = self.query_gs(self.tile, self.date)
                 if query_results is None:
                     raise IOError('Could not locate metadata for'
                                   ' ({}, {})'.format(self.tile, self.date))
-                # [-1] is mtl file path
-                text = requests.get(self._s3_url + query_results[-1]).text
+                url = _c1gs_object_url + query_results['keys']['mtl']
+                utils.verbose_out('requesting ' + url, 4)
+                text = requests.get(url).text
         elif os.path.exists(self.filename):
             mtlfilename = self.extract(
                 [f for f in self.datafiles() if f.endswith('MTL.txt')]
@@ -1373,7 +1375,7 @@ class landsatData(Data):
                         #  NOTE: from USGS tables as of 2018-05-22, cloud
                         #  shadow conficence is either high(3) or low(1).
                         #  No pixels get medium (2).  And only no-data pixels
-                        #  ever get no (0) confidence. 
+                        #  ever get no (0) confidence.
 
 
                         # GIPPY 1.0 note: rewrite this whole product after
@@ -1902,7 +1904,7 @@ class landsatData(Data):
         spatial_extent = SpatialExtent.factory(
             sentinel2Data, site=landsat_shp,
             where="pr = '{}'".format(self.id),
-            ptile=33.0)[0]
+            ptile=20.0)[0]
         fetch = False
 
         # If there is no available sentinel2 scene on that day, search before and after
@@ -1985,13 +1987,14 @@ class landsatData(Data):
                 f for f in asset.datafiles()
                         if f.endswith("B{}.TIF".format(nir_band))
             ]
-            asset.extract(filenames=warp_band_filenames, path=tmpdir)
+            if asset_type not in ['C1GS', 'C1S3']:
+                warp_band_filenames = ['/vsitar/' + os.path.join(asset.filename, f) for f in warp_band_filenames]
 
             warp_bands_bin = []
             for band in warp_band_filenames:
                 band_bin = basename(band) + '.bin'
                 cmd = ["gdal_translate", "-of", "ENVI",
-                       os.path.join(tmpdir, band),
+                       band,
                        os.path.join(tmpdir, band_bin)]
                 subprocess.call(args=cmd, cwd=tmpdir)
                 warp_bands_bin.append(band_bin)
@@ -2087,16 +2090,32 @@ class landsatData(Data):
         self.utm_zone_number = None
 
         asset = self.assets[self.preferred_asset]
-        mtl = asset.extract([f for f in asset.datafiles() if f.endswith("MTL.txt")])[0]
-        with open(mtl, 'r') as mtl_file:
-            l = mtl_file.readline()
-            while l:
-                match = re.search("UTM_ZONE = (\d+)", l)
-                if match:
-                    self.utm_zone_number = match.group(1)
-                    break
-                l = mtl_file.readline()
 
+        # TODO: stick this somewhere better.  Just hacking to make it work now.
+        if asset.asset in ['C1S3', 'C1GS']:
+            if os.path.exists(asset.filename):
+                c1json_content = asset.load_c1_json()
+                utils.verbose_out('requesting ' + c1json_content['mtl'], 4)
+                text = requests.get(c1json_content['mtl']).text
+            else:
+                query_results = asset.query_gs(asset.tile, asset.date)
+                if query_results is None:
+                    raise IOError('Could not locate metadata for'
+                                  ' ({}, {})'.format(self.tile, self.date))
+                url = _c1gs_object_url + query_results['keys']['mtl']
+                utils.verbose_out('requesting ' + url, 4)
+                text = requests.get(url).text
+        else:
+            print('asset is "{}"'.format(asset.asset))
+            mtl = asset.extract([f for f in asset.datafiles() if f.endswith("MTL.txt")])[0]
+            with open(mtl, 'r') as mtl_file:
+                text = mtl_file.read()
+        match = re.search(".*UTM_ZONE = (\d+).*", text)
+        if match:
+            self.utm_zone_number = match.group(1)
+        else:
+            raise ValueError('MTL file does not contian UTM_ZONE')
+        print('utm_zone is ' + str(self.utm_zone_number))
         return self.utm_zone_number
 
     def parse_coreg_coefficients(self):
