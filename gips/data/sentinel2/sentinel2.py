@@ -34,7 +34,10 @@ import zipfile
 import copy
 import glob
 from itertools import izip_longest
-from xml.etree import ElementTree, cElementTree
+from xml.etree import ElementTree
+import StringIO
+
+from backports.functools_lru_cache import lru_cache
 
 import numpy
 import pyproj
@@ -46,6 +49,7 @@ import gippy
 import gippy.algorithms
 
 from gips.data.core import Repository, Asset, Data
+import gips.data.core
 from gips import utils
 from gips import atmosphere
 
@@ -62,14 +66,31 @@ from gips import atmosphere
 * update system tests
 """
 
-_asset_type = 'L1C' # only one for the whole driver for now
-
+_asset_types = ('L1C', 'L1CGS')
 
 class sentinel2Repository(Repository):
     name = 'Sentinel2'
     description = 'Data from the Sentinel 2 satellite(s) from the ESA'
     # when looking at the tiles shapefile, what's the key to fetch a feature's tile ID?
     _tile_attribute = 'Name'
+
+    default_settings = {
+        'source': 'esa',
+        'asset-preference': _asset_types,
+        'extract': False,
+    }
+
+    @classmethod
+    def validate_setting(cls, key, value):
+        if key == 'source' and value not in ('esa', 'gs'):
+            raise ValueError("Sentinel-2's 'source' setting is '{}',"
+                    " but valid values are 'esa' or 'gs'".format(value))
+        if key == 'asset-preference':
+            warts = set(value) - set(_asset_types)
+            if warts:
+                raise ValueError("Valid 'asset-preferences' for Sentinel-2"
+                        " are {}; invalid values found:  {}".format(warts))
+        return value
 
     @classmethod
     def tile_lat_lon(cls, tileid):
@@ -83,8 +104,10 @@ class sentinel2Repository(Repository):
         return e.x0(), e.x1(), e.y0(), e.y1()
 
 
-class sentinel2Asset(Asset):
+class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
     Repository = sentinel2Repository
+
+    gs_bucket_name = 'gcp-public-data-sentinel-2'
 
     _sensors = {
         'S2A': {
@@ -123,7 +146,6 @@ class sentinel2Asset(Asset):
             # 'tcap': _tcapcoef,
 
             # colors needed for computing indices products such as NDVI
-            # color names are ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2']
             'indices-bands': ['02', '03', '04', '05', '06',
                               '07', '08', '8A', '11', '12'],
             # similar to landsat's "visbands"
@@ -135,11 +157,14 @@ class sentinel2Asset(Asset):
     _sensors['S2B'] = copy.deepcopy(_sensors['S2A'])
     _sensors['S2B']['description'] = 'Sentinel-2, Satellite B'
 
+    _asset_fn_pat_base = '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*'
+
     _assets = {
         'L1C': {
+            'source': 'esa',
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both original and shortened post-2016-12-07 assets.
-            'pattern': '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*\.zip$',
+            'pattern': _asset_fn_pat_base + '\.zip$',
             # TODO find real start date for S2 data:
             # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
             # (change to orderby=ingestiondate%20desc if needed)
@@ -150,9 +175,15 @@ class sentinel2Asset(Asset):
             'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
                           # only needed by Asset.end_date and Asset.available, but those are never called?
         },
-
+        'L1CGS': {
+            'source': 'gs',
+            'startdate': datetime.date(2015, 1, 1),
+            'latency': 3,
+            'pattern': _asset_fn_pat_base + '_gs\.json$',
+        }
     }
 
+    original = 'original'
     _2016_12_07 = datetime.datetime(2016, 12, 7, 0, 0) # first day of new-style assets, UTC
 
     # regexes for verifying filename correctness & extracting metadata; convention:
@@ -177,7 +208,7 @@ class sentinel2Asset(Asset):
         '_N\d{4}_R\d\d\d_T' + _tile_re +  # tile
         '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
         'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
-        '.zip$'
+        '\.(SAFE_gs\.json|zip)$'
     )
 
     _asset_styles = {
@@ -204,9 +235,6 @@ class sentinel2Asset(Asset):
             # internal metadata file patterns
             'datastrip-md-re': '^.*/DATASTRIP/.*/MTD_DS.xml$',
             'tile-md-re': '^.*/GRANULE/.*/MTD_TL.xml$',
-            # Two files with asset-global metadata, this is one of them:
-            # for INSPIRE.xml see http://inspire.ec.europa.eu/XML-Schemas/Data-Specifications/2892
-            'inspire-md-re': '^.*/INSPIRE.xml$',
             'asset-md-re': '^.*/MTD_MSIL1C.xml$',
         },
     }
@@ -221,43 +249,54 @@ class sentinel2Asset(Asset):
         https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
         """
         super(sentinel2Asset, self).__init__(filename)
-        with utils.error_handler("Error opening asset '({})'".format(filename)):
-            if os.path.exists(filename):  # __init__ should work even if file doesn't exist
-                zipfile.ZipFile(filename)  # exception if file isn't a valid zip
-        base_filename = os.path.basename(filename)
 
+        self.basename = os.path.basename(filename)
+        # L1CGS assets are a funny mix of the two styles
         for style, style_dict in self._asset_styles.items():
-            match = re.match(style_dict['archived-name-re'], base_filename)
+            match = re.match(style_dict['archived-name-re'], self.basename)
             if match is not None:
                 break
         if match is None:
-            raise IOError("Asset file name is incorrect for Sentinel-2: '{}'".format(base_filename))
+            raise IOError("Asset file name is incorrect for"
+                          " Sentinel-2: '{}'".format(self.basename))
+
         self.style = style
-        self.asset = 'L1C' # only supported asset type
+        self.asset = 'L1CGS' if filename.endswith('_gs.json') else 'L1C'
         self.sensor = match.group('sensor')
         self.tile = match.group('tile')
         self.date = datetime.date(*[int(i) for i in match.group('year', 'mon', 'day')])
         self.time = datetime.time(*[int(i) for i in match.group('hour', 'min', 'sec')])
-        self.set_style_regular_expressions()
+        self.style_res = self.get_style_regexes(self.style, self.tile)
         self._version = int(''.join(
             match.group('pyear', 'pmon', 'pday', 'phour', 'pmin', 'psec')
         ))
         self.meta = {} # for caching asset metadata values
-
-
-    def set_style_regular_expressions(self):
-        """Sets self.style_res dict.
-
-        This lets the asset object locate internal metadata by setting
-        patterns appropriate for the asset's style.
-        """
-        sr = self.style_res = copy.deepcopy(self._asset_styles[self.style])
-        if self.style == 'original':
-            self.style_res['tile-md-re'] = sr['tile-md-re'].format(tileid=self.tile)
-            self.style_res['datastrip-md-re'] = sr['datastrip-md-re'].format(tileid=self.tile)
+        self.tile_meta = None # tile metadata; dict was not good for this
+        # sometimes assets are instantiated but no file is present
+        #                                      vvv
+        if self.asset == 'L1CGS' and os.path.exists(filename):
+            with open(filename) as fo:
+                self.json_content = json.load(fo)
+                self.meta['cloud-cover'] = self.json_content['cloud-cover']
 
     @classmethod
-    def query_scihub(cls, style, tile, date):
+    def get_style_regexes(cls, style, tile_id, compile=False):
+        """Returns regexes for the given style.
+
+        This lets one locate internal metadata.
+        """
+        sr = copy.deepcopy(cls._asset_styles[style])
+        if style == cls.original:
+            sr['raster-re']       = sr['raster-re'].format(tileid=tile_id)
+            sr['tile-md-re']      = sr['tile-md-re'].format(tileid=tile_id)
+            sr['datastrip-md-re'] = sr['datastrip-md-re'].format(
+                tileid=tile_id)
+        if compile:
+            return {k: re.compile(v) for (k, v) in sr.items()}
+        return sr
+
+    @classmethod
+    def query_scihub(cls, tile, date):
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
 
@@ -266,7 +305,7 @@ class sentinel2Asset(Asset):
         url_head = 'https://scihub.copernicus.eu/dhus/search?q='
         #                vvvvvvvv--- sort by processing date so always get the newest one
         url_tail = '&orderby=ingestiondate desc&format=json'
-        if style == 'original':
+        if date < cls._2016_12_07: # original style
             # compute the center coordinate of the tile
             x0, x1, y0, y1 = cls.Repository.tile_lat_lon(tile)
             lat, lon = (y0 + y1)/2, (x0 + x1)/2
@@ -285,24 +324,21 @@ class sentinel2Asset(Asset):
         return r.json()
 
     @classmethod
-    def query_provider(cls, asset, tile, date, pclouds=100, **fetch_kwargs):
+    def query_esa(cls, tile, date, pclouds):
         """Search for a matching asset in the Sentinel-2 servers.
 
-        Uses the given (asset, tile, date) tuple as a search key, and
-        returns a tuple (base-filename-of-asset, url-for-fetching).  If
-        no assets were found, returns (None, None).
+        Uses the given (tile, date) tuple as a search key, and
+        returns a dict else None, like for query_service.
         """
-        # set up fetch params
-        style = 'original' if date < cls._2016_12_07 else cls._2016_12_07
-
         # search for the asset's URL with wget call (using a suprocess call to wget instead of a
         # more conventional call to a lib because available libs are perceived to be inferior).
-        with utils.error_handler("Error performing asset search '({} {} {})'".format(asset, tile, date.strftime("%Y%j"))):
-            results = cls.query_scihub(style, tile, date)['feed'] # always top-level key
+        with utils.error_handler("Error performing asset search ({}, {})".format(
+                tile, date.strftime("%Y%j"))):
+            results = cls.query_scihub(tile, date)['feed'] # always top-level key
 
             result_count = int(results['opensearch:totalResults'])
             if result_count == 0:
-                return None, None # nothing found, a normal occurence for eg date range queries
+                return None # nothing found, a normal occurence for eg date range queries
             # unfortunately the data's structure varies with the result count
             if result_count == 1:
                 entry = results['entry']
@@ -319,15 +355,119 @@ class sentinel2Asset(Asset):
         if pclouds < 100:
             asset = cls(output_file_name)
             if not asset.filter(pclouds):
-                return None, None
+                return None
 
-        return output_file_name, asset_url
-
+        return {'basename': output_file_name, 'url': asset_url}
 
     @classmethod
-    def fetch(cls, asset, tile, date, pclouds=100, **fetch_kwargs):
-        """Fetch the asset corresponding to the given asset type, tile, and date."""
-        qs_rv = cls.query_service(asset, tile, date)
+    def query_gs(cls, tile, date, pclouds):
+        """Query google's store of sentinel-2 data for the given scene."""
+        prefix_template = 'tiles/{}/{}/{}/{}_MSIL1C_{}'
+        # It might be S2A or S2B, find out which one
+        for sensor in cls._sensors.keys():
+            search_prefix = prefix_template.format(
+                tile[0:2], tile[2], tile[3:], sensor, date.strftime('%Y%m%d'))
+            # only going to be one prefix, if any are found
+            prefix = cls.gs_api_search(search_prefix).get(
+                'prefixes', [None])[0]
+            if prefix is not None:
+                break
+        if prefix is None:
+            return None
+
+        # search for the parts of the asset we need
+        style = cls.original if date < cls._2016_12_07 else cls._2016_12_07
+
+        style_regexes = cls.get_style_regexes(style, tile, compile=True)
+        band_regex = style_regexes['raster-re']
+        md_regexes = {'datastrip-md': style_regexes['datastrip-md-re'],
+                      'tile-md':      style_regexes['tile-md-re']}
+        # for sanity checking later
+        expected_key_set = set(md_regexes.keys() + ['spectral-bands'])
+        expected_band_cnt = len(cls._sensors['S2A']['band-strings'])
+        bands = []
+        keys = {'spectral-bands': bands}
+        for i in cls.gs_api_search(prefix, delimiter=None)['items']:
+            k = i['name']
+            if len(bands) < expected_band_cnt and band_regex.match(k):
+                bands.append(k)
+            else:
+                for md_key, regex in md_regexes.items():
+                    if regex.match(k):
+                        keys[md_key] = k
+                        del md_regexes[md_key] # don't repeat useless searches
+
+        # sort correctly despite the wart in the band numbering scheme ('8A')
+        def band_sort_key(fn):
+            band = band_regex.match(fn).group('band')
+            return 8.5 if band == '8A' else int(band)
+        bands.sort(key=band_sort_key)
+
+        # check for asset completeness
+        if expected_band_cnt != len(bands):
+            utils.verbose_out("Found GS asset wasn't complete for"
+                              " (L1CGS, {}, {}); expected {} bands but got {}.".format(
+                tile, date, expected_band_cnt, len(bands)), 2)
+            return None
+        missing_keys = expected_key_set - set(keys.keys())
+        if missing_keys:
+            utils.verbose_out("Found GS asset wasn't complete for"
+                              " (L1CGS, {}, {}); keys not found: {}".format(
+                tile, date, missing_keys), 2)
+            return None
+
+        # handle cloud cover
+        r = requests.get(cls.gs_object_url_base() + keys['tile-md'])
+        r.raise_for_status()
+        cc = cls.cloud_cover_from_et(
+                ElementTree.parse(StringIO.StringIO(r.text)))
+        if cc > pclouds:
+            cc_msg = ('C1GS asset found for ({}, {}), but cloud cover'
+                      ' percentage ({}%) fails to meet threshold ({}%)')
+            utils.verbose_out(cc_msg.format(tile, date, cc, pclouds), 3)
+            return None
+        # save it in the asset file to reduce network traffic
+        keys['cloud-cover'] = cc
+
+        utils.verbose_out('Found complete L1CGS asset for'
+                          ' ({}, {})'.format(tile, date), 3)
+        return dict(basename=(prefix.split('/')[-2] + '_gs.json'), keys=keys)
+
+    @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
+    def query_service(cls, asset, tile, date, pclouds=100, **ignored):
+        """as superclass, but bifurcate between google and ESA sources."""
+        if not cls.available(asset, date):
+            return None
+        source = cls.get_setting('source')
+        if cls._assets[asset]['source'] != source:
+            return None
+        rv = {'esa': cls.query_esa,
+              'gs':  cls.query_gs, }[source](tile, date, pclouds)
+        utils.verbose_out(
+            'queried ATD {} {} {}, found '.format(asset, tile, date)
+            + ('nothing' if rv is None else rv['basename']), 5)
+        return rv
+
+    @classmethod
+    def fetch_gs(cls, asset, tile, date, pclouds):
+        """Fetch from Google Storage, but only if asset type is L1CGS"""
+        qs_rv = cls.query_service(asset, tile, date, pclouds)
+        if qs_rv is None:
+            return []
+        keys = qs_rv['keys']
+        # keys have been checked in query_gs already, so just take 'em
+        a_content = {k: cls.gs_object_url_base() + keys[k]
+                     for k in keys if k.endswith('-md')}
+        a_content['spectral-bands'] = [
+            cls.gs_vsi_prefix() + b for b in keys['spectral-bands']]
+        a_content['cloud-cover'] = keys['cloud-cover']
+        cls.gs_stage_asset(qs_rv['basename'], a_content)
+
+    @classmethod
+    def fetch_esa(cls, asset, tile, date, pclouds):
+        """Fetch an asset from ESA if asset type is L1C."""
+        qs_rv = cls.query_service(asset, tile, date, pclouds)
         if qs_rv is None:
             return []
         output_file_name, asset_url = (qs_rv['basename'], qs_rv['url'])
@@ -368,6 +508,12 @@ class sentinel2Asset(Asset):
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
         return [output_full_path]
 
+    @classmethod
+    def fetch(cls, asset, tile, date, pclouds=100, **ignored):
+        """Fetch an asset."""
+        source = cls.get_setting('source')
+        return {'esa': cls.fetch_esa,
+                'gs':  cls.fetch_gs, }[source](asset, tile, date, pclouds)
 
     @classmethod
     def archive(cls, path, recursive=False, keep=False, update=False):
@@ -385,7 +531,10 @@ class sentinel2Asset(Asset):
             cls._2016_12_07: [],
         }
 
-        for fn in utils.find_files(cls._assets['L1C']['pattern'], path):
+        # find all the files that resemble assets in the given spot
+        fn_pile = sum([utils.find_files(cls._assets[at]['pattern'], path)
+                       for at in _asset_types], [])
+        for fn in fn_pile:
             with utils.error_handler('Error archiving asset', continuable=True):
                 bn = os.path.basename(fn)
                 for style, style_dict in cls._asset_styles.items():
@@ -451,6 +600,23 @@ class sentinel2Asset(Asset):
             )
         return list(tiles)
 
+    @classmethod
+    def cloud_cover_from_et(cls, tree):
+        """Tree needs to be an ElementTree object."""
+        root = tree.getroot()
+        nsre = r'^({.+})Level-1C_Tile_ID$'
+        ns = None
+        for el in root.iter():
+            match = re.match(nsre, el.tag)
+            if match:
+                ns = match.group(1)
+                break
+        if ns is None:
+            raise Exception("Tile metadata xml namespace could not be found")
+        cloud_cover_xpath = ("./{}Quality_Indicators_Info/Image_Content_QI"
+                             "/CLOUDY_PIXEL_PERCENTAGE")
+        cloud_coverage_el = root.findall(cloud_cover_xpath.format(ns))[0]
+        return float(cloud_coverage_el.text)
 
     def cloud_cover(self):
         """Returns cloud cover for the current asset.
@@ -466,36 +632,19 @@ class sentinel2Asset(Asset):
                 ][0]
                 self.extract([metadata_file], path=tmpdir)
                 tree = ElementTree.parse(tmpdir + '/' + metadata_file)
-            root = tree.getroot()
-            nsre = r'^({.+})Level-1C_Tile_ID$'
-            cloud_cover_xpath = "./{}Quality_Indicators_Info/Image_Content_QI/CLOUDY_PIXEL_PERCENTAGE"
-
-            for el in root.iter():
-                match = re.match(nsre, el.tag)
-                ns = False
-                if match:
-                    ns = match.group(1)
-                    break
-                if not ns:
-                    raise Exception("Tile metadata xml namespace could not be found")
-            cloud_coverage_el = root.findall(cloud_cover_xpath.format(ns))[0]
-            self.meta['cloud-cover'] = float(cloud_coverage_el.text)
-
+            self.meta['cloud-cover'] = self.cloud_cover_from_et(tree)
             return self.meta['cloud-cover']
-        else:
-            results = self.query_scihub(self.style, self.tile, self.date)
 
-            if 'entry' in results['feed']:
-                # TODO: This assertion is occasionally false.  'entry'
-                #       sometimes points at a list, instead of a dict.
-                #       Make this jive with the API better.
-                if type(results['feed']['entry']) is list:
-                    entry = results['feed']['entry'][0]
-                else:
-                    entry = results['feed']['entry']
-                assert entry['double']['name'] == 'cloudcoverpercentage'
-                return float(entry['double']['content'])
-            raise ValueError("%s doesn't exist locally or remotely" % self.filename)
+        results = self.query_scihub(self.tile, self.date)
+        try:
+            entry = results['feed']['entry']
+        except:
+            raise ValueError(self.filename + " doesn't exist locally and"
+                             " remote metadata couldn't be loaded")
+        if type(entry) is list: # XML is just the best thing
+            entry = entry[0]
+        assert entry['double']['name'] == 'cloudcoverpercentage'
+        return float(entry['double']['content'])
 
     def filter(self, pclouds=100, **kwargs):
         if pclouds >= 100:
@@ -510,21 +659,74 @@ class sentinel2Asset(Asset):
         utils.verbose_out(msg.format(cc, pclouds), 3)
         return asset_passes_filter
 
-    def xml_subtree(self, md_file_type, subtree_tag):
-        """Loads XML, then returns the given Element from it.
+    def save_tile_md_file(self, path):
+        if self.asset == 'L1C':
+            tile_md_fn = next(fn for fn in ao.datafiles()
+                              if self.style_res['tile-md-re'].match(name))
+            self.extract((tile_md_fn,), path)
+            return os.path.join(path, tile_md_fn)
+        # L1CGS case:
+        r = requests.get(self.json_content['tile-md'])
+        r.raise_for_status()
+        fp = os.path.join(path, 'MTD_TL.xml')
+        with open(fp, 'wb') as fo:
+            fo.write(r.content)
+        return fp
 
-        File to read is specified by type eg 'tile' or 'datastrip'.  The first
-        matching tag in the XML tree is returned.  The metadata file is located
-        in self.style_res eg 'tile' results in 'tile-md-re' being used.
+    def xml_subtree_esa(self, md_file_type):
+        """Loads XML, then returns the etree object for it.
+
+        File to read is specified by type eg 'tile' or 'datastrip'.
         """
         file_pattern = self.style_res[md_file_type + '-md-re']
-        # python idiom for "first item in list that satisfies a condition"
         metadata_fn = next(fn for fn in self.datafiles() if re.match(file_pattern, fn))
         with zipfile.ZipFile(self.filename) as asset_zf:
             with asset_zf.open(metadata_fn) as metadata_zf:
-                tree = ElementTree.parse(metadata_zf)
-                return next(tree.iter(subtree_tag))
+                return ElementTree.parse(metadata_zf)
 
+    def xml_subtree_gs(self, md_file_type):
+        r = requests.get(self.json_content[md_file_type + '-md'])
+        r.raise_for_status()
+        return ElementTree.fromstring(r.content)
+
+    def xml_subtree(self, md_file_type, *tags):
+        tree = {'L1C': self.xml_subtree_esa,
+                'L1CGS': self.xml_subtree_gs,
+               }[self.asset](md_file_type)
+        stl = [next(tree.iter(at)) for at in tags]
+        return stl if len(stl) > 1 else stl[0]
+
+    def tile_metadata(self):
+        """Read the tile metadata xml file and extract values of interest.
+
+        Return values are in degrees.  Mainly exists to avoid reading
+        the file more than once.
+        """
+
+        if self.tile_meta is not None:
+            return self.tile_meta
+        mva_elem, msa_elem = self.xml_subtree(
+            'tile', 'Mean_Viewing_Incidence_Angle_List', 'Mean_Sun_Angle')
+        # set viewing angle metadata (should only be one list, with 13 elems,
+        # each with 2 angles, a zen and an az)
+        angles = mva_elem.findall('Mean_Viewing_Incidence_Angle')
+        mvza = numpy.mean([float(e.find('ZENITH_ANGLE').text) for e in angles])
+        mvaa = numpy.mean([float(e.find('AZIMUTH_ANGLE').text) for e in angles])
+        # set solar angle metadata
+        msza = float(msa_elem.find('ZENITH_ANGLE').text)
+        msaa = float(msa_elem.find('AZIMUTH_ANGLE').text)
+        self.tile_meta = mvza, mvaa, msza, msaa
+        return self.tile_meta
+
+    @lru_cache(maxsize=1)
+    def raster_full_paths(self):
+        rfn_re = re.compile(self.style_res['raster-re'])
+        fnl = [df for df in self.datafiles() if rfn_re.match(df)]
+        # have to sort the list or else gippy will get confused about which band is which
+        bs = self.sensor_spec('band-strings')
+        # sorting is weird because the bands aren't named consistently
+        fnl.sort(key=lambda f: bs.index(f[-6:-4]))
+        return fnl
 
     def solar_irradiances(self):
         """Loads solar irradiances from asset metadata and returns them.
@@ -540,66 +742,6 @@ class sentinel2Asset(Asset):
         # sanity check that the bands are in the right order
         assert range(13) == [int(vt.attrib['bandId']) for vt in values_tags]
         return [float(vt.text) for vt in values_tags]
-
-
-    def mean_viewing_angle(self, angle='both'):
-        """Loads & returns mean viewing angle:  (zenith, azimuth).
-
-        Queries and returns asset metadata for these values.  Return
-        value is in degrees.
-        """
-        if angle != 'both':
-            raise NotImplementedError('getting zenith or azimuth separately is not supported')
-        mvial_elem = self.xml_subtree('tile', 'Mean_Viewing_Incidence_Angle_List')
-        # should only be one list, with 13 elems, each with 2 angles, a zen and an az
-        angles = mvial_elem.findall('Mean_Viewing_Incidence_Angle')
-        mean_zen = numpy.mean([float(e.find('ZENITH_ANGLE' ).text) for e in angles])
-        mean_az  = numpy.mean([float(e.find('AZIMUTH_ANGLE').text) for e in angles])
-        return (mean_zen, mean_az)
-
-
-    def mean_solar_angle(self, angle='both'):
-        """Loads & returns solar zenith and/or azimuth angle.
-
-        Queries and returns asset metadata for these values.  Set angle
-        to 'zenith' or 'azimuth' to get single values, or 'both' to get
-        (zenith, azimuth).  Return value is in degrees.
-        """
-        assert angle in ('both', 'zenith', 'azimuth') # sanity check
-        msa_elem = self.xml_subtree('tile', 'Mean_Sun_Angle')
-        get_angle = lambda tag: float(msa_elem.find(tag).text)
-        if angle == 'both':
-            return (get_angle('ZENITH_ANGLE'), get_angle('AZIMUTH_ANGLE'))
-        if angle == 'zenith':
-            return get_angle('ZENITH_ANGLE')
-        if angle == 'azimuth':
-            return get_angle('AZIMUTH_ANGLE')
-
-
-    def tile_lat_lon(self):
-        """Loads & returns boundaries for this asset's tile.
-
-        If the asset is old-style, it's taken from the tiles shapefile.
-        Otherwise, taken from asset metadata; tuple is (w-lon, e-lon,
-        s-lat, n-lat), in degrees.  Structure for the lat/lons in
-        INSPIRE.xml is, deep in the file:
-            <gmd:EX_GeographicBoundingBox>
-                <gmd:westBoundLongitude>
-                    <gco:Decimal>-71.46678204877877</gco:Decimal>
-                </gmd:westBoundLongitude>
-                . . . and so on for 3 more values . . .
-            </gmd:EX_GeographicBoundingBox>
-        """
-        if self.style == 'original':
-            return self.Repository.tile_lat_lon(self.tile)
-        gmd = '{http://www.isotc211.org/2005/gmd}' # xml namespace foolishness
-        gco = '{http://www.isotc211.org/2005/gco}'
-        gbb_elem = self.xml_subtree('inspire', gmd + 'EX_GeographicBoundingBox')
-        return tuple(float(gbb_elem.find(gmd + s).find(gco + 'Decimal').text) for s in (
-                'westBoundLongitude', 'eastBoundLongitude',
-                'southBoundLatitude', 'northBoundLatitude',
-        ))
-
 
     #def gridded_zenith_angle(self):
     #    """Loads and returns zenith angle from the asset metadata.
@@ -632,7 +774,7 @@ class sentinel2Asset(Asset):
         same as the order of the bands in _sensors given above.  See:
         https://sentinel.esa.int/web/sentinel/technical-guides/sentinel-2-msi/level-1c/algorithm
         """
-        mza = math.radians(self.mean_solar_angle('zenith'))
+        mza = math.radians(self.tile_metadata()[2])
         solar_irrads = self.solar_irradiances()
         julian_date = utils.julian_date(datetime.datetime.combine(self.date, self.time), 'cnes')
         return [(1 - 0.01673 * math.cos(0.0172 * (julian_date - 2)))**-2 # solar distance term
@@ -657,9 +799,8 @@ class sentinel2Asset(Asset):
         # assemble list of relevant band boundaries
         wvlens = [sensor_md['bandbounds'][i] for i in vb_indices]
         # assemble geometries
-        (viewing_zn, viewing_az) = self.mean_viewing_angle()
-        (solar_zn, solar_az) = self.mean_solar_angle()
-        (w_lon, e_lon, s_lat, n_lat) = self.tile_lat_lon()
+        viewing_zn, viewing_az, solar_zn, solar_az = self.tile_metadata()
+        (w_lon, e_lon, s_lat, n_lat) = self.Repository.tile_lat_lon(self.tile)
         geo = {
             'zenith': viewing_zn,
             'azimuth': viewing_az,
@@ -713,26 +854,26 @@ class sentinel2Data(Data):
         # standard products
         'rad': {
             'description': 'Surface-leaving radiance',
-            'assets': [_asset_type],
+            'assets': _asset_types,
             'bands': [{'name': band_name, 'units': 'W/m^2/um'} # aka watts/(m^2 * micrometers)
                       for band_name in Asset._sensors['S2A']['indices-colors']],
             # 'startdate' and 'latency' are optional for DH
         },
         'ref': {
             'description': 'Surface reflectance',
-            'assets': [_asset_type],
+            'assets': _asset_types,
             'bands': [{'name': band_name, 'units': Data._unitless}
                       for band_name in Asset._sensors['S2A']['indices-colors']],
         },
         'cfmask': {
             'description': 'Cloud, cloud shadow, and water classification',
-            'assets': [_asset_type],
+            'assets': _asset_types,
             'bands': {'name': 'cfmask', 'units': Data._unitless},
             'toa': True,
         },
         'cloudmask': {
             'description': 'Cloud mask',
-            'assets': [_asset_type],
+            'assets': _asset_types,
             'bands': {'name': 'cloudmask', 'units': Data._unitless},
         },
     }
@@ -740,7 +881,7 @@ class sentinel2Data(Data):
     # add index products to _products
     _products.update(
         (p, {'description': d,
-             'assets': [_asset_type],
+             'assets': _asset_types,
              'bands': [{'name': p, 'units': Data._unitless}]}
         ) for p, d in [
             # duplicated in modis and landsat; may be worth it to DRY out
@@ -765,7 +906,8 @@ class sentinel2Data(Data):
         ]
     )
 
-    atmosphere.add_acolite_product_dicts(_products, _asset_type)
+    # acolite doesn't (yet?) support google storage sentinel-2 data
+    atmosphere.add_acolite_product_dicts(_products, 'L1C')
 
     _product_dependencies = {
         'indices':      'ref',
@@ -779,7 +921,7 @@ class sentinel2Data(Data):
         's2rep-toa':    'ref-toa',
         'mtci':         'ref',
         's2rep':        'ref',
-	'cloudmask':	'cfmask',
+        'cloudmask':	'cfmask',
     }
 
     need_fetch_kwargs = True
@@ -830,11 +972,11 @@ class sentinel2Data(Data):
         return work
 
     def current_asset(self):
-        return self.assets[_asset_type]
+        return next(self.assets[at]
+                    for at in _asset_types if at in self.assets)
 
     def current_sensor(self):
-        return self.sensors[_asset_type]
-
+        return self.current_asset().sensor
 
     def load_image(self, product):
         """Load a product file into a GeoImage and return it
@@ -877,83 +1019,53 @@ class sentinel2Data(Data):
             self.current_asset().filename, additional)
         return meta
 
-    def prep_meta(self, additional=None):
-        meta = super(sentinel2Data, self).prep_meta(
-            self.current_asset().filename, additional)
-        return meta
-
-    def load_metadata(self):
-        """Ingest metadata from asset files; just raster filenames presently."""
-        if hasattr(self, 'metadata'):
-            return # nothing to do if metadata is already loaded
-
-        # only one asset type supported for this driver so for now hardcoding is ok
-        asset_type = 'L1C'
-        datafiles = self.assets[asset_type].datafiles()
-
-        # restrict filenames known to just the raster layers
-        asset = self.current_asset()
-        raster_fn_pat = asset.style_res['raster-re'].format(tileid=asset.tile)
-        fnl = [df for df in datafiles if re.match(raster_fn_pat, df)]
-        # have to sort the list or else gippy will get confused about which band is which
-        band_strings = sentinel2Asset._sensors[self.sensors[asset_type]]['band-strings']
-        # sorting is weird because the bands aren't named consistently
-        fnl.sort(key=lambda f: band_strings.index(f[-6:-4]))
-        self.metadata = {'filenames': fnl}
-
-
-    def read_raw(self):
-        """Read in bands using original SAFE asset file (a .zip)."""
-        self.load_metadata()
-
-        if utils.settings().REPOS[self.Repository.name.lower()].get('extract', False):
-            # Extract files to disk
-            datafiles = self.assets['L1C'].extract(self.metadata['filenames'])
-        else:
+    # TODO move to Asset?
+    @lru_cache(maxsize=1)
+    def raster_paths(self):
+        """Return paths to raster files, extracting them if necessary."""
+        ao = self.current_asset()
+        if ao.asset == 'L1CGS':
+            return ao.json_content['spectral-bands']
+        with utils.error_handler('Error reading ' + ao.basename):
+            fnl = ao.raster_full_paths()
+            if self.get_setting('extract'):
+                return ao.extract(fnl)
             # Use zipfile directly using GDAL's virtual filesystem
-            datafiles = [os.path.join('/vsizip/' + self.assets['L1C'].filename, f)
-                    for f in self.metadata['filenames']]
-        self.metadata['abs-filenames'] = datafiles
+            return [os.path.join('/vsizip/' + ao.filename, f) for f in fnl]
 
-    def ref_toa_geoimage(self, sensor, data_spec):
+    def ref_toa_geoimage(self):
         """Make a proto-product which acts as a basis for several products.
 
         It is equivalent to ref-toa; it's needed because the asset's
         spatial resolution must be resampled to be equal for all bands
         of interest.
         """
-        # TODO data_spec can be refactored out of argslist;
-        #      only depends on self & asset_type ('L1C')
         self._time_report('Start VRT for ref-toa image')
-        src_filenames = [f for f in self.metadata['abs-filenames']
-                         if f[-6:-4] in data_spec['indices-bands']]
+        ao = self.current_asset()
+        indices_bands, b_strings, colors = ao.sensor_spec(
+            'indices-bands', 'band-strings', 'colors')
+        vrt_filename = os.path.join(self._temp_proc_dir,
+                                    self.basename + '_ref-toa.vrt')
+        cmd_args = ('gdalbuildvrt -tr 20 20 -separate'
+                    ' -srcnodata 0 -vrtnodata 0').split(' ')
+        cmd_args += [vrt_filename] + [
+            f for f in self.raster_paths() if f[-6:-4] in indices_bands]
+        p = subprocess.Popen(cmd_args)
+        p.communicate()
+        if p.returncode != 0:
+            raise IOError("Expected gdalbuildvrt exit status 0,"
+                          " got {}".format(p.returncode))
 
-        with utils.make_temp_dir() as tmpdir:
-            # TODO document why VRT is superior to prior method (faster?)
-            vrt_filename = os.path.join(tmpdir, self.basename + '_ref-toa.vrt')
-            cmd_str = (
-                'gdalbuildvrt -tr 20 20 -separate '
-                '-srcnodata 0 -vrtnodata 0 {} {}'
-            ).format(vrt_filename, ' '.join(src_filenames))
-            cmd_args = shlex.split(cmd_str)
-            p = subprocess.Popen(cmd_args)
-            p.communicate()
-            if p.returncode != 0:
-                raise IOError("Expected gdalbuildvrt exit status 0, got {}"
-                              .format(p.returncode))
-            vrt_img = gippy.GeoImage(vrt_filename)
-            vrt_img.SetNoData(0)
-            vrt_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
-            # eg:   3        '08'
-            for band_num, band_string in enumerate(data_spec['indices-bands'], 1):
-                # starts at 0
-                band_index = data_spec['band-strings'].index(band_string)
-                color_name = data_spec['colors'][band_index]
-                vrt_img.SetBandName(color_name, band_num)
+        vrt_img = gippy.GeoImage(vrt_filename)
+        vrt_img.SetNoData(0)
+        vrt_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
+        # eg:   1        '02', which yields color_name 'BLUE'
+        for band_num, band_string in enumerate(indices_bands, 1): # starts at 0
+            vrt_img.SetBandName(colors[b_strings.index(band_string)], band_num)
         self._product_images['ref-toa'] = vrt_img
         self._time_report('Finished VRT for ref-toa image')
 
-    def rad_toa_geoimage(self, asset_type, sensor):
+    def rad_toa_geoimage(self):
         """Reverse-engineer TOA ref data back into a TOA radiance product.
 
         This is used as intermediary data but is congruent to the rad-toa
@@ -961,11 +1073,9 @@ class sentinel2Data(Data):
         """
         self._time_report('Starting reversion to TOA radiance.')
         reftoa_img = self.load_image('ref-toa')
-        asset_instance = self.assets[asset_type] # sentinel2Asset
-        colors = asset_instance._sensors[sensor]['colors']
-
+        asset_instance = self.current_asset()
+        colors = asset_instance.sensor_spec('colors')
         radiance_factors = asset_instance.radiance_factors()
-
         rad_image = gippy.GeoImage(reftoa_img)
 
         for i in range(len(rad_image)):
@@ -976,7 +1086,6 @@ class sentinel2Data(Data):
             rad_image[i] = rad_image[i] * rf
         rad_image.SetNoData(0)
         self._product_images['rad-toa'] = rad_image
-
 
     def rad_geoimage(self):
         """Transmute TOA radiance product into a surface radiance product."""
@@ -1080,7 +1189,7 @@ class sentinel2Data(Data):
 
         prodout = atmosphere.process_acolite(
                 a_obj, aco_tmp_dir, acolite_product_spec,
-                a_obj.style_res['raster-re'].format(tileid=self.id),
+                a_obj.style_res['raster-re'],
                 extracted_asset_glob='*.SAFE',
                 roi=roi,
                 band='02')
@@ -1089,29 +1198,29 @@ class sentinel2Data(Data):
         self._time_report(' -> {}: processed {}'.format(
                 self.basename + '_' + sensor, prodout.keys()))
 
-    def ref_geoimage(self, asset_type, sensor):
+    def ref_geoimage(self):
         """Generate a surface reflectance image.
 
         Made from a rad-toa image (the reverted ref-toa data sentinel-2 L1C
         provides), put through an atmospheric correction process.  CF landsat.
         """
+        ao = self.current_asset()
         self._time_report('Computing atmospheric corrections for surface reflectance')
-        atm6s = self.assets[asset_type].generate_atmo_corrector()
+        atm6s = ao.generate_atmo_corrector()
         scaling_factor = 0.001 # to prevent chunky small ints
         rad_toa_image = self.load_image('rad-toa')
         sr_image = gippy.GeoImage(rad_toa_image)
         # set meta to pass along to indices
         sr_image._aod_source = str(atm6s.aod[0])
         sr_image._aod_value  = str(atm6s.aod[1])
-        for c in self.assets[asset_type]._sensors[sensor]['indices-colors']:
+        for c in ao.sensor_spec('indices-colors'):
             (T, Lu, Ld) = atm6s.results[c]
             lu = 0.0001 * Lu # see rad_geoimage for reason for this
             TLdS = T * Ld * scaling_factor
             sr_image[c] = (rad_toa_image[c] - lu) / TLdS
         self._product_images['ref'] = sr_image
 
-
-    def fmask_geoimage(self, asset_type):
+    def fmask_geoimage(self):
         """Generate cloud mask.
 
         Uses python implementation of cfmask. Builds a VRT of all the necessary
@@ -1120,7 +1229,7 @@ class sentinel2Data(Data):
         """
         self._time_report('Generating cloud mask')
 
-        asset_style = self.assets[asset_type].style
+        ao = self.current_asset()
 
         DEVNULL = open(os.devnull, 'w')
 
@@ -1130,22 +1239,13 @@ class sentinel2Data(Data):
             "-tr", "20", "20",
             "-separate",
             "%s/allbands.vrt" % self._temp_proc_dir,
-        ] + self.metadata['abs-filenames']
+        ] + self.raster_paths()
         subprocess.check_call(gdalbuildvrt_args, stderr=DEVNULL)
 
-        safe_zip = zipfile.ZipFile(self.assets[asset_type].filename, 'r')
-        metadata_xml = None
-        for name in safe_zip.namelist():
-            if re.match(self.Asset._asset_styles[asset_style]['tile-md-re'].format(tileid=self.assets[asset_type].tile), name):
-                safe_zip.extract(name, self._temp_proc_dir)
-                metadata_xml = "{}/{}".format(self._temp_proc_dir, name)
-        if not metadata_xml:
-            raise IOError("{} does not contain expected metadatafile.".format(safe_zip.filename))
-        safe_zip.close()
-
+        # set up commands
         angles_cmd_list = [
             "fmask_sentinel2makeAnglesImage.py",
-            "-i", metadata_xml,
+            "-i", ao.save_tile_md_file(self._temp_proc_dir),
             "-o", "%s/angles.img" % self._temp_proc_dir,
         ]
         fmask_cmd_list = [
@@ -1157,7 +1257,7 @@ class sentinel2Data(Data):
             "-v",
         ]
         # Temp dir for intermediaries that pyfmask generates in the current
-        # working directory.  N.B.: the mask is output to self._temp_proc_dir.
+        # working directory.  The mask is output to self._temp_proc_dir.
         with utils.make_temp_dir(prefix='gips-py-fmask', dir='/tmp') as tdir:
             prev_wd = os.getcwd()
             os.chdir(tdir)
@@ -1172,8 +1272,6 @@ class sentinel2Data(Data):
                     fmask_cmd_list,
                     stderr=DEVNULL
                 )
-            except:
-                raise
             finally:
                 os.chdir(prev_wd)
 
@@ -1213,7 +1311,6 @@ class sentinel2Data(Data):
         # test this with eg:
         # gips_process sentinel2 -t 16TDP -d 2017-10-01 -v5 -p mtci --overwrite
         self._time_report('Generating MTCI')
-        asset_style = self.assets[_asset_type].style
 
         # change this to 'ref'
         ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
@@ -1245,7 +1342,6 @@ class sentinel2Data(Data):
     def s2rep_geoimage(self, mode):
         """Generate Python implementation of S2REP."""
         self._time_report('Generating S2REP')
-        asset_style = self.assets[_asset_type].style
 
         # change this to 'ref'
         ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
@@ -1287,7 +1383,6 @@ class sentinel2Data(Data):
         are found.  Products are saved to a well-known or else specified
         directory.  kwargs is unused, and is present for compatibility.
         """
-        asset_type = 'L1C' # only one in the driver for now, conveniently
         self._time_report('Starting processing for this temporal-spatial unit')
         products = self.needed_products(products, overwrite)
         if len(products) == 0:
@@ -1295,28 +1390,25 @@ class sentinel2Data(Data):
             return
         self._product_images = {}
 
-        # Read the assets
-        with utils.error_handler('Error reading '
-                                 + utils.basename(self.assets[asset_type].filename)):
-            self.read_raw() # returns a GeoImage, presently unused
-
-        sensor = self.sensors[asset_type]
-        # dict describing specification for all the bands in the asset
-        data_spec = self.assets[asset_type]._sensors[sensor]
-
         work = self.plan_work(products.requested.keys(), overwrite) # see if we can save any work
+
+        if self.current_asset().asset == 'L1CGS':
+            no_can_do = work & set(('mtci-toa', 'mtci', 's2rep-toa', 's2rep'))
+            if no_can_do:
+                raise NotImplementedError(
+                    'Not supported for L1CGS assets:  ' + ' '.join(no_can_do))
 
         # only do the bits that need doing
         if 'ref-toa' in work:
-            self.ref_toa_geoimage(sensor, data_spec)
+            self.ref_toa_geoimage()
         if 'rad-toa' in work:
-            self.rad_toa_geoimage(asset_type, sensor)
+            self.rad_toa_geoimage()
         if 'rad' in work:
             self.rad_geoimage()
         if 'ref' in work:
-            self.ref_geoimage(asset_type, sensor)
+            self.ref_geoimage()
         if 'cfmask' in work:
-            self.fmask_geoimage(asset_type)
+            self.fmask_geoimage()
         if 'cloudmask' in work:
             self.cloudmask_geoimage()
         if 'mtci-toa' in work:
@@ -1330,10 +1422,11 @@ class sentinel2Data(Data):
 
         self._time_report('Starting on standard product processing')
 
+        sensor = self.current_sensor()
         # Process standard products
         for prod_type in products.groups()['Standard']:
             err_msg = 'Error creating product {} for {}'.format(
-                    prod_type, os.path.basename(self.assets[asset_type].filename))
+                    prod_type, self.current_asset().basename)
             with utils.error_handler(err_msg, continuable=True):
                 self._time_report('Starting {} processing'.format(prod_type))
                 temp_fp = self.temp_product_filename(sensor, prod_type)
