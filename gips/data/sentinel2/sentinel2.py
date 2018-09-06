@@ -33,12 +33,14 @@ import tempfile
 import zipfile
 import copy
 import glob
+from itertools import izip_longest
 from xml.etree import ElementTree, cElementTree
 
 import numpy
 import pyproj
 import requests
 from requests.auth import HTTPBasicAuth
+from shapely.wkt import loads as wkt_loads
 
 import gippy
 import gippy.algorithms
@@ -660,6 +662,31 @@ class sentinel2Asset(Asset):
         dt = datetime.datetime.combine(self.date, self.time)
         self._atmo_corrector = atmosphere.SIXS(visbands, wvlens, geo, dt, sensor=self.sensor)
         return self._atmo_corrector
+
+    def footprint(self):
+         asset_contents = self.datafiles()
+         if self.style == 'original':
+             mtd_file_pattern = '^./S2.*\.xml$'
+         else:
+             mtd_file_pattern = '^.*/MTD_MSIL1C.xml$'
+         # python idiom for "first item in list that satisfies a      condition"; should only be one
+         metadata_fn = next(n for n in asset_contents if re.match(mtd_file_pattern, n))
+         with zipfile.ZipFile(self.filename) as asset_zf:
+             with asset_zf.open(metadata_fn) as metadata_zf:
+                 tree = ElementTree.parse(metadata_zf)
+                 sag_elem = next(tree.iter('Global_Footprint')) #      should only be one
+                 values_tags = sag_elem.find('EXT_POS_LIST')
+
+                 # format as valid WKT
+                 points = values_tags.text.strip().split(" ")
+                 zipped_points = izip_longest(*[iter(points)]*2)  # fancy way to group list into pairs
+                 wkt_points = ", ".join([x + " " + y for x, y in list(zipped_points)])
+                 footprint_wkt = "POLYGON (({}))".format(wkt_points)
+
+                 # For old style assets, `Global_Footprint` is the entire swath,
+                 # so intersect it with tile boundary to get actual footprint.
+                 tile_polygon = wkt_loads(self.get_geometry)
+                 return tile_polygon.intersection(wkt_loads(footprint_wkt)).wkt
 
 
 class sentinel2Data(Data):
