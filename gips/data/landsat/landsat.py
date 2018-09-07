@@ -56,6 +56,8 @@ from gips.inventory import DataInventory
 from gips.utils import RemoveFiles, basename, settings, verbose_out
 from gips import utils
 
+from shapely.geometry import Polygon
+from shapely.wkt import loads as wkt_loads
 import requests
 import homura
 
@@ -1885,6 +1887,32 @@ class landsatData(Data):
         verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image
 
+    def _s2_tiles_for_coreg(self, inventory, date_found, landsat_footprint):
+        if len(inventory) != 0:
+            geo_images = []
+            s2_footprint = Polygon()
+            tiles = inventory[date_found].tiles.keys()
+
+            for tile in tiles:
+                asset = inventory[date_found][tile].assets['L1C']
+                if asset.tile[:2] != self.utm_zone():
+                    continue
+                band_8 = [
+                    f for f in asset.datafiles()
+                    if f.endswith('B08.jp2') and tile in basename(f)
+                ][0]
+                geo_images.append('/vsizip/' + os.path.join(asset.filename, band_8))
+                s2_footprint = s2_footprint.union(wkt_loads(asset.footprint()))
+
+            print(s2_footprint.area)
+            if len(geo_images) >= 1:
+                percent_cover = (s2_footprint.intersection(landsat_footprint).area) / landsat_footprint.area
+                if percent_cover > .5:
+                    date_found = starting_date + delta
+                    return geo_images
+
+        return None
+
     def sentinel2_coreg_export(self, tmpdir):
         """
         Grabs closest (temporally) sentinel2 tiles and stitches them together
@@ -1915,41 +1943,29 @@ class landsatData(Data):
         # TODO: DRY the following statement which is repeated 3 times here
         inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
-        while len(inventory) == 0:
+        landsat_footprint = wkt_loads(self.assets[next(iter(self.assets))].get_geometry())
+
+        while True:
             if delta > timedelta(90):
                 raise NoSentinelError("No sentinel2 data could be found within +/-90 days")
 
             temporal_extent = TemporalExtent((starting_date + delta).strftime("%Y-%j"))
             inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
-            if len(inventory) != 0:
+            geo_images = self._s2_tiles_for_coreg(inventory, (starting_date + delta), landsat_footprint)
+            if geo_images:
                 date_found = starting_date + delta
                 break
 
             temporal_extent = TemporalExtent((starting_date - delta).strftime("%Y-%j"))
             inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
-            date_found = starting_date - delta
+            geo_images = self._s2_tiles_for_coreg(inventory, (starting_date - delta), landsat_footprint)
+            if geo_images:
+                date_found = starting_date - delta
+                break
+
             delta += timedelta(1)
-
-        geo_images = []
-        tiles = inventory[date_found].tiles.keys()
-        for tile in tiles:
-            asset = inventory[date_found][tile].assets['L1C']
-            if asset.tile[:2] != self.utm_zone():
-                continue
-            band_8 = [
-                f for f in asset.datafiles()
-                if f.endswith('B08.jp2') and tile in basename(f)
-            ][0]
-            asset.extract([band_8], tmpdir)
-            geo_images.append(os.path.join(tmpdir, band_8))
-
-        if len(geo_images) < 1:
-            raise Exception(
-                "didn't find s2 images to coreg in this utm zone {}"
-                .format(self.utm_zone())
-            )
 
         self._time_report("merge sentinel images to bin")
         merge_args = ["gdal_merge.py", "-o", tmpdir + "/sentinel_mosaic.bin",
