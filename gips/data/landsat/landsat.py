@@ -1904,11 +1904,9 @@ class landsatData(Data):
                 geo_images.append('/vsizip/' + os.path.join(asset.filename, band_8))
                 s2_footprint = s2_footprint.union(wkt_loads(asset.footprint()))
 
-            print(s2_footprint.area)
             if len(geo_images) >= 1:
                 percent_cover = (s2_footprint.intersection(landsat_footprint).area) / landsat_footprint.area
                 if percent_cover > .5:
-                    date_found = starting_date + delta
                     return geo_images
 
         return None
@@ -2051,7 +2049,7 @@ class landsatData(Data):
 
             try:
                 # subprocess has a timeout option as of python 3.3
-                ORTHO_TIMEOUT = 5 * 60
+                ORTHO_TIMEOUT = 10 * 60
                 cmd = ["timeout", str(ORTHO_TIMEOUT),
                        "ortho", "-r", parameter_file]
                 returnstatus = subprocess.check_call(args=cmd, cwd=tmpdir)
