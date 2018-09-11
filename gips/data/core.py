@@ -32,6 +32,7 @@ from itertools import groupby
 from shapely.wkt import loads
 import tarfile
 import zipfile
+import json
 import traceback
 import ftplib
 import shutil
@@ -341,7 +342,10 @@ class Asset(object):
         """Get list of readable datafiles from asset.
 
         A 'datafile' in this context is a file contained within the
-        asset file, such as for tar, zip, and hdf files."""
+        asset file, such as for tar, zip, and hdf files.
+
+        In the case of JSON files, the files pointed to are considered 'within'
+        the JSON asset."""
         path = os.path.dirname(self.filename)
         indexfile = os.path.join(path, self.filename + '.index')
         if os.path.exists(indexfile):
@@ -356,6 +360,12 @@ class Asset(object):
             elif zipfile.is_zipfile(self.filename):
                 zfile = zipfile.ZipFile(self.filename)
                 datafiles = zfile.namelist()
+            elif self.filename.endswith('json'):
+                datafiles = []
+                for v in json.loads(open(self.filename).read()).values():
+                    df = [v] if type(v) in (str, unicode) else v
+                    datafiles += v
+                datafiles = tuple(v.encode('ascii', 'ignore') for v in datafiles)
             else:
                 # Try subdatasets
                 fh = gdal.Open(self.filename)
@@ -403,8 +413,10 @@ class Asset(object):
                 if not os.path.isdir(tmp_fname):
                     os.chmod(tmp_fname, 0664)
                 extracted_fnames.append((tmp_fname, final_fname))
-            utils.verbose_out(
-                "Moving files from {} to {}".format(tmp_dn, path), 3)
+            if extracted_fnames:
+                utils.verbose_out("Moving files from {} to {}".format(tmp_dn, path), 3)
+            else:
+                utils.verbose_out("No files to extract or move", 3)
             for (tfn, ffn) in extracted_fnames:
                 # tfn's parent dir may be earlier in the list
                 if not os.path.exists(ffn):

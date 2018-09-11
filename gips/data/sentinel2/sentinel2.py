@@ -486,8 +486,15 @@ class sentinel2Asset(Asset):
             results = self.query_scihub(self.style, self.tile, self.date)
 
             if 'entry' in results['feed']:
-                assert results['feed']['entry']['double']['name'] == 'cloudcoverpercentage'
-                return float(results['feed']['entry']['double']['content'])
+                # TODO: This assertion is occasionally false.  'entry'
+                #       sometimes points at a list, instead of a dict.
+                #       Make this jive with the API better.
+                if type(results['feed']['entry']) is list:
+                    entry = results['feed']['entry'][0]
+                else:
+                    entry = results['feed']['entry']
+                assert entry['double']['name'] == 'cloudcoverpercentage'
+                return float(entry['double']['content'])
             raise ValueError("%s doesn't exist locally or remotely" % self.filename)
 
     def filter(self, pclouds=100, **kwargs):

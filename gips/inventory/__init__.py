@@ -220,7 +220,7 @@ class DataInventory(Inventory):
         :products: List of requested products of interest
         :fetch: bool indicated if missing data should be downloaded
         """
-        VerboseOut('Retrieving inventory for site %s' % spatial.sitename, 2)
+        VerboseOut('Retrieving inventory for site %s for date range %s' % (spatial.sitename, temporal) , 2)
 
         self.dataclass = dataclass
         Repository = dataclass.Asset.Repository
