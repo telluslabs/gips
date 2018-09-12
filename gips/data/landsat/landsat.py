@@ -2039,7 +2039,9 @@ class landsatData(Data):
                 warp_nbands=len(warp_bands_bin),
                 warp_bands=' '.join([os.path.join(tmpdir, band) for band in warp_bands_bin]),
                 warp_base_band=os.path.join(tmpdir, warp_base_band_filename),
-                warp_data_type=' '.join((['2'] * len(warp_bands_bin))),
+                warp_data_type=' '.join(([
+                    str(warp_base_band_img.DataType())
+                ] * len(warp_bands_bin))),
                 warp_nsample=warp_base_band_img.XSize(),
                 warp_nline=warp_base_band_img.YSize(),
                 warp_pixel_size=warp_pixel_size,
