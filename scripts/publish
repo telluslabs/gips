@@ -1,0 +1,15 @@
+#!/bin/bash
+
+set -e
+
+TAG=${1:-latest}
+ECR_URI=
+IMAGE=
+
+echo "Publishing gips with tag '${TAG}'"
+
+./scripts/setup $TAG
+
+eval $(aws ecr get-login --region us-east-1 --no-include-email)
+docker tag $IMAGE:$TAG $ECR_URI/$IMAGE:$TAG
+docker push $ECR_URI/$IMAGE:$TAG
