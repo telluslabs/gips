@@ -682,6 +682,7 @@ class landsatData(Data):
             'acoflags',
             # 'rhoam',  # Dropped for the moment due to issues in ACOLITE
         ],
+        'Other': ['l8pan']
     }
     __toastring = 'toa: use top of the atmosphere reflectance'
     __visible_bands_union = [color for color in Asset._sensors['LC8']['colors'] if 'LWIR' not in color]
@@ -798,6 +799,13 @@ class landsatData(Data):
             'startdate': _lc8_startdate,
             'latency': 0,
             'bands': unitless_bands('bqashadow'),
+        },
+        'l8pan': {
+            'assets': ['DN', 'C1'],
+            'description': 'LC8 Panchromatic Band',
+            'startdate': _lc8_startdate,
+            'latency': 0,
+            'bands': unitless_bands('brightness')
         },
         #'Indices': {
         'bi': {
@@ -1330,6 +1338,12 @@ class landsatData(Data):
                         outbands = ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6']
                         for i in range(0, imgout.NumBands()):
                             imgout.SetBandName(outbands[i], i + 1)
+                    elif val[0] == 'l8pan':
+                        print(fname)
+                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 1)
+
+                        from pdb import set_trace; set_trace()
+
                     elif val[0] == 'temp':
                         imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
                         for i in range(0, imgout.NumBands()):
