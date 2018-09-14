@@ -1896,7 +1896,7 @@ class landsatData(Data):
 
     def _s2_tiles_for_coreg(self, inventory, date_found, landsat_footprint):
         if len(inventory) == 0:
-            utils.verbose_out("No S2 assets found on " + date_found, 3)
+            verbose_out("No S2 assets found on {}".format(date_found), 3)
             return None
 
         geo_images = []
@@ -1915,14 +1915,14 @@ class landsatData(Data):
             s2_footprint = s2_footprint.union(wkt_loads(asset.footprint()))
 
         if len(geo_images) == 0:
-            utils.verbose_out("No S2 assets found in UTM zone " + self.utm_zone(), 3)
+            verbose_out("No S2 assets found in UTM zone {}".format(self.utm_zone()), 3)
             return None
 
         percent_cover = (s2_footprint.intersection(landsat_footprint).area) / landsat_footprint.area
         if percent_cover > .2:
             return geo_images
 
-        utils.verbose_out("S2 assets do not cover enough of Landsat data.", 3)
+        verbose_out("S2 assets do not cover enough of Landsat data.", 3)
         return None
 
     def sentinel2_coreg_export(self, tmpdir):
