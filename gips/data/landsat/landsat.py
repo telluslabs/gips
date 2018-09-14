@@ -1919,7 +1919,7 @@ class landsatData(Data):
             return None
 
         percent_cover = (s2_footprint.intersection(landsat_footprint).area) / landsat_footprint.area
-        if percent_cover > .5:
+        if percent_cover > .2:
             return geo_images
 
         utils.verbose_out("S2 assets do not cover enough of Landsat data.", 3)
