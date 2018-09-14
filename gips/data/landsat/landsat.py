@@ -1895,27 +1895,34 @@ class landsatData(Data):
         return image
 
     def _s2_tiles_for_coreg(self, inventory, date_found, landsat_footprint):
-        if len(inventory) != 0:
-            geo_images = []
-            s2_footprint = Polygon()
-            tiles = inventory[date_found].tiles.keys()
+        if len(inventory) == 0:
+            utils.verbose_out("No S2 assets found on " + date_found, 3)
+            return None
 
-            for tile in tiles:
-                asset = inventory[date_found][tile].assets['L1C']
-                if asset.tile[:2] != self.utm_zone():
-                    continue
-                band_8 = [
-                    f for f in asset.datafiles()
-                    if f.endswith('B08.jp2') and tile in basename(f)
-                ][0]
-                geo_images.append('/vsizip/' + os.path.join(asset.filename, band_8))
-                s2_footprint = s2_footprint.union(wkt_loads(asset.footprint()))
+        geo_images = []
+        s2_footprint = Polygon()
+        tiles = inventory[date_found].tiles.keys()
 
-            if len(geo_images) >= 1:
-                percent_cover = (s2_footprint.intersection(landsat_footprint).area) / landsat_footprint.area
-                if percent_cover > .5:
-                    return geo_images
+        for tile in tiles:
+            asset = inventory[date_found][tile].assets['L1C']
+            if asset.tile[:2] != self.utm_zone():
+                continue
+            band_8 = [
+                f for f in asset.datafiles()
+                if f.endswith('B08.jp2') and tile in basename(f)
+            ][0]
+            geo_images.append('/vsizip/' + os.path.join(asset.filename, band_8))
+            s2_footprint = s2_footprint.union(wkt_loads(asset.footprint()))
 
+        if len(geo_images) == 0:
+            utils.verbose_out("No S2 assets found in UTM zone " + self.utm_zone(), 3)
+            return None
+
+        percent_cover = (s2_footprint.intersection(landsat_footprint).area) / landsat_footprint.area
+        if percent_cover > .5:
+            return geo_images
+
+        utils.verbose_out("S2 assets do not cover enough of Landsat data.", 3)
         return None
 
     def sentinel2_coreg_export(self, tmpdir):
