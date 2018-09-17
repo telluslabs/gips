@@ -33,12 +33,14 @@ import tempfile
 import zipfile
 import copy
 import glob
+from itertools import izip_longest
 from xml.etree import ElementTree, cElementTree
 
 import numpy
 import pyproj
 import requests
 from requests.auth import HTTPBasicAuth
+from shapely.wkt import loads as wkt_loads
 
 import gippy
 import gippy.algorithms
@@ -191,6 +193,7 @@ class sentinel2Asset(Asset):
             # updated assumption: only XML file in DATASTRIP/ (not including subdirs)
             'datastrip-md-re': '^.*/DATASTRIP/[^/]+/[^/]*.xml$',
             'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
+            'asset-md-re': '^.*/S2.*\.xml$',
         },
         _2016_12_07: {
             # post-2016 assets use their downloaded FN as their archived FN
@@ -204,6 +207,7 @@ class sentinel2Asset(Asset):
             # Two files with asset-global metadata, this is one of them:
             # for INSPIRE.xml see http://inspire.ec.europa.eu/XML-Schemas/Data-Specifications/2892
             'inspire-md-re': '^.*/INSPIRE.xml$',
+            'asset-md-re': '^.*/MTD_MSIL1C.xml$',
         },
     }
 
@@ -667,6 +671,28 @@ class sentinel2Asset(Asset):
         dt = datetime.datetime.combine(self.date, self.time)
         self._atmo_corrector = atmosphere.SIXS(visbands, wvlens, geo, dt, sensor=self.sensor)
         return self._atmo_corrector
+
+    def footprint(self):
+        asset_contents = self.datafiles()
+
+        mtd_file_pattern = self._asset_styles[self.style]['asset-md-re']
+        metadata_fn = next(n for n in asset_contents if re.match(mtd_file_pattern, n))
+
+        metadata_zf = next(iter(self.extract([metadata_fn])))
+        tree = ElementTree.parse(metadata_zf)
+        sag_elem = next(tree.iter('Global_Footprint')) #      should only be one
+        values_tags = sag_elem.find('EXT_POS_LIST')
+
+        # format as valid WKT
+        points = values_tags.text.strip().split(" ")
+        zipped_points = izip_longest(*[iter(points)]*2)  # fancy way to group list into pairs
+        wkt_points = ", ".join([y + " " + x for x, y in list(zipped_points)])
+        footprint_wkt = "POLYGON (({}))".format(wkt_points)
+
+        # For old style assets, `Global_Footprint` is the entire swath,
+        # so intersect it with tile boundary to get actual footprint.
+        tile_polygon = wkt_loads(self.get_geometry())
+        return tile_polygon.intersection(wkt_loads(footprint_wkt)).wkt
 
 
 class sentinel2Data(Data):
