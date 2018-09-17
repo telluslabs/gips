@@ -145,6 +145,10 @@ for k in (('landsat', 'bqashadow'), ('landsat', 'ref-toa'),
 #    assert expected == actual
 expectations['landsat'] = collections.OrderedDict([
  # t_process[landsat-acca] recording:
+ ('cloudmask-coreg',
+   [('landsat/tiles/012030/2017213/012030_2017213_coreg_args.txt',
+    'text-full',
+    ['x: -6.59999999999\n', 'y: -7.14'])]),
  ('acca',
   [('landsat/tiles/012030/2017213/012030_2017213_LC8_acca.tif',
     'raster',

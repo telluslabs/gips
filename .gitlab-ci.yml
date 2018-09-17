@@ -5,6 +5,7 @@ make_image:
     - wget -O sixs ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/sixs
     - wget -O gitlab_ci ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gitlab_ci
     - wget -O gips_creds.sh.enc ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gips_creds.sh.enc
+    - cp /home/icooke/bin/ortho ./
     - git checkout $CI_COMMIT_REF_NAME
     - docker build -t gippy-0.3.x -f docker/gippy-install.docker docker
     - docker build --no-cache
@@ -27,7 +28,8 @@ run_tests:
     - docker run --dns=10.0.4.1 --rm
       -v /net/cluster/projects/gips-dev/sys-test-assets/:/artifact-store
       gips_test_$CI_COMMIT_REF_SLUG 
-      pytest -r es -vv --slow --setup-repo --sys -s -m lite 
+      pytest -r es -vv --slow --setup-repo --sys -s
+      -k '(landsat and coreg) or (sentinel2 and ndvi-toa)'
 
 
     # TODO get this CI pipeline up to passing

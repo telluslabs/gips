@@ -317,8 +317,9 @@ class Asset(object):
 
         v = gippy.GeoVector(self.get_setting("tiles"))
         v.SetPrimaryKey(self.Repository._tile_attribute)
-        feat = v[tile_num]
-
+        # If a GeoVector is indexed with an int, it queries using
+        # FID field.
+        feat = v[str(tile_num)]
         return feat.WKT()
 
     ##########################################################################

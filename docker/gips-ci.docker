@@ -7,12 +7,14 @@ RUN apt-get update \
 COPY . /gips
 COPY gitlab_ci /root/.ssh/gitlab_ci
 COPY sixs /usr/local/bin/sixs
+COPY ortho /usr/local/bin/ortho
 COPY gips_creds.sh.enc /root/gips_creds.sh.enc
 
 ENV GIPS_OVERRIDE_VERSION='0.0.0-dev'
 
 RUN cd /gips \
     && chmod +x /usr/local/bin/sixs \
+    && chmod +x /usr/local/bin/ortho \
     && pip install -r dev_requirements.txt \
     && pip install --process-dependency-links -e . \
     && rm -f /gips/gips/settings.py /gips/pytest.ini \
