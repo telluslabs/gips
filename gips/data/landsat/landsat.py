@@ -1944,8 +1944,10 @@ class landsatData(Data):
 
         while True:
             if delta > timedelta(90):
-                raise NoSentinelError("No sentinel2 data could be found within +/-90 days")
-
+                raise NoSentinelError(
+                    "didn't find s2 images in this utm zone {}, (pathrow={},date={})"
+                    .format(self.utm_zone(), self.id, self.date)
+                )
             temporal_extent = TemporalExtent((starting_date + delta).strftime("%Y-%j"))
             inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
