@@ -1,0 +1,8 @@
+FROM gips_test
+
+USER root
+
+COPY acolite_py_linux /acolite_py_linux
+RUN echo "ACOLITE = { 'dir': '/acolite_py_linux' }" >> /gips/gips/settings.py
+
+USER gips
