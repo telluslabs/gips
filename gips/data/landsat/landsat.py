@@ -508,12 +508,20 @@ class landsatAsset(Asset):
         re_string = key_prefix + fname_fragment
         filter_re = re.compile(re_string)
 
-        # missing_auth_vars = tuple(
-        #         set(['AWS_SECRET_ACCESS_KEY', 'AWS_ACCESS_KEY_ID'])
-        #         - set(os.environ.keys()))
-        # if len(missing_auth_vars) > 0:
-        #     raise EnvironmentError("Missing AWS S3 auth credentials:"
-        #                            "  {}".format(missing_auth_vars))
+        missing_auth_vars = tuple(
+                set(['AWS_SECRET_ACCESS_KEY', 'AWS_ACCESS_KEY_ID'])
+                - set(os.environ.keys()))
+        if len(missing_auth_vars) > 0:
+            # Set environment variables by loading them from ~/.aws/credentials
+            session = boto3.Session()
+            credentials = session.get_credentials().get_frozen_credentials()
+            if credentials is None:
+                # TODO: If still missing, raise
+                raise EnvironmentError("Missing AWS S3 auth credentials:"
+                                       "  {}".format(missing_auth_vars))
+
+            os.environ['AWS_ACCESS_KEY_ID'] = credentials.access_key
+            os.environ['AWS_SECRET_ACCESS_KEY'] = credentials.secret_key
 
         # on repeated searches, chances are we have a cache we can use
         expected_prefix, keys = cls._query_s3_cache
