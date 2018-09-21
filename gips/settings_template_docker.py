@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 ################################################################################
 #    GIPS: Geospatial Image Processing System
 #
@@ -69,6 +70,7 @@ REPOS = {
         'extract': False,       # extract files from tar.gz before processing instead of direct access
         'username': USGS_USER,
         'password': USGS_PASS,
+	    'source': 's3',
     },
     'modis': {
         'repository': prepend('modis'),
