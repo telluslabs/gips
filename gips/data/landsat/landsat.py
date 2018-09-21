@@ -498,6 +498,9 @@ class landsatAsset(Asset):
         and a list of S3 keys.  Returns None if no asset found for the
         given scene.  Filters by the given cloud percentage.
         """
+
+        import boto3
+
         # for finding assets matching the tile
         key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
         # match something like:  'LC08_L1TP_013030_20170402_20170414_01_T1'
@@ -528,7 +531,6 @@ class landsatAsset(Asset):
         if expected_prefix != key_prefix:
             verbose_out("New prefix detected; refreshing S3 query cache.", 5)
             # find the layer and metadata files matching the current scene
-            import boto3 # import here so it only breaks if it's actually needed
             s3 = boto3.resource('s3')
             bucket = s3.Bucket(cls._s3_bucket_name)
             keys = [o.key for o in bucket.objects.filter(Prefix=key_prefix)]
