@@ -29,6 +29,7 @@ date/time, and location).
 
 Any info passed in beyond this should be via keywords
 """
+from __future__ import print_function
 
 import os
 import sys
@@ -487,8 +488,67 @@ def add_acolite_product_dicts(_products, *assets):
 
 _acolite_ndv = 1.875 * 2 ** 122 # acolite's no-data value
 
-def process_acolite(asset, aco_proc_dir, products,
-                    model_layer_re=r'.*\.((jp2)|(tif)|(TIF))$',
+_aco_img_params = {
+    'float32': (gippy.GDT_Float32, -32768.0),
+    'int16': (gippy.GDT_Int16, -32768),
+    'uint8': (gippy.GDT_Byte, 1),
+}
+
+def extract_aco_prod_from_netcdf(products, nc_file, meta, model_layer_re, asset_dn):
+    # stash projection and geotransform (in a GeoImage)
+    layer_finder = re.compile(model_layer_re)
+    model_image = None
+    for d, _, files in os.walk(asset_dn):
+        for f in files:
+            fp = os.path.join(d, f)
+            match = layer_finder.match(fp)
+            if match:
+                if not band or match.group('band') == band:
+                    model_image = gippy.GeoImage(fp)
+                    break
+    assert model_image, "No matching raster for {}".format(model_layer_re)
+    verbose_out('acolite processing:  model layer located: {}'.format(
+        model_image.Filename()), 3)
+
+    dsroot = netCDF4.Dataset(nc_file)
+    prodout = dict()
+    for p_type, p_spec in products.items():
+        ofname = p_spec['fname']
+        verbose_out('acolite processing: extracting {}'.format(ofname), 2)
+        aco_key = p_spec['acolite-key']
+        bands = [b for b in dsroot.variables.keys()
+                 if str(b).startswith(aco_key)]
+        npdtype = p_spec['dtype']
+        dtype, missing = _aco_img_params[npdtype]
+        gain = p_spec.get('gain', 1.0)
+        offset = p_spec.get('offset', 0.0)
+        imgout = gippy.GeoImage(ofname, model_image, dtype, len(bands))
+        # TODO add units to products dictionary and use here:
+        # imgout.SetUnits(products[key]['units'])
+        pmeta = {mdi: p_spec[mdi] for mdi in ['acolite-key', 'description']}
+        pmeta['source_asset'] = os.path.basename(asset.filename)
+        pmeta.update(meta)
+        imgout.SetMeta(pmeta)
+
+        for i, b in enumerate(bands):
+            imgout.SetBandName(str(b), i + 1)
+            arr = numpy.array(dsroot.variables[b][:])
+            fill = getattr(dsroot.variables[b], '_FillValue', _acolite_ndv)
+            mask = arr != fill
+            arr[numpy.invert(mask)] = missing
+            arr[mask] = ((arr[mask] - offset) / gain)
+            verbose_out('acolite processing:  writing band {} of {}'.format(
+                i, ofname), 2)
+            imgout[i].Write(arr.astype(npdtype))
+
+        prodout[p_type] = imgout.Filename()
+        imgout = None
+        imgout = gippy.GeoImage(ofname, True)
+        imgout.SetGain(gain)
+        imgout.SetOffset(offset)
+        imgout.SetNoData(missing)
+
+def process_acolite(asset, aco_proc_dir, products, meta, model_layer_re,
                     extracted_asset_glob='', roi=None, band=None,
                     extract=True):
     """Generate acolite products from the given asset.
@@ -511,43 +571,19 @@ def process_acolite(asset, aco_proc_dir, products,
     Returns:  A mapping of product type strings to generated filenames
         in the tiles/ directory; Data.AddFile() ready.
     """
-    # TODO still true?
-    # acolite only seems to work when run from the ACO_DIR
-    acolite_dir = utils.settings().ACOLITE['dir']
-    acolite_paths = {
-        'ACO_DIR': acolite_dir,
-        'ACOLITE_BINARY': 'acolite.sav',
-    }
-    # mapping from dtype to gdal type and nodata value
-    img_params = {
-        'float32': (gippy.GDT_Float32, -32768.0),
-        'int16': (gippy.GDT_Int16, -32768),
-        'uint8': (gippy.GDT_Byte, 1),
-    }
-    imeta = products.pop('meta') # TODO refactor into an argument
+    asset_dn = os.path.join(aco_proc_dir, 'asset')
+    os.mkdir(asset_dn)
+    output_dn = os.path.join(aco_proc_dir, 'output')
+    os.mkdir(output_dn)
 
     # EXTRACT ASSET
     verbose_out('acolite processing:  Extracting {} to {}'.format(
-                asset.filename, aco_proc_dir), 2)
+                asset.filename, asset_dn), 2)
     # mostly for debugging purposes
-    extract and asset.extract(path=aco_proc_dir)
+    # TODO not sure if this will work for sentinel-2; may need to modify the processing dir
+    extract and asset.extract(path=asset_dn)
     verbose_out('acolite processing:  Finished extracting {} to {}'.format(
-                asset.filename, aco_proc_dir), 2)
-
-    # STASH PROJECTION AND GEOTRANSFORM (in a GeoImage)
-    layer_finder = re.compile(model_layer_re)
-    tmp = None
-    for d, _, files in os.walk(aco_proc_dir):
-        for f in files:
-            fp = os.path.join(d, f)
-            match = layer_finder.match(fp)
-            if match:
-                if not band or match.group('band') == band:
-                    tmp = gippy.GeoImage(fp)
-                    break
-    verbose_out('acolite processing:  model layer located: {}'.format(
-            tmp.Filename()), 3)
-    assert tmp, "No matching raster for {}".format(model_layer_re)
+                asset.filename, asset_dn), 2)
 
     # PROCESS SETTINGS TEMPLATE FOR SPECIFIED PRODUCTS
     settings_path = os.path.join(aco_proc_dir, 'settings.cfg')
@@ -558,21 +594,22 @@ def process_acolite(asset, aco_proc_dir, products,
     if len(acolite_products) == 0:
         raise Exception("ACOLITE: Must specify at least 1 product."
                         "  'acoflags' cannot be generated on its own.")
-    with open(template_path, 'r') as aco_template, \
-            open(settings_path, 'w') as settings_fo:
-        # TODO gips is already a django application; its templating system is sitting RIGHT THERE
-        for l in aco_template:
-            settings_fo.write(re.sub(
-                r'GIPS_LANDSAT_PRODUCTS', ','.join(acolite_products), l))
+    #with open(template_path, 'r') as aco_template, \
+    #        open(settings_path, 'w') as settings_fo:
+    with open(settings_path, 'w') as settings_fo:
+        # xy_output=True may want this; writes easting & northing to netcdfs
+        for s in ('l2w_parameters=' + ','.join(acolite_products),
+                  'output=' + output_dn):
+            print(s, file=settings_fo)
         if roi is not None:
-            settings_fo.write('limit=' + ','.join(str(i) for i in roi) + '\n')
+            print('limit=' + ','.join(str(i) for i in roi), file=settings_fo)
 
     with open(settings_path, 'r') as settings_fo:
         verbose_out('acolite processing:  ====== begin acolite.cfg ======', 4)
         verbose_out(settings_fo.read(), 4)
         verbose_out('acolite processing:  ====== end acolite.cfg ======', 4)
 
-    eag_fp = os.path.join(aco_proc_dir, extracted_asset_glob)
+    eag_fp = os.path.join(asset_dn, extracted_asset_glob)
     eag_rv = glob.glob(eag_fp)
     if len(eag_rv) != 1:
         raise IOError("Expected exactly one asset glob for"
@@ -580,90 +617,29 @@ def process_acolite(asset, aco_proc_dir, products,
     extracted_asset_fp = eag_rv[0]
 
     # PROCESS VIA ACOLITE CALL
-    cmd = (
-        ('cd {ACO_DIR} ; ' # TODO needed?
-         # TODO this is all different now too obviously
-         'path-to-acolite-here -IDL_CPU_TPOOL_NTHREADS 1 '
-         '-rt={ACOLITE_BINARY} '
-         '-args settings={ACOLITE_SETTINGS} '
-         'run=1 '
-         'output={OUTPUT} image={IMAGES}')
-            .format(
-            OUTPUT=aco_proc_dir, # acolite seems to ignore this argument
-            IMAGES=extracted_asset_fp,        # <-- and put the netcdf file in here
-            ACOLITE_SETTINGS=settings_path,
-            **acolite_paths
-        )
-    )
+    # TODO options we now lack, not sure if want:
+    # -IDL_CPU_TPOOL_NTHREADS 1 run=1
+    cmd = '{} --cli --nogfx --images={} --settings={}'.format(
+            os.path.join(utils.settings().ACOLITE['dir'], 'acolite'),
+            extracted_asset_fp, settings_path)
     verbose_out('acolite processing:  starting acolite: `{}`'.format(cmd), 2)
 
-    if roi is not None:
-        cmd += ' limit=' + ','.join(str(i) for i in roi)
-
     status, output = commands.getstatusoutput(cmd)
-    if status != 0:
-        raise RuntimeError("Got exit status {} from `{}`".format(status, cmd),
-                           output)
+
     verbose_out('acolite processing:  ====== begin acolite output ======', 4)
     verbose_out(output, 4)
     verbose_out('acolite processing:  ====== end acolite output ======', 4)
+    if status != 0:
+        raise RuntimeError("Got exit status {} from `{}`".format(status, cmd))
 
     # EXTRACT IMAGES FROM NETCDF AND COMBINE MULTI-IMAGE PRODUCTS INTO
     # A MULTI-BAND TIF, ADD METADATA, and MOVE INTO TILES
     verbose_out('acolite processing:  acolite completed;'
                 ' starting conversion from netcdf into gips products', 2)
-    aco_nc_file = glob.glob(os.path.join(extracted_asset_fp, '*_L2.nc'))[0]
-    dsroot = netCDF4.Dataset(aco_nc_file)
+    aco_nc_file = next(glob.iglob(os.path.join(output_dn, '*_L2W.nc')))
 
-    prodout = dict()
-
-    for key in products:
-        ofname = products[key]['fname']
-        verbose_out('acolite processing: starting {}'.format(ofname), 2)
-        aco_key = products[key]['acolite-key']
-        bands = list(filter(
-            lambda x: str(x) == aco_key or x.startswith(aco_key),
-            dsroot.variables.keys()
-        ))
-        npdtype = products[key]['dtype']
-        dtype, missing = img_params[npdtype]
-        gain = products[key].get('gain', 1.0)
-        offset = products[key].get('offset', 0.0)
-        imgout = gippy.GeoImage(ofname, tmp, dtype, len(bands))
-        # # TODO: add units to products dictionary and use here.
-        # imgout.SetUnits(products[key]['units'])
-        pmeta = {
-            mdi: products[key][mdi]
-            for mdi in ['acolite-key', 'description']
-            }
-        pmeta['source_asset'] = os.path.basename(asset.filename)
-        pmeta.update(imeta)
-        imgout.SetMeta(pmeta)
-        for i, b in enumerate(bands):
-            imgout.SetBandName(str(b), i + 1)
-
-        for i, b in enumerate(bands):
-            var = dsroot.variables[b][:]
-            arr = numpy.array(var)
-            if hasattr(dsroot.variables[b], '_FillValue'):
-                fill = dsroot.variables[b]._FillValue
-            else:
-                fill = _acolite_ndv
-            mask = arr != fill
-            arr[numpy.invert(mask)] = missing
-            # if key == 'rhow':
-            #     set_trace()
-            arr[mask] = ((arr[mask] - offset) / gain)
-            verbose_out('acolite processing:  writing band {} of {}'.format(
-                        i, ofname), 2)
-            imgout[i].Write(arr.astype(npdtype))
-
-        prodout[key] = imgout.Filename()
-        imgout = None
-        imgout = gippy.GeoImage(ofname, True)
-        imgout.SetGain(gain)
-        imgout.SetOffset(offset)
-        imgout.SetNoData(missing)
+    prodout = extract_aco_prod_from_netcdf(products, aco_nc_file, meta,
+                                           model_layer_re, asset_dn)
     verbose_out('acolite processing:'
                 '  finishing; {} products completed'.format(len(products)), 2)
     return prodout

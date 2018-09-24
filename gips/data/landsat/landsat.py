@@ -1626,9 +1626,7 @@ class landsatData(Data):
                         ),
                         continuable=True):
                     # amd is 'meta' (common to all products) and product info dicts
-                    amd = {
-                        'meta': md.copy()
-                    }
+                    amd = {}
                     for p in groups['ACOLITE']:
                         amd[p] = {
                             'fname': os.path.join(
@@ -1638,11 +1636,8 @@ class landsatData(Data):
                         amd[p].update(self._products[p])
                         amd[p].pop('assets')
                     prodout = gips.atmosphere.process_acolite(
-                        self.assets[asset],
-                        aco_proc_dir,
-                        amd,
-                        model_layer_re=r'.*_B1\.(tif|TIF)$'
-                    )
+                        self.assets[asset], aco_proc_dir, amd, md.copy(),
+                        model_layer_re=r'.*_B1\.(tif|TIF)$')
                     endtime = datetime.now()
                     for k, fn in prodout.items():
                         self.AddFile(sensor, k, fn)

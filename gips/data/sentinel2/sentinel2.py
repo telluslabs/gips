@@ -1167,7 +1167,6 @@ class sentinel2Data(Data):
         # let acolite use a subdirectory in this run's tempdir:
         aco_tmp_dir = self.generate_temp_path('acolite')
         os.mkdir(aco_tmp_dir)
-        acolite_product_spec = {'meta': self.prep_meta()}
         for p in aco_prods:
             # TODO use tempdirs to match current gips practices
             fn = os.path.join(self.path, self.product_filename(sensor, p))
@@ -1181,11 +1180,9 @@ class sentinel2Data(Data):
             roi = (s_lat, w_lon, n_lat, e_lon)
 
         prodout = atmosphere.process_acolite(
-                a_obj, aco_tmp_dir, acolite_product_spec,
+                a_obj, aco_tmp_dir, acolite_product_spec, self.prep_meta(),
                 a_obj.style_res['raster-re'],
-                extracted_asset_glob='*.SAFE',
-                roi=roi,
-                band='02')
+                extracted_asset_glob='*.SAFE', roi=roi, band='02')
 
         [self.AddFile(sensor, pt, fn) for pt, fn in prodout.items()]
         self._time_report(' -> {}: processed {}'.format(

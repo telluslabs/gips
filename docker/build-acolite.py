@@ -8,7 +8,7 @@ import urllib
 import tarfile
 
 wd = '.'
-bn = 'acolite_py_linux_20180917.0.tar.gz'
+bn = 'acolite_py_linux_20180925.0.tar.gz'
 untarred_bn = 'acolite_py_linux'
 url = 'http://odnature.naturalsciences.be/downloads/remsem/acolite/' + bn
 tag = 'aco-gips'
