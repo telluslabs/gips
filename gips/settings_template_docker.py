@@ -70,7 +70,7 @@ REPOS = {
         'extract': False,       # extract files from tar.gz before processing instead of direct access
         'username': USGS_USER,
         'password': USGS_PASS,
-        'source': 's3',
+        'source': 'gs',
     },
     'modis': {
         'repository': prepend('modis'),
