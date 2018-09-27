@@ -440,7 +440,7 @@ _aco_prod_templs = {
     'fai': {
         'description': 'Floating Algae Index',
         'acolite-product': 'FAI',
-        'acolite-key': 'FAI',
+        'acolite-key': 'fai',
         'dtype': 'float32',
         'toa': True,
         'bands': [{'name': 'fai', 'units': Data._unitless}],
@@ -494,30 +494,14 @@ _aco_img_params = {
     'uint8': (gippy.GDT_Byte, 1),
 }
 
-def extract_aco_prod_from_netcdf(products, nc_file, meta, model_layer_re, asset_dn):
-    # stash projection and geotransform (in a GeoImage)
-    layer_finder = re.compile(model_layer_re)
-    model_image = None
-    for d, _, files in os.walk(asset_dn):
-        for f in files:
-            fp = os.path.join(d, f)
-            match = layer_finder.match(fp)
-            if match:
-                if not band or match.group('band') == band:
-                    model_image = gippy.GeoImage(fp)
-                    break
-    assert model_image, "No matching raster for {}".format(model_layer_re)
-    verbose_out('acolite processing:  model layer located: {}'.format(
-        model_image.Filename()), 3)
-
+def acolite_nc_to_prods(products, nc_file, meta, model_image):
     dsroot = netCDF4.Dataset(nc_file)
     prodout = dict()
     for p_type, p_spec in products.items():
         ofname = p_spec['fname']
         verbose_out('acolite processing: extracting {}'.format(ofname), 2)
-        aco_key = p_spec['acolite-key']
         bands = [b for b in dsroot.variables.keys()
-                 if str(b).startswith(aco_key)]
+                 if str(b).startswith(p_spec['acolite-key'])]
         npdtype = p_spec['dtype']
         dtype, missing = _aco_img_params[npdtype]
         gain = p_spec.get('gain', 1.0)
@@ -526,7 +510,6 @@ def extract_aco_prod_from_netcdf(products, nc_file, meta, model_layer_re, asset_
         # TODO add units to products dictionary and use here:
         # imgout.SetUnits(products[key]['units'])
         pmeta = {mdi: p_spec[mdi] for mdi in ['acolite-key', 'description']}
-        pmeta['source_asset'] = os.path.basename(asset.filename)
         pmeta.update(meta)
         imgout.SetMeta(pmeta)
 
@@ -547,10 +530,10 @@ def extract_aco_prod_from_netcdf(products, nc_file, meta, model_layer_re, asset_
         imgout.SetGain(gain)
         imgout.SetOffset(offset)
         imgout.SetNoData(missing)
+    return prodout
 
-def process_acolite(asset, aco_proc_dir, products, meta, model_layer_re,
-                    extracted_asset_glob='', roi=None, band=None,
-                    extract=True):
+def process_acolite(asset, aco_proc_dir, products, meta, model_image,
+                    roi=None, extract=True):
     """Generate acolite products from the given asset.
 
     Args:
@@ -609,6 +592,7 @@ def process_acolite(asset, aco_proc_dir, products, meta, model_layer_re,
         verbose_out(settings_fo.read(), 4)
         verbose_out('acolite processing:  ====== end acolite.cfg ======', 4)
 
+    extracted_asset_glob = '' # TODO probably different for sentinel-2, hmm
     eag_fp = os.path.join(asset_dn, extracted_asset_glob)
     eag_rv = glob.glob(eag_fp)
     if len(eag_rv) != 1:
@@ -638,8 +622,7 @@ def process_acolite(asset, aco_proc_dir, products, meta, model_layer_re,
                 ' starting conversion from netcdf into gips products', 2)
     aco_nc_file = next(glob.iglob(os.path.join(output_dn, '*_L2W.nc')))
 
-    prodout = extract_aco_prod_from_netcdf(products, aco_nc_file, meta,
-                                           model_layer_re, asset_dn)
+    prodout =  acolite_nc_to_prods(products, aco_nc_file, meta, model_image)
     verbose_out('acolite processing:'
                 '  finishing; {} products completed'.format(len(products)), 2)
     return prodout

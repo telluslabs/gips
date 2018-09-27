@@ -1613,40 +1613,27 @@ class landsatData(Data):
 
             if groups['ACOLITE']:
                 start = datetime.now()
-                # TEMPDIR FOR PROCESSING
-                aco_proc_dir = tempfile.mkdtemp(
-                    prefix='aco_proc_',
-                    dir=os.path.join(self.Repository.path(), 'stage')
-                )
-                with utils.error_handler(
-                        'Error creating ACOLITE products {} for {}'
-                        .format(
-                            groups['ACOLITE'].keys(),
-                            basename(self.assets[asset].filename)
-                        ),
-                        continuable=True):
-                    # amd is 'meta' (common to all products) and product info dicts
-                    amd = {}
+                aco_dn = self.generate_temp_path('acolite')
+                os.mkdir(aco_dn)
+                a_obj = self.assets[asset]
+                err_msg = 'Error creating ACOLITE products {} for {}'.format(
+                    groups['ACOLITE'].keys(), os.path.basename(a_obj.filename))
+                with utils.error_handler(err_msg, continuable=True):
+                    p_spec = {}
                     for p in groups['ACOLITE']:
-                        amd[p] = {
+                        p_spec[p] = {
+                            # TODO isn't prod name generation already done?
                             'fname': os.path.join(
-                                self.path, self.basename + '_' + p + '.tif'
-                            )
-                        }
-                        amd[p].update(self._products[p])
-                        amd[p].pop('assets')
-                    prodout = gips.atmosphere.process_acolite(
-                        self.assets[asset], aco_proc_dir, amd, md.copy(),
-                        model_layer_re=r'.*_B1\.(tif|TIF)$')
+                                self.path, self.basename + '_' + p + '.tif')}
+                        p_spec[p].update(self._products[p])
+                        p_spec[p].pop('assets')
+                    prodout = gips.atmosphere.process_acolite(a_obj, aco_dn,
+                        p_spec, self.prep_meta(asset_fn, md.copy()), reflimg)
                     endtime = datetime.now()
                     for k, fn in prodout.items():
                         self.AddFile(sensor, k, fn)
-                    verbose_out(
-                        ' -> {}: processed {} in {}'
-                        .format(self.basename, prodout.keys(), endtime - start),
-                        1
-                    )
-                shutil.rmtree(aco_proc_dir)
+                    verbose_out(' -> {}: processed {} in {}'.format(
+                            self.basename, prodout.keys(), endtime - start), 1)
                 ## end ACOLITE
 
     need_fetch_kwargs = True
