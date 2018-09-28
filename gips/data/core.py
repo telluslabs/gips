@@ -44,6 +44,7 @@ import argparse
 
 # from functools import lru_cache <-- python 3.2+ can do this instead
 from backports.functools_lru_cache import lru_cache
+import requests
 
 import gippy
 from gippy.algorithms import CookieCutter
@@ -58,6 +59,46 @@ from ..inventory import dbinv, orm
 The data.core classes are the base classes that are used by individual Data modules.
 For a new dataset create children of Repository, Asset, and Data
 """
+
+class GoogleStorageMixin(object):
+    """Mix this into a class (probably Asset) to use data in google storage.
+
+    The class should set gs_bucket_name.
+    """
+    _gs_query_url_base = 'https://www.googleapis.com/storage/v1/b/{}/o'
+    _gs_object_url_base = 'http://storage.googleapis.com/{}/'
+
+    @classmethod
+    def gs_api_search(cls, prefix, delimiter='/'):
+        """Convenience wrapper for searching in google cloud storage."""
+        params = {'prefix': prefix}
+        if delimiter is not None:
+            params['delimiter'] = delimiter
+        r = requests.get(cls._gs_query_url_base.format(cls.gs_bucket_name),
+                         params=params)
+        r.raise_for_status()
+        return r.json()
+
+    @classmethod
+    def gs_object_url_base(cls):
+        """Return the google store URL for the driver's bucket."""
+        return cls._gs_object_url_base.format(cls.gs_bucket_name)
+
+    @classmethod
+    def gs_vsi_prefix(cls, streaming=True):
+        """Generate the first part of a VSI path for gdal."""
+        vsi_magic_string = '/vsicurl_streaming/' if streaming else '/vsicurl/'
+        return vsi_magic_string + cls.gs_object_url_base()
+
+    @classmethod
+    def gs_stage_asset(cls, basename, urls):
+        """Write the urls as json to the given basename in the stage."""
+        stage_dn = cls.Repository.path('stage')
+        with utils.make_temp_dir(prefix='fetch', dir=stage_dn) as tmp_dir:
+            tmp_fp = tmp_dir + '/' + basename
+            with open(tmp_fp, 'w') as tfo:
+                json.dump(urls, tfo)
+            shutil.copy(tmp_fp, stage_dn)
 
 
 class Repository(object):
@@ -111,6 +152,15 @@ class Repository(object):
         else:
             return []
 
+    @classmethod
+    def validate_setting(cls, key, value):
+        """Override this method to validate settings.
+
+        Validation, for this purpose, includes transformations,
+        such as changing types.
+        """
+        return value
+
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
@@ -125,7 +175,7 @@ class Repository(object):
         dataclass = cls.__name__[:-10] # name of a class, not the class object
         r = settings().REPOS[dataclass]
         if key in r:
-            return r[key]
+            return cls.validate_setting(key, r[key])
         if key in cls.default_settings:
             return cls.default_settings[key]
 
@@ -271,6 +321,13 @@ class Asset(object):
         # gips interpretation of the version of the asset
         # (which may differ from 'version' already used by some drivers)
         self._version = 1
+
+    def sensor_spec(self, *keys):
+        """Return one or more entries from the current asset's sensor dict.
+
+        Returns a single value if len(keys) == 1, a list otherwise."""
+        s = self._sensors[self.sensor]
+        return s[keys[0]] if len(keys) == 1 else [s[k] for k in keys]
 
     @classmethod
     def get_setting(cls, key):

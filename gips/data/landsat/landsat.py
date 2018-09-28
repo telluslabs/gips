@@ -50,6 +50,7 @@ from gips import __version__ as __gips_version__
 from gips.core import SpatialExtent, TemporalExtent
 from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
 from gips.data.core import Repository, Asset, Data
+import gips.data.core
 from gips.atmosphere import SIXS, MODTRAN
 import gips.atmosphere
 from gips.inventory import DataInventory
@@ -97,53 +98,12 @@ class landsatRepository(Repository):
         tile = super(landsatRepository, cls).feature2tile(feature)
         return tile.zfill(6)
 
-_c1_sources = ('s3', 'usgs', 'gs')
-_c1_correction_levels = ('L1TP', 'L1GT', 'L1GS') # in desc order of preference
-_c1_tiers = ('T1', 'T2', 'RT')
 
-_c1gs_query_url = ('https://www.googleapis.com/storage/v1/b/'
-                   'gcp-public-data-landsat/o')
-_c1gs_object_url = 'http://storage.googleapis.com/gcp-public-data-landsat/'
-
-def _gs_api_search(prefix, delimiter='/'):
-    """Convenience wrapper for searching in google cloud storage."""
-    r = requests.get(_c1gs_query_url,
-                 params=dict(delimiter=delimiter, prefix=prefix))
-    r.raise_for_status()
-    return r.json()
-
-def _gs_prefix_search(tile, acq_date):
-    """Locates the best prefix for the given arguments.
-
-    Docs:  https://cloud.google.com/storage/docs/json_api/v1/objects/list
-    """
-    # we identify a sensor as eg 'LC8' but in the filename it's 'LC08';
-    # prefer the latest sensor that has data for the scene
-    sensors = reversed([s for s in landsatAsset._assets['C1GS']['sensors']])
-    ads = acq_date.strftime('%Y%m%d')
-    path, row = path_row(tile)
-
-    # sample full key (highly redundant, unfortunately):
-    # we're searching up to here ---------------v
-    # ('LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/
-    #                       'LC08_L1GT_044034_20130330_20170310_01_T2_MTL.txt')
-    p_template = '{{}}/01/{}/{}/{{}}_{{}}_{}_{}_'.format(path, row, tile, ads)
-
-    # more indentation = better engineering
-    for s in sensors:
-        c = landsatAsset._sensors[s]['code']
-        for cl in _c1_correction_levels:
-            search_prefix = p_template.format(c, c, cl)
-            full_prefixes = _gs_api_search(search_prefix).get('prefixes', [])
-            for t in _c1_tiers:
-                for p in full_prefixes:
-                    if p.endswith(t + '/'):
-                        return s, p
-    return None, None
-
-class landsatAsset(Asset):
+class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
     """ Landsat asset (original raw tar file) """
     Repository = landsatRepository
+
+    gs_bucket_name = 'gcp-public-data-landsat'
 
     # tassled cap coefficients for L5 and L7
     _tcapcoef = [
@@ -393,7 +353,7 @@ class landsatAsset(Asset):
                 if query_results is None:
                     raise IOError('Could not locate metadata for'
                                   ' ({}, {})'.format(self.tile, self.date))
-                url = _c1gs_object_url + query_results['keys']['mtl']
+                url = cls.gs_object_url_base() + query_results['keys']['mtl']
                 utils.verbose_out('requesting ' + url, 4)
                 text = requests.get(url).text
         elif os.path.exists(self.filename):
@@ -581,18 +541,47 @@ class landsatAsset(Asset):
                 'qa_tif': qa_tif, 'mtl_txt': mtl_txt}
 
     @classmethod
+    def gs_prefix_search(cls, tile, acq_date):
+        """Locates the best prefix for the given arguments.
+
+        Docs:  https://cloud.google.com/storage/docs/json_api/v1/objects/list
+        """
+        # we identify a sensor as eg 'LC8' but in the filename it's 'LC08';
+        # prefer the latest sensor that has data for the scene
+        sensors = reversed([s for s in cls._assets['C1GS']['sensors']])
+        ads = acq_date.strftime('%Y%m%d')
+        path, row = path_row(tile)
+
+        # sample full key (highly redundant, unfortunately):
+        # we're searching up to here ---------------v
+        # ('LC08/01/044/034/LC08_L1GT_044034_20130330_20170310_01_T2/
+        #                       'LC08_L1GT_044034_20130330_20170310_01_T2_MTL.txt')
+        p_template = '{{}}/01/{}/{}/{{}}_{{}}_{}_{}_'.format(path, row, tile, ads)
+
+        for s in sensors:
+            c = cls._sensors[s]['code']
+            # find best correction level in desc order of preference
+            for cl in ('L1TP', 'L1GT', 'L1GS'):
+                search_prefix = p_template.format(c, c, cl)
+                full_prefixes = cls.gs_api_search(search_prefix).get('prefixes', [])
+                for t in ('T1', 'T2', 'RT'):  # get best C1 tier available
+                    for p in full_prefixes:
+                        if p.endswith(t + '/'):
+                            return s, p
+        return None, None
+
+    @classmethod
     def query_gs(cls, tile, date, pclouds=100):
         """Query for assets in google cloud storage.
 
         Returns {'basename': '...', 'urls': [...]}, else None.
         """
-        sensor, prefix = _gs_prefix_search(tile, date)
+        sensor, prefix = cls.gs_prefix_search(tile, date)
         if prefix is None:
             return None
-        raw_keys = [i['name'] for i in _gs_api_search(prefix)['items']]
+        raw_keys = [i['name'] for i in cls.gs_api_search(prefix)['items']]
 
         # sort and organize the URLs, and check for missing ones
-        # TODO need to test 7 & 5
         keys = {'spectral-bands': []}
         missing_suffixes = []
         band_suffixes = ['B{}.TIF'.format(b)
@@ -613,12 +602,12 @@ class landsatAsset(Asset):
         if missing_suffixes:
             err_msg = ("Found GS asset wasn't complete for (C1GS, {}, {});"
                        " missing files with these suffixes: {}")
-            verbose_out(err_msg.format(tile, date, missing_suffixes), 4)
+            verbose_out(err_msg.format(tile, date, missing_suffixes), 2)
             return None
 
         # handle pclouds
         if pclouds < 100:
-            r = requests.get(_c1gs_object_url + keys['mtl'])
+            r = requests.get(cls.gs_object_url_base() + keys['mtl'])
             r.raise_for_status()
             cc = cls.cloud_cover_from_mtl_text(r.text)
             if cc > pclouds:
@@ -690,9 +679,11 @@ class landsatAsset(Asset):
                     asset), 6)
             return None
         data_src = cls.get_setting('source')
-        if data_src not in _c1_sources:
+
+        c1_sources = ('s3', 'usgs', 'gs')
+        if data_src not in c1_sources:
             raise ValueError("Invalid data source '{}'; valid sources:"
-                             " {}".format(data_src, _c1_sources))
+                             " {}".format(data_src, c1_sources))
         # perform the query, but on a_type-source mismatch, do nothing
         return {
             ('C1', 'usgs'): cls.query_c1,
@@ -756,6 +747,7 @@ class landsatAsset(Asset):
             'mtl': cls._s3_url + mtl_txt,
         }
 
+        # TODO refactor:  cls.gs_stage_asset(basename, asset_content)
         with utils.make_temp_dir(prefix='fetch',
                                  dir=cls.Repository.path('stage')) as tmp_dir:
             tmp_fp = tmp_dir + '/' + basename
@@ -768,22 +760,15 @@ class landsatAsset(Asset):
         """Assembles C1 assets that link into Google Cloud Storage.
 
         Constructs a json file containing /vsicurl_streaming/ paths,
-        similarly to S3 assets."""
-        # first add the vsi prefix to everything
-        vsi_prefix = '/vsicurl_streaming/' + _c1gs_object_url
-        urls = {
-            'mtl':     _c1gs_object_url + keys['mtl'],
-            'qa-band': vsi_prefix + keys['qa-band'],
-            'spectral-bands': [vsi_prefix + u for u in keys['spectral-bands']],
-        }
+        similarly to S3 assets.
+        """
+        cls.gs_stage_asset(basename, {
+            'mtl':     cls.gs_object_url_base() + keys['mtl'],
+            'qa-band': cls.gs_vsi_prefix() + keys['qa-band'],
+            'spectral-bands': [cls.gs_vsi_prefix() + u
+                               for u in keys['spectral-bands']],
+        })
 
-        # TODO refactor - same code in query_s3
-        stage_dn = cls.Repository.path('stage')
-        with utils.make_temp_dir(prefix='fetch', dir=stage_dn) as tmp_dir:
-            tmp_fp = tmp_dir + '/' + basename
-            with open(tmp_fp, 'w') as tfo:
-                json.dump(urls, tfo)
-            shutil.copy(tmp_fp, stage_dn)
 
 def unitless_bands(*bands):
     return [{'name': b, 'units': Data._unitless} for b in bands]
@@ -2125,7 +2110,7 @@ class landsatData(Data):
                 if query_results is None:
                     raise IOError('Could not locate metadata for'
                                   ' ({}, {})'.format(self.tile, self.date))
-                url = _c1gs_object_url + query_results['keys']['mtl']
+                url = cls.gs_object_url_base() + query_results['keys']['mtl']
                 utils.verbose_out('requesting ' + url, 4)
                 text = requests.get(url).text
         else:
