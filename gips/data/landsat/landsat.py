@@ -458,6 +458,9 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
         and a list of S3 keys.  Returns None if no asset found for the
         given scene.  Filters by the given cloud percentage.
         """
+
+        import boto3
+
         # for finding assets matching the tile
         key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
         # match something like:  'LC08_L1TP_013030_20170402_20170414_01_T1'
@@ -472,15 +475,22 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
                 set(['AWS_SECRET_ACCESS_KEY', 'AWS_ACCESS_KEY_ID'])
                 - set(os.environ.keys()))
         if len(missing_auth_vars) > 0:
-            raise EnvironmentError("Missing AWS S3 auth credentials:"
-                                   "  {}".format(missing_auth_vars))
+            # Set environment variables by loading them from ~/.aws/credentials
+            session = boto3.Session()
+            credentials = session.get_credentials().get_frozen_credentials()
+            if credentials is None:
+                # TODO: If still missing, raise
+                raise EnvironmentError("Missing AWS S3 auth credentials:"
+                                       "  {}".format(missing_auth_vars))
+
+            os.environ['AWS_ACCESS_KEY_ID'] = credentials.access_key
+            os.environ['AWS_SECRET_ACCESS_KEY'] = credentials.secret_key
 
         # on repeated searches, chances are we have a cache we can use
         expected_prefix, keys = cls._query_s3_cache
         if expected_prefix != key_prefix:
             verbose_out("New prefix detected; refreshing S3 query cache.", 5)
             # find the layer and metadata files matching the current scene
-            import boto3 # import here so it only breaks if it's actually needed
             s3 = boto3.resource('s3')
             bucket = s3.Bucket(cls._s3_bucket_name)
             keys = [o.key for o in bucket.objects.filter(Prefix=key_prefix)]
