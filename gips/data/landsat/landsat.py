@@ -1889,15 +1889,15 @@ class landsatData(Data):
         tiles = inventory[date_found].tiles.keys()
 
         for tile in tiles:
-            asset = inventory[date_found][tile].assets['L1C']
-            if asset.tile[:2] != self.utm_zone():
+            s2ao = inventory[date_found][tile].current_asset()
+            if s2ao.tile[:2] != self.utm_zone():
                 continue
             band_8 = [
-                f for f in asset.datafiles()
+                f for f in s2ao.datafiles()
                 if f.endswith('B08.jp2') and tile in basename(f)
             ][0]
-            geo_images.append('/vsizip/' + os.path.join(asset.filename, band_8))
-            s2_footprint = s2_footprint.union(wkt_loads(asset.footprint()))
+            geo_images.append('/vsizip/' + os.path.join(s2ao.filename, band_8))
+            s2_footprint = s2_footprint.union(wkt_loads(s2ao.footprint()))
 
         if len(geo_images) == 0:
             verbose_out("No S2 assets found in UTM zone {}".format(self.utm_zone()), 3)
@@ -1929,7 +1929,7 @@ class landsatData(Data):
         # until one is found.
         delta = timedelta(1)
 
-        if self.date < sentinel2Asset._assets['L1C']['startdate']:
+        if self.date < sentinel2Asset._start_date:
             date_found = starting_date = date(2017, self.date.month, self.date.day)
         else:
             date_found = starting_date = self.date

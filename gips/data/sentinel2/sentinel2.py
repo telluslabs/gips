@@ -159,25 +159,24 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
     _asset_fn_pat_base = '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*'
 
+    # TODO find real start date for S2 data:
+    # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
+    # (change to orderby=ingestiondate%20desc if needed)
+    _start_date = datetime.date(2015, 1, 1)
+
     _assets = {
         'L1C': {
             'source': 'esa',
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both original and shortened post-2016-12-07 assets.
             'pattern': _asset_fn_pat_base + '\.zip$',
-            # TODO find real start date for S2 data:
-            # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
-            # (change to orderby=ingestiondate%20desc if needed)
-            'startdate': datetime.date(2015, 1, 1), # used to prevent
-            # impossible searches
-            # TODO: (may need to change -- nigeria work shows no
-            # imagery before August 2015)
+            'startdate': _start_date,
             'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
                           # only needed by Asset.end_date and Asset.available, but those are never called?
         },
         'L1CGS': {
             'source': 'gs',
-            'startdate': datetime.date(2015, 1, 1),
+            'startdate': _start_date,
             'latency': 3,
             'pattern': _asset_fn_pat_base + '_gs\.json$',
         }
