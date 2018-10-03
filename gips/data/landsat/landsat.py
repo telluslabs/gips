@@ -1892,10 +1892,8 @@ class landsatData(Data):
             s2ao = inventory[date_found][tile].current_asset()
             if s2ao.tile[:2] != self.utm_zone():
                 continue
-            band_8 = [
-                f for f in s2ao.datafiles()
-                if f.endswith('B08.jp2') and tile in basename(f)
-            ][0]
+            band_8 = next(f for f in s2ao.datafiles()
+                if f.endswith('B08.jp2') and tile in basename(f))
             geo_images.append('/vsizip/' + os.path.join(s2ao.filename, band_8))
             s2_footprint = s2_footprint.union(wkt_loads(s2ao.footprint()))
 
