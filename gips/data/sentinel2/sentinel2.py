@@ -380,7 +380,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         style_regexes = cls.get_style_regexes(style, tile, compile=True)
         band_regex = style_regexes['raster-re']
         md_regexes = {'datastrip-md': style_regexes['datastrip-md-re'],
-                      'tile-md':      style_regexes['tile-md-re']}
+                      'tile-md':      style_regexes['tile-md-re'],
+                      'asset-md':     style_regexes['asset-md-re']}
         # for sanity checking later
         expected_key_set = set(md_regexes.keys() + ['spectral-bands'])
         expected_band_cnt = len(cls._sensors['S2A']['band-strings'])
@@ -813,15 +814,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         return self._atmo_corrector
 
     def footprint(self):
-        asset_contents = self.datafiles()
-
-        mtd_file_pattern = self._asset_styles[self.style]['asset-md-re']
-        metadata_fn = next(n for n in asset_contents if re.match(mtd_file_pattern, n))
-
-        metadata_zf = next(iter(self.extract([metadata_fn])))
-        tree = ElementTree.parse(metadata_zf)
-        sag_elem = next(tree.iter('Global_Footprint')) #      should only be one
-        values_tags = sag_elem.find('EXT_POS_LIST')
+        gf_elem = self.xml_subtree('asset', 'Global_Footprint')
+        values_tags = gf_elem.find('EXT_POS_LIST')
 
         # format as valid WKT
         points = values_tags.text.strip().split(" ")
