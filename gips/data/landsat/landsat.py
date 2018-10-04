@@ -1620,8 +1620,7 @@ class landsatData(Data):
                     groups['ACOLITE'].keys(), os.path.basename(a_obj.filename))
                 with utils.error_handler(err_msg, continuable=True):
                     # TODO use self.temp_product_filename(sensor, prod_type):
-                    # then copy to self.path using METHODS MOTHERFUCKER
-                    #            vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+                    # then copy to self.path using methods
                     p_spec = {p: os.path.join(self.path, self.basename + '_' + p + '.tif')
                               for p in groups['ACOLITE']}
                     prodout = gips.atmosphere.process_acolite(a_obj, aco_dn,

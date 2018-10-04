@@ -396,17 +396,16 @@ class MODTRAN():
     """
 
 _aco_prod_templs = {
-    'rhow': {
+    'rhow': { # product passed in eg process_acolite(products={'rhow':...}...)
         'description': 'Water-Leaving Radiance-Reflectance',
-        'acolite-product': 'rhow_vnir',
-        'acolite-key': 'RHOW',
+        'acolite-product': 'rhow_*', #'rhow_vnir', # passed to acolite in l2w_parameters
+        'acolite-key': 'rhow', # needed to extract from output netcdf
         'gain': 0.0001,
         'offset': 0.,
         'dtype': 'int16',
         'toa': True,
         'bands': [{'name': bn, 'units': Data._unitless} for bn in (
-                    '444nm', '497nm', '560nm', '664nm', '704nm',
-                    '740nm', '782nm', '835nm', '865nm', '1614nm', '2202nm')]
+            '443nm', '483nm', '561nm', '655nm', '865nm', '1609nm', '2201nm')]
     },
     # Not sure what the issue is with this product, but it doesn't seem to
     # work as expected (multiband vis+nir product)
@@ -419,8 +418,8 @@ _aco_prod_templs = {
     # },
     'oc2chl': {
         'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 483 & 561',
-        'acolite-product': 'CHL_OC2',
-        'acolite-key': 'CHL_OC2',
+        'acolite-product': 'chl_oc2',
+        'acolite-key': 'chl_oc2',
         'gain': 0.0125,
         'offset': 250.,
         'dtype': 'int16',
@@ -429,8 +428,8 @@ _aco_prod_templs = {
     },
     'oc3chl': {
         'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561',
-        'acolite-product': 'CHL_OC3',
-        'acolite-key': 'CHL_OC3',
+        'acolite-product': 'chl_oc3',
+        'acolite-key': 'chl_oc3',
         'gain': 0.0125,
         'offset': 250.,
         'dtype': 'int16',
@@ -439,7 +438,7 @@ _aco_prod_templs = {
     },
     'fai': {
         'description': 'Floating Algae Index',
-        'acolite-product': 'FAI',
+        'acolite-product': 'fai',
         'acolite-key': 'fai',
         'dtype': 'float32',
         'toa': True,
@@ -447,16 +446,16 @@ _aco_prod_templs = {
     },
     'acoflags': {
         'description': '0 = water 1 = no data 2 = land',
-        'acolite-product': 'FLAGS',
-        'acolite-key': 'FLAGS',
+        # never used:  'acolite-product': '',
+        'acolite-key': 'l2_flags',
         'dtype': 'uint8',
         'toa': True,
         'bands': [{'name': 'acoflags', 'units': Data._unitless}],
     },
     'spm655': {
         'description': 'Suspended Sediment Concentration 655nm',
-        'acolite-product': 'SPM_NECHAD_655',
-        'acolite-key': 'SPM_NECHAD_655',
+        'acolite-product': 'spm_nechad_655',
+        'acolite-key': 'spm_nechad_655',
         'offset': 50.,
         'gain': 0.005,
         'dtype': 'int16',
@@ -465,8 +464,8 @@ _aco_prod_templs = {
     },
     'turbidity': {
         'description': 'Blended Turbidity',
-        'acolite-product': 'T_DOGLIOTTI',
-        'acolite-key': 'T_DOGLIOTTI',
+        'acolite-product': 't_dogliotti',
+        'acolite-key': 't_dogliotti',
         'offset': 50.,
         'gain': 0.005,
         'dtype': 'int16',
@@ -503,6 +502,9 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
             p_type, p_fp), 2)
         bands = [b for b in dsroot.variables.keys()
                  if str(b).startswith(p_spec['acolite-key'])]
+        if len(bands) == 0:
+            raise ValueError("Found no band for '{}' in {}".format(
+                             p_spec['acolite-key'], dsroot.variables.keys()))
         npdtype = p_spec['dtype']
         dtype, missing = _aco_img_params[npdtype]
         gain = p_spec.get('gain', 1.0)
@@ -580,6 +582,8 @@ def process_acolite(asset, aco_proc_dir, products, meta, model_image,
     #with open(template_path, 'r') as aco_template, \
     #        open(settings_path, 'w') as settings_fo:
     with open(settings_path, 'w') as settings_fo:
+        print('l2w_mask=True\nl2w_mask_wave=1609\nl2w_mask_threshold=0.05',
+              file=settings_fo)
         # xy_output=True may want this; writes easting & northing to netcdfs
         for s in ('l2w_parameters=' + ','.join(prod_args),
                   'output=' + output_dn):
