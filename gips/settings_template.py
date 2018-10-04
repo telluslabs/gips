@@ -82,6 +82,12 @@ REPOS = {
         'password': ESA_PASS,
         'extract': False,  # extract files from tar.gz before processing instead of direct access
     },
+    'smap': {
+        'repository': '$TLD/smap',
+        # sign up for access to data source here:  https://scihub.copernicus.eu/dhus/#/self-registration
+        'username': ESA_USER,
+        'password': ESA_PASS
+    },
     # these drivers tend to more specialized and experimental so turned off by default
     'cdl': {
         'repository': '$TLD/cdl',
