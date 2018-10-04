@@ -37,7 +37,7 @@ class smapRepository(Repository):
 
 class smapAsset(Asset):
     Repository = smapRepository
-    _sensors = {_smap: {'description': 'Soil Moisture Active Passive Radiometer'}}
+    _sensors = {'SMAP': {'description': 'Soil Moisture Active Passive Radiometer'}}
     _assets = {
         'SM_P_E': {
             'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.002/',
