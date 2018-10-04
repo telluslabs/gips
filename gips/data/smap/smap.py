@@ -37,7 +37,7 @@ class smapRepository(Repository):
 
 class smapAsset(Asset):
     Repository = smapRepository
-    _sensors = {'SMAP': {'description': 'Soil Moisture Active Passive Radiometer'}}
+    _sensors = {'RAD': {'description': 'Soil Moisture Active Passive Radiometer'}}
     _assets = {
         'SM_P_E': {
             'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.002/',
@@ -98,7 +98,6 @@ class smapAsset(Asset):
         return None, None
 
     @classmethod
-    @lru_cache(maxsize=100)  # cache size chosen arbitrarily
     def query_service(cls, asset, date):
         """Query the data provider for files matching the arguments.
 
