@@ -1619,14 +1619,11 @@ class landsatData(Data):
                 err_msg = 'Error creating ACOLITE products {} for {}'.format(
                     groups['ACOLITE'].keys(), os.path.basename(a_obj.filename))
                 with utils.error_handler(err_msg, continuable=True):
-                    p_spec = {}
-                    for p in groups['ACOLITE']:
-                        p_spec[p] = {
-                            # TODO isn't prod name generation already done?
-                            'fname': os.path.join(
-                                self.path, self.basename + '_' + p + '.tif')}
-                        p_spec[p].update(self._products[p])
-                        p_spec[p].pop('assets')
+                    # TODO use self.temp_product_filename(sensor, prod_type):
+                    # then copy to self.path using METHODS MOTHERFUCKER
+                    #            vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+                    p_spec = {p: os.path.join(self.path, self.basename + '_' + p + '.tif')
+                              for p in groups['ACOLITE']}
                     prodout = gips.atmosphere.process_acolite(a_obj, aco_dn,
                         p_spec, self.prep_meta(asset_fn, md.copy()), reflimg)
                     endtime = datetime.now()
