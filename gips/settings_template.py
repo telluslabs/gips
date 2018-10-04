@@ -84,9 +84,8 @@ REPOS = {
     },
     'smap': {
         'repository': '$TLD/smap',
-        # sign up for access to data source here:  https://scihub.copernicus.eu/dhus/#/self-registration
-        'username': ESA_USER,
-        'password': ESA_PASS
+        'username': EARTHDATA_USER,
+        'password': EARTHDATA_PASS,
     },
     # these drivers tend to more specialized and experimental so turned off by default
     'cdl': {
