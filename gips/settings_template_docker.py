@@ -83,6 +83,11 @@ REPOS = {
         'password': ESA_PASS,
         'extract': False,  # extract files from tar.gz before processing instead of direct access
     },
+    'smap': {
+        'repository': prepend('smap'),
+        'username': EARTHDATA_USER,
+        'password': EARTHDATA_PASS,
+    },
     'cdl': {
         'repository': prepend('cdl'),
     },
