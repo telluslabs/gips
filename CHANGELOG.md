@@ -1,24 +1,3 @@
-################################################################################
-#    GIPS: Geospatial Image Processing System
-#
-#    AUTHOR: Matthew Hanson
-#    EMAIL:  matt.a.hanson@gmail.com
-#
-#    Copyright (C) 2014 Applied Geosolutions
-#
-#    This program is free software; you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
-#    (at your option) any later version.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
-#
-#   You should have received a copy of the GNU General Public License
-#   along with this program. If not, see <http://www.gnu.org/licenses/>
-################################################################################
 # Changelog
 All notable changes to this project will be documented in this file.
 
@@ -31,7 +10,9 @@ and this project adheres to
 - added DOI badge to README.md
 
 ### Changed
-- migrated CHANGES.txt to CHANGELOG.md 
+- migrated CHANGES.txt to CHANGELOG.md
+- squelched out https `InsecureRequestWarning`s for CDL, and added
+  `urllib3[secure]` to stop same warning in Sentinel-2
 
 ### Fixed
 - Various items in Sentinel-2's ACOLITE processing:

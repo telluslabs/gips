@@ -318,7 +318,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             search_url = url_head + url_search_string.format(year, month, day, tile) + url_tail
 
         auth = HTTPBasicAuth(username, password)
-        r = requests.get(search_url, auth=auth, verify=False)
+        r = requests.get(search_url, auth=auth)
         r.raise_for_status()
         return r.json()
 
