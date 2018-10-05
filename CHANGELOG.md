@@ -8,6 +8,8 @@ and this project adheres to
 ## [Unreleased]
 ### Added
 - added DOI badge to README.md
+- preliminary SRTM driver
+- initial version of google cloud based assets
 
 ### Changed
 - migrated CHANGES.txt to CHANGELOG.md
@@ -15,6 +17,7 @@ and this project adheres to
   `urllib3[secure]` to stop same warning in Sentinel-2
 
 ### Fixed
+- Landsat coregistration #572
 - Various items in Sentinel-2's ACOLITE processing:
     - Fix #506 by always keying off band 1 for resolution.
     - Fix #548/#437, wastefully processing entire datastrips, by using acolite's
