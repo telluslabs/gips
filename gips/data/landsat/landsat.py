@@ -1884,28 +1884,28 @@ class landsatData(Data):
             verbose_out("No S2 assets found on {}".format(date_found), 3)
             return None
 
-        geo_images = []
+        raster_vsi_paths = []
         s2_footprint = Polygon()
         tiles = inventory[date_found].tiles.keys()
 
         for tile in tiles:
-            asset = inventory[date_found][tile].assets['L1C']
-            if asset.tile[:2] != self.utm_zone():
+            s2ao = inventory[date_found][tile].current_asset()
+            if s2ao.tile[:2] != self.utm_zone():
                 continue
-            band_8 = [
-                f for f in asset.datafiles()
-                if f.endswith('B08.jp2') and tile in basename(f)
-            ][0]
-            geo_images.append('/vsizip/' + os.path.join(asset.filename, band_8))
-            s2_footprint = s2_footprint.union(wkt_loads(asset.footprint()))
+            band_8 = next(f for f in s2ao.datafiles()
+                if f.endswith('B08.jp2') and tile in basename(f))
+            vsi_str = (band_8 if s2ao.asset == 'L1CGS' else
+                       '/vsizip/' + os.path.join(s2ao.filename, band_8))
+            raster_vsi_paths.append(vsi_str)
+            s2_footprint = s2_footprint.union(wkt_loads(s2ao.footprint()))
 
-        if len(geo_images) == 0:
+        if len(raster_vsi_paths) == 0:
             verbose_out("No S2 assets found in UTM zone {}".format(self.utm_zone()), 3)
             return None
 
         percent_cover = (s2_footprint.intersection(landsat_footprint).area) / landsat_footprint.area
         if percent_cover > .2:
-            return geo_images
+            return raster_vsi_paths
 
         verbose_out("S2 assets do not cover enough of Landsat data.", 3)
         return None
@@ -1929,7 +1929,7 @@ class landsatData(Data):
         # until one is found.
         delta = timedelta(1)
 
-        if self.date < sentinel2Asset._assets['L1C']['startdate']:
+        if self.date < sentinel2Asset._start_date:
             date_found = starting_date = date(2017, self.date.month, self.date.day)
         else:
             date_found = starting_date = self.date
