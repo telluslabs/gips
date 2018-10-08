@@ -75,7 +75,7 @@ class smapAsset(Asset):
 
         mainurl = "%s/%s" % (cls._assets[asset]['url'], str(date.strftime('%Y.%m.%d')))
 
-        pattern = r'^SMAP\_.{2}\_%s\_%s\_.{6}\_.{3}\.h5$' % (asset, str(date.strftime('%Y%m%d')))
+        pattern = '^SMAP\_.{2}\_%s\_%s\_.{6}\_.{3}\.h5$' % (asset, str(date.strftime('%Y%m%d')))
         cpattern = re.compile(pattern)
         err_msg = "Error downloading: " + mainurl
         with utils.error_handler(err_msg):
