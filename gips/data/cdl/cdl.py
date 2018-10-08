@@ -34,6 +34,7 @@ from zipfile import ZipFile
 from backports.functools_lru_cache import lru_cache
 from dbfread import DBF
 import requests
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 import gips
 from gips.data.core import Repository, Asset, Data
@@ -43,6 +44,8 @@ from gippy import GeoImage, GeoImages
 from osgeo import gdal
 
 import imghdr
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # make the compiler spell-check the one sensor, product, and asset type in the driver
 _cdl = 'cdl'
@@ -112,7 +115,6 @@ class cdlAsset(Asset):
     def fetch(cls, asset, tile, date):
         # The nassgeodata site is known to have an invalid certificate.
         # We don't want to clutter up the output with SSL warnings.
-        import urllib3; urllib3.disable_warnings()
 
         if asset == _cdlmkii:
             verbose_out("Fetching not supported for cdlmkii", 2)
@@ -136,7 +138,7 @@ class cdlAsset(Asset):
             imgout = None
             shutil.copy(tmp_fname, cls.Repository.path('stage'))
 
-    
+
 class cdlData(Data):
     """ A tile (CONUS State) of CDL """
     name = 'CDL'

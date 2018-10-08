@@ -32,6 +32,7 @@ from itertools import groupby
 from shapely.wkt import loads
 import tarfile
 import zipfile
+import json
 import traceback
 import ftplib
 import shutil
@@ -43,6 +44,7 @@ import argparse
 
 # from functools import lru_cache <-- python 3.2+ can do this instead
 from backports.functools_lru_cache import lru_cache
+import requests
 
 import gippy
 from gippy.algorithms import CookieCutter
@@ -57,6 +59,46 @@ from ..inventory import dbinv, orm
 The data.core classes are the base classes that are used by individual Data modules.
 For a new dataset create children of Repository, Asset, and Data
 """
+
+class GoogleStorageMixin(object):
+    """Mix this into a class (probably Asset) to use data in google storage.
+
+    The class should set gs_bucket_name.
+    """
+    _gs_query_url_base = 'https://www.googleapis.com/storage/v1/b/{}/o'
+    _gs_object_url_base = 'http://storage.googleapis.com/{}/'
+
+    @classmethod
+    def gs_api_search(cls, prefix, delimiter='/'):
+        """Convenience wrapper for searching in google cloud storage."""
+        params = {'prefix': prefix}
+        if delimiter is not None:
+            params['delimiter'] = delimiter
+        r = requests.get(cls._gs_query_url_base.format(cls.gs_bucket_name),
+                         params=params)
+        r.raise_for_status()
+        return r.json()
+
+    @classmethod
+    def gs_object_url_base(cls):
+        """Return the google store URL for the driver's bucket."""
+        return cls._gs_object_url_base.format(cls.gs_bucket_name)
+
+    @classmethod
+    def gs_vsi_prefix(cls, streaming=True):
+        """Generate the first part of a VSI path for gdal."""
+        vsi_magic_string = '/vsicurl_streaming/' if streaming else '/vsicurl/'
+        return vsi_magic_string + cls.gs_object_url_base()
+
+    @classmethod
+    def gs_stage_asset(cls, basename, urls):
+        """Write the urls as json to the given basename in the stage."""
+        stage_dn = cls.Repository.path('stage')
+        with utils.make_temp_dir(prefix='fetch', dir=stage_dn) as tmp_dir:
+            tmp_fp = tmp_dir + '/' + basename
+            with open(tmp_fp, 'w') as tfo:
+                json.dump(urls, tfo)
+            shutil.copy(tmp_fp, stage_dn)
 
 
 class Repository(object):
@@ -110,6 +152,15 @@ class Repository(object):
         else:
             return []
 
+    @classmethod
+    def validate_setting(cls, key, value):
+        """Override this method to validate settings.
+
+        Validation, for this purpose, includes transformations,
+        such as changing types.
+        """
+        return value
+
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
@@ -124,7 +175,7 @@ class Repository(object):
         dataclass = cls.__name__[:-10] # name of a class, not the class object
         r = settings().REPOS[dataclass]
         if key in r:
-            return r[key]
+            return cls.validate_setting(key, r[key])
         if key in cls.default_settings:
             return cls.default_settings[key]
 
@@ -271,6 +322,18 @@ class Asset(object):
         # (which may differ from 'version' already used by some drivers)
         self._version = 1
 
+    def sensor_spec(self, *keys):
+        """Return one or more entries from the current asset's sensor dict.
+
+        Returns a single value if len(keys) == 1, a list otherwise."""
+        s = self._sensors[self.sensor]
+        return s[keys[0]] if len(keys) == 1 else [s[k] for k in keys]
+
+    @classmethod
+    def get_setting(cls, key):
+        """Convenience method to acces Repository's get_setting."""
+        return cls.Repository.get_setting(key)
+
     def updated(self, newasset):
         '''
         Return:
@@ -309,10 +372,11 @@ class Asset(object):
         except:
             tile_num = self.tile
 
-        v = gippy.GeoVector(self.Repository.get_setting("tiles"))
+        v = gippy.GeoVector(self.get_setting("tiles"))
         v.SetPrimaryKey(self.Repository._tile_attribute)
-        feat = v[tile_num]
-
+        # If a GeoVector is indexed with an int, it queries using
+        # FID field.
+        feat = v[str(tile_num)]
         return feat.WKT()
 
     ##########################################################################
@@ -335,7 +399,10 @@ class Asset(object):
         """Get list of readable datafiles from asset.
 
         A 'datafile' in this context is a file contained within the
-        asset file, such as for tar, zip, and hdf files."""
+        asset file, such as for tar, zip, and hdf files.
+
+        In the case of JSON files, the files pointed to are considered 'within'
+        the JSON asset."""
         path = os.path.dirname(self.filename)
         indexfile = os.path.join(path, self.filename + '.index')
         if os.path.exists(indexfile):
@@ -344,22 +411,29 @@ class Asset(object):
                 return datafiles
         with utils.error_handler('Problem accessing asset(s) in ' + self.filename):
             if tarfile.is_tarfile(self.filename):
-                tfile = tarfile.open(self.filename)
-                tfile = tarfile.open(self.filename)
-                datafiles = tfile.getnames()
+                datafiles = tarfile.open(self.filename).getnames()
             elif zipfile.is_zipfile(self.filename):
-                zfile = zipfile.ZipFile(self.filename)
-                datafiles = zfile.namelist()
-            else:
-                # Try subdatasets
+                datafiles = zipfile.ZipFile(self.filename).namelist()
+            elif self.filename.endswith('json'):
+                # take strings at the top level, or in lists at the top level
+                # TODO this is brittle; drivers implementing json assets
+                # should override this method to handle their specific needs
+                with open(self.filename) as fp:
+                    content = json.load(fp)
+                raw_df = []
+                for v in content.values():
+                    raw_df += v if type(v) is list else [v]
+                datafiles = tuple(v.encode('ascii', 'ignore')
+                                  for v in raw_df if isinstance(v, basestring))
+            else: # Try subdatasets
                 fh = gdal.Open(self.filename)
-                sds = fh.GetSubDatasets()
-                datafiles = [s[0] for s in sds]
+                datafiles = [s[0] for s in fh.GetSubDatasets()]
+
+            # if we found files, record them to save work later:
             if len(datafiles) > 0:
                 List2File(datafiles, indexfile)
                 return datafiles
-            else:
-                return [self.filename]
+            return [self.filename]
 
 
     def extract(self, filenames=tuple(), path=None):
@@ -397,11 +471,15 @@ class Asset(object):
                 if not os.path.isdir(tmp_fname):
                     os.chmod(tmp_fname, 0664)
                 extracted_fnames.append((tmp_fname, final_fname))
-            utils.verbose_out(
-                "Moving files from {} to {}".format(tmp_dn, path), 3)
+            if extracted_fnames:
+                utils.verbose_out("Moving files from {} to {}".format(tmp_dn, path), 3)
+            else:
+                utils.verbose_out("No files to extract or move", 3)
             for (tfn, ffn) in extracted_fnames:
-                utils.mkdir(os.path.dirname(ffn))
-                os.rename(tfn, ffn)
+                # tfn's parent dir may be earlier in the list
+                if not os.path.exists(ffn):
+                    utils.mkdir(os.path.dirname(ffn))
+                    os.rename(tfn, ffn)
 
         return extant_fnames + [ffn for (_, ffn) in extracted_fnames]
 
@@ -762,6 +840,11 @@ class Data(object):
     _pattern = '*.tif'
     _products = {}
     _productgroups = {}
+
+    @classmethod
+    def get_setting(cls, key):
+        """Convenience method to acces Repository's get_setting."""
+        return cls.Asset.Repository.get_setting(key)
 
     def needed_products(self, products, overwrite):
         """ Make sure all products exist and return those that need processing """
