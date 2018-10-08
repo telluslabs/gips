@@ -69,7 +69,7 @@ class smapAsset(Asset):
     def query_provider(cls, asset, date):
         """Find out from the SMAP servers what assets are available.
 
-        Uses the given (asset, date) tuple as a search key, and
+        Uses the given (asset, date) tuple as a search key, andcat
         returns a tuple:  base-filename, url
         """
         year, month, day = date.timetuple()[:3]
@@ -129,3 +129,28 @@ class smapAsset(Asset):
             utils.verbose_out('Retrieved ' + basename, 2)
             return [outpath]
         return []
+
+class smapData(Data):
+    """ A tile of data (all assets and products) """
+    name = 'SMAP'
+    version = '1.0.0'
+    Asset = smapAsset
+
+    _geotransform = (0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    _projection = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],' \
+                  'AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",' \
+                  '0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]'
+
+
+    _products = {
+        'smp': {
+            'description': 'SMAP SM AM Acquisiton posted on native grid ',
+            # the list of asset types associated with this product
+            'assets': ['SM_P'],  # , 'MYD08'],
+        },
+        'smpe': {
+            'description': 'SMAP SM AM Acquisiton posted on enhanced 9km grid',
+            # the list of asset types associated with this product
+            'assets': ['SM_P_E'],  # , 'MYD08'],
+        }
+    }
