@@ -114,7 +114,7 @@ class smapAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        qs_rv = cls.query_service(asset, tile, date)
+        qs_rv = cls.query_service(asset, date)
         if qs_rv is None:
             return []
         basename, url = qs_rv['basename'], qs_rv['url']
