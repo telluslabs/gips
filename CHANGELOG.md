@@ -98,10 +98,10 @@ and this project adheres to
 - enabled `--sensors` filter for landsat.
 - fixed: `gips.tiles.Tiles.pprint` TypeError when `colors` is None
 
-v0.8.1
+## v0.8.1
 - added support for `alltouch` paramter in CookieCutter (gippy==0.3.6)
 
-v0.8.0
+## v0.8.0
 - Indvidual data utilities deprecated (e.g., landsat), replaced with gips_ scripts
 - New gips scripts, each with more specific functionatlity: gips_inventory, gips_warptiles, gips_process
 - Refactor of core inventory and tiles for streamlined code reuse
