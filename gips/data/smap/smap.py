@@ -40,14 +40,14 @@ class smapAsset(Asset):
     _sensors = {'RAD': {'description': 'Soil Moisture Active Passive Radiometer'}}
     _assets = {
         'SM_P_E': {
-            'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.002/',
+            'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.002',
             'pattern': '^SMAP\_.{2}\_SM\_P\_E\_.{8}\_.{8}\_.{3}\.h5$',
             'description': 'Passive Enhanced Radiometer Based SM at 9KM',
             'startdate': datetime.date(2015, 3, 31),
             'latency': 3,
         },
         'SM_P': {
-            'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP.005/',
+            'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP.005',
             'pattern': '^SMAP\_.{2}\_SM\_P\_.{8}\_.{8}\_.{3}\.h5$',
             'description': 'Passive Original Radiometer Based SM at 36KM',
             'startdate': datetime.date(2015, 3, 31),
@@ -72,10 +72,10 @@ class smapAsset(Asset):
         Uses the given (asset, date) tuple as a search key, andcat
         returns a tuple:  base-filename, url
         """
-        year, month, day = date.timetuple()[:3]
-        mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
 
-        pattern = r'^SMAP\_.{2}\_%s\_%s\_.{6}\_.{3}\.h5$' % (asset, str(year + month + day))
+        mainurl = "%s/%s" % (cls._assets[asset]['url'], str(date.strftime('%Y.%m.%d')))
+
+        pattern = r'^SMAP\_.{2}\_%s\_%s\_.{6}\_.{3}\.h5$' % (asset, str(date.strftime('%Y%m%d')))
         cpattern = re.compile(pattern)
         err_msg = "Error downloading: " + mainurl
         with utils.error_handler(err_msg):
