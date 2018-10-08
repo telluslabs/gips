@@ -154,3 +154,7 @@ class smapData(Data):
             'assets': ['SM_P_E'],  # , 'MYD08'],
         }
     }
+
+    @Data.proc_temp_dir_manager
+    def process(self, *args, **kwargs):
+        """Produce requested products."""
