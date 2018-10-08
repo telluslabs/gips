@@ -85,7 +85,7 @@ class GoogleStorageMixin(object):
         return cls._gs_object_url_base.format(cls.gs_bucket_name)
 
     @classmethod
-    def gs_vsi_prefix(cls, streaming=True):
+    def gs_vsi_prefix(cls, streaming=False):
         """Generate the first part of a VSI path for gdal."""
         vsi_magic_string = '/vsicurl_streaming/' if streaming else '/vsicurl/'
         return vsi_magic_string + cls.gs_object_url_base()
