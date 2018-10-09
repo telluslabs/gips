@@ -33,7 +33,7 @@ class smapRepository(Repository):
 
     # NASA assets require special authentication
     _manager_url = "https://urs.earthdata.nasa.gov"
-
+    _tile_attribute = 'tileid'
 
 class smapAsset(Asset):
     Repository = smapRepository
@@ -61,9 +61,9 @@ class smapAsset(Asset):
 
         bname = os.path.basename(filename)
         self.asset = (re.search('(?<=^SMAP_L3_)\w*(?=_[0-9]{8})',bname)).group(0)
-        date_here = (re.search('[0-9]{8}',bname)).group(0)
+        date_here = (re.search('[0-9]{8}', bname)).group(0)
         self.date = datetime.datetime.strptime(date_here, "%Y%m%d").date()
-        self._version = (re.search('R[0-9]*',bname)).group(0)
+        self._version = (re.search('R[0-9]*', bname)).group(0)
         self.tile = 'h01v01'
 
     @classmethod
@@ -76,7 +76,7 @@ class smapAsset(Asset):
 
         mainurl = "%s/%s" % (cls._assets[asset]['url'], str(date.strftime('%Y.%m.%d')))
 
-        pattern = r'SMAP\_.{2}\_%s\_%s\_.{6}\_.{3}\.h5$' % (asset, str(date.strftime('%Y%m%d')))
+        pattern = r'SMAP\_.{2}\_%s\_%s\_.{6}\_.{3}\.h5' % (asset, str(date.strftime('%Y%m%d')))
         cpattern = re.compile(pattern)
         err_msg = "Error downloading: " + mainurl
         with utils.error_handler(err_msg):
