@@ -64,9 +64,10 @@ class smapAsset(Asset):
         date_here = (re.search('[0-9]{8}',bname)).group(0)
         self.date = datetime.datetime.strptime(date_here, "%Y%m%d").date()
         self._version = (re.search('R[0-9]*',bname)).group(0)
+        self.tile = 'h01v01'
 
     @classmethod
-    def query_provider(cls, asset, date):
+    def query_provider(cls, asset, tile, date):
         """Find out from the SMAP servers what assets are available.
 
         Uses the given (asset, date) tuple as a search key, andcat
@@ -97,24 +98,10 @@ class smapAsset(Asset):
                           '{} at {}'.format(pattern, mainurl), 4)
         return None, None
 
-    @classmethod
-    def query_service_here(cls, asset, date):
-        """Query the data provider for files matching the arguments.
-
-        """
-        if not cls.available(asset, date):
-            return None
-        utils.verbose_out('querying ATD {} {}'.format(asset, date), 5)
-        bn, url = cls.query_provider(asset, date)
-        utils.verbose_out('queried ATD {} {}, found {} at {}'.format(
-            asset, date, bn, url), 5)
-        if (bn, url) == (None, None):
-            return None
-        return {'basename': bn, 'url': url}
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        qs_rv = cls.query_service_here(asset, date)
+        qs_rv = cls.query_service(asset, tile, date)
         if qs_rv is None:
             return []
         basename, url = qs_rv['basename'], qs_rv['url']
