@@ -146,17 +146,56 @@ class smapData(Data):
         }
     }
 
+    def asset_check(self, prod_type):
+        """Is an asset available for the current scene and product?
+
+        Returns the last found asset, or else None, its version, the
+        complete lists of missing and available assets, and lastly, an array
+        of pseudo-filepath strings suitable for consumption by gdal/gippy.
+        """
+        # return values
+        asset = None
+        missingassets = []
+        availassets = []
+        allsds = []
+
+        for asset in self._products[prod_type]['assets']:
+            # many asset types won't be found for the current scene
+            if asset not in self.assets:
+                missingassets.append(asset)
+                continue
+            try:
+                sds = self.assets[asset].datafiles()
+            except Exception as e:
+                utils.report_error(e, 'Error reading datafiles for ' + asset)
+                missingassets.append(asset)
+            else:
+                availassets.append(asset)
+                allsds.extend(sds)
+
+        return asset, missingassets, availassets, allsds
+
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
         """Produce requested products."""
         products = super(smapData, self).process(*args, **kwargs)
         if len(products) == 0:
             return
-
-        bname = os.path.join(self.path, self.basename)
-
         # example products.requested:
         # {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
         # key is only used once far below, and val is only used for val[0].
         for key, val in products.requested.items():
-            VerboseOut('Key: {0}, Item: {1}'.format(key, val))
+            prod_type = val[0]
+            asset, missingassets, availassets, allsds = \
+                self.asset_check(prod_type)
+
+            if not availassets:
+                # some products aren't available for every day but this is trying every day
+                VerboseOut('There are no available assets (%s) on %s for tile %s'
+                           % (str(missingassets), str(self.date), str(self.id),), 5)
+                continue
+
+            sensor = self._products[prod_type]['sensor']
+            fname = self.temp_product_filename(sensor, prod_type)  # moved to archive at end of loop
+            os.symlink(allsds[15], fname)
+            imgout = gippy.GeoImage(fname)
