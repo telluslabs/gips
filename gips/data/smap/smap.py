@@ -149,3 +149,15 @@ class smapData(Data):
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
         """Produce requested products."""
+        """Produce requested products."""
+        products = super(smapData, self).process(*args, **kwargs)
+        if len(products) == 0:
+            return
+
+        bname = os.path.join(self.path, self.basename)
+
+        # example products.requested:
+        # {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
+        # key is only used once far below, and val is only used for val[0].
+        for key, val in products.requested.items():
+            print ('Key: {0}, Item: {1}'.format(key, val))
