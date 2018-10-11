@@ -200,7 +200,7 @@ class smapData(Data):
             imgout = gippy.GeoImage(fname)
             imgout.SetNoData(-9999.0)
             imgout.SetProjection(self._projection)
-            imgout.SetGeoTransform(self._geotransform)
+            imgout.SetAffine(np.array(self._geotransform))
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
             self.AddFile(sensor, key, archive_fp)
