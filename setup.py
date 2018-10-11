@@ -63,6 +63,7 @@ setup(
     },
     install_requires=[
         'six>=1.9.0',
+        'urllib3[secure]',
         'requests',
         'django==1.10',
         'netCDF4',

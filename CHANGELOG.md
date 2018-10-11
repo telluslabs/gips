@@ -1,24 +1,35 @@
-################################################################################
-#    GIPS: Geospatial Image Processing System
-#
-#    AUTHOR: Matthew Hanson
-#    EMAIL:  matt.a.hanson@gmail.com
-#
-#    Copyright (C) 2014 Applied Geosolutions
-#
-#    This program is free software; you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
-#    (at your option) any later version.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
-#
-#   You should have received a copy of the GNU General Public License
-#   along with this program. If not, see <http://www.gnu.org/licenses/>
-################################################################################
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [UNRELEASED]
+
+
+
+## v0.12.0
+### Added
+- added DOI badge to README.md
+- preliminary SRTM driver
+- initial version of google cloud based assets
+
+### Changed
+- migrated CHANGES.txt to CHANGELOG.md
+- squelched out https `InsecureRequestWarning`s for CDL, and added
+  `urllib3[secure]` to stop same warning in Sentinel-2
+
+### Fixed
+- Landsat coregistration #572
+- Various items in Sentinel-2's ACOLITE processing:
+    - Fix #506 by always keying off band 1 for resolution.
+    - Fix #548/#437, wastefully processing entire datastrips, by using acolite's
+      limit config/param
+    - Fix #438, off-by-one errors in tile selection, by shrinking the limit
+      down to avoid overlap (thanks MGRS!).
+
+## v0.11.0
 - Documentation (README) improved
 - aod-6.1
 - file system race conditions in directory creation addresseed (Thanks for
@@ -27,10 +38,7 @@
 - `cloudmask` products for s2 and landsat inverted (1=cloud, 0=nodata)
 - Provenance improved (add "SOURCE_ASSET" and always add metadata, not subtract)
 
-v0.10.0
-=======
 ## v0.10.0
->>>>>>> upstream/dev:CHANGELOG.md
 - modis using gippy.algorithms.Indices
 - changed system tests to use gdalinfo based comparator
 - added Sentinel2 MTCI and S2REP products

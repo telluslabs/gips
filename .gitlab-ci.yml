@@ -30,11 +30,6 @@ run_tests:
       -v /net/cluster/projects/gips-dev/sys-test-assets/:/artifact-store
       gips_test_$CI_COMMIT_REF_SLUG
       pytest -r es -vv --slow --setup-repo --sys -s -m lite
-    - docker run --dns=10.0.4.1 --rm
-      -v /net/cluster/projects/gips-dev/sys-test-assets/:/artifact-store
-      gips_test_$CI_COMMIT_REF_SLUG
-      pytest -r es -vv --slow --setup-repo --sys -s
-      gips/test/sys/t_process.py::t_process[landsat-cloudmask-coreg]
 
     # TODO get this CI pipeline up to passing
     # - docker run --dns=10.0.4.1 --rm

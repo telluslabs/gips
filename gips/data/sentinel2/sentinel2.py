@@ -159,25 +159,24 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
     _asset_fn_pat_base = '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*'
 
+    # TODO find real start date for S2 data:
+    # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
+    # (change to orderby=ingestiondate%20desc if needed)
+    _start_date = datetime.date(2015, 1, 1)
+
     _assets = {
         'L1C': {
             'source': 'esa',
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both original and shortened post-2016-12-07 assets.
             'pattern': _asset_fn_pat_base + '\.zip$',
-            # TODO find real start date for S2 data:
-            # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
-            # (change to orderby=ingestiondate%20desc if needed)
-            'startdate': datetime.date(2015, 1, 1), # used to prevent
-            # impossible searches
-            # TODO: (may need to change -- nigeria work shows no
-            # imagery before August 2015)
+            'startdate': _start_date,
             'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
                           # only needed by Asset.end_date and Asset.available, but those are never called?
         },
         'L1CGS': {
             'source': 'gs',
-            'startdate': datetime.date(2015, 1, 1),
+            'startdate': _start_date,
             'latency': 3,
             'pattern': _asset_fn_pat_base + '_gs\.json$',
         }
@@ -319,7 +318,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             search_url = url_head + url_search_string.format(year, month, day, tile) + url_tail
 
         auth = HTTPBasicAuth(username, password)
-        r = requests.get(search_url, auth=auth, verify=False)
+        r = requests.get(search_url, auth=auth)
         r.raise_for_status()
         return r.json()
 
@@ -381,7 +380,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         style_regexes = cls.get_style_regexes(style, tile, compile=True)
         band_regex = style_regexes['raster-re']
         md_regexes = {'datastrip-md': style_regexes['datastrip-md-re'],
-                      'tile-md':      style_regexes['tile-md-re']}
+                      'tile-md':      style_regexes['tile-md-re'],
+                      'asset-md':     style_regexes['asset-md-re']}
         # for sanity checking later
         expected_key_set = set(md_regexes.keys() + ['spectral-bands'])
         expected_band_cnt = len(cls._sensors['S2A']['band-strings'])
@@ -814,15 +814,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         return self._atmo_corrector
 
     def footprint(self):
-        asset_contents = self.datafiles()
-
-        mtd_file_pattern = self._asset_styles[self.style]['asset-md-re']
-        metadata_fn = next(n for n in asset_contents if re.match(mtd_file_pattern, n))
-
-        metadata_zf = next(iter(self.extract([metadata_fn])))
-        tree = ElementTree.parse(metadata_zf)
-        sag_elem = next(tree.iter('Global_Footprint')) #      should only be one
-        values_tags = sag_elem.find('EXT_POS_LIST')
+        gf_elem = self.xml_subtree('asset', 'Global_Footprint')
+        values_tags = gf_elem.find('EXT_POS_LIST')
 
         # format as valid WKT
         points = values_tags.text.strip().split(" ")

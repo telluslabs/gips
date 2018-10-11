@@ -411,28 +411,29 @@ class Asset(object):
                 return datafiles
         with utils.error_handler('Problem accessing asset(s) in ' + self.filename):
             if tarfile.is_tarfile(self.filename):
-                tfile = tarfile.open(self.filename)
-                tfile = tarfile.open(self.filename)
-                datafiles = tfile.getnames()
+                datafiles = tarfile.open(self.filename).getnames()
             elif zipfile.is_zipfile(self.filename):
-                zfile = zipfile.ZipFile(self.filename)
-                datafiles = zfile.namelist()
+                datafiles = zipfile.ZipFile(self.filename).namelist()
             elif self.filename.endswith('json'):
-                datafiles = []
-                for v in json.loads(open(self.filename).read()).values():
-                    df = [v] if type(v) in (str, unicode) else v
-                    datafiles += v
-                datafiles = tuple(v.encode('ascii', 'ignore') for v in datafiles)
-            else:
-                # Try subdatasets
+                # take strings at the top level, or in lists at the top level
+                # TODO this is brittle; drivers implementing json assets
+                # should override this method to handle their specific needs
+                with open(self.filename) as fp:
+                    content = json.load(fp)
+                raw_df = []
+                for v in content.values():
+                    raw_df += v if type(v) is list else [v]
+                datafiles = tuple(v.encode('ascii', 'ignore')
+                                  for v in raw_df if isinstance(v, basestring))
+            else: # Try subdatasets
                 fh = gdal.Open(self.filename)
-                sds = fh.GetSubDatasets()
-                datafiles = [s[0] for s in sds]
+                datafiles = [s[0] for s in fh.GetSubDatasets()]
+
+            # if we found files, record them to save work later:
             if len(datafiles) > 0:
                 List2File(datafiles, indexfile)
                 return datafiles
-            else:
-                return [self.filename]
+            return [self.filename]
 
 
     def extract(self, filenames=tuple(), path=None):
