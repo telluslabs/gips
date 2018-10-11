@@ -452,15 +452,15 @@ _aco_prod_templs = {
         'toa': True,
         'bands': [{'name': 'acoflags', 'units': Data._unitless}],
     },
-    'spm655': {
-        'description': 'Suspended Sediment Concentration 655nm',
-        'acolite-product': 'spm_nechad_655',
-        'acolite-key': 'spm_nechad_655',
+    'spm': {
+        'description': 'Suspended Sediment Concentration',
+        'acolite-product': 'spm_nechad2016',
+        'acolite-key': 'spm_nechad',
         'offset': 50.,
         'gain': 0.005,
         'dtype': 'int16',
         'toa': True,
-        'bands': [{'name': 'spm655', 'units': 'unknown'}],
+        'bands': [{'name': 'spm', 'units': 'unknown'}],
     },
     'turbidity': {
         'description': 'Blended Turbidity',

@@ -840,7 +840,7 @@ class sentinel2Data(Data):
             'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti',
         ],
         'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
-                    'spm655', 'turbidity', 'acoflags'],
+                    'spm', 'turbidity', 'acoflags'],
     }
 
     _products = {
