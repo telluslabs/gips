@@ -123,12 +123,8 @@ class smapData(Data):
     version = '1.0.0'
     Asset = smapAsset
 
-    _geotransform = (0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-    _projection = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],' \
-                  'AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",' \
-                  '0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]'
-
-
+    _geotransform = (-17367530.44516138, 9000, 0, 7314540.79258289, 0, -9000.0)
+    _projection = '+proj=cea +lon_0=0 +lat_ts=30 +ellps=WGS84 +units=m'
     _products = {
         'smp': {
             'description': 'SMAP SM AM Acquisiton posted on native grid ',
@@ -202,7 +198,9 @@ class smapData(Data):
             fname = self.temp_product_filename(sensor, prod_type)  # moved to archive at end of loop
             os.symlink(allsds[15], fname)
             imgout = gippy.GeoImage(fname)
-
+            imgout.SetNoData(-9999.0)
+            imgout.SetProjection(self._projection)
+            imgout.SetGeoTransform(self._geotransform)
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
             self.AddFile(sensor, key, archive_fp)
