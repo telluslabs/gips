@@ -135,6 +135,7 @@ class smapData(Data):
             # the list of asset types associated with this product
             'assets': ['SM_P'],  # , 'MYD08'],
             'startdate': datetime.date(2015, 3, 31),
+            'sensor': 'RAD',
             'latency': 1,
         },
         'smpe': {
@@ -142,6 +143,7 @@ class smapData(Data):
             # the list of asset types associated with this product
             'assets': ['SM_P_E'],  # , 'MYD08'],
             'startdate': datetime.date(2015, 3, 31),
+            'sensor': 'RAD',
             'latency': 1,
         }
     }
