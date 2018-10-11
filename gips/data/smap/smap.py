@@ -198,7 +198,7 @@ class smapData(Data):
             fname = self.temp_product_filename(sensor, prod_type)  # moved to archive at end of loop
             img = gippy.GeoImage(allsds[15])
             imgdata = img.Read()
-            imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 7)
+            imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
             del img
             imgout.SetNoData(-9999.0)
             imgout.SetOffset(0.0)
