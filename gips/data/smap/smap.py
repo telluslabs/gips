@@ -199,3 +199,10 @@ class smapData(Data):
             fname = self.temp_product_filename(sensor, prod_type)  # moved to archive at end of loop
             os.symlink(allsds[15], fname)
             imgout = gippy.GeoImage(fname)
+
+            # add product to inventory
+            archive_fp = self.archive_temp_path(fname)
+            self.AddFile(sensor, key, archive_fp)
+            del imgout  # to cover for GDAL's internal problems
+            utils.verbose_out(' -> {}: processed in {}'.format(
+                os.path.basename(fname), datetime.datetime.now() - start), level=1)
