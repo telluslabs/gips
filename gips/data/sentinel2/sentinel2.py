@@ -1174,7 +1174,7 @@ class sentinel2Data(Data):
 
         # TODO relies on this metadata; may not persist past this merge:
         # https://gitlab.com/appliedgeosolutions/gips/merge_requests/572
-        layer_02_abs_fn = next(fn for fn in self.metadata['abs-filenames']
+        layer_02_abs_fn = next(fn for fn in self.raster_paths()
                                if fn.endswith('_B02.jp2'))
         model_image = gippy.GeoImage(layer_02_abs_fn)
 
