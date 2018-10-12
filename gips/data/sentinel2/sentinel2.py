@@ -1171,15 +1171,12 @@ class sentinel2Data(Data):
         # then copy into self.path the right way
         p_spec = {p: os.path.join(self.path, self.product_filename(sensor, p))
                   for p in aco_prods}
-
-        # TODO relies on this metadata; may not persist past this merge:
-        # https://gitlab.com/appliedgeosolutions/gips/merge_requests/572
         layer_02_abs_fn = next(fn for fn in self.raster_paths()
                                if fn.endswith('_B02.jp2'))
         model_image = gippy.GeoImage(layer_02_abs_fn)
 
         roi = None
-        if a_obj.style == 'original': # never needed for L1CGS
+        if a_obj.style == 'original':
             w, e, s, n = self.Repository.tile_lat_lon(a_obj.tile)
             roi = s, w, n, e
 
