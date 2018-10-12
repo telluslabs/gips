@@ -123,7 +123,7 @@ class smapData(Data):
     version = '1.0.0'
     Asset = smapAsset
 
-    _geotransform = (-17367530.44516138, 9000, 0, 7314540.79258289, 0, -9000.0)
+    _geotransform = (-17367530.44516138, 36032.220850622405123, 0, 7314540.79258289, 0, -36032.217290640393912)
     _projection = '+proj=cea +lon_0=0 +lat_ts=30 +ellps=WGS84 +units=m'
     _products = {
         'smp': {
