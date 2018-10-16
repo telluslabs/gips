@@ -20,7 +20,8 @@ def read_raster(infile):
     proj = fp.GetProjection()
     geo = fp.GetGeoTransform()
     data = fp.ReadAsArray()
-    nodata = fp.GetNoDataValue()
+    band = fp.GetRasterBand(1)
+    nodata = band.GetNoDataValue()
     ny, nx = (fp.RasterYSize, fp.RasterXSize)
     return data, proj, geo, nodata
 
