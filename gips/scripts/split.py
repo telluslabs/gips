@@ -20,8 +20,9 @@ def read_raster(infile):
     proj = fp.GetProjection()
     geo = fp.GetGeoTransform()
     data = fp.ReadAsArray()
+    nodata = fp.GetNoDataValue()
     ny, nx = (fp.RasterYSize, fp.RasterXSize)
-    return data, proj, geo
+    return data, proj, geo, nodata
 
 
 def write_raster(outfile, outdata, proj, geo, nodata, dtype):
@@ -74,7 +75,7 @@ def main():
 
                     bnames = img.BandNames()
 
-                    imgdata, proj, geo = read_raster(fname)
+                    imgdata, proj, geo, nodata = read_raster(fname)
 
                     for i,bname in enumerate(bnames):
 
@@ -102,8 +103,6 @@ def main():
                                 elif yd < yf:
                                     data = np.vstack((data, np.zeros((1, data.shape[1]), dtype=data.dtype)))
 
-
-                        nodata = -32768
                         scale = 10000
                         data = data.astype('int16')
                         dtype = gdal.GDT_Int16
