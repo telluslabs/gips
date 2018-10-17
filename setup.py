@@ -63,7 +63,8 @@ setup(
     },
     install_requires=[
         'six>=1.9.0',
-        'urllib3[secure]',
+        # because requests is a diva and won't leave its trailer otherwise:
+        'urllib3[secure]<1.24',
         'requests',
         'django==1.10',
         'netCDF4',
