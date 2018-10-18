@@ -12,6 +12,7 @@ COPY gips_creds.sh.enc /root/gips_creds.sh.enc
 
 ENV GIPS_OVERRIDE_VERSION='0.0.0-dev'
 
+# note settings.py is removed, then regenerated with gips_config, then edited
 RUN cd /gips \
     && chmod +x /usr/local/bin/sixs \
     && chmod +x /usr/local/bin/ortho \

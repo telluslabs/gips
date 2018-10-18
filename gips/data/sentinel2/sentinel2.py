@@ -845,7 +845,7 @@ class sentinel2Data(Data):
             'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti',
         ],
         'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
-                    'spm655', 'turbidity', 'acoflags'],
+                    'spm', 'turbidity', 'acoflags'],
     }
 
     _products = {
@@ -1168,29 +1168,25 @@ class sentinel2Data(Data):
 
     def process_acolite(self, aco_prods):
         a_obj, sensor = self.current_asset(), self.current_sensor()
-        self._time_report("Starting acolite processing") # for {}".format(x.keys()))
+        self._time_report("Starting acolite processing")
         # let acolite use a subdirectory in this run's tempdir:
-        aco_tmp_dir = self.generate_temp_path('acolite')
-        os.mkdir(aco_tmp_dir)
-        acolite_product_spec = {'meta': self.prep_meta()}
-        for p in aco_prods:
-            # TODO use tempdirs to match current gips practices
-            fn = os.path.join(self.path, self.product_filename(sensor, p))
-            aps_p = acolite_product_spec[p] = {'fname': fn}
-            aps_p.update(self._products[p])
-            aps_p.pop('assets')
+        aco_dn = self.generate_temp_path('acolite')
+        os.mkdir(aco_dn)
+        # TODO use self.temp_product_filename(sensor, prod_type)
+        # then copy into self.path the right way
+        p_spec = {p: os.path.join(self.path, self.product_filename(sensor, p))
+                  for p in aco_prods}
+        layer_02_abs_fn = next(fn for fn in self.raster_paths()
+                               if fn.endswith('_B02.jp2'))
+        model_image = gippy.GeoImage(layer_02_abs_fn)
 
-        w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(a_obj.tile)
         roi = None
         if a_obj.style == 'original':
-            roi = (s_lat, w_lon, n_lat, e_lon)
+            w, e, s, n = self.Repository.tile_lat_lon(a_obj.tile)
+            roi = s, w, n, e
 
-        prodout = atmosphere.process_acolite(
-                a_obj, aco_tmp_dir, acolite_product_spec,
-                a_obj.style_res['raster-re'],
-                extracted_asset_glob='*.SAFE',
-                roi=roi,
-                band='02')
+        prodout = atmosphere.process_acolite(a_obj, aco_dn, p_spec,
+                self.prep_meta(), model_image, roi, "*.SAFE")
 
         [self.AddFile(sensor, pt, fn) for pt, fn in prodout.items()]
         self._time_report(' -> {}: processed {}'.format(
