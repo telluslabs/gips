@@ -223,7 +223,10 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             # updated assumption: only XML file in DATASTRIP/ (not including subdirs)
             'datastrip-md-re': '^.*/DATASTRIP/[^/]+/[^/]*.xml$',
             'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
-            'asset-md-re': '^.*/S2.*\.xml$',
+            # example asset metadata path:
+            # S2A_OPER_PRD_MSIL1C_PDMC_20160904T192336_R126_V20160903T164322_20160903T164911.SAFE/
+            #   S2A_OPER_MTD_SAFL1C_PDMC_20160904T192336_R126_V20160903T164322_20160903T164911.xml
+            'asset-md-re': r'^[^/]+/S2[AB]_[^/]+\.xml$',
         },
         _2016_12_07: {
             # post-2016 assets use their downloaded FN as their archived FN
@@ -680,6 +683,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         """
         file_pattern = self.style_res[md_file_type + '-md-re']
         metadata_fn = next(fn for fn in self.datafiles() if re.match(file_pattern, fn))
+        utils.verbose_out(
+            'Found {} metadata file:  {}'.format(md_file_type, metadata_fn), 5)
         with zipfile.ZipFile(self.filename) as asset_zf:
             with asset_zf.open(metadata_fn) as metadata_zf:
                 return ElementTree.parse(metadata_zf)
