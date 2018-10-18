@@ -661,8 +661,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
     def save_tile_md_file(self, path):
         if self.asset == 'L1C':
-            tile_md_fn = next(fn for fn in ao.datafiles()
-                              if self.style_res['tile-md-re'].match(name))
+            tile_md_fn = next(fn for fn in self.datafiles()
+                              if re.match(self.style_res['tile-md-re'], fn))
             self.extract((tile_md_fn,), path)
             return os.path.join(path, tile_md_fn)
         # L1CGS case:
