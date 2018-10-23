@@ -1227,13 +1227,27 @@ class sentinel2Data(Data):
 
         DEVNULL = open(os.devnull, 'w')
 
+        print("ASSET", ao.asset)
+        if ao.asset == 'L1CGS':
+            band_files = []
+            for path in self.raster_paths():
+                match = re.match("/[\w_]+?/(.+)", path)
+                url = match.group(1)
+                output_path = os.path.join(
+                    self._temp_proc_dir,
+                    os.path.basename(url)
+                )
+                subprocess.check_call(["wget", "--quiet", url, "--output-document", output_path])
+                band_files.append(output_path)
+        else:
+            band_files = self.raster_paths()
         gdalbuildvrt_args = [
             "gdalbuildvrt",
             "-resolution", "user",
             "-tr", "20", "20",
             "-separate",
             "%s/allbands.vrt" % self._temp_proc_dir,
-        ] + self.raster_paths()
+        ] + band_files
         subprocess.check_call(gdalbuildvrt_args, stderr=DEVNULL)
 
         # set up commands
