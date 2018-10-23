@@ -1231,7 +1231,7 @@ class sentinel2Data(Data):
         if ao.asset == 'L1CGS':
             band_files = []
             for path in self.raster_paths():
-                match = re.match("/[\w_]+?/(.+)", path)
+                match = re.match("/[\w_]+/(.+)", path)
                 url = match.group(1)
                 output_path = os.path.join(
                     self._temp_proc_dir,
