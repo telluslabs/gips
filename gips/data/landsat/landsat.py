@@ -789,9 +789,9 @@ class landsatData(Data):
                   'satvi', 'vari'],
         'Tillage': ['ndti', 'crc', 'sti', 'isti'],
         'LC8SR': ['ndvi8sr'],
-        'ACOLITE': [
-            # 'rhoam',  # Dropped for the moment due to issues in ACOLITE
-            'rhow', 'oc2chl', 'oc3chl', 'fai', 'spm', 'turbidity', 'acoflags'],
+        # 'rhoam',  # Dropped for the moment due to issues in ACOLITE
+        'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
+                    'spm', 'spm2016', 'turbidity', 'acoflags'],
     }
     __toastring = 'toa: use top of the atmosphere reflectance'
     __visible_bands_union = [color for color in Asset._sensors['LC8']['colors'] if 'LWIR' not in color]
@@ -1015,7 +1015,6 @@ class landsatData(Data):
             'latency': 1,
             'bands': unitless_bands('isti'),
         },
-        # NEW!!!
         'ndvi8sr': {
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
