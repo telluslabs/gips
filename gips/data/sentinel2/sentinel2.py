@@ -353,11 +353,11 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                 raise IOError("Unexpected 'rel' attribute in search link")
             asset_url = entry['link'][0]['href']
             output_file_name = entry['title'] + '.zip'
+            assert entry['double']['name'] == 'cloudcoverpercentage'
+            cloud_cover = float(entry['double']['content'])
 
-        if pclouds < 100:
-            asset = cls(output_file_name)
-            if not asset.filter(pclouds):
-                return None
+        if pclouds < 100 and cloud_cover > pclouds:
+            return None
 
         return {'basename': output_file_name, 'url': asset_url}
 
@@ -638,7 +638,10 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             self.meta['cloud-cover'] = self.cloud_cover_from_et(tree)
             return self.meta['cloud-cover']
 
-        results = self.query_scihub(self.tile, self.date)
+        results = self.query_scihub(
+            self.tile,
+            datetime.datetime.strptime(self.date.strftime('%Y-%m-%d'),'%Y-%m-%d')
+        )
         try:
             entry = results['feed']['entry']
         except:
