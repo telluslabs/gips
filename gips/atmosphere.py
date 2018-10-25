@@ -643,7 +643,8 @@ def process_acolite(asset, aco_proc_dir, products, meta, model_image,
     # A MULTI-BAND TIF, ADD METADATA, and MOVE INTO TILES
     verbose_out('acolite processing:  acolite completed;'
                 ' starting conversion from netcdf into gips products', 2)
-    aco_nc_file = next(glob.iglob(os.path.join(output_dn, '*_L2W.nc')))
+    aco_nc_file = next(glob.iglob(
+            os.path.join(output_dn, '*' + asset.tile + '*_L2W.nc')))
 
     prodout = acolite_nc_to_prods(
             valid_products, aco_nc_file, meta, model_image)
