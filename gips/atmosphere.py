@@ -399,7 +399,9 @@ _aco_prod_templs = {
     'rhow': { # product passed in eg process_acolite(products={'rhow':...}...)
         'description': 'Water-Leaving Radiance-Reflectance',
         'acolite-product': 'rhow_*', #'rhow_vnir', # passed to acolite in l2w_parameters
-        'acolite-key': 'rhow', # needed to extract from output netcdf
+        # needed to extract from output netcdf; string or iterable of strings
+        'acolite-key': (u'rhow_443', u'rhow_483', u'rhow_561', u'rhow_655',
+                        u'rhow_865', u'rhow_1609', u'rhow_2201'),
         'gain': 0.0001,
         'offset': 0.,
         'dtype': 'int16',
@@ -514,17 +516,14 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
         p_spec = _aco_prod_templs[p_type]
         verbose_out('acolite processing: extracting {} to {}'.format(
             p_type, p_fp), 2)
-        bands = [b for b in dsroot.variables.keys()
-                 if str(b).startswith(p_spec['acolite-key'])]
-        if len(bands) == 0:
-            raise ValueError("Found no band for '{}' in {}".format(
-                             p_spec['acolite-key'], dsroot.variables.keys()))
+        aco_key = p_spec['acolite-key']
+        bands = [aco_key] if isinstance(aco_key, basestring) else aco_key
         npdtype = p_spec['dtype']
         dtype, missing = _aco_img_params[npdtype]
         gain = p_spec.get('gain', 1.0)
         offset = p_spec.get('offset', 0.0)
         imgout = gippy.GeoImage(p_fp, model_image, dtype, len(bands))
-        pmeta = {mdi: p_spec[mdi] for mdi in ['acolite-key', 'description']}
+        pmeta = {'description': p_spec['description']}
         pmeta.update(meta)
         imgout.SetMeta(pmeta)
 
