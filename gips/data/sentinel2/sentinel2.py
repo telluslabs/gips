@@ -223,7 +223,10 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             # updated assumption: only XML file in DATASTRIP/ (not including subdirs)
             'datastrip-md-re': '^.*/DATASTRIP/[^/]+/[^/]*.xml$',
             'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
-            'asset-md-re': '^.*/S2.*\.xml$',
+            # example asset metadata path:
+            # S2A_OPER_PRD_MSIL1C_PDMC_20160904T192336_R126_V20160903T164322_20160903T164911.SAFE/
+            #   S2A_OPER_MTD_SAFL1C_PDMC_20160904T192336_R126_V20160903T164322_20160903T164911.xml
+            'asset-md-re': r'^[^/]+/S2[AB]_[^/]+\.xml$',
         },
         _2016_12_07: {
             # post-2016 assets use their downloaded FN as their archived FN
@@ -350,11 +353,11 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                 raise IOError("Unexpected 'rel' attribute in search link")
             asset_url = entry['link'][0]['href']
             output_file_name = entry['title'] + '.zip'
+            assert entry['double']['name'] == 'cloudcoverpercentage'
+            cloud_cover = float(entry['double']['content'])
 
-        if pclouds < 100:
-            asset = cls(output_file_name)
-            if not asset.filter(pclouds):
-                return None
+        if pclouds < 100 and cloud_cover > pclouds:
+            return None
 
         return {'basename': output_file_name, 'url': asset_url}
 
@@ -635,7 +638,10 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             self.meta['cloud-cover'] = self.cloud_cover_from_et(tree)
             return self.meta['cloud-cover']
 
-        results = self.query_scihub(self.tile, self.date)
+        results = self.query_scihub(
+            self.tile,
+            datetime.datetime.strptime(self.date.strftime('%Y-%m-%d'),'%Y-%m-%d')
+        )
         try:
             entry = results['feed']['entry']
         except:
@@ -661,8 +667,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
     def save_tile_md_file(self, path):
         if self.asset == 'L1C':
-            tile_md_fn = next(fn for fn in ao.datafiles()
-                              if self.style_res['tile-md-re'].match(name))
+            tile_md_fn = next(fn for fn in self.datafiles()
+                              if re.match(self.style_res['tile-md-re'], fn))
             self.extract((tile_md_fn,), path)
             return os.path.join(path, tile_md_fn)
         # L1CGS case:
@@ -680,6 +686,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         """
         file_pattern = self.style_res[md_file_type + '-md-re']
         metadata_fn = next(fn for fn in self.datafiles() if re.match(file_pattern, fn))
+        utils.verbose_out(
+            'Found {} metadata file:  {}'.format(md_file_type, metadata_fn), 5)
         with zipfile.ZipFile(self.filename) as asset_zf:
             with asset_zf.open(metadata_fn) as metadata_zf:
                 return ElementTree.parse(metadata_zf)
@@ -840,7 +848,7 @@ class sentinel2Data(Data):
             'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti',
         ],
         'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
-                    'spm655', 'turbidity', 'acoflags'],
+                    'spm', 'turbidity', 'acoflags'],
     }
 
     _products = {
@@ -1163,29 +1171,25 @@ class sentinel2Data(Data):
 
     def process_acolite(self, aco_prods):
         a_obj, sensor = self.current_asset(), self.current_sensor()
-        self._time_report("Starting acolite processing") # for {}".format(x.keys()))
+        self._time_report("Starting acolite processing")
         # let acolite use a subdirectory in this run's tempdir:
-        aco_tmp_dir = self.generate_temp_path('acolite')
-        os.mkdir(aco_tmp_dir)
-        acolite_product_spec = {'meta': self.prep_meta()}
-        for p in aco_prods:
-            # TODO use tempdirs to match current gips practices
-            fn = os.path.join(self.path, self.product_filename(sensor, p))
-            aps_p = acolite_product_spec[p] = {'fname': fn}
-            aps_p.update(self._products[p])
-            aps_p.pop('assets')
+        aco_dn = self.generate_temp_path('acolite')
+        os.mkdir(aco_dn)
+        # TODO use self.temp_product_filename(sensor, prod_type)
+        # then copy into self.path the right way
+        p_spec = {p: os.path.join(self.path, self.product_filename(sensor, p))
+                  for p in aco_prods}
+        layer_02_abs_fn = next(fn for fn in self.raster_paths()
+                               if fn.endswith('_B02.jp2'))
+        model_image = gippy.GeoImage(layer_02_abs_fn)
 
-        w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(a_obj.tile)
         roi = None
         if a_obj.style == 'original':
-            roi = (s_lat, w_lon, n_lat, e_lon)
+            w, e, s, n = self.Repository.tile_lat_lon(a_obj.tile)
+            roi = s, w, n, e
 
-        prodout = atmosphere.process_acolite(
-                a_obj, aco_tmp_dir, acolite_product_spec,
-                a_obj.style_res['raster-re'],
-                extracted_asset_glob='*.SAFE',
-                roi=roi,
-                band='02')
+        prodout = atmosphere.process_acolite(a_obj, aco_dn, p_spec,
+                self.prep_meta(), model_image, roi, "*.SAFE")
 
         [self.AddFile(sensor, pt, fn) for pt, fn in prodout.items()]
         self._time_report(' -> {}: processed {}'.format(
@@ -1226,13 +1230,27 @@ class sentinel2Data(Data):
 
         DEVNULL = open(os.devnull, 'w')
 
+        print("ASSET", ao.asset)
+        if ao.asset == 'L1CGS':
+            band_files = []
+            for path in self.raster_paths():
+                match = re.match("/[\w_]+/(.+)", path)
+                url = match.group(1)
+                output_path = os.path.join(
+                    self._temp_proc_dir,
+                    os.path.basename(url)
+                )
+                subprocess.check_call(["wget", "--quiet", url, "--output-document", output_path])
+                band_files.append(output_path)
+        else:
+            band_files = self.raster_paths()
         gdalbuildvrt_args = [
             "gdalbuildvrt",
             "-resolution", "user",
             "-tr", "20", "20",
             "-separate",
             "%s/allbands.vrt" % self._temp_proc_dir,
-        ] + self.raster_paths()
+        ] + band_files
         subprocess.check_call(gdalbuildvrt_args, stderr=DEVNULL)
 
         # set up commands
