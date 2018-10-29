@@ -701,7 +701,12 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         tree = {'L1C': self.xml_subtree_esa,
                 'L1CGS': self.xml_subtree_gs,
                }[self.asset](md_file_type)
-        stl = [next(tree.iter(at)) for at in tags]
+        try:
+            stl = [next(tree.iter(at)) for at in tags]
+        except StopIteration:
+            err_str = "For Sentinel-2 {} {} {}, couldn't find {} in {}"
+            raise IOError(err_str.format(
+                self.asset, self.date, self.tile, tags, md_file_type))
         return stl if len(stl) > 1 else stl[0]
 
     def tile_metadata(self):
@@ -1295,16 +1300,10 @@ class sentinel2Data(Data):
             prev_wd = os.getcwd()
             os.chdir(tdir)
             try:
-                utils.verbose_out('running: ' + ' '.join(angles_cmd_list), 3)
-                subprocess.check_call(
-                    angles_cmd_list,
-                    #stderr=DEVNULL
-                )
-                utils.verbose_out('running: ' + ' '.join(fmask_cmd_list), 3)
-                subprocess.check_call(
-                    fmask_cmd_list,
-                    stderr=DEVNULL
-                )
+                self._time_report('running: ' + ' '.join(angles_cmd_list))
+                subprocess.check_call(angles_cmd_list)
+                self._time_report('running: ' + ' '.join(fmask_cmd_list))
+                subprocess.check_call(fmask_cmd_list)
             finally:
                 os.chdir(prev_wd)
 
@@ -1416,7 +1415,10 @@ class sentinel2Data(Data):
         are found.  Products are saved to a well-known or else specified
         directory.  kwargs is unused, and is present for compatibility.
         """
-        self._time_report('Starting processing for this temporal-spatial unit')
+        a_obj = self.current_asset()
+        self._time_report(
+            'Starting processing for Sentinel-2 {} {} {}'.format(
+            a_obj.asset, a_obj.tile, a_obj.date))
         products = self.needed_products(products, overwrite)
         if len(products) == 0:
             utils.verbose_out('No new processing required.')
@@ -1425,7 +1427,7 @@ class sentinel2Data(Data):
 
         work = self.plan_work(products.requested.keys(), overwrite) # see if we can save any work
 
-        if self.current_asset().asset == 'L1CGS':
+        if a_obj.asset == 'L1CGS':
             no_can_do = work & set(('mtci-toa', 'mtci', 's2rep-toa', 's2rep'))
             if no_can_do:
                 raise NotImplementedError(
@@ -1459,7 +1461,7 @@ class sentinel2Data(Data):
         # Process standard products
         for prod_type in products.groups()['Standard']:
             err_msg = 'Error creating product {} for {}'.format(
-                    prod_type, self.current_asset().basename)
+                    prod_type, a_obj.basename)
             with utils.error_handler(err_msg, continuable=True):
                 self._time_report('Starting {} processing'.format(prod_type))
                 temp_fp = self.temp_product_filename(sensor, prod_type)
