@@ -197,17 +197,15 @@ class smapData(Data):
             sensor = self._products[prod_type]['sensor']
             fname = self.temp_product_filename(sensor, prod_type)  # moved to archive at end of loop
             img = gippy.GeoImage(allsds[15])
-            img.SetProjection(self._projection)
-            img.SetAffine(np.array(self._geotransform))
             imgdata = img.Read()
-            imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
+            imgout = gippy.GeoImage(fname, img.XSize(), img.YSize(), 1, gippy.GDT_Float32)
             del img
             imgout.SetNoData(-9999.0)
             imgout.SetOffset(0.0)
             imgout.SetGain(1.0)
             imgout.SetBandName('Soil Moisture', 1)
-            #imgout.SetProjection(self._projection)
-            #imgout.SetAffine(np.array(self._geotransform))
+            imgout.SetProjection(self._projection)
+            imgout.SetAffine(np.array(self._geotransform))
             imgout[0].Write(imgdata)
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
