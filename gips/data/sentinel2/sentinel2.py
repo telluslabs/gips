@@ -1034,6 +1034,21 @@ class sentinel2Data(Data):
             # Use zipfile directly using GDAL's virtual filesystem
             return [os.path.join('/vsizip/' + ao.filename, f) for f in fnl]
 
+    def _download_gcs_bands(self, output_dir):
+        if self.current_asset().asset != 'L1CGS':
+            raise
+
+        band_files = []
+        for path in self.raster_paths():
+            match = re.match("/[\w_]+/(.+)", path)
+            url = match.group(1)
+            output_path = os.path.join(
+                output_dir, os.path.basename(url)
+            )
+            subprocess.check_call(["wget", "--quiet", url, "--output-document", output_path])
+            band_files.append(output_path)
+        return band_files
+
     def ref_toa_geoimage(self):
         """Make a proto-product which acts as a basis for several products.
 
@@ -1049,8 +1064,12 @@ class sentinel2Data(Data):
                                     self.basename + '_ref-toa.vrt')
         cmd_args = ('gdalbuildvrt -tr 20 20 -separate'
                     ' -srcnodata 0 -vrtnodata 0').split(' ')
+        if ao.asset == 'L1CGS':
+            raster_paths = self._download_gcs_bands(self._temp_proc_dir)
+        else:
+            raster_paths = self.raster_paths()
         cmd_args += [vrt_filename] + [
-            f for f in self.raster_paths() if f[-6:-4] in indices_bands]
+            f for f in raster_paths if f[-6:-4] in indices_bands]
         p = subprocess.Popen(cmd_args)
         p.communicate()
         if p.returncode != 0:
@@ -1232,16 +1251,7 @@ class sentinel2Data(Data):
 
         print("ASSET", ao.asset)
         if ao.asset == 'L1CGS':
-            band_files = []
-            for path in self.raster_paths():
-                match = re.match("/[\w_]+/(.+)", path)
-                url = match.group(1)
-                output_path = os.path.join(
-                    self._temp_proc_dir,
-                    os.path.basename(url)
-                )
-                subprocess.check_call(["wget", "--quiet", url, "--output-document", output_path])
-                band_files.append(output_path)
+            band_files = self._download_gcs_bands(self._temp_proc_dir)
         else:
             band_files = self.raster_paths()
         gdalbuildvrt_args = [
