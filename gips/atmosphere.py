@@ -400,14 +400,15 @@ _aco_prod_templs = {
         'description': 'Water-Leaving Radiance-Reflectance',
         'acolite-product': 'rhow_*', #'rhow_vnir', # passed to acolite in l2w_parameters
         # needed to extract from output netcdf; string or iterable of strings
-        'acolite-key': (u'rhow_443', u'rhow_483', u'rhow_561', u'rhow_655',
-                        u'rhow_865', u'rhow_1609', u'rhow_2201'),
+        'acolite-key': r'^rhow_.*',
+        'acolite-key-regex': True, # treat key as regex with this
         'gain': 0.0001,
         'offset': 0.,
         'dtype': 'int16',
         'toa': True,
-        'bands': [{'name': bn, 'units': Data._unitless} for bn in (
-            '443nm', '483nm', '561nm', '655nm', '865nm', '1609nm', '2201nm')]
+        # each asset type results in a different rhow product with differing
+        # bands, which gips doesn't currently support.
+        'bands': [{'name': 'various', 'units': Data._unitless}],
     },
     # Not sure what the issue is with this product, but it doesn't seem to
     # work as expected (multiband vis+nir product)
@@ -517,7 +518,11 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
         verbose_out('acolite processing: extracting {} to {}'.format(
             p_type, p_fp), 2)
         aco_key = p_spec['acolite-key']
-        bands = [aco_key] if isinstance(aco_key, basestring) else aco_key
+        bands = ([aco_key] if not p_spec.get('acolite-key-regex', False) else
+                        [k for k in dsroot.variables if re.search(aco_key, k)])
+        if len(bands) == 0:
+            raise IOError("Couldn't find `{}` in {}".format(aco_key, nc_file))
+        verbose_out('Found bands for {}:  {}'.format(p_type, bands), 5)
         npdtype = p_spec['dtype']
         dtype, missing = _aco_img_params[npdtype]
         gain = p_spec.get('gain', 1.0)
