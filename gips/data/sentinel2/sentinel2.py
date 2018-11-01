@@ -1038,6 +1038,7 @@ class sentinel2Data(Data):
         if self.current_asset().asset != 'L1CGS':
             raise
 
+        self._time_report('Start download from GCS')
         band_files = []
         for path in self.raster_paths():
             match = re.match("/[\w_]+/(.+)", path)
@@ -1045,8 +1046,12 @@ class sentinel2Data(Data):
             output_path = os.path.join(
                 output_dir, os.path.basename(url)
             )
-            subprocess.check_call(["wget", "--quiet", url, "--output-document", output_path])
+            if not os.path.exists(output_path):
+                subprocess.check_call(
+                    ["wget", "--quiet", url, "--output-document", output_path]
+                )
             band_files.append(output_path)
+        self._time_report('Finished download from GCS ({} bands)'.format(len(band_files)))
         return band_files
 
     def ref_toa_geoimage(self):
