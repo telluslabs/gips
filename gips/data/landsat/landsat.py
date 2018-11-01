@@ -1098,6 +1098,22 @@ class landsatData(Data):
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
 
+    def _download_gcs_bands(self, output_dir):
+        if self.preferred_asset != 'C1GS':
+            raise
+
+        band_files = []
+
+        for path in self.assets[self.preferred_asset].band_paths():
+            match = re.match("/[\w_]+/(.+)", path)
+            url = match.group(1)
+            output_path = os.path.join(
+                output_dir, os.path.basename(url)
+            )
+            subprocess.check_call(["wget", "--quiet", url, "--output-document", output_path])
+            band_files.append(output_path)
+        return band_files
+
     @property
     def preferred_asset(self):
         if getattr(self, '_preferred_asset', None):
@@ -1802,7 +1818,10 @@ class landsatData(Data):
         md = self.meta(asset_type)
 
         try:
-            paths = asset_obj.band_paths()
+            if asset_type == 'C1GS':
+                paths = self._download_gcs_bands('/tmp')
+            else:
+                paths = asset_obj.band_paths()
         except NotImplementedError:
             # Extract files, use tarball directly via GDAL's virtual filesystem?
             if self.get_setting('extract'):
