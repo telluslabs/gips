@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 ################################################################################
 #    GIPS: Geospatial Image Processing System
 #
@@ -69,6 +70,7 @@ REPOS = {
         'extract': False,       # extract files from tar.gz before processing instead of direct access
         'username': USGS_USER,
         'password': USGS_PASS,
+        'source': 'gs',
     },
     'modis': {
         'repository': prepend('modis'),
@@ -80,6 +82,11 @@ REPOS = {
         'username': ESA_USER,
         'password': ESA_PASS,
         'extract': False,  # extract files from tar.gz before processing instead of direct access
+    },
+    'smap': {
+        'repository': prepend('smap'),
+        'username': EARTHDATA_USER,
+        'password': EARTHDATA_PASS,
     },
     'cdl': {
         'repository': prepend('cdl'),

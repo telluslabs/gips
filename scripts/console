@@ -1,0 +1,13 @@
+#!/bin/bash
+
+export TAG=${1:-latest}
+
+export GIPS_REPO=${PWD}
+export GIPS_DATA=${HOME}/archive
+
+docker-compose run \
+    --rm \
+    -e GIPS_REPO \
+    -e GIPS_DATA \
+    docker-gips \
+    /bin/bash

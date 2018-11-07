@@ -33,12 +33,14 @@ import tempfile
 import zipfile
 import copy
 import glob
+from itertools import izip_longest
 from xml.etree import ElementTree, cElementTree
 
 import numpy
 import pyproj
 import requests
 from requests.auth import HTTPBasicAuth
+from shapely.wkt import loads as wkt_loads
 
 import gippy
 import gippy.algorithms
@@ -191,6 +193,7 @@ class sentinel2Asset(Asset):
             # updated assumption: only XML file in DATASTRIP/ (not including subdirs)
             'datastrip-md-re': '^.*/DATASTRIP/[^/]+/[^/]*.xml$',
             'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
+            'asset-md-re': '^.*/S2.*\.xml$',
         },
         _2016_12_07: {
             # post-2016 assets use their downloaded FN as their archived FN
@@ -204,6 +207,7 @@ class sentinel2Asset(Asset):
             # Two files with asset-global metadata, this is one of them:
             # for INSPIRE.xml see http://inspire.ec.europa.eu/XML-Schemas/Data-Specifications/2892
             'inspire-md-re': '^.*/INSPIRE.xml$',
+            'asset-md-re': '^.*/MTD_MSIL1C.xml$',
         },
     }
 
@@ -482,13 +486,22 @@ class sentinel2Asset(Asset):
             results = self.query_scihub(self.style, self.tile, self.date)
 
             if 'entry' in results['feed']:
-                assert results['feed']['entry']['double']['name'] == 'cloudcoverpercentage'
-                return float(results['feed']['entry']['double']['content'])
+                # TODO: This assertion is occasionally false.  'entry'
+                #       sometimes points at a list, instead of a dict.
+                #       Make this jive with the API better.
+                if type(results['feed']['entry']) is list:
+                    entry = results['feed']['entry'][0]
+                else:
+                    entry = results['feed']['entry']
+                assert entry['double']['name'] == 'cloudcoverpercentage'
+                return float(entry['double']['content'])
             raise ValueError("%s doesn't exist locally or remotely" % self.filename)
 
     def filter(self, pclouds=100, **kwargs):
+        if pclouds >= 100:
+            return True
         cc = self.cloud_cover()
-        asset_passes_filter = pclouds >= 100 or cc <= pclouds
+        asset_passes_filter = cc <= pclouds
         if asset_passes_filter:
             msg = 'Asset cloud cover is {} %, meets pclouds threshold of {} %'
         else:
@@ -658,6 +671,28 @@ class sentinel2Asset(Asset):
         dt = datetime.datetime.combine(self.date, self.time)
         self._atmo_corrector = atmosphere.SIXS(visbands, wvlens, geo, dt, sensor=self.sensor)
         return self._atmo_corrector
+
+    def footprint(self):
+        asset_contents = self.datafiles()
+
+        mtd_file_pattern = self._asset_styles[self.style]['asset-md-re']
+        metadata_fn = next(n for n in asset_contents if re.match(mtd_file_pattern, n))
+
+        metadata_zf = next(iter(self.extract([metadata_fn])))
+        tree = ElementTree.parse(metadata_zf)
+        sag_elem = next(tree.iter('Global_Footprint')) #      should only be one
+        values_tags = sag_elem.find('EXT_POS_LIST')
+
+        # format as valid WKT
+        points = values_tags.text.strip().split(" ")
+        zipped_points = izip_longest(*[iter(points)]*2)  # fancy way to group list into pairs
+        wkt_points = ", ".join([y + " " + x for x, y in list(zipped_points)])
+        footprint_wkt = "POLYGON (({}))".format(wkt_points)
+
+        # For old style assets, `Global_Footprint` is the entire swath,
+        # so intersect it with tile boundary to get actual footprint.
+        tile_polygon = wkt_loads(self.get_geometry())
+        return tile_polygon.intersection(wkt_loads(footprint_wkt)).wkt
 
 
 class sentinel2Data(Data):
@@ -1006,21 +1041,23 @@ class sentinel2Data(Data):
 
         self._time_report(' -> %s: processed %s' % (self.basename, indices))
 
-    def shrunk_bbox(self, tile):
-        w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(tile)
-        latlon = pyproj.Proj(init='epsg:4326')
-        utm = pyproj.Proj(init='epsg:326{}'.format(tile[0:2]))
+    # this function creates a geolocation error
+    #def shrunk_bbox(self, tile):
+        #w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(tile)
+        #latlon = pyproj.Proj(init='epsg:4326')
+        #utm = pyproj.Proj(init='epsg:326{}'.format(tile[0:2]))
 
-        w_lon_utm, s_lat_utm = pyproj.transform(latlon, utm, w_lon, s_lat)
-        e_lon_utm, n_lat_utm = pyproj.transform(latlon, utm, e_lon, n_lat)
+        #w_lon_utm, s_lat_utm = pyproj.transform(latlon, utm, w_lon, s_lat)
+        #e_lon_utm, n_lat_utm = pyproj.transform(latlon, utm, e_lon, n_lat)
 
-        lon_diff = (w_lon_utm - e_lon_utm) / 16
-        lat_diff = (n_lat_utm - s_lat_utm) / 16
+        #lon_diff = (e_lon_utm - w_lon_utm) / 16
+        #lat_diff = (n_lat_utm - s_lat_utm) / 16
 
-        w_lon_shrunk, s_lat_shrunk = pyproj.transform(utm, latlon, w_lon_utm + lon_diff, s_lat_utm + lat_diff)
-        e_lon_shrunk, n_lat_shrunk = pyproj.transform(utm, latlon, e_lon_utm - lon_diff, n_lat_utm - lat_diff)
+        #w_lon_shrunk, s_lat_shrunk = pyproj.transform(utm, latlon, w_lon_utm + lon_diff, s_lat_utm + lat_diff)
+        #e_lon_shrunk, n_lat_shrunk = pyproj.transform(utm, latlon, e_lon_utm - lon_diff, n_lat_utm - lat_diff)
 
-        return w_lon_shrunk, e_lon_shrunk, s_lat_shrunk, n_lat_shrunk
+        #return w_lon_shrunk, e_lon_shrunk, s_lat_shrunk, n_lat_shrunk
+
 
     def process_acolite(self, aco_prods):
         a_obj, sensor = self.current_asset(), self.current_sensor()
@@ -1036,13 +1073,16 @@ class sentinel2Data(Data):
             aps_p.update(self._products[p])
             aps_p.pop('assets')
 
-        w_lon, e_lon, s_lat, n_lat = self.shrunk_bbox(a_obj.tile)
+        w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(a_obj.tile)
+        roi = None
+        if a_obj.style == 'original':
+            roi = (s_lat, w_lon, n_lat, e_lon)
 
         prodout = atmosphere.process_acolite(
                 a_obj, aco_tmp_dir, acolite_product_spec,
                 a_obj.style_res['raster-re'].format(tileid=self.id),
                 extracted_asset_glob='*.SAFE',
-                roi=(s_lat, w_lon, n_lat, e_lon),
+                roi=roi,
                 band='02')
 
         [self.AddFile(sensor, pt, fn) for pt, fn in prodout.items()]
@@ -1155,7 +1195,7 @@ class sentinel2Data(Data):
 
         # Set cfmask 2 and 3 to 1's, everything else to 0's
         np_cloudmask = numpy.logical_or( npfm == 2, npfm == 3).astype('uint8')
-        
+
         # cloudmask.tif is taken by cfmask
         cloudmask_filename = "%s/cloudmask2.tif" % self._temp_proc_dir
         cloudmask_img = gippy.GeoImage(

@@ -38,6 +38,9 @@ def write_raster(outfile, outdata, proj, geo, nodata, dtype):
 
 __version__ = '0.1.0'
 
+FORCE_OUTPUT_DIM = (5000, 5000)
+
+
 def main():
     title = Colors.BOLD + 'GIPS Project Raster Splitter (v%s)' % __version__ + Colors.OFF
 
@@ -85,20 +88,27 @@ def main():
                         except:
                             data = imgdata[:,:]
 
+
+                        if FORCE_OUTPUT_DIM is not None:
+                            if data.shape != FORCE_OUTPUT_DIM:
+                                yf, xf = FORCE_OUTPUT_DIM
+                                yd, xd = data.shape
+                                if xd > xf:
+                                    data = data[:,:xf]
+                                elif xd < xf:
+                                    data = np.hstack((data, np.zeros((data.shape[0], 1), dtype=data.dtype)))
+                                if yd > yf:
+                                    data = data[:yf,:]
+                                elif yd < yf:
+                                    data = np.vstack((data, np.zeros((1, data.shape[1]), dtype=data.dtype)))
+
+
                         nodata = -32768
                         scale = 10000
                         data = data.astype('int16')
                         dtype = gdal.GDT_Int16
 
                         write_raster(fnameout, data, proj, geo, nodata, dtype)
-
-                        #imgout = gippy.GeoImage(fnameout, img, gippy.GDT_Int16, 1)
-                        #imgout.SetNoData(-32768)
-                        #imgout.SetOffset(0.0)
-                        #imgout.SetGain(0.0001)
-                        #imgout[0].Write(data)
-                        #imgout.SetBandName(bname, 1)
-                        #imgout = None
 
                     img = None
 

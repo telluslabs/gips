@@ -5,6 +5,7 @@ import os
 import pkgutil
 import imp
 import datetime
+from datetime import datetime as dt
 
 import pytest
 import mock
@@ -150,14 +151,13 @@ def t_data_fetch_base_case(mocker, m_discover_asset, m_query_service, m_fetch):
     It should return data about the fetch on success, and shouldn't
     raise an exception."""
     # setup
-    c1_atd = ('C1', '012030', datetime.datetime(2017, 8, 1, 0, 0))
-    c1s3_atd = ('C1S3', '012030', datetime.datetime(2017, 8, 1, 0, 0))
-    expected_calls = [mocker.call(*c1_atd), mocker.call(*c1s3_atd)]
+    a_types = ('C1', 'C1GS', 'C1S3')
+    atds = [(a, '012030', dt(2017, 8, 1, 0, 0)) for a in a_types]
+    expected_calls = [mocker.call(*atd) for atd in atds]
     # call
     actual = landsatData.fetch(*df_args)
     # assertions
-    assert ([c1_atd, c1s3_atd] == actual
-            and expected_calls == m_fetch.call_args_list)
+    assert atds == actual and expected_calls == m_fetch.call_args_list
 
 def t_data_fetch_error_case(mocker, m_discover_asset, m_query_service, m_fetch):
     """Test error case of data.core.Data.fetch.
