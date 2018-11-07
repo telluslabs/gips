@@ -200,7 +200,7 @@ class smapData(Data):
             if val[0] == 'smp':
                 img = gippy.GeoImage(allsds[15])
             elif val[0] == 'smpe':
-                img = gippy.GeoImage(allsds[14])
+                img = gippy.GeoImage(allsds[13])
 
             imgdata = img.Read()
             imgout = gippy.GeoImage(fname, img.XSize(), img.YSize(), 1, gippy.GDT_Float32)
