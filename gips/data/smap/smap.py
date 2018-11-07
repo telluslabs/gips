@@ -196,9 +196,10 @@ class smapData(Data):
 
             sensor = self._products[prod_type]['sensor']
             fname = self.temp_product_filename(sensor, prod_type)  # moved to archive at end of loop
-            if val == 'smp':
+
+            if val[0] == 'smp':
                 img = gippy.GeoImage(allsds[15])
-            elif val == 'smpe':
+            elif val[0] == 'smpe':
                 img = gippy.GeoImage(allsds[14])
 
             imgdata = img.Read()
