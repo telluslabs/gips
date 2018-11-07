@@ -82,6 +82,11 @@ REPOS = {
         'password': ESA_PASS,
         'extract': False,  # extract files from tar.gz before processing instead of direct access
     },
+    'smap': {
+        'repository': '$TLD/smap',
+        'username': EARTHDATA_USER,
+        'password': EARTHDATA_PASS,
+    },
     # these drivers tend to more specialized and experimental so turned off by default
     'cdl': {
         'repository': '$TLD/cdl',
