@@ -123,7 +123,6 @@ class smapData(Data):
     version = '1.0.0'
     Asset = smapAsset
 
-    _geotransform = (-17367530.44516138, 36032.220850622405123, 0, 7314540.79258289, 0, -36032.217290640393912)
     _projection = 'PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],TOWGS84[0,0,0,0,0,0,0],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9108"]],AUTHORITY["EPSG","4326"]],PROJECTION["Cylindrical_Equal_Area"],PARAMETER["standard_parallel_1",30],PARAMETER["central_meridian",0],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1],AUTHORITY["epsg","6933"]]'
     _products = {
         'smp': {
@@ -133,6 +132,7 @@ class smapData(Data):
             'startdate': datetime.date(2015, 3, 31),
             'sensor': 'RAD',
             'latency': 1,
+            '_geotransform': (-17367530.44516138, 36032.220850622405123, 0, 7314540.79258289, 0, -36032.217290640393912),
         },
         'smpe': {
             'description': 'SMAP SM AM Acquisiton posted on enhanced 9km grid',
@@ -141,6 +141,7 @@ class smapData(Data):
             'startdate': datetime.date(2015, 3, 31),
             'sensor': 'RAD',
             'latency': 1,
+            '_geotransform': (-17367530.44516138, 9000.0, 0, 7314540.79258289, 0, -9000.0),
         }
     }
 
@@ -210,7 +211,7 @@ class smapData(Data):
             imgout.SetGain(1.0)
             imgout.SetBandName('Soil Moisture', 1)
             imgout.SetProjection(self._projection)
-            imgout.SetAffine(np.array(self._geotransform))
+            imgout.SetAffine(np.array(self._products[prod_type]['_geotransform']))
             imgout[0].Write(imgdata)
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
