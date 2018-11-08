@@ -64,7 +64,7 @@ class gpmAsset(Asset):
     def ftp_connect(cls, asset, date):
         """Connect to an FTP server and chdir according to the args.
         Returns the ftplib connection object."""
-        utils.verbose_out('Connecting to {}'.format(cls._host), 5)
+        utils.verbose_out('Connecting to {}'.format(cls._assets[asset]['host']), 5)
         conn = ftplib.FTP(cls._assets[asset]['host'])
         conn.login('subitc@ufl.edu', 'subitc@ufl.edu')
         conn.set_pasv(True)
