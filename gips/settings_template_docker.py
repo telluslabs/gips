@@ -89,7 +89,7 @@ REPOS = {
         'password': EARTHDATA_PASS,
     },
     'gpm': {
-        'repository': '$TLD/gpm',
+        'repository': prepend('gpm'),
     },
     'cdl': {
         'repository': prepend('cdl'),
