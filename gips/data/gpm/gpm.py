@@ -30,16 +30,16 @@ from gips import utils
 class gpmRepository(Repository):
     name = 'GPM'
     description = 'Global Precipitation Measurement Mission (GPM)'
-
     # NASA assets require special authentication
     _host = "arthurhou.pps.eosdis.nasa.gov"
     _tile_attribute = 'tileid'
 
 class gpmAsset(Asset):
     Repository = gpmRepository
-    _sensors = {'IMERG': {'description': 'Integrated Multi-satellite Retrievals for GPM'}}
+    _sensors = {'GPM': {'description': 'Integrated Multi-satellite Retrievals for GPM'}}
     _assets = {
         'IMERG': {
+            'host': "arthurhou.pps.eosdis.nasa.gov",
             'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.002',
             'pattern': r'3B-DAY-GIS\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.tif',
             'description': 'Multisatellite Daily Precipitation Retrieval at 0.1 degrees',
@@ -65,7 +65,7 @@ class gpmAsset(Asset):
         """Connect to an FTP server and chdir according to the args.
         Returns the ftplib connection object."""
         utils.verbose_out('Connecting to {}'.format(cls._host), 5)
-        conn = ftplib.FTP(cls._host)
+        conn = ftplib.FTP(cls._assets[asset]['host'])
         conn.login('subitc@ufl.edu', 'subitc@ufl.edu')
         conn.set_pasv(True)
         working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%m'),
@@ -103,7 +103,7 @@ class gpmAsset(Asset):
         if qs_rv is None:
             return []
         asset_fn = qs_rv['basename']
-        with utils.error_handler("Error downloading from " + cls._host, continuable=True):
+        with utils.error_handler("Error downloading from " + cls._assets[asset]['host'], continuable=True):
             ftp = cls.ftp_connect(asset, date)  # starts chdir'd to the right directory
             stage_dir_fp = cls.Repository.path('stage')
             stage_fp = os.path.join(stage_dir_fp, asset_fn)
