@@ -89,7 +89,7 @@ class gpmAsset(Asset):
         if 0 == len(filenames):
             return None, None
         # choose the one that has the most favorable stability & version values (usually only one)
-        compiled_pattern = re.compile(cls.asset[asset]['pattern'])
+        compiled_pattern = re.compile(cls._assets[asset]['pattern'])
         for filename in filenames:
             if compiled_pattern.search(filename):
                 return filename, None
