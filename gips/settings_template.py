@@ -87,6 +87,9 @@ REPOS = {
         'username': EARTHDATA_USER,
         'password': EARTHDATA_PASS,
     },
+    'gpm': {
+        'repository': '$TLD/gpm',
+    },
     # these drivers tend to more specialized and experimental so turned off by default
     'cdl': {
         'repository': '$TLD/cdl',

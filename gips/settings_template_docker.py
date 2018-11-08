@@ -88,6 +88,9 @@ REPOS = {
         'username': EARTHDATA_USER,
         'password': EARTHDATA_PASS,
     },
+    'gpm': {
+        'repository': '$TLD/gpm',
+    },
     'cdl': {
         'repository': prepend('cdl'),
     },
