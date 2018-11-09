@@ -50,7 +50,7 @@ class gpmAsset(Asset):
             'host': "jsimpson.pps.eosdis.nasa.gov",
             'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.tif',
             'description': 'Daily Accumulated Precipitation (in mm) at 0.1 degrees - Production Run',
-            'path': '/gpmdata/',
+            'path': '/NRTPUB/imerg/gis/',
             'startdate': datetime.date(2014, 3, 12),
             'latency': 1,
         },
@@ -62,7 +62,11 @@ class gpmAsset(Asset):
         super(gpmAsset, self).__init__(filename)
 
         bname = os.path.basename(filename)
-        self.asset = (re.search('(?<=3B-DAY-GIS.MS.MRG.3)\w*(?=.[0-9]{8})', bname)).group(0)
+        indicator = (re.search('(?<=3B-)\w*(?=-{1})', bname)).group(0)
+        if indicator == 'DAY':
+            self.asset = 'IMERG-DAY-FINAL'
+        elif indicator == 'HHR':
+            self.asset = 'IMERG-DAY-LATE'
         date_here = (re.search('[0-9]{8}', bname)).group(0)
         self.date = datetime.datetime.strptime(date_here, "%Y%m%d").date()
         self._version = (re.search('V[0-9A-Z]*', bname)).group(0)
@@ -76,8 +80,12 @@ class gpmAsset(Asset):
         conn = ftplib.FTP(cls._assets[asset]['host'])
         conn.login('subitc@ufl.edu', 'subitc@ufl.edu')
         conn.set_pasv(True)
-        working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%m'),
-                                         date.strftime('%d'), 'gis')
+        if asset == 'IMERG-DAY-FINAL':
+            working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%m'),
+                                             date.strftime('%d'), 'gis')
+        elif asset == 'IMERG-DAY-LATE':
+            working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%m'))
+
         utils.verbose_out('Changing to {}'.format(working_directory), 5)
         conn.cwd(working_directory)
         return conn
