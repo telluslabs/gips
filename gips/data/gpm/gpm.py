@@ -152,14 +152,14 @@ class gpmData(Data):
                   'UNIT["degree",0.0174532925199433],AUTHORITY["EPSG","4326"]]'
     _geotransform = (-180.0, 0.10000000149011612, 0.0, 90.0, 0.0, -0.10000000149011612)
     _products = {
-        'gpm_ppt_rate_final': {
+        'pratefinal': {
             'description': 'Final Precipitation Rate Averaged over 1 Day in mm/hr',
             # the list of asset types associated with this product
             'assets': ['IMERG-DAY-FINAL'],
             'startdate': datetime.date(2014, 3, 12),
             'sensor': 'GPM',
         },
-        'gpm_ppt_acc_nrt': {
+        'paccnrt': {
             'description': 'NRT Precipitation Accumulated over 1 Day in mm',
             # the list of asset types associated with this product
             'assets': ['IMERG-DAY-LATE'],
