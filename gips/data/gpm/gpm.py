@@ -48,7 +48,7 @@ class gpmAsset(Asset):
         },
         'IMERG-DAY-LATE': {
             'host': "jsimpson.pps.eosdis.nasa.gov",
-            'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.tif',
+            'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif',
             'description': 'Daily Accumulated Precipitation (in mm) at 0.1 degrees - Production Run',
             'path': '/NRTPUB/imerg/gis/',
             'startdate': datetime.date(2014, 3, 12),
@@ -207,8 +207,6 @@ class gpmData(Data):
         # {'temp8tn': ['temp8tn'], 'clouds': ['clouds'], . . . }
         # key is only used once far below, and val is only used for val[0].
         for key, val in products.requested.items():
-            VerboseOut('Key (%s) for value %s'
-                       % (str(key), str(val[0])))
             start = datetime.datetime.now()
             prod_type = val[0]
             asset, missingassets, availassets, allsds = \
