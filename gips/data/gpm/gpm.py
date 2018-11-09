@@ -38,15 +38,23 @@ class gpmAsset(Asset):
     Repository = gpmRepository
     _sensors = {'GPM': {'description': 'Integrated Multi-satellite Retrievals for GPM'}}
     _assets = {
-        'IMERG': {
+        'IMERG-DAY-FINAL': {
             'host': "arthurhou.pps.eosdis.nasa.gov",
-            'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.002',
             'pattern': r'3B-DAY-GIS\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.tif',
-            'description': 'Multisatellite Daily Precipitation Retrieval at 0.1 degrees',
+            'description': 'Daily Precipitation Rate (mm/hr) at 0.1 degrees - Research Run',
             'path': '/gpmdata/',
             'startdate': datetime.date(2014, 3, 12),
             'latency': 1,
         },
+        'IMERG-DAY-LATE': {
+            'host': "jsimpson.pps.eosdis.nasa.gov",
+            'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.tif',
+            'description': 'Daily Accumulated Precipitation (in mm) at 0.1 degrees - Production Run',
+            'path': '/gpmdata/',
+            'startdate': datetime.date(2014, 3, 12),
+            'latency': 1,
+        },
+
     }
 
     def __init__(self, filename):
@@ -92,7 +100,15 @@ class gpmAsset(Asset):
         compiled_pattern = re.compile(cls._assets[asset]['pattern'])
         for filename in filenames:
             if compiled_pattern.search(filename):
-                return filename, None
+                if asset == 'IMERG-DAY-FINAL':
+                    return filename, None
+                elif asset == 'IMERG-DAY-LATE':
+                    end_timestamp = int(re.search(r'(?<=E)[0-9]{6}', filename))
+                    if end_timestamp > 230000:
+                        return filename, None
+                    else:
+                        continue
+
         return None, None
 
 
@@ -128,10 +144,17 @@ class gpmData(Data):
                   'UNIT["degree",0.0174532925199433],AUTHORITY["EPSG","4326"]]'
     _geotransform = (-180.0, 0.10000000149011612, 0.0, 90.0, 0.0, -0.10000000149011612)
     _products = {
-        'prate': {
+        'gpm_ppt_rate_final': {
             'description': 'Final Precipitation Rate Averaged over 1 Day in mm/hr',
             # the list of asset types associated with this product
-            'assets': ['IMERG'],
+            'assets': ['IMERG-DAY-FINAL'],
+            'startdate': datetime.date(2014, 3, 12),
+            'sensor': 'GPM',
+        },
+        'gpm_ppt_acc_nrt': {
+            'description': 'NRT Precipitation Accumulated over 1 Day in mm',
+            # the list of asset types associated with this product
+            'assets': ['IMERG-DAY-LATE'],
             'startdate': datetime.date(2014, 3, 12),
             'sensor': 'GPM',
         },
