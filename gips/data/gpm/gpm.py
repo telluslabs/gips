@@ -111,7 +111,7 @@ class gpmAsset(Asset):
                 if asset == 'IMERG-DAY-FINAL':
                     return filename, None
                 elif asset == 'IMERG-DAY-LATE':
-                    end_timestamp = int(re.search(r'(?<=E)[0-9]{6}', filename))
+                    end_timestamp = int(re.search(r'(?<=E)[0-9]{6}', filename).group(0))
                     if end_timestamp > 230000:
                         return filename, None
                     else:
