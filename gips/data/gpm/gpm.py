@@ -41,7 +41,8 @@ class gpmAsset(Asset):
         'IMERG-DAY-FINAL': {
             'host': "arthurhou.pps.eosdis.nasa.gov",
             'pattern': r'3B-DAY-GIS\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.tif',
-            'description': 'Daily Precipitation Rate (mm/hr) at 0.1 degrees - Research Run',
+            'description': 'Daily Precipitation Rate (mm/hr) at 0.1 degrees - Research Run using the IMERG Algorithm'
+                           'developed for the GPM constellation',
             'path': '/gpmdata/',
             'startdate': datetime.date(2014, 3, 12),
             'latency': 1,
@@ -49,9 +50,19 @@ class gpmAsset(Asset):
         'IMERG-DAY-LATE': {
             'host': "jsimpson.pps.eosdis.nasa.gov",
             'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif',
-            'description': 'Daily Accumulated Precipitation (in mm) at 0.1 degrees - Production Run',
+            'description': 'Daily Accumulated Precipitation (in mm) at 0.1 degrees - Production Run using the '
+                           'IMERG Algorithm developed for the GPM constellation',
             'path': '/NRTPUB/imerg/gis/',
             'startdate': datetime.date(2014, 3, 12),
+            'latency': 1,
+        },
+        '3B42-DAY-LATE': {
+            'host': "trmmopen.gsfc.nasa.gov",
+            'pattern': r'3B42RT\..{10}\..{1}\.1day.tif',
+            'description': 'Daily Accumulated Precipitation (in mm) at 0.25 degrees - Production Run using the '
+                           '3B42 Algorithm developed for the TRMM constellation',
+            'path': '/pub/gis/',
+            'startdate': datetime.date(2000, 3, 2),
             'latency': 1,
         },
 
@@ -62,14 +73,28 @@ class gpmAsset(Asset):
         super(gpmAsset, self).__init__(filename)
 
         bname = os.path.basename(filename)
-        indicator = (re.search('(?<=3B-)\w*(?=-{1})', bname)).group(0)
+        try:
+            indicator = (re.search('(?<=3B-)\w*(?=-{1})', bname)).group(0)
+        except AttributeError:
+            indicator = (re.search('(?<=3B)\w*(?=\.{1})', bname)).group(0)
+            pass
+
         if indicator == 'DAY':
             self.asset = 'IMERG-DAY-FINAL'
         elif indicator == 'HHR':
             self.asset = 'IMERG-DAY-LATE'
-        date_here = (re.search('[0-9]{8}', bname)).group(0)
+        elif indicator == '42RT':
+            self.asset = '3B42-DAY-LATE'
+
+        # Will break in the next millenium
+        date_here = (re.search('2[0-9]{7}', bname)).group(0)
         self.date = datetime.datetime.strptime(date_here, "%Y%m%d").date()
-        self._version = (re.search('V[0-9A-Z]*', bname)).group(0)
+        try:
+            self._version = (re.search('V[0-9A-Z]*', bname)).group(0)
+        except AttributeError:
+            self._version = 7 #hard code for 3B42 products
+            pass
+
         self.tile = 'h01v01'
 
     @classmethod
@@ -85,6 +110,9 @@ class gpmAsset(Asset):
                                              date.strftime('%d'), 'gis')
         elif asset == 'IMERG-DAY-LATE':
             working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%m'))
+
+        elif asset == '3B42-DAY-LATE':
+            working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y%m'))
 
         utils.verbose_out('Changing to {}'.format(working_directory), 5)
         conn.cwd(working_directory)
@@ -116,7 +144,12 @@ class gpmAsset(Asset):
                         return filename, None
                     else:
                         continue
-
+                elif asset == '3B42-DAY-LATE':
+                    end_timestamp = int(re.search(r'[0-9]{2}(?=\..)', filename).group(0))
+                    if end_timestamp == 21:
+                        return filename, None
+                    else:
+                        continue
         return None, None
 
 
@@ -150,7 +183,7 @@ class gpmData(Data):
     _projection = 'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.2572326660159,' \
                   'AUTHORITY["EPSG","7030"]], AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],' \
                   'UNIT["degree",0.0174532925199433],AUTHORITY["EPSG","4326"]]'
-    _geotransform = (-180.0, 0.10000000149011612, 0.0, 90.0, 0.0, -0.10000000149011612)
+
     _products = {
         'pratefinal': {
             'description': 'Final Precipitation Rate Averaged over 1 Day in mm/hr',
@@ -158,13 +191,23 @@ class gpmData(Data):
             'assets': ['IMERG-DAY-FINAL'],
             'startdate': datetime.date(2014, 3, 12),
             'sensor': 'GPM',
+            '_geotransform': (-180.0, 0.10000000149011612, 0.0, 90.0, 0.0, -0.10000000149011612),
         },
-        'paccnrt': {
+        'paccnrtgpm': {
             'description': 'NRT Precipitation Accumulated over 1 Day in mm',
             # the list of asset types associated with this product
             'assets': ['IMERG-DAY-LATE'],
             'startdate': datetime.date(2014, 3, 12),
             'sensor': 'GPM',
+            '_geotransform': (-180.0, 0.10000000149011612, 0.0, 90.0, 0.0, -0.10000000149011612),
+        },
+        'paccnrttrmm': {
+            'description': 'NRT Precipitation Accumulated over 1 Day in mm',
+            # the list of asset types associated with this product
+            'assets': ['3B42-DAY-LATE'],
+            'startdate': datetime.date(2014, 3, 12),
+            'sensor': 'GPM',
+            '_geotransform': (-180.0, 0.25, 0.0, 90.0, 0.0, -0.25),
         },
     }
 
