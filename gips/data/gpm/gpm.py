@@ -57,7 +57,7 @@ class gpmAsset(Asset):
             'latency': 1,
         },
         '3B42-DAY-LATE': {
-            'host': "trmmopen.pps.eosdis.nasa.gov/",
+            'host': "trmmopen.pps.eosdis.nasa.gov",
             'pattern': r'3B42RT\..{10}\..{1}\.1day.tif',
             'description': 'Daily Accumulated Precipitation (in mm) at 0.25 degrees - Production Run using the '
                            '3B42 Algorithm developed for the TRMM constellation',
@@ -102,16 +102,22 @@ class gpmAsset(Asset):
         """Connect to an FTP server and chdir according to the args.
         Returns the ftplib connection object."""
         utils.verbose_out('Connecting to {}'.format(cls._assets[asset]['host']), 5)
-        conn = ftplib.FTP(cls._assets[asset]['host'])
-        conn.login('subitc@ufl.edu', 'subitc@ufl.edu')
-        conn.set_pasv(True)
         if asset == 'IMERG-DAY-FINAL':
+            conn = ftplib.FTP(cls._assets[asset]['host'])
+            conn.login('subitc@ufl.edu', 'subitc@ufl.edu')
+            conn.set_pasv(True)
             working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%m'),
                                              date.strftime('%d'), 'gis')
         elif asset == 'IMERG-DAY-LATE':
+            conn = ftplib.FTP(cls._assets[asset]['host'])
+            conn.login('subitc@ufl.edu', 'subitc@ufl.edu')
+            conn.set_pasv(True)
             working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%m'))
 
         elif asset == '3B42-DAY-LATE':
+            conn = ftplib.FTP(cls._assets[asset]['host'])
+            conn.login()
+            conn.set_pasv(True)
             working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y%m'))
 
         utils.verbose_out('Changing to {}'.format(working_directory), 5)
