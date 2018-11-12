@@ -57,11 +57,11 @@ class gpmAsset(Asset):
             'latency': 1,
         },
         '3B42-DAY-LATE': {
-            'host': "trmmopen.gsfc.nasa.gov/pub",
+            'host': "trmmopen.pps.eosdis.nasa.gov/",
             'pattern': r'3B42RT\..{10}\..{1}\.1day.tif',
             'description': 'Daily Accumulated Precipitation (in mm) at 0.25 degrees - Production Run using the '
                            '3B42 Algorithm developed for the TRMM constellation',
-            'path': '/gis/',
+            'path': '/pub/gis/',
             'startdate': datetime.date(2000, 3, 2),
             'latency': 1,
         },
