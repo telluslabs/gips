@@ -280,7 +280,7 @@ class gpmData(Data):
             imgout.SetGain(0.1)
             imgout.SetBandName('PrecipitationRate', 1)
             imgout.SetProjection(self._projection)
-            imgout.SetAffine(np.array(self._geotransform))
+            imgout.SetAffine(np.array(self._products[prod_type]['_geotransform']))
             imgout[0].Write(imgdata)
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
