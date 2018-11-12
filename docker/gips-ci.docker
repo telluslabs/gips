@@ -16,8 +16,9 @@ ENV GIPS_OVERRIDE_VERSION='0.0.0-dev'
 RUN cd /gips \
     && chmod +x /usr/local/bin/sixs \
     && chmod +x /usr/local/bin/ortho \
-    && pip install -r dev_requirements.txt \
-    && pip install --process-dependency-links -e . \
+    && pip install -U pip \
+    && /usr/local/bin/pip install -r dev_requirements.txt \
+    && /usr/local/bin/pip install -e file:///gips/ \
     && rm -f /gips/gips/settings.py /gips/pytest.ini \
     && gips_config env -r /archive -e icooke@ags.io \
     && openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh  -pass file:/root/.ssh/gitlab_ci \

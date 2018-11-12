@@ -991,6 +991,13 @@ class sentinel2Data(Data):
         self._product_images[product] = image
         return image
 
+    def _drop_geoimage_cache(self):
+        """GeoImage objects hold a file handle.  Dropping them to avoid
+        filesystme complications.
+        """
+        for k in self._product_images:
+            v = self._product_images.pop(k)
+            del v
 
     @classmethod
     def normalize_tile_string(cls, tile_string):
@@ -1506,3 +1513,6 @@ class sentinel2Data(Data):
 
         self._product_images = {} # hint for gc; may be needed due to C++/swig weirdness
         self._time_report('Processing complete for this spatial-temporal unit')
+
+        ## Drop GeoImage cache
+        self._drop_geoimage_cache()
