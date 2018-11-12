@@ -57,11 +57,11 @@ class gpmAsset(Asset):
             'latency': 1,
         },
         '3B42-DAY-LATE': {
-            'host': "trmmopen.gsfc.nasa.gov",
+            'host': "trmmopen.gsfc.nasa.gov/pub",
             'pattern': r'3B42RT\..{10}\..{1}\.1day.tif',
             'description': 'Daily Accumulated Precipitation (in mm) at 0.25 degrees - Production Run using the '
                            '3B42 Algorithm developed for the TRMM constellation',
-            'path': '/pub/gis/',
+            'path': '/gis/',
             'startdate': datetime.date(2000, 3, 2),
             'latency': 1,
         },
@@ -194,7 +194,7 @@ class gpmData(Data):
             '_geotransform': (-180.0, 0.10000000149011612, 0.0, 90.0, 0.0, -0.10000000149011612),
         },
         'paccnrtgpm': {
-            'description': 'NRT Precipitation Accumulated over 1 Day in mm',
+            'description': 'NRT Precipitation Accumulated over 1 Day in mm - GPM (and friends) Archive',
             # the list of asset types associated with this product
             'assets': ['IMERG-DAY-LATE'],
             'startdate': datetime.date(2014, 3, 12),
@@ -202,7 +202,7 @@ class gpmData(Data):
             '_geotransform': (-180.0, 0.10000000149011612, 0.0, 90.0, 0.0, -0.10000000149011612),
         },
         'paccnrttrmm': {
-            'description': 'NRT Precipitation Accumulated over 1 Day in mm',
+            'description': 'NRT Precipitation Accumulated over 1 Day in mm - TRMM (and friends) Archive',
             # the list of asset types associated with this product
             'assets': ['3B42-DAY-LATE'],
             'startdate': datetime.date(2014, 3, 12),
