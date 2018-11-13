@@ -39,7 +39,7 @@ class gpmAsset(Asset):
     _sensors = {'GPM': {'description': 'Integrated Multi-satellite Retrievals for GPM'}}
     _assets = {
         'IMERG-DAY-FINAL': {
-            'host': "arthurhou.pps.eosdis.nasa.gov",
+                        'host': "arthurhou.pps.eosdis.nasa.gov",
             'pattern': r'3B-DAY-GIS\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.tif',
             'description': 'Daily Precipitation Rate (mm/hr) at 0.1 degrees - Research Run using the IMERG Algorithm'
                            'developed for the GPM constellation',
@@ -197,7 +197,7 @@ class gpmData(Data):
             'assets': ['IMERG-DAY-FINAL'],
             'startdate': datetime.date(2014, 3, 12),
             'sensor': 'GPM',
-            '_geotransform': (-180.0, 0.10000000149011612, 0.0, 90.0, 0.0, -0.10000000149011612),
+            '_geotransform': (-179.9499969, 0.10000000149011612, 0.0, 89.9499969, 0.0, -0.10000000149011612),
         },
         'paccnrtgpm': {
             'description': 'NRT Precipitation Accumulated over 1 Day in mm - GPM (and friends) Archive',
@@ -205,7 +205,7 @@ class gpmData(Data):
             'assets': ['IMERG-DAY-LATE'],
             'startdate': datetime.date(2014, 3, 12),
             'sensor': 'GPM',
-            '_geotransform': (-180.0, 0.10000000149011612, 0.0, 90.0, 0.0, -0.10000000149011612),
+            '_geotransform': (-179.9499969, 0.10000000149011612, 0.0, 89.9499969, 0.0, -0.10000000149011612),
         },
         'paccnrttrmm': {
             'description': 'NRT Precipitation Accumulated over 1 Day in mm - TRMM (and friends) Archive',
@@ -213,7 +213,7 @@ class gpmData(Data):
             'assets': ['3B42-DAY-LATE'],
             'startdate': datetime.date(2000, 3, 1),
             'sensor': 'GPM',
-            '_geotransform': (-180.0, 0.25, 0.0, 90.0, 0.0, -0.25),
+            '_geotransform': (-179.875, 0.25, 0.0, 59.875, 0.0, -0.25),
         },
     }
 
