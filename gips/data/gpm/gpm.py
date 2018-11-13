@@ -50,8 +50,26 @@ class gpmAsset(Asset):
         'IMERG-DAY-LATE': {
             'host': "jsimpson.pps.eosdis.nasa.gov",
             'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif',
-            'description': 'Daily Accumulated Precipitation (in mm) at 0.1 degrees - Production Run using the '
-                           'IMERG Algorithm developed for the GPM constellation',
+            'description': 'Daily Accumulated Precipitation (in mm) at 23:59 UTC at 0.1 degrees - Production Run '
+                           'using the IMERG Algorithm developed for the GPM constellation',
+            'path': '/NRTPUB/imerg/gis/',
+            'startdate': datetime.date(2014, 3, 12),
+            'latency': 1,
+        },
+        'IMERG-DAY-EARLY': {
+            'host': "jsimpson.pps.eosdis.nasa.gov",
+            'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif',
+            'description': 'Daily Accumulated Precipitation (in mm) at 06:59 UTC 0.1 degrees - Production Run '
+                           'using the IMERG Algorithm developed for the GPM constellation',
+            'path': '/NRTPUB/imerg/gis/',
+            'startdate': datetime.date(2014, 3, 12),
+            'latency': 1,
+        },
+        'IMERG-DAY-MID': {
+            'host': "jsimpson.pps.eosdis.nasa.gov",
+            'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif',
+            'description': 'Daily Accumulated Precipitation (in mm) at 14:59 0.1 degrees - Production Run '
+                           'using the IMERG Algorithm developed for the GPM constellation',
             'path': '/NRTPUB/imerg/gis/',
             'startdate': datetime.date(2014, 3, 12),
             'latency': 1,
@@ -65,7 +83,6 @@ class gpmAsset(Asset):
             'startdate': datetime.date(2000, 3, 2),
             'latency': 1,
         },
-
     }
 
     def __init__(self, filename):
@@ -108,7 +125,7 @@ class gpmAsset(Asset):
             conn.set_pasv(True)
             working_directory = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%m'),
                                              date.strftime('%d'), 'gis')
-        elif asset == 'IMERG-DAY-LATE':
+        elif asset == 'IMERG-DAY-LATE' or asset == 'IMERG-DAY-EARLY' or asset == 'IMERG-DAY-MID':
             conn = ftplib.FTP(cls._assets[asset]['host'])
             conn.login('subitc@ufl.edu', 'subitc@ufl.edu')
             conn.set_pasv(True)
@@ -147,6 +164,18 @@ class gpmAsset(Asset):
                 elif asset == 'IMERG-DAY-LATE':
                     end_timestamp = int(re.search(r'(?<=E)[0-9]{6}', filename).group(0))
                     if end_timestamp > 230000:
+                        return filename, None
+                    else:
+                        continue
+                elif asset == 'IMERG-DAY-EARLY':
+                    end_timestamp = int(re.search(r'(?<=E)[0-9]{6}', filename).group(0))
+                    if end_timestamp == 65959:
+                        return filename, None
+                    else:
+                        continue
+                elif asset == 'IMERG-DAY-MID':
+                    end_timestamp = int(re.search(r'(?<=E)[0-9]{6}', filename).group(0))
+                    if end_timestamp == 145959:
                         return filename, None
                     else:
                         continue
@@ -199,10 +228,26 @@ class gpmData(Data):
             'sensor': 'GPM',
             '_geotransform': (-179.9499969, 0.10000000149011612, 0.0, 89.9499969, 0.0, -0.10000000149011612),
         },
-        'paccnrtgpm': {
-            'description': 'NRT Precipitation Accumulated over 1 Day in mm - GPM (and friends) Archive',
+        'paccnrtgpmlate': {
+            'description': 'NRT Precipitation Accumulated over 1 Day ending at 23:59 UTC in mm - GPM (and friends) Archive',
             # the list of asset types associated with this product
             'assets': ['IMERG-DAY-LATE'],
+            'startdate': datetime.date(2014, 3, 12),
+            'sensor': 'GPM',
+            '_geotransform': (-179.9499969, 0.10000000149011612, 0.0, 89.9499969, 0.0, -0.10000000149011612),
+        },
+        'paccnrtgpmmid': {
+            'description': 'NRT Precipitation Accumulated over 1 Day ending at 14:59 UTC in mm - GPM (and friends) Archive',
+            # the list of asset types associated with this product
+            'assets': ['IMERG-DAY-MID'],
+            'startdate': datetime.date(2014, 3, 12),
+            'sensor': 'GPM',
+            '_geotransform': (-179.9499969, 0.10000000149011612, 0.0, 89.9499969, 0.0, -0.10000000149011612),
+        },
+        'paccnrtgpmearly': {
+            'description': 'NRT Precipitation Accumulated over 1 Day ending at 06:59 UTC in mm - GPM (and friends) Archive',
+            # the list of asset types associated with this product
+            'assets': ['IMERG-DAY-EARLY'],
             'startdate': datetime.date(2014, 3, 12),
             'sensor': 'GPM',
             '_geotransform': (-179.9499969, 0.10000000149011612, 0.0, 89.9499969, 0.0, -0.10000000149011612),
