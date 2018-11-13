@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 ################################################################################
-#    SMAP: Soil Moisture Active Passive
+#    GPM: Global Precipitation Measurement Mission
 #
 #    AUTHOR: Subit Chakrabarti
 #    EMAIL:  chakrabarti.subit@gmail.com
