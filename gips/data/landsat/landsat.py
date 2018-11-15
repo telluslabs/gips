@@ -1067,8 +1067,10 @@ class landsatData(Data):
             gippy_input[pt_split[0]] = temp_fp
             tempfps_to_ptypes[temp_fp] = prod_type
 
+        self._time_report("Running Indices")
         prodout = Indices(image, gippy_input,
                           self.prep_meta(asset_fn, metadata))
+        self._time_report("Finshed running Indices")
 
         if coreg_shift:
             for key, val in prodout.iteritems():
@@ -1098,12 +1100,12 @@ class landsatData(Data):
             self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
 
     def _download_gcs_bands(self, output_dir):
-        if self.preferred_asset != 'C1GS':
-            raise
+        if 'C1GS' not in self.assets:
+            raise Exception("This asset does not have a C1GS asset")
 
         band_files = []
 
-        for path in self.assets[self.preferred_asset].band_paths():
+        for path in self.assets['C1GS'].band_paths():
             match = re.match("/[\w_]+/(.+)", path)
             url = match.group(1)
             output_path = os.path.join(
@@ -1819,10 +1821,12 @@ class landsatData(Data):
         md = self.meta(asset_type)
 
         try:
+            self._time_report("Gathering band files")
             if asset_type == 'C1GS':
-                paths = self._download_gcs_bands('/tmp')
+                paths = self._download_gcs_bands(self._temp_proc_dir)
             else:
                 paths = asset_obj.band_paths()
+            self._time_report("Finished gathering band files")
         except NotImplementedError:
             # Extract files, use tarball directly via GDAL's virtual filesystem?
             if self.get_setting('extract'):
@@ -1830,6 +1834,7 @@ class landsatData(Data):
             else:
                 paths = [os.path.join('/vsitar/' + asset_obj.filename, f)
                          for f in md['filenames']]
+        self._time_report("reading bands")
         image = gippy.GeoImage(paths)
         image.SetNoData(0)
 
@@ -1872,6 +1877,7 @@ class landsatData(Data):
             #     In [20]: ascale.min() - 1*0.01298554277169103
             #     Out[20]: -64.927711800095906
 
+        self._time_report("done reading bands")
         verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image
 
