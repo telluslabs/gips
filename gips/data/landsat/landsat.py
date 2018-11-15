@@ -1251,21 +1251,18 @@ class landsatData(Data):
                 # TODO: question: why are we using glob here?
                 if not glob.glob(os.path.join(self.path, "*coreg_args.txt")):
                     with utils.error_handler('Problem with running AROP'):
-                        with utils.make_temp_dir() as tmpdir:
-                            try:
-                                s2_export = self.sentinel2_coreg_export(tmpdir)
-                                self.run_arop(s2_export)
-                            except NoSentinelError:
-                                # fall through and use the image unshifted
-                                utils.verbose_out(
-                                    'No Sentinel found for co-registration', 4)
-                                pass
-                            except CantAlignError as cae:
-                                # fall through and use the image unshifted
-                                utils.verbose_out(
-                                    'Co-registration error (FALLBACK):' + str(cae),
-                                    4)
-                                pass
+                        tmpdir_fp = self.generate_temp_path('arop')
+                        utils.mkdir(tmpdir_fp)
+                        try:
+                            # on error, use the unshifted image
+                            s2_export = self.sentinel2_coreg_export(tmpdir_fp)
+                            self.run_arop(s2_export)
+                        except NoSentinelError:
+                            verbose_out(
+                                'No Sentinel found for co-registration', 4)
+                        except CantAlignError as cae:
+                            verbose_out('Co-registration error '
+                                        '(FALLBACK): {}'.format(cae), 4)
 
                 try:
                     coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
