@@ -717,7 +717,7 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
         api_key = cls.ee_login()
         from usgs import api
         url = api.download(
-            dataset, 'EE', [str(scene_id)], 'STANDARD', api_key)['data'][0]
+            dataset, 'EE', [str(scene_id)], 'STANDARD', api_key)['data'][0]['url']
         with utils.make_temp_dir(prefix='dwnld', dir=stage_dir) as dldir:
             homura.download(url, dldir)
             granules = os.listdir(dldir)
