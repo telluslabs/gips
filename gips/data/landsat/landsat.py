@@ -717,7 +717,7 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
         api_key = cls.ee_login()
         from usgs import api
         url = api.download(
-            dataset, 'EE', [str(scene_id)], 'STANDARD', api_key)['data'][0]
+            dataset, 'EE', [str(scene_id)], 'STANDARD', api_key)['data'][0]['url']
         with utils.make_temp_dir(prefix='dwnld', dir=stage_dir) as dldir:
             homura.download(url, dldir)
             granules = os.listdir(dldir)
@@ -789,9 +789,9 @@ class landsatData(Data):
                   'satvi', 'vari'],
         'Tillage': ['ndti', 'crc', 'sti', 'isti'],
         'LC8SR': ['ndvi8sr'],
-        'ACOLITE': [
-            # 'rhoam',  # Dropped for the moment due to issues in ACOLITE
-            'rhow', 'oc2chl', 'oc3chl', 'fai', 'spm', 'turbidity', 'acoflags'],
+        # 'rhoam',  # Dropped for the moment due to issues in ACOLITE
+        'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
+                    'spm', 'spm2016', 'turbidity', 'acoflags'],
     }
     __toastring = 'toa: use top of the atmosphere reflectance'
     __visible_bands_union = [color for color in Asset._sensors['LC8']['colors'] if 'LWIR' not in color]
@@ -1015,7 +1015,6 @@ class landsatData(Data):
             'latency': 1,
             'bands': unitless_bands('isti'),
         },
-        # NEW!!!
         'ndvi8sr': {
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
@@ -1108,7 +1107,7 @@ class landsatData(Data):
         if len(self.assets) > 1:
             # if there's more than one, have to choose:
             # prefer local over fetching from the cloud, and prefer C1 over DN
-            at_pref = self.get_setting('asset-type-preference')
+            at_pref = self.get_setting('asset-preference')
             try:
                 self._preferred_asset = next(at for at in at_pref if at in self.assets)
             except StopIteration:
@@ -1314,6 +1313,10 @@ class landsatData(Data):
 
             # Process standard products (this is in the 'DN' block)
             for key, val in groups['Standard'].items():
+                p_type = val[0]
+                if asset not in self._products[p_type]['assets']:
+                    verbose_out("{} not supported for {} assets".format(p_type, asset), 5)
+                    continue
                 start = datetime.now()
                 # TODO - update if no atmos desired for others
                 toa = self._products[val[0]].get('toa', False) or 'toa' in val
@@ -1765,8 +1768,9 @@ class landsatData(Data):
             'geometry': _geometry,
             'datetime': dt,
             'clouds': clouds,
-            'qafilename': qafn,
         }
+        if qafn is not None:
+            self.metadata['qafilename'] = qafn
         #self.metadata.update(smeta)
         return self.metadata
 
