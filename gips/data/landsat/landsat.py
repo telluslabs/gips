@@ -1906,7 +1906,7 @@ class landsatData(Data):
         # until one is found.
         delta = timedelta(1)
 
-        if self.date < sentinel2Asset._start_date:
+        if self.date < date(2017, 1, 1):
             date_found = starting_date = date(2017, self.date.month, self.date.day)
         else:
             date_found = starting_date = self.date
@@ -1918,6 +1918,19 @@ class landsatData(Data):
         inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
         landsat_footprint = wkt_loads(self.assets[next(iter(self.assets))].get_geometry())
+        def _cache_if_vsicurl(gilist, tmpdir):
+            # TODO: move this to the GoogleStorage mixin
+            ofiles = []
+            for gi in gilist:
+                if gi.startswith('/vsicurl/'):
+                    dest_path = os.path.join(tmpdir, os.path.basename(gi))
+                    subprocess.call(
+                        ['wget', '--no-verbose', '-O', dest_path, gi[9:]]
+                    )
+                    ofiles.append(dest_path)
+                else:
+                    ofiles.append(gi)
+            return ofiles
 
         while True:
             if delta > timedelta(90):
@@ -1926,18 +1939,31 @@ class landsatData(Data):
                     .format(self.utm_zone(), self.id, self.date)
                 )
             temporal_extent = TemporalExtent((starting_date + delta).strftime("%Y-%j"))
-            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
+            inventory = DataInventory(
+                sentinel2Data, spatial_extent, temporal_extent,
+                fetch=fetch, pclouds=33
+            )
 
-            geo_images = self._s2_tiles_for_coreg(inventory, (starting_date + delta), landsat_footprint)
+            geo_images = self._s2_tiles_for_coreg(
+                inventory, (starting_date + delta), landsat_footprint
+            )
+
             if geo_images:
+                geo_images = _cache_if_vsicurl(geo_images, tmpdir)
                 date_found = starting_date + delta
                 break
 
             temporal_extent = TemporalExtent((starting_date - delta).strftime("%Y-%j"))
-            inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
+            inventory = DataInventory(
+                sentinel2Data, spatial_extent, temporal_extent,
+                fetch=fetch, pclouds=33
+            )
 
-            geo_images = self._s2_tiles_for_coreg(inventory, (starting_date - delta), landsat_footprint)
+            geo_images = self._s2_tiles_for_coreg(
+                inventory, (starting_date - delta), landsat_footprint
+            )
             if geo_images:
+                geo_images = _cache_if_vsicurl(geo_images, tmpdir)
                 date_found = starting_date - delta
                 break
 
@@ -1948,7 +1974,7 @@ class landsatData(Data):
                       "-of", "ENVI", "-a_nodata", "0"]
         # only use images that are in the same proj as landsat tile
         merge_args.extend(geo_images)
-        subprocess.call(merge_args)
+        subprocess.call(merge_args, env={"GDAL_NUM_THREADS": "1"}, )
         self._time_report("done with s2 export")
         return tmpdir + '/sentinel_mosaic.bin'
 
