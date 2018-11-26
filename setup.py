@@ -82,6 +82,7 @@ setup(
         'python-fmask @ https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.5.0.zip#egg=python-fmask-0.5.0',
         'usgs', # 0.2.1 known to work
         'backports.functools_lru_cache',
+        'backoff',
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
