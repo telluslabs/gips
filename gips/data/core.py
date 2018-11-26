@@ -45,6 +45,7 @@ import argparse
 # from functools import lru_cache <-- python 3.2+ can do this instead
 from backports.functools_lru_cache import lru_cache
 import requests
+import backoff
 
 import gippy
 from gippy.algorithms import CookieCutter
@@ -68,7 +69,22 @@ class GoogleStorageMixin(object):
     _gs_query_url_base = 'https://www.googleapis.com/storage/v1/b/{}/o'
     _gs_object_url_base = 'http://storage.googleapis.com/{}/'
 
+    def _gs_stop_trying(e):
+        """Should backoff keep retrying based on this HTTPError?
+
+        For searching using backoff per GCP docs:
+                Clients should use truncated exponential backoff for all requests
+                to Cloud Storage that return HTTP 5xx and 429 response codes,
+                including uploads and downloads of data or metadata.
+        """
+        c = e.response.status_code
+        return c != 429 and (499 < c < 600)
+
     @classmethod
+    @backoff.on_exception(backoff.expo,
+                          requests.exceptions.RequestException,
+                          max_time=120,
+                          giveup=_gs_stop_trying)
     def gs_api_search(cls, prefix, delimiter='/'):
         """Convenience wrapper for searching in google cloud storage."""
         params = {'prefix': prefix}
@@ -382,6 +398,14 @@ class Asset(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
+    def _quarantine_file(cls, filepath, error):
+        """if problem with a file, move to quarantine"""
+        #TODO: make this ORM compatible
+        utils.report_error(error, 'Quarantining ' + filepath)
+        qname = os.path.join(cls.Repository.path('quarantine'), os.path.basename(filepath))
+        if not os.path.exists(qname):
+            os.link(os.path.abspath(filepath), qname)
+
     def parse_asset_fp(self):
         """Parse self.filename using the class's asset patterns.
 
@@ -444,9 +468,18 @@ class Asset(object):
         to prior existence.
         """
         if tarfile.is_tarfile(self.filename):
-            open_file = tarfile.open(self.filename)
+            try:
+                open_file = tarfile.open(self.filename)
+            except tarfile.TarError as te:
+                self._quarantine_file(self.filename, te)
+                raise Exception('corrupt asset tarfile (has been quarantined): {}'.format(self.filename))
+
         elif zipfile.is_zipfile(self.filename):
-            open_file = zipfile.ZipFile(self.filename)
+            try:
+                open_file = zipfile.ZipFile(self.filename)
+            except zipfile.BadZipfile as zfe:
+                self._quarantine_file(self.filename, zfe)
+                raise Exception('corrupt asset zipfile (has been quarantined): {}'.format(self.filename))
         else:
             raise Exception('%s is not a valid tar or zip file' % self.filename)
         if not path:
@@ -736,11 +769,7 @@ class Asset(object):
         try:
             asset = cls(filename)
         except Exception, e:
-            # if problem with inspection, move to quarantine
-            utils.report_error(e, 'File error, quarantining ' + filename)
-            qname = os.path.join(cls.Repository.path('quarantine'), bname)
-            if not os.path.exists(qname):
-                os.link(os.path.abspath(filename), qname)
+            cls._quarantine_file(filename, e)
             return (None, 0, None)
 
         # make an array out of asset.date if it isn't already
