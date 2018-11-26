@@ -1918,19 +1918,6 @@ class landsatData(Data):
         inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
         landsat_footprint = wkt_loads(self.assets[next(iter(self.assets))].get_geometry())
-        def _cache_if_vsicurl(gilist, tmpdir):
-            # TODO: move this to the GoogleStorage mixin
-            ofiles = []
-            for gi in gilist:
-                if gi.startswith('/vsicurl/'):
-                    dest_path = os.path.join(tmpdir, os.path.basename(gi))
-                    subprocess.call(
-                        ['wget', '--no-verbose', '-O', dest_path, gi[9:]]
-                    )
-                    ofiles.append(dest_path)
-                else:
-                    ofiles.append(gi)
-            return ofiles
 
         while True:
             if delta > timedelta(90):
@@ -1949,7 +1936,7 @@ class landsatData(Data):
             )
 
             if geo_images:
-                geo_images = _cache_if_vsicurl(geo_images, tmpdir)
+                geo_images = self._cache_if_vsicurl(geo_images, tmpdir)
                 date_found = starting_date + delta
                 break
 
@@ -1963,7 +1950,7 @@ class landsatData(Data):
                 inventory, (starting_date - delta), landsat_footprint
             )
             if geo_images:
-                geo_images = _cache_if_vsicurl(geo_images, tmpdir)
+                geo_images = self._cache_if_vsicurl(geo_images, tmpdir)
                 date_found = starting_date - delta
                 break
 
