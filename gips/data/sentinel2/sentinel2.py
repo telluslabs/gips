@@ -364,11 +364,11 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
     @classmethod
     def query_gs(cls, tile, date, pclouds):
         """Query google's store of sentinel-2 data for the given scene."""
-        prefix_template = 'tiles/{}/{}/{}/{}_MSIL1C_{}'
+        tile_prefix = 'tiles/{}/{}/{}/'.format(tile[0:2], tile[2], tile[3:])
+        prefix_template = tile_prefix + '{}_MSIL1C_' + date.strftime('%Y%m%d')
         # It might be S2A or S2B, find out which one
         for sensor in cls._sensors.keys():
-            search_prefix = prefix_template.format(
-                tile[0:2], tile[2], tile[3:], sensor, date.strftime('%Y%m%d'))
+            search_prefix = prefix_template.format(sensor)
             # only going to be one prefix, if any are found
             prefix = cls.gs_api_search(search_prefix).get(
                 'prefixes', [None])[0]
@@ -392,13 +392,17 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         keys = {'spectral-bands': bands}
         for i in cls.gs_api_search(prefix, delimiter=None)['items']:
             k = i['name']
-            if len(bands) < expected_band_cnt and band_regex.match(k):
+            p = k.replace(tile_prefix, '', 1)
+            if len(bands) < expected_band_cnt and band_regex.match(p):
                 bands.append(k)
             else:
                 for md_key, regex in md_regexes.items():
-                    if regex.match(k):
+                    if regex.match(p):
+                        utils.verbose_out('query_gs found {}:  {}'.format(md_key, k), 5)
                         keys[md_key] = k
                         del md_regexes[md_key] # don't repeat useless searches
+                    elif k.endswith('xml'):
+                        utils.verbose_out('query_gs found unmatched XML file: {}'.format(k), 5)
 
         # sort correctly despite the wart in the band numbering scheme ('8A')
         def band_sort_key(fn):
