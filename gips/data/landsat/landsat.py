@@ -1101,7 +1101,9 @@ class landsatData(Data):
 
     def _download_gcs_bands(self, output_dir):
         if 'C1GS' not in self.assets:
-            raise Exception("This asset does not have a C1GS asset")
+            raise Exception("C1GS asset not found for {} on {}".format(
+                self.id, self.date
+            ))
 
         band_files = []
 
@@ -1111,7 +1113,7 @@ class landsatData(Data):
             output_path = os.path.join(
                 output_dir, os.path.basename(url)
             )
-            subprocess.check_call(["wget", "--quiet", url, "--output-document", output_path])
+            self.Asset.gs_backoff_downloader(url, output_path)
             band_files.append(output_path)
         return band_files
 
