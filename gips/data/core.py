@@ -69,8 +69,9 @@ def _gs_stop_trying(e):
     to Cloud Storage that return HTTP 5xx and 429 response codes,
     including uploads and downloads of data or metadata.
     """
-    c = e.response.status_code
-    return c != 429 and (499 < c < 600)
+    return (e.response is not None
+            and e.response.status_code != 429
+            and (499 < e.response.status_code < 600))
 
 class GoogleStorageMixin(object):
     """Mix this into a class (probably Asset) to use data in google storage.
