@@ -1063,7 +1063,7 @@ class sentinel2Data(Data):
                 output_dir, os.path.basename(url)
             )
             if not os.path.exists(output_path):
-                self.gs_backoff_downloader(path, output_path)
+                self.Asset.gs_backoff_downloader(url, output_path)
             band_files.append(output_path)
         self._time_report('Finished download from GCS ({} bands)'.format(len(band_files)))
         return band_files
