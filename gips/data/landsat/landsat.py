@@ -1963,7 +1963,7 @@ class landsatData(Data):
             )
 
             if geo_images:
-                geo_images = self._cache_if_vsicurl(geo_images, tmpdir)
+                geo_images = self.Asset._cache_if_vsicurl(geo_images, tmpdir)
                 date_found = starting_date + delta
                 break
 
@@ -1977,7 +1977,7 @@ class landsatData(Data):
                 inventory, (starting_date - delta), landsat_footprint
             )
             if geo_images:
-                geo_images = self._cache_if_vsicurl(geo_images, tmpdir)
+                geo_images = self.Asset._cache_if_vsicurl(geo_images, tmpdir)
                 date_found = starting_date - delta
                 break
 
