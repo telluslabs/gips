@@ -1067,8 +1067,10 @@ class landsatData(Data):
             gippy_input[pt_split[0]] = temp_fp
             tempfps_to_ptypes[temp_fp] = prod_type
 
+        self._time_report("Running Indices")
         prodout = Indices(image, gippy_input,
                           self.prep_meta(asset_fn, metadata))
+        self._time_report("Finshed running Indices")
 
         if coreg_shift:
             for key, val in prodout.iteritems():
@@ -1096,6 +1098,24 @@ class landsatData(Data):
         for temp_fp in prodout.values():
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
+
+    def _download_gcs_bands(self, output_dir):
+        if 'C1GS' not in self.assets:
+            raise Exception("C1GS asset not found for {} on {}".format(
+                self.id, self.date
+            ))
+
+        band_files = []
+
+        for path in self.assets['C1GS'].band_paths():
+            match = re.match("/[\w_]+/(.+)", path)
+            url = match.group(1)
+            output_path = os.path.join(
+                output_dir, os.path.basename(url)
+            )
+            self.Asset.gs_backoff_downloader(url, output_path)
+            band_files.append(output_path)
+        return band_files
 
     @property
     def preferred_asset(self):
@@ -1803,7 +1823,12 @@ class landsatData(Data):
         md = self.meta(asset_type)
 
         try:
-            paths = asset_obj.band_paths()
+            self._time_report("Gathering band files")
+            if asset_type == 'C1GS':
+                paths = self._download_gcs_bands(self._temp_proc_dir)
+            else:
+                paths = asset_obj.band_paths()
+            self._time_report("Finished gathering band files")
         except NotImplementedError:
             # Extract files, use tarball directly via GDAL's virtual filesystem?
             if self.get_setting('extract'):
@@ -1811,6 +1836,7 @@ class landsatData(Data):
             else:
                 paths = [os.path.join('/vsitar/' + asset_obj.filename, f)
                          for f in md['filenames']]
+        self._time_report("reading bands")
         image = gippy.GeoImage(paths)
         image.SetNoData(0)
 
@@ -1853,6 +1879,7 @@ class landsatData(Data):
             #     In [20]: ascale.min() - 1*0.01298554277169103
             #     Out[20]: -64.927711800095906
 
+        self._time_report("done reading bands")
         verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
         return image
 
@@ -1936,7 +1963,7 @@ class landsatData(Data):
             )
 
             if geo_images:
-                geo_images = self._cache_if_vsicurl(geo_images, tmpdir)
+                geo_images = self.Asset._cache_if_vsicurl(geo_images, tmpdir)
                 date_found = starting_date + delta
                 break
 
@@ -1950,7 +1977,7 @@ class landsatData(Data):
                 inventory, (starting_date - delta), landsat_footprint
             )
             if geo_images:
-                geo_images = self._cache_if_vsicurl(geo_images, tmpdir)
+                geo_images = self.Asset._cache_if_vsicurl(geo_images, tmpdir)
                 date_found = starting_date - delta
                 break
 
