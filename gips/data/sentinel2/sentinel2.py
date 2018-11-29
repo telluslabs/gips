@@ -889,11 +889,16 @@ class sentinel2Data(Data):
             ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
             ('isti',   'Inverse Standard Tillage Index'),
             ('sti',    'Standard Tillage Index'),
-            # not processed by gippy.Indices() but still indices products:
-            ('mtci',    'MERIS Terrestrial Chlorophyll Index'),
-            ('s2rep',   'Sentinel-2 Red Edge Position'),
         ]
     )
+
+    # indices not processed by gippy.Indices(); L1CGS not supported:
+    _products.update(
+        (p, {'description': d, 'assets': ('L1C',),
+             'bands': [{'name': p, 'units': Data._unitless}]}
+        ) for p, d in [
+            ('mtci',    'MERIS Terrestrial Chlorophyll Index'),
+            ('s2rep',   'Sentinel-2 Red Edge Position')])
 
     # acolite doesn't (yet?) support google storage sentinel-2 data
     atmosphere.add_acolite_product_dicts(_products, 'L1C')
@@ -1178,9 +1183,6 @@ class sentinel2Data(Data):
 
     def process_acolite(self, aco_prods):
         a_obj, sensor = self.current_asset(), self.current_sensor()
-        if a_obj.style == a_obj.ds_style:
-            raise NotImplementedError(
-                "Datastrip assets aren't compatible with acolite")
         self._time_report("Starting acolite processing")
         # let acolite use a subdirectory in this run's tempdir:
         aco_dn = self.generate_temp_path('acolite')
@@ -1396,11 +1398,10 @@ class sentinel2Data(Data):
 
         work = self.plan_work(products.requested.keys(), overwrite) # see if we can save any work
 
-        if a_obj.asset == 'L1CGS':
-            no_can_do = work & set(('mtci-toa', 'mtci', 's2rep-toa', 's2rep'))
-            if no_can_do:
-                raise NotImplementedError(
-                    'Not supported for L1CGS assets:  ' + ' '.join(no_can_do))
+        if (a_obj.asset == 'L1C' and a_obj.style == a_obj.ds_style and
+                work & set(self._productgroups['ACOLITE'])):
+            raise NotImplementedError(
+                "Datastrip assets aren't compatible with acolite")
 
         # only do the bits that need doing
         if 'ref-toa' in work:
