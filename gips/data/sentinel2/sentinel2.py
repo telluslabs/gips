@@ -1196,7 +1196,7 @@ class sentinel2Data(Data):
         model_image = gippy.GeoImage(layer_02_abs_fn)
 
         prodout = atmosphere.process_acolite(a_obj, aco_dn, p_spec,
-                self.prep_meta(), model_image, None, "*.SAFE")
+                self.prep_meta(), model_image, "*.SAFE")
 
         [self.AddFile(sensor, pt, fn) for pt, fn in prodout.items()]
         self._time_report(' -> {}: processed {}'.format(
