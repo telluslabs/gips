@@ -184,6 +184,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
     ds_style = 'datastrip-style' # can't be downloaded anymore; deprecated
     st_style = 'single-tile-style'
+    # first day of new-style assets, UTC
+    st_style_start_date = datetime.datetime(2016, 12, 7, 0, 0)
 
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
@@ -369,7 +371,10 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             return None
 
         # search for the parts of the asset we need
-        style_regexes = cls.get_style_regexes(cls.st_style, tile, compile=True)
+        # it's not clear if/when google is going to update their sentinel-2
+        # data to have reprocessed single-tile assets
+        style = cls.ds_style if date < cls.st_style_start_date else cls.st_style
+        style_regexes = cls.get_style_regexes(style, tile, compile=True)
         band_regex = style_regexes['raster-re']
         md_regexes = {'datastrip-md': style_regexes['datastrip-md-re'],
                       'tile-md':      style_regexes['tile-md-re'],
