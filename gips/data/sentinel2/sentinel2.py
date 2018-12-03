@@ -589,7 +589,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                 m = p.match(f)
                 if m:
                     tiles.add(m.group('tile'))
-        if len(tiles) > 0:
+        if len(tiles) == 0:
             raise IOError(file_name + ' contains no raster files')
         return list(tiles)
 
