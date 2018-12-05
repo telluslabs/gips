@@ -18,8 +18,7 @@ ENV GIPS_OVERRIDE_VERSION='0.0.0-dev'
 RUN cd /gips \
     && chmod +x /usr/local/bin/sixs \
     && chmod +x /usr/local/bin/ortho \
-    && pip install -U pip \
-    && pip install Cython \
+    && pip install -U pip 'idna<2.8' Cython \
     && /usr/local/bin/pip install -r dev_requirements.txt \
     && /usr/local/bin/pip install -e file:///gips/ \
     && rm -f /gips/gips/settings.py /gips/pytest.ini \

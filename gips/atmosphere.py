@@ -552,7 +552,7 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
     return prodout
 
 def process_acolite(asset, aco_proc_dir, products, meta, model_image,
-                    roi=None, extracted_asset_glob=''):
+                    extracted_asset_glob=''):
     """Generate acolite products from the given asset.
 
     Args:
@@ -563,9 +563,6 @@ def process_acolite(asset, aco_proc_dir, products, meta, model_image,
             destination product files
         meta:  dict defining metadata to add to the product files
         model_image:  A GeoImage suitable for basing the output products on.
-        roi:  Region of interest; lat/lon bounding box to crop data and thus
-            reduce processing; defaults to entire scene being processed.
-            Format is floats, in decimal degrees: s_lat, w_lon, n_lat, e_lon.
         extracted_asset_glob:  If needed, pass in a glob to help acolite find
             extracted asset data.
 
@@ -613,8 +610,6 @@ def process_acolite(asset, aco_proc_dir, products, meta, model_image,
         for s in ('l2w_parameters=' + ','.join(prod_args),
                   'output=' + output_dn):
             print(s, file=settings_fo)
-        if roi is not None:
-            print('limit=' + ','.join(str(i) for i in roi), file=settings_fo)
 
     with open(settings_path, 'r') as settings_fo:
         verbose_out('acolite processing:  ====== begin acolite.cfg ======', 4)

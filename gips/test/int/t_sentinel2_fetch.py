@@ -272,7 +272,7 @@ strange_asset_bn = 'S2A_OPER_PRD_MSIL1C_PDMC_20161030T191653_R079_V20161030T0951
 ))
 def t_tile_list(asset_fp, expected_tiles):
     """Use the test asset file to confirm tile_list()."""
-    actual_tiles = sentinel2.sentinel2Asset.tile_list(asset_fp)
+    actual_tiles = sentinel2.sentinel2Asset.ds_tile_list(asset_fp)
     assert sorted(expected_tiles) == sorted(actual_tiles)
 
 @pytest.fixture

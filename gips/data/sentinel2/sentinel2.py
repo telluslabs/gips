@@ -168,7 +168,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         'L1C': {
             'source': 'esa',
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
-            # is used for both original and shortened post-2016-12-07 assets.
+            # is used for both datastrip and single-tile assets.
             'pattern': _asset_fn_pat_base + '\.zip$',
             'startdate': _start_date,
             'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
@@ -182,15 +182,17 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         }
     }
 
-    original = 'original'
-    _2016_12_07 = datetime.datetime(2016, 12, 7, 0, 0) # first day of new-style assets, UTC
+    ds_style = 'datastrip-style' # can't be downloaded anymore; deprecated
+    st_style = 'single-tile-style'
+    # first day of new-style assets, UTC
+    st_style_start_date = datetime.datetime(2016, 12, 7, 0, 0)
 
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
     _tile_re = '(?P<tile>\d\d[A-Z]{3})'
     # example, note that leading tile code is spliced in by Asset.fetch:
     # 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
-    _orig_name_re = (
+    _ds_name_re = (
         '(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
         '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
         'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
@@ -200,7 +202,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
         '_\d{8}T\d{6}.zip') # repeated observation datetime for no known reason
 
-    _2016_12_07_name_re = (
+    _name_re = (
         '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
         '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
         'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
@@ -211,11 +213,12 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
     )
 
     _asset_styles = {
-        'original': {
-            # original-style assets can't use the same name for downloading and archiving, because
-            # each downloaded file contains multiple tiles of data
-            'downloaded-name-re': _orig_name_re,
-            'archived-name-re': '^' + _tile_re + '_' + _orig_name_re,
+        ds_style: {
+            # datastrip-style assets can't use the same name for
+            # downloading and archiving, because each downloaded file
+            # contains multiple tiles of data
+            'downloaded-name-re': _ds_name_re,
+            'archived-name-re': '^' + _tile_re + '_' + _ds_name_re,
             # raster file pattern
             # TODO '/.*/' can be misleading due to '/' satisfying '.', so rework into '/[^/]*/'
             'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B(?P<band>\d[\dA]).jp2$',
@@ -228,10 +231,9 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             #   S2A_OPER_MTD_SAFL1C_PDMC_20160904T192336_R126_V20160903T164322_20160903T164911.xml
             'asset-md-re': r'^[^/]+/S2[AB]_[^/]+\.xml$',
         },
-        _2016_12_07: {
-            # post-2016 assets use their downloaded FN as their archived FN
-            'downloaded-name-re': _2016_12_07_name_re,
-            'archived-name-re': _2016_12_07_name_re,
+        st_style: {
+            'downloaded-name-re': _name_re,
+            'archived-name-re': _name_re,
             # raster file pattern
             'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B(?P<band>\d[\dA]).jp2$',
             # internal metadata file patterns
@@ -247,7 +249,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
     def __init__(self, filename):
         """Inspect a single file and set some metadata.
 
-        Both shortened and original longer file name & content structure are supported:
+        File naming convention:
         https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
         """
         super(sentinel2Asset, self).__init__(filename)
@@ -288,7 +290,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         This lets one locate internal metadata.
         """
         sr = copy.deepcopy(cls._asset_styles[style])
-        if style == cls.original:
+        if style == cls.ds_style:
             sr['raster-re']       = sr['raster-re'].format(tileid=tile_id)
             sr['tile-md-re']      = sr['tile-md-re'].format(tileid=tile_id)
             sr['datastrip-md-re'] = sr['datastrip-md-re'].format(
@@ -307,18 +309,9 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         url_head = 'https://scihub.copernicus.eu/dhus/search?q='
         #                vvvvvvvv--- sort by processing date so always get the newest one
         url_tail = '&orderby=ingestiondate desc&format=json'
-        if date < cls._2016_12_07: # original style
-            # compute the center coordinate of the tile
-            x0, x1, y0, y1 = cls.Repository.tile_lat_lon(tile)
-            lat, lon = (y0 + y1)/2, (x0 + x1)/2
-            #                                                  year mon  day
-            url_search_string = ('filename:S2?_OPER_PRD_MSIL1C_*_{}{:02}{:02}T??????.SAFE'
-                                 '%20AND%20footprint:%22Intersects({},%20{})%22') # <-- lat/lon
-            search_url = url_head + url_search_string.format(year, month, day, lat, lon) + url_tail
-        else:
-            #                                      year mon  day                    tile
-            url_search_string = 'filename:S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'
-            search_url = url_head + url_search_string.format(year, month, day, tile) + url_tail
+        #                                      year mon  day                    tile
+        url_search_string = 'filename:S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'
+        search_url = url_head + url_search_string.format(year, month, day, tile) + url_tail
 
         auth = HTTPBasicAuth(username, password)
         r = requests.get(search_url, auth=auth)
@@ -378,8 +371,9 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             return None
 
         # search for the parts of the asset we need
-        style = cls.original if date < cls._2016_12_07 else cls._2016_12_07
-
+        # it's not clear if/when google is going to update their sentinel-2
+        # data to have reprocessed single-tile assets
+        style = cls.ds_style if date < cls.st_style_start_date else cls.st_style
         style_regexes = cls.get_style_regexes(style, tile, compile=True)
         band_regex = style_regexes['raster-re']
         md_regexes = {'datastrip-md': style_regexes['datastrip-md-re'],
@@ -479,9 +473,9 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             return []
         output_file_name, asset_url = (qs_rv['basename'], qs_rv['url'])
 
-        # old-style assets cover many tiles, so there may be duplication of
-        # effort; avoid that by aborting if the stage already contains the
-        # desired asset
+        # datastrip-style assets cover many tiles, so there may be
+        # duplication of effort; avoid that by aborting if the stage
+        # already contains the desired asset
         full_staged_path = os.path.join(cls.Repository.path('stage'),
                                         output_file_name)
         if os.path.exists(full_staged_path):
@@ -524,19 +518,16 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
     @classmethod
     def archive(cls, path, recursive=False, keep=False, update=False):
-        """Archive original and new-style Sentinel-2 assets.
+        """Archive Sentinel-2 assets.
 
-        Original-style Sentinel-2 assets have special archiving needs
-        due to their multi-tile nature, so this method archives them
-        specially using hard links.
+        Datastrip assets have special archiving needs due to their
+        multi-tile nature, so this method archives them specially using
+        hard links.
         """
         if recursive:
             raise ValueError('Recursive asset search not supported by Sentinel-2 driver.')
 
-        found_files = {
-            'original': [],
-            cls._2016_12_07: [],
-        }
+        found_files = {cls.ds_style: [], cls.st_style: []}
 
         # find all the files that resemble assets in the given spot
         fn_pile = sum([utils.find_files(cls._assets[at]['pattern'], path)
@@ -554,14 +545,14 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
         assets = []
         overwritten_assets = []
-        for fn in found_files[cls._2016_12_07]:
+        for fn in found_files[cls.st_style]:
             new_aol, new_overwritten_aol = super(sentinel2Asset, cls).archive(
                     fn, False, keep, update)
             assets += new_aol
             overwritten_assets += new_overwritten_aol
 
-        for fn in found_files['original']:
-            tile_list = cls.tile_list(fn)
+        for fn in found_files[cls.ds_style]:
+            tile_list = cls.ds_tile_list(fn)
             # use the stage dir since it's likely not to break anything (ie on same filesystem)
             with utils.make_temp_dir(dir=cls.Repository.path('stage')) as tdname:
                 for tile in tile_list:
@@ -587,24 +578,19 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
 
     @classmethod
-    def tile_list(cls, file_name):
-        """Extract a list of tiles from the given old-style asset."""
-        # find an xml file with a very long name in the top-level .SAFE/ directory
-        # eg
-        # S2A_OPER_MTD_SAFL1C_PDMC_20161030T191653_R079_V20161030T095132_20161030T095132.xml
+    def ds_tile_list(cls, file_name):
+        """Extract a list of tiles from the given datastrip-style asset."""
         tiles = set()
-        file_pattern = cls._asset_styles['original']['raster-re'].format(tileid=cls._tile_re)
+        file_pattern = cls._asset_styles[cls.ds_style]['raster-re'].format(
+            tileid=cls._tile_re)
         p = re.compile(file_pattern)
         with zipfile.ZipFile(file_name) as asset_zf:
             for f in asset_zf.namelist():
                 m = p.match(f)
                 if m:
                     tiles.add(m.group('tile'))
-        if not tiles:
-            raise Exception(
-                'Datastrip asset contains no tiles???? ({})'
-                .format(file_name)
-            )
+        if len(tiles) == 0:
+            raise IOError(file_name + ' contains no raster files')
         return list(tiles)
 
     @classmethod
@@ -633,10 +619,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             return self.meta['cloud-cover']
         if os.path.exists(self.filename):
             with utils.make_temp_dir() as tmpdir:
-                metadata_file = [
-                    f for f in self.datafiles()
-                    if re.match(self.style_res['tile-md-re'], f)
-                ][0]
+                metadata_file = next(f for f in self.datafiles()
+                    if re.match(self.style_res['tile-md-re'], f))
                 self.extract([metadata_file], path=tmpdir)
                 tree = ElementTree.parse(tmpdir + '/' + metadata_file)
             self.meta['cloud-cover'] = self.cloud_cover_from_et(tree)
@@ -840,7 +824,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         wkt_points = ", ".join([y + " " + x for x, y in list(zipped_points)])
         footprint_wkt = "POLYGON (({}))".format(wkt_points)
 
-        # For old style assets, `Global_Footprint` is the entire swath,
+        # For datastrip assets, `Global_Footprint` is the entire swath,
         # so intersect it with tile boundary to get actual footprint.
         tile_polygon = wkt_loads(self.get_geometry())
         return tile_polygon.intersection(wkt_loads(footprint_wkt)).wkt
@@ -910,11 +894,16 @@ class sentinel2Data(Data):
             ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
             ('isti',   'Inverse Standard Tillage Index'),
             ('sti',    'Standard Tillage Index'),
-            # not processed by gippy.Indices() but still indices products:
-            ('mtci',    'MERIS Terrestrial Chlorophyll Index'),
-            ('s2rep',   'Sentinel-2 Red Edge Position'),
         ]
     )
+
+    # indices not processed by gippy.Indices(); L1CGS not supported:
+    _products.update(
+        (p, {'description': d, 'assets': ('L1C',),
+             'bands': [{'name': p, 'units': Data._unitless}]}
+        ) for p, d in [
+            ('mtci',    'MERIS Terrestrial Chlorophyll Index'),
+            ('s2rep',   'Sentinel-2 Red Edge Position')])
 
     # acolite doesn't (yet?) support google storage sentinel-2 data
     atmosphere.add_acolite_product_dicts(_products, 'L1C')
@@ -935,16 +924,6 @@ class sentinel2Data(Data):
     }
 
     need_fetch_kwargs = True
-
-    @classmethod
-    def need_to_fetch(cls, a_type, tile, date, update, **fetch_kwargs):
-        if date < sentinel2Asset._2016_12_07:
-            # must be an original-style asset, which has many tiles at
-            # query time, so there's no easy way to tell if we can skip the
-            # download or not.  So, just assume the worst and fetch it.
-            return True
-        return super(sentinel2Data, cls).need_to_fetch(
-                a_type, tile, date, update, **fetch_kwargs)
 
     def plan_work(self, requested_products, overwrite):
         """Plan processing run using requested products & their dependencies.
@@ -1221,13 +1200,8 @@ class sentinel2Data(Data):
                                if fn.endswith('_B02.jp2'))
         model_image = gippy.GeoImage(layer_02_abs_fn)
 
-        roi = None
-        if a_obj.style == 'original':
-            w, e, s, n = self.Repository.tile_lat_lon(a_obj.tile)
-            roi = s, w, n, e
-
         prodout = atmosphere.process_acolite(a_obj, aco_dn, p_spec,
-                self.prep_meta(), model_image, roi, "*.SAFE")
+                self.prep_meta(), model_image, "*.SAFE")
 
         [self.AddFile(sensor, pt, fn) for pt, fn in prodout.items()]
         self._time_report(' -> {}: processed {}'.format(
@@ -1429,11 +1403,10 @@ class sentinel2Data(Data):
 
         work = self.plan_work(products.requested.keys(), overwrite) # see if we can save any work
 
-        if a_obj.asset == 'L1CGS':
-            no_can_do = work & set(('mtci-toa', 'mtci', 's2rep-toa', 's2rep'))
-            if no_can_do:
-                raise NotImplementedError(
-                    'Not supported for L1CGS assets:  ' + ' '.join(no_can_do))
+        if (a_obj.asset == 'L1C' and a_obj.style == a_obj.ds_style and
+                work & set(self._productgroups['ACOLITE'])):
+            raise NotImplementedError(
+                "Datastrip assets aren't compatible with acolite")
 
         # only do the bits that need doing
         if 'ref-toa' in work:
