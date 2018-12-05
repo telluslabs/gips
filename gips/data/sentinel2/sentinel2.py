@@ -284,7 +284,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                 self.meta['cloud-cover'] = self.json_content['cloud-cover']
 
     @classmethod
-    def get_style_regexes(cls, style, tile_id, compile=False):
+    def get_style_regexes(cls, style, tile_id=None, compile=False):
         """Returns regexes for the given style.
 
         This lets one locate internal metadata.
@@ -355,11 +355,58 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         return {'basename': output_file_name, 'url': asset_url}
 
     @classmethod
+    def query_gs_find_keys(cls, style, tile, tile_prefix, gs_keys):
+        """Searches the google storage keys for a complete asset.
+
+        Only searches for the given style.
+        """
+        style_regexes = cls.get_style_regexes(style, tile, compile=True)
+        band_regex = style_regexes['raster-re']
+        md_regexes = {'datastrip-md': style_regexes['datastrip-md-re'],
+                      'tile-md':      style_regexes['tile-md-re'],
+                      'asset-md':     style_regexes['asset-md-re']}
+        # for sanity checking later
+        expected_key_set = set(md_regexes.keys() + ['spectral-bands'])
+        expected_band_cnt = len(cls._sensors['S2A']['band-strings'])
+        bands = []
+        asset_keys = {'spectral-bands': bands}
+        for k in gs_keys:
+            p = k.replace(tile_prefix, '', 1)
+            if len(bands) < expected_band_cnt and band_regex.match(p):
+                bands.append(k)
+                continue
+            for md_key, regex in md_regexes.items():
+                if regex.match(p):
+                    utils.verbose_out('query_gs_find_keys found {}:'
+                                      '  {}'.format(md_key, k), 5)
+                    asset_keys[md_key] = k
+                    del md_regexes[md_key] # don't repeat useless searches
+
+        # sort correctly despite the wart in the band numbering scheme ('8A')
+        def band_sort_key(fn):
+            band = band_regex.match(fn).group('band')
+            return 8.5 if band == '8A' else int(band)
+        bands.sort(key=band_sort_key)
+
+        # check for asset completeness
+        problems = []
+        if expected_band_cnt != len(bands):
+            problems.append("expected {} bands but got {}".format(
+                expected_band_cnt, len(bands)))
+        missing_keys = expected_key_set - set(asset_keys.keys())
+        if missing_keys:
+            problems.append("keys not found: {}".format(missing_keys))
+        if problems:
+            raise IOError('; '.join(problems))
+        return asset_keys
+
+    @classmethod
     def query_gs(cls, tile, date, pclouds):
         """Query google's store of sentinel-2 data for the given scene."""
+        atd_triad = '(L1CGS, {}, {})'.format(tile, date.strftime('%Y-%j'))
         tile_prefix = 'tiles/{}/{}/{}/'.format(tile[0:2], tile[2], tile[3:])
+        # use a template to handle S2A vs. S2B
         prefix_template = tile_prefix + '{}_MSIL1C_' + date.strftime('%Y%m%d')
-        # It might be S2A or S2B, find out which one
         for sensor in cls._sensors.keys():
             search_prefix = prefix_template.format(sensor)
             # only going to be one prefix, if any are found
@@ -370,51 +417,22 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         if prefix is None:
             return None
 
-        # search for the parts of the asset we need
-        # it's not clear if/when google is going to update their sentinel-2
-        # data to have reprocessed single-tile assets
-        style = cls.ds_style if date < cls.st_style_start_date else cls.st_style
-        style_regexes = cls.get_style_regexes(style, tile, compile=True)
-        band_regex = style_regexes['raster-re']
-        md_regexes = {'datastrip-md': style_regexes['datastrip-md-re'],
-                      'tile-md':      style_regexes['tile-md-re'],
-                      'asset-md':     style_regexes['asset-md-re']}
-        # for sanity checking later
-        expected_key_set = set(md_regexes.keys() + ['spectral-bands'])
-        expected_band_cnt = len(cls._sensors['S2A']['band-strings'])
-        bands = []
-        keys = {'spectral-bands': bands}
-        for i in cls.gs_api_search(prefix, delimiter=None)['items']:
-            k = i['name']
-            p = k.replace(tile_prefix, '', 1)
-            if len(bands) < expected_band_cnt and band_regex.match(p):
-                bands.append(k)
+        gs_keys = [i['name'] for i in
+                   cls.gs_api_search(prefix, delimiter=None)['items']]
+
+        # ESA & google may take awhile to finish reprocessing old data
+        # into single-tile assets, so for now, support both.
+        keys = None
+        for style in (cls.st_style, cls.ds_style):
+            try:
+                keys = cls.query_gs_find_keys(style, tile, tile_prefix, gs_keys)
+            except IOError as ioe:
+                utils.verbose_out('{} asset for {} was incomplete: {}'.format(
+                    style, atd_triad, ioe), 5)
             else:
-                for md_key, regex in md_regexes.items():
-                    if regex.match(p):
-                        utils.verbose_out('query_gs found {}:  {}'.format(md_key, k), 5)
-                        keys[md_key] = k
-                        del md_regexes[md_key] # don't repeat useless searches
-                    elif k.endswith('xml'):
-                        utils.verbose_out('query_gs found unmatched XML file: {}'.format(k), 5)
-
-        # sort correctly despite the wart in the band numbering scheme ('8A')
-        def band_sort_key(fn):
-            band = band_regex.match(fn).group('band')
-            return 8.5 if band == '8A' else int(band)
-        bands.sort(key=band_sort_key)
-
-        # check for asset completeness
-        if expected_band_cnt != len(bands):
-            utils.verbose_out("Found GS asset wasn't complete for"
-                              " (L1CGS, {}, {}); expected {} bands but got {}.".format(
-                tile, date, expected_band_cnt, len(bands)), 2)
-            return None
-        missing_keys = expected_key_set - set(keys.keys())
-        if missing_keys:
-            utils.verbose_out("Found GS asset wasn't complete for"
-                              " (L1CGS, {}, {}); keys not found: {}".format(
-                tile, date, missing_keys), 2)
+                break
+        if keys is None:
+            utils.verbose_out('No complete asset for {}'.format(atd_triad), 5)
             return None
 
         # handle cloud cover
@@ -423,15 +441,12 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         cc = cls.cloud_cover_from_et(
                 ElementTree.parse(StringIO.StringIO(r.text)))
         if cc > pclouds:
-            cc_msg = ('C1GS asset found for ({}, {}), but cloud cover'
+            cc_msg = ('C1GS asset found for {}, but cloud cover'
                       ' percentage ({}%) fails to meet threshold ({}%)')
-            utils.verbose_out(cc_msg.format(tile, date, cc, pclouds), 3)
+            utils.verbose_out(cc_msg.format(atd_triad, cc, pclouds), 3)
             return None
         # save it in the asset file to reduce network traffic
         keys['cloud-cover'] = cc
-
-        utils.verbose_out('Found complete L1CGS asset for'
-                          ' ({}, {})'.format(tile, date), 3)
         return dict(basename=(prefix.split('/')[-2] + '_gs.json'), keys=keys)
 
     @classmethod
