@@ -20,10 +20,13 @@
 
 from __future__ import print_function
 
+import requests
 from backports.functools_lru_cache import lru_cache
 
 from gips.data.core import Repository, Asset, Data
+from gips.utils import verbose_out
 
+# User guide & other docs here:  https://hls.gsfc.nasa.gov/documents/
 
 class hlsRepository(Repository):
     name = 'hls'
@@ -34,18 +37,63 @@ class hlsRepository(Repository):
 class hlsAsset(Asset):
     Repository = hlsRepository
 
-    _sensors = {} # TODO
+    _sensors = {
+        'L30': {
+            'description': 'Landsat-8 OLI harmonized surface reflectance',
+        },
+        'S30': {
+            'description': 'Sentinel-2 MSI harmonized surface reflectance',
+        }
+    }
 
-    _assets = {} # TODO
+    # TODO not sure if want '^' at beginning?  is <atype> really needed?
+    # literal for asset type is subbed in below
+    _asset_fn_pat_base = (r'^HLS\.(?P<atype>{})\.T(?P<tile>\d\d[A-Z]{{3}})'
+        r'\.(?P<year>\d\d\d\d)(?P<doy>\d\d\d)\.v(?P<version>...)\.hdf$')
+
+    _assets = {
+        'L30': {
+            'pattern': _asset_fn_pat_base.format('L30'),
+            'startdate': None, # TODO
+            'latency': 7,
+        },
+        'S30': {
+            'pattern': _asset_fn_pat_base.format('S30'),
+            'startdate': None, # TODO
+            'latency': 7,
+        }
+    }
 
     def __init__(self):
         super(hlsAsset, self).__init__(filename)
 
+    _hls_version = '1.4'
+    _url_base = 'https://hls.gsfc.nasa.gov/data/v' + _hls_version
+
     @classmethod
-    @lru_cache(maxsize=100) # cache size chosen arbitrarily
-    def query_service(cls, asset, tile, date, pclouds=100, **ignored):
-        # TODO query_provider instead?
-        raise NotImplementedError()
+    @lru_cache(maxsize=1)
+    def check_hls_version(cls):
+        """Once per runtime, confirm 1.4 is still usable."""
+        r = requests.head(_url_base)
+        if r.status_code == 200:
+            verbose_out('HLS URL base `{}` confirmed valid'.format(_url_base), 5)
+        else:
+            raise requests.HTTPError('HLS URL base `{}` returned status code'
+                ' {}; HLS version may have changed'.format(
+                    _url_base, r.status_code))
+
+    @classmethod
+    def query_provider(cls, asset, tile, date, pclouds=100, **ignored):
+        cls.check_hls_version()
+        # build the full URL & basename of the file
+        basename = 'HLS.{}.T{}.{}.v{}.hdf'.format(
+            asset, tile, date.strftime('%Y%j'), cls._hls_version)
+        zbcr = '/'.join(tile[0:2], *(tile[2:])) # eg '19/T/C/H'
+        url = 'https://hls.gsfc.nasa.gov/data/{}/{}/{}/{}'.format(
+                asset, date.year, zbcr, basename)
+        if requests.head(url).status_code == 200: # so do they have it?
+            return basename, url
+        return None, None
 
     @classmethod
     def fetch(cls, asset, tile, date, pclouds=100, **ignored):
