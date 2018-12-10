@@ -20,6 +20,8 @@
 
 from __future__ import print_function
 
+import re
+
 import requests
 from backports.functools_lru_cache import lru_cache
 
@@ -65,6 +67,18 @@ class hlsAsset(Asset):
     }
 
     def __init__(self):
+        """
+        All the spectral measurements and QA data from a given sensor on
+        a day for a tile are saved in a single HDF, named with the
+        following naming convention:
+            HLS.<HLS_Product>.T<Tile_ID>.<year><doy>.v<version_number>.hdf
+        where:
+            - <HLS_Product> is the HLS product type (S10, S30 or L30) [3 symbols]
+            - <Tile_ID> is the MGRS Tile ID [5 digits]
+            - <Year> is the sensing time year [4 digits]
+            - <Doy> is the sensing time day of year [3 digits]
+            - <Version_number> is the HLS version number (e.g., 1.2) [3 digits]
+        """
         super(hlsAsset, self).__init__(filename)
 
     _hls_version = '1.4'
@@ -97,7 +111,8 @@ class hlsAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date, pclouds=100, **ignored):
-        raise NotImplementedError()
+        # each asset has an hdr alongside; not sure if want
+        verbose_out('DOING NOTHING HURRR')
 
 
 class hlsData(Data):

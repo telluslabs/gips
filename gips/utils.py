@@ -254,9 +254,8 @@ def data_sources():
     for key in sorted(repos.keys()):
         if not os.path.isdir(repos[key]['repository']):
             raise Exception('ERROR: archive %s is not a directory or is not available' % key)
-        with error_handler(continuable=True):
-            repo = import_repository_class(key)
-            sources[key] = repo.description
+        repo = import_repository_class(key)
+        sources[key] = repo.description
     return sources
 
 
