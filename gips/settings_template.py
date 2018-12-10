@@ -103,6 +103,9 @@ REPOS = {
     'daymet': {
         'repository': '$TLD/daymet',
     },
+    'hls': {
+        'repository': '$TLD/hls',
+    }
 }
 
 

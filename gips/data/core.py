@@ -334,7 +334,7 @@ class Repository(object):
 
 class Asset(object):
     """ Class for a single file asset (usually an original raw file or archive) """
-    Repository = Repository
+    Repository = None # override in each driver
 
     # Sensors
     _sensors = {
@@ -893,7 +893,7 @@ class Data(object):
     """
     name = 'Data'
     version = '0.0.0'
-    Asset = Asset
+    Asset = None # override in each driver
 
     _unitless = 'unitless' # standard string for expressing that a product has no units
 
