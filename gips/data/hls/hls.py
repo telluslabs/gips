@@ -20,12 +20,15 @@
 
 from __future__ import print_function
 
+import os
 import re
+import datetime
 
 import requests
 from backports.functools_lru_cache import lru_cache
 
 from gips.data.core import Repository, Asset, Data
+from gips import utils
 from gips.utils import verbose_out
 
 from gips.data.sentinel2 import sentinel2
@@ -58,7 +61,7 @@ class hlsAsset(Asset):
     # TODO not sure if want '^' at beginning?  is <atype> really needed?
     # literal for asset type is subbed in below
     _asset_fn_pat_base = (r'^HLS\.(?P<atype>{})\.T(?P<tile>\d\d[A-Z]{{3}})'
-        r'\.(?P<year>\d\d\d\d)(?P<doy>\d\d\d)\.v(?P<version>...)\.hdf$')
+        r'\.(?P<date>\d{{7}})\.v(?P<version>...)\.hdf$')
 
     _assets = {
         'L30': {
@@ -86,7 +89,23 @@ class hlsAsset(Asset):
             - <Doy> is the sensing time day of year [3 digits]
             - <Version_number> is the HLS version number (e.g., 1.2) [3 digits]
         """
+        # TODO some of this is boilerplate and can be DRYed with other drivers
         super(hlsAsset, self).__init__(filename)
+        self.basename = os.path.basename(filename)
+        match = None
+        for a_type, a_properties in self._assets.items():
+            match = re.match(a_properties['pattern'], self.basename)
+            if match is not None:
+                break
+        if match is None:
+            raise IOError('Unparseable asset filename `{}`'.format(
+                self.basename))
+
+        self.asset, self.tile = match.group('atype', 'tile')
+        self.sensor = self.asset
+        self.date = datetime.datetime.strptime(
+            match.group('date'), self.Repository._datedir).date()
+        self._version = float(match.group('version'))
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -102,6 +121,7 @@ class hlsAsset(Asset):
 
     @classmethod
     def query_provider(cls, asset, tile, date, pclouds=100, **ignored):
+        # TODO handle pclouds
         cls.check_hls_version()
         # build the full URL & basename of the file
         basename = 'HLS.{}.T{}.{}.v{}.hdf'.format(
@@ -113,9 +133,8 @@ class hlsAsset(Asset):
         return None, None
 
     @classmethod
-    def fetch(cls, asset, tile, date, pclouds=100, **ignored):
-        # each asset has an hdr alongside; not sure if want
-        verbose_out('DOING NOTHING HURRR')
+    def download(cls, url, download_fp, **ignored):
+        utils.http_download(url, download_fp)
 
 
 class hlsData(Data):
@@ -155,17 +174,14 @@ class hlsData(Data):
 
     @classmethod
     def normalize_tile_string(cls, tile_string):
-        # TODO probably copy sentinel-2
-        return tile_string
+        return sentinel2.sentinel2Data.normalize_tile_string(tile_string)
 
-    @classmethod
-    def add_filter_args(cls, parser):
-        # TODO probably copy sentinel-2
-        pass
-
-    def filter(self, pclouds=100, **kwargs):
-        # TODO confirm this use of sentinel-2 version
-        return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
+    # TODO copy sentinel-2 to implement pclouds
+    #@classmethod
+    #def add_filter_args(cls, parser):
+        #pass
+    #def filter(self, pclouds=100, **kwargs):
+        #return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
     def prep_meta(self, additional=None):
         # TODO confirm this use of sentinel-2 version

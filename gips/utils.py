@@ -33,7 +33,9 @@ import commands
 import shutil
 import traceback
 import datetime
+
 import numpy as np
+import requests
 
 import gippy
 from gippy import GeoVector
@@ -170,7 +172,6 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
             shutil.rmtree(absolute_pathname)
         else:
             print('GIPS_DEBUG: Orphaning {}'.format(absolute_pathname))
-
 
 def find_files(regex, path='.'):
     """Find filenames in the given directory that match the regex.
@@ -636,3 +637,11 @@ def stringify_meta_dict(md):
             return str(o)
 
     return {str(k): stringify(v) for (k, v) in md.items()}
+
+def http_download(url, full_path, chunk_size=512 * 1024):
+    """Download a file via http GET, saving to the given file path."""
+    r = requests.get(url, stream=True)
+    r.raise_for_status()
+    with open(full_path, 'wb') as fo:
+        # 'if c' filters out keep-alive new chunks
+        [fo.write(c) for c in r.iter_content(chunk_size=chunk_size) if c]

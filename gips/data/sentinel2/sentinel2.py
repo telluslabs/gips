@@ -519,7 +519,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                 p.communicate()
                 if p.returncode != 0:
                     raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-                cls.stage_asset(output_full_path, output_file_name)
+                cls.stage_asset(output_full_path)
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
         return [output_full_path]
@@ -582,15 +582,6 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                 utils.RemoveFiles([fn], ['.index', '.aux.xml'])
 
         return assets, overwritten_assets
-
-
-    @classmethod
-    def stage_asset(cls, asset_full_path, asset_base_name):
-        """Copy the given asset to the stage."""
-        stage_path = cls.Repository.path('stage')
-        stage_full_path = os.path.join(stage_path, asset_base_name)
-        os.rename(asset_full_path, stage_full_path) # on POSIX, if it works, it's atomic
-
 
     @classmethod
     def ds_tile_list(cls, file_name):

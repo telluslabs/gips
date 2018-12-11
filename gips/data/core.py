@@ -429,9 +429,11 @@ class Asset(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
+    @classmethod
     def _quarantine_file(cls, filepath, error):
         """if problem with a file, move to quarantine"""
         #TODO: make this ORM compatible
+        error.tb_text = traceback.format_exc()
         utils.report_error(error, 'Quarantining ' + filepath)
         qname = os.path.join(cls.Repository.path('quarantine'), os.path.basename(filepath))
         if not os.path.exists(qname):
@@ -687,11 +689,38 @@ class Asset(object):
             return None
         return {'basename': bn, 'url': url}
 
+    @classmethod
+    def download(cls, url, fp, **kwargs):
+        """Override this method to provide custom download code."""
+        raise NotImplementedError('download not supported for' + cls.__name__)
 
     @classmethod
-    def fetch(cls, *args, **kwargs):
-        """ Fetch stub """
-        raise NotImplementedError("Fetch not supported for this data source")
+    def stage_asset(cls, asset_full_path):
+        """Copy the given asset to the stage."""
+        stage_full_path = os.path.join(cls.Repository.path('stage'),
+                                       os.path.basename(asset_full_path))
+        os.rename(asset_full_path, stage_full_path) # atomic on POSIX
+        return stage_full_path
+
+    @classmethod
+    def fetch(cls, a_type, tile, date, **fetch_kwargs):
+        """Standard fetch method; calls query_service() and download().
+
+        Outputs from query_service are passed in to download as kwargs, so one
+        can talk to the other in a standard way.
+        """
+        qs_rv = cls.query_service(a_type, tile, date, **fetch_kwargs)
+        if qs_rv is None:
+            return []
+        stage_dir_fp = cls.Repository.path('stage')
+        if os.path.exists(os.path.join(stage_dir_fp, qs_rv['basename'])):
+            utils.verbose_out('Asset `{}` needed but already in stage/,'
+                              ' skipping.'.format(qs_rv['basename']))
+            return []
+        with utils.make_temp_dir(prefix='fetch-', dir=stage_dir_fp) as td_fp:
+            qs_rv['download_fp'] = os.path.join(td_fp, qs_rv['basename'])
+            cls.download(**qs_rv)
+            return [cls.stage_asset(qs_rv['download_fp'])]
 
     @classmethod
     def ftp_connect(cls, working_directory):
@@ -1360,7 +1389,7 @@ class Data(object):
             for a in cls.products2assets(products)
             for t in tiles
             for d in cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                if not cls.need_to_fetch(a, t, d, update, **fetch_kwargs))
+                if cls.need_to_fetch(a, t, d, update, **fetch_kwargs))
         for a, t, d in atd_pile:
             err_msg = 'Problem fetching asset for {}, {}, {}'.format(
                 a, t, d.strftime("%y-%m-%d"))
