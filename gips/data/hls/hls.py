@@ -28,7 +28,14 @@ from backports.functools_lru_cache import lru_cache
 from gips.data.core import Repository, Asset, Data
 from gips.utils import verbose_out
 
+from gips.data.sentinel2 import sentinel2
+from gips.data.landsat import landsat
+
 # User guide & other docs here:  https://hls.gsfc.nasa.gov/documents/
+
+_hls_version = '1.4'
+_url_base = 'https://hls.gsfc.nasa.gov/data/v' + _hls_version
+_ordered_asset_types = 'S30', 'L30' # for now assume sentinel-2 is preferred
 
 class hlsRepository(Repository):
     name = 'hls'
@@ -56,17 +63,17 @@ class hlsAsset(Asset):
     _assets = {
         'L30': {
             'pattern': _asset_fn_pat_base.format('L30'),
-            'startdate': None, # TODO
+            'startdate': landsat.landsatAsset._assets['C1']['startdate'],
             'latency': 7,
         },
         'S30': {
             'pattern': _asset_fn_pat_base.format('S30'),
-            'startdate': None, # TODO
+            'startdate': sentinel2.sentinel2Asset._assets['L1C']['startdate'],
             'latency': 7,
         }
     }
 
-    def __init__(self):
+    def __init__(self, filename):
         """
         All the spectral measurements and QA data from a given sensor on
         a day for a tile are saved in a single HDF, named with the
@@ -81,14 +88,11 @@ class hlsAsset(Asset):
         """
         super(hlsAsset, self).__init__(filename)
 
-    _hls_version = '1.4'
-    _url_base = 'https://hls.gsfc.nasa.gov/data/v' + _hls_version
-
     @classmethod
     @lru_cache(maxsize=1)
     def check_hls_version(cls):
         """Once per runtime, confirm 1.4 is still usable."""
-        r = requests.head(_url_base)
+        r = requests.head(_url_base + '/')
         if r.status_code == 200:
             verbose_out('HLS URL base `{}` confirmed valid'.format(_url_base), 5)
         else:
@@ -101,10 +105,9 @@ class hlsAsset(Asset):
         cls.check_hls_version()
         # build the full URL & basename of the file
         basename = 'HLS.{}.T{}.{}.v{}.hdf'.format(
-            asset, tile, date.strftime('%Y%j'), cls._hls_version)
-        zbcr = '/'.join(tile[0:2], *(tile[2:])) # eg '19/T/C/H'
-        url = 'https://hls.gsfc.nasa.gov/data/{}/{}/{}/{}'.format(
-                asset, date.year, zbcr, basename)
+            asset, tile, date.strftime('%Y%j'), _hls_version)
+        zbcr = '/'.join([tile[0:2]] + list(tile[2:])) # '19TCH' -> '19/T/C/H'
+        url = '/'.join([_url_base, asset, str(date.year), zbcr, basename])
         if requests.head(url).status_code == 200: # so do they have it?
             return basename, url
         return None, None
@@ -121,7 +124,34 @@ class hlsData(Data):
 
     _productgroups = {} # TODO
 
-    _products = {} # TODO
+    _products = {}
+    # TODO DRY out (see sentinel-2)
+    # TODO does L30 support all these?
+    # TODO does S30 support all these?
+    # add index products to _products
+    _products.update(
+        (p, {'description': d,
+             'assets': _ordered_asset_types,
+             'bands': [{'name': p, 'units': Data._unitless}]}
+         ) for p, d in [
+            # duplicated in modis and landsat; may be worth it to DRY out
+            ('ndvi',   'Normalized Difference Vegetation Index'),
+            # ('evi',    'Enhanced Vegetation Index'),
+            # ('lswi',   'Land Surface Water Index'),
+            # ('ndsi',   'Normalized Difference Snow Index'),
+            # ('bi',     'Brightness Index'),
+            # ('satvi',  'Soil-Adjusted Total Vegetation Index'),
+            # ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
+            # ('vari',   'Visible Atmospherically Resistant Index'),
+            # ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
+            # # index products related to tillage
+            # ('ndti',   'Normalized Difference Tillage Index'),
+            # ('crc',    'Crop Residue Cover (uses BLUE)'),
+            # ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
+            # ('isti',   'Inverse Standard Tillage Index'),
+            # ('sti',    'Standard Tillage Index'),
+        ]
+    )
 
     @classmethod
     def normalize_tile_string(cls, tile_string):
