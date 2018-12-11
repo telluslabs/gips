@@ -1354,23 +1354,20 @@ class Data(object):
     @classmethod
     def fetch(cls, products, tiles, textent, update=False, **kwargs):
         """ Download data for tiles and add to archive. update forces fetch """
-        assets = cls.products2assets(products)
         fetched = []
         fetch_kwargs = kwargs if cls.need_fetch_kwargs else {}
-        # TODO rewrite this to back off the indentation
-        for a in assets:
-            for t in tiles:
-                asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                for d in asset_dates: # we say dates but really datetimes
-                    if not cls.need_to_fetch(a, t, d, update, **fetch_kwargs):
-                        continue
-                    with utils.error_handler(
-                            'Problem fetching asset for {}, {}, {}'.format(
-                                a, t, d.strftime("%y-%m-%d")),
-                            continuable=True):
-                        cls.Asset.fetch(a, t, d, **fetch_kwargs)
-                        # fetched may contain both fetched things and unfetchable things
-                        fetched.append((a, t, d))
+        atd_pile = ((a, t, d)
+            for a in cls.products2assets(products)
+            for t in tiles
+            for d in cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
+                if not cls.need_to_fetch(a, t, d, update, **fetch_kwargs))
+        for a, t, d in atd_pile:
+            err_msg = 'Problem fetching asset for {}, {}, {}'.format(
+                a, t, d.strftime("%y-%m-%d"))
+            with utils.error_handler(err_msg, continuable=True):
+                cls.Asset.fetch(a, t, d, **fetch_kwargs)
+                # fetched may contain both fetched and unfetchable things
+                fetched.append((a, t, d))
 
         return fetched
 
