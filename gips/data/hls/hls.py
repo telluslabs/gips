@@ -26,6 +26,7 @@ import datetime
 
 import requests
 from backports.functools_lru_cache import lru_cache
+import gippy
 
 from gips.data.core import Repository, Asset, Data
 import gips.data.core
@@ -56,6 +57,10 @@ class hlsAsset(Asset):
         },
         'S30': {
             'description': 'Sentinel-2 MSI harmonized surface reflectance',
+            'colors': sentinel2.sentinel2Asset._sensors['S2A']['colors'],
+            #'no-data-value': -1000, 'gain': 0.0001
+            # for raster bands:  30m, int16
+            # QA band:  30m, uint8, ndv=255, gain=n/a
         }
     }
 
@@ -138,6 +143,14 @@ class hlsAsset(Asset):
     def download(cls, url, download_fp, **ignored):
         utils.http_download(url, download_fp)
 
+    def load_image(self):
+        """Load this asset into a GeoImage and return it."""
+        subdatasets = self.datafiles()
+        image = gippy.GeoImage(subdatasets)
+        colors = self.sensor_spec('colors')
+        [image.SetBandName(name, i) for (i, name) in enumerate(colors, 1)]
+        return image
+
 
 class hlsData(Data):
     version = '1.0.0'
@@ -162,12 +175,41 @@ class hlsData(Data):
         #return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
     def prep_meta(self, additional=None):
-        # TODO confirm this use of sentinel-2 version
-        meta = super(sentinel2Data, self).prep_meta(
+        meta = super(hlsData, self).prep_meta(
             self.current_asset().filename, additional)
         return meta
 
+    def current_asset(self):
+        """Pick the currently-preferred asset type."""
+        return next(self.assets[at]
+                    for at in _ordered_asset_types if at in self.assets)
+
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
-        # TODO for now just gippy indices
-        raise NotImplementedError()
+        """Hope you like index products."""
+        # TODO another place that can be DRY'd out; several drivers process similarly
+        products = self.needed_products(products, overwrite)
+        if len(products) == 0:
+            verbose_out('No new processing required.', 5)
+            return
+
+        indices = products.groups()['Index']
+        metadata = self.prep_meta()
+        a_obj = self.current_asset()
+
+        # indices' values are the keys, split by hyphen, eg {ndvi-toa':
+        # ['ndvi', 'toa']} (technically it's useless here, as no argumentated
+        # products are supported; doing it for consistency).
+        gippy_input = {} # gippy wants p-types mapped to output filenames
+        tempfps_to_ptypes = {} # AddFile needs a map of p-types to filenames
+        for prod_type, pt_split in indices.items():
+            temp_fp = self.temp_product_filename(a_obj.sensor, prod_type)
+            gippy_input[pt_split[0]] = temp_fp
+            tempfps_to_ptypes[temp_fp] = prod_type
+
+        prodout = gippy.algorithms.Indices(
+            a_obj.load_image(), gippy_input, metadata)
+
+        for temp_fp in prodout.values():
+            archived_fp = self.archive_temp_path(temp_fp)
+            self.AddFile(a_obj.sensor, tempfps_to_ptypes[temp_fp], archived_fp)

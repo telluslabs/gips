@@ -120,8 +120,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                  '07', '08', '8A', '09', '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
             'colors':
-                ["COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
-                 "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"],
+                ("COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
+                 "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"),
             # center wavelength of band in micrometers, CF:
             # https://earth.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/radiometric
             'bandlocs':
