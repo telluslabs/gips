@@ -61,6 +61,33 @@ The data.core classes are the base classes that are used by individual Data modu
 For a new dataset create children of Repository, Asset, and Data
 """
 
+gippy_index_product_glossary = (
+    ('ndvi',   'Normalized Difference Vegetation Index'),
+    ('evi',    'Enhanced Vegetation Index'),
+    ('lswi',   'Land Surface Water Index'),
+    ('ndsi',   'Normalized Difference Snow Index'),
+    ('bi',     'Brightness Index'),
+    ('satvi',  'Soil-Adjusted Total Vegetation Index'),
+    ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
+    ('vari',   'Visible Atmospherically Resistant Index'),
+    ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
+    # index products related to tillage
+    ('ndti',   'Normalized Difference Tillage Index'),
+    ('crc',    'Crop Residue Cover (uses BLUE)'),
+    ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
+    ('isti',   'Inverse Standard Tillage Index'),
+    ('sti',    'Standard Tillage Index'),
+)
+
+def add_gippy_index_products(p_dict, p_groups, a_types):
+    """Add index products to a driver's Data._products & _productgroups."""
+    p_groups['Index'] = [i for (i, _) in gippy_index_product_glossary]
+    p_dict.update(
+        (p, {'description': d,
+             'assets': a_types,
+             'bands': [{'name': p, 'units': Data._unitless}]}
+         ) for p, d in gippy_index_product_glossary)
+
 def _gs_stop_trying(e):
     """Should backoff keep retrying based on this HTTPError?
     

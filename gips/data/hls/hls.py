@@ -28,6 +28,7 @@ import requests
 from backports.functools_lru_cache import lru_cache
 
 from gips.data.core import Repository, Asset, Data
+import gips.data.core
 from gips import utils
 from gips.utils import verbose_out
 
@@ -77,7 +78,8 @@ class hlsAsset(Asset):
     }
 
     def __init__(self, filename):
-        """
+        """Instantiate an HLS asset.  From the docs:
+
         All the spectral measurements and QA data from a given sensor on
         a day for a tile are saved in a single HDF, named with the
         following naming convention:
@@ -141,36 +143,12 @@ class hlsData(Data):
     version = '1.0.0'
     Asset = hlsAsset
 
-    _productgroups = {} # TODO
-
+    _productgroups = {}
     _products = {}
-    # TODO DRY out (see sentinel-2)
     # TODO does L30 support all these?
     # TODO does S30 support all these?
-    # add index products to _products
-    _products.update(
-        (p, {'description': d,
-             'assets': _ordered_asset_types,
-             'bands': [{'name': p, 'units': Data._unitless}]}
-         ) for p, d in [
-            # duplicated in modis and landsat; may be worth it to DRY out
-            ('ndvi',   'Normalized Difference Vegetation Index'),
-            # ('evi',    'Enhanced Vegetation Index'),
-            # ('lswi',   'Land Surface Water Index'),
-            # ('ndsi',   'Normalized Difference Snow Index'),
-            # ('bi',     'Brightness Index'),
-            # ('satvi',  'Soil-Adjusted Total Vegetation Index'),
-            # ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
-            # ('vari',   'Visible Atmospherically Resistant Index'),
-            # ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
-            # # index products related to tillage
-            # ('ndti',   'Normalized Difference Tillage Index'),
-            # ('crc',    'Crop Residue Cover (uses BLUE)'),
-            # ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
-            # ('isti',   'Inverse Standard Tillage Index'),
-            # ('sti',    'Standard Tillage Index'),
-        ]
-    )
+    gips.data.core.add_gippy_index_products(
+        _products, _productgroups, _ordered_asset_types)
 
     @classmethod
     def normalize_tile_string(cls, tile_string):

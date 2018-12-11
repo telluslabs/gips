@@ -842,10 +842,6 @@ class sentinel2Data(Data):
     Asset = sentinel2Asset
 
     _productgroups = {
-        'Index': [
-            'ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari',
-            'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti',
-        ],
         'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
                     'spm', 'spm2016', 'turbidity', 'acoflags'],
     }
@@ -878,30 +874,8 @@ class sentinel2Data(Data):
         },
     }
 
-    # add index products to _products
-    _products.update(
-        (p, {'description': d,
-             'assets': _asset_types,
-             'bands': [{'name': p, 'units': Data._unitless}]}
-        ) for p, d in [
-            # duplicated in modis and landsat; may be worth it to DRY out
-            ('ndvi',   'Normalized Difference Vegetation Index'),
-            ('evi',    'Enhanced Vegetation Index'),
-            ('lswi',   'Land Surface Water Index'),
-            ('ndsi',   'Normalized Difference Snow Index'),
-            ('bi',     'Brightness Index'),
-            ('satvi',  'Soil-Adjusted Total Vegetation Index'),
-            ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
-            ('vari',   'Visible Atmospherically Resistant Index'),
-            ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
-            # index products related to tillage
-            ('ndti',   'Normalized Difference Tillage Index'),
-            ('crc',    'Crop Residue Cover (uses BLUE)'),
-            ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
-            ('isti',   'Inverse Standard Tillage Index'),
-            ('sti',    'Standard Tillage Index'),
-        ]
-    )
+    gips.data.core.add_gippy_index_products(
+        _products, _productgroups, _asset_types)
 
     # indices not processed by gippy.Indices(); L1CGS not supported:
     _products.update(
