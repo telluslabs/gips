@@ -40,6 +40,7 @@ _hls_version = '1.4'
 _url_base = 'https://hls.gsfc.nasa.gov/data/v' + _hls_version
 _ordered_asset_types = 'S30', 'L30' # for now assume sentinel-2 is preferred
 
+
 class hlsRepository(Repository):
     name = 'hls'
     description = 'harmonized Landsat & Sentinel-2 data provided by NASA'
@@ -131,8 +132,7 @@ class hlsAsset(Asset):
                     _url_base, r.status_code))
 
     @classmethod
-    def query_provider(cls, asset, tile, date, pclouds=100, **ignored):
-        # TODO handle pclouds
+    def query_provider(cls, asset, tile, date, **ignored):
         cls.check_hls_version()
         # build the full URL & basename of the file
         basename = 'HLS.{}.T{}.{}.v{}.hdf'.format(
@@ -144,8 +144,17 @@ class hlsAsset(Asset):
         return None, None
 
     @classmethod
-    def download(cls, url, download_fp, **ignored):
+    def download(cls, url, download_fp, pclouds=100.0, **ignored):
         utils.http_download(url, download_fp)
+        verbose_out(
+            'checking {} for cloud cover threshold'.format(download_fp), 4)
+        cloud_cover = float(gippy.GeoImage(download_fp).Meta('cloud_coverage'))
+        asset_passes_filter = cloud_cover <= pclouds
+        msg = ('Asset cloud cover is {}%, meets pclouds threshold of {}%'
+            if asset_passes_filter else
+            'Asset cloud cover is {}%, fails to meet pclouds threshold of {}%')
+        verbose_out(msg.format(cloud_cover, pclouds), 3)
+        return asset_passes_filter
 
     def load_image(self):
         """Load this asset into a GeoImage and return it."""
@@ -170,11 +179,18 @@ class hlsData(Data):
         return sentinel2.sentinel2Data.normalize_tile_string(tile_string)
 
     # TODO copy sentinel-2 to implement pclouds
-    #@classmethod
-    #def add_filter_args(cls, parser):
-        #pass
     #def filter(self, pclouds=100, **kwargs):
         #return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
+
+    need_fetch_kwargs = True
+
+    @classmethod
+    def add_filter_args(cls, parser):
+        """Add custom filtering options for landsat."""
+        help_str = ('cloud percentage threshold; assets with cloud cover'
+                    ' percentages higher than this value will be filtered out')
+        parser.add_argument('--pclouds', help=help_str,
+                            type=cls.natural_percentage, default=100)
 
     def prep_meta(self, additional=None):
         meta = super(hlsData, self).prep_meta(

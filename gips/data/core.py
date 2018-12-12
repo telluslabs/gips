@@ -733,8 +733,9 @@ class Asset(object):
     def fetch(cls, a_type, tile, date, **fetch_kwargs):
         """Standard fetch method; calls query_service() and download().
 
-        Outputs from query_service are passed in to download as kwargs, so one
-        can talk to the other in a standard way.
+        Outputs from query_service and fetch_kwargs are passed in to
+        download as kwargs, so one can talk to the other in a standard
+        way.
         """
         qs_rv = cls.query_service(a_type, tile, date, **fetch_kwargs)
         if qs_rv is None:
@@ -746,8 +747,10 @@ class Asset(object):
             return []
         with utils.make_temp_dir(prefix='fetch-', dir=stage_dir_fp) as td_fp:
             qs_rv['download_fp'] = os.path.join(td_fp, qs_rv['basename'])
-            cls.download(**qs_rv)
-            return [cls.stage_asset(qs_rv['download_fp'])]
+            fetch_kwargs.update(**qs_rv)
+            if cls.download(**fetch_kwargs):
+                return [cls.stage_asset(qs_rv['download_fp'])]
+        return []
 
     @classmethod
     def ftp_connect(cls, working_directory):
