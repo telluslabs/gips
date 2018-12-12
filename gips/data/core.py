@@ -1569,3 +1569,46 @@ class Data(object):
                 os.remove(full_path)
 
         return archived_aol
+
+
+# TODO rebase other drivers on these subclasses as needed
+class CloudCoverAsset(Asset):
+    """Adds filtering support to the Asset class.
+
+    Together with CloudCoverData, lets Assets and Data objects work
+    together to filter by cloud cover. It needs Asset.cloud_cover() to
+    be implemented.
+    """
+    def filter(self, pclouds=100.0, **kwargs):
+        if pclouds >= 100.0:
+            return True
+        cc = self.cloud_cover()
+        asset_passes_filter = cc <= pclouds
+        msg = ('Asset cloud cover is {}%, meets pclouds threshold of {}%'
+               if asset_passes_filter else
+               'Asset cloud cover is {}%, fails to meet pclouds threshold of {}%')
+        utils.verbose_out(msg.format(cc, pclouds), 3)
+        return asset_passes_filter
+
+
+class CloudCoverData(Data):
+    """Adds filtering support to a Data class.
+
+    Together with CloudCoverAsset, lets Assets and Data objects work
+    together to filter by cloud cover.
+    """
+    need_fetch_kwargs = True
+
+    @classmethod
+    def add_filter_args(cls, parser):
+        super(CloudCoverData, cls).add_filter_args(parser)
+        help_str = ('cloud percentage threshold; assets with cloud cover'
+                    ' percentages higher than this value will be filtered out')
+        parser.add_argument('--pclouds', help=help_str,
+                            type=cls.natural_percentage, default=100.0)
+
+    def filter(self, pclouds=100.0, **kwargs):
+        # in case filter() actually does something someday
+        if not super(CloudCoverData, self).filter(**kwargs):
+            return False
+        return all([a.filter(pclouds, **kwargs) for a in self.assets.values()])

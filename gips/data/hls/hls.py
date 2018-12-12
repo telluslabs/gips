@@ -26,7 +26,7 @@ import requests
 from backports.functools_lru_cache import lru_cache
 import gippy
 
-from gips.data.core import Repository, Asset, Data
+from gips.data.core import Repository, Data
 import gips.data.core
 from gips import utils
 from gips.utils import verbose_out
@@ -53,7 +53,7 @@ class hlsRepository(Repository):
         return super(hlsRepository, cls).get_setting(key)
 
 
-class hlsAsset(Asset):
+class hlsAsset(gips.data.core.CloudCoverAsset):
     Repository = hlsRepository
 
     _sensors = {
@@ -119,6 +119,9 @@ class hlsAsset(Asset):
             match.group('date'), self.Repository._datedir).date()
         self._version = float(match.group('version'))
 
+    def cloud_cover(self):
+        return float(gippy.GeoImage(self.filename).Meta('cloud_coverage'))
+
     @classmethod
     @lru_cache(maxsize=1)
     def check_hls_version(cls):
@@ -146,15 +149,7 @@ class hlsAsset(Asset):
     @classmethod
     def download(cls, url, download_fp, pclouds=100.0, **ignored):
         utils.http_download(url, download_fp)
-        verbose_out(
-            'checking {} for cloud cover threshold'.format(download_fp), 4)
-        cloud_cover = float(gippy.GeoImage(download_fp).Meta('cloud_coverage'))
-        asset_passes_filter = cloud_cover <= pclouds
-        msg = ('Asset cloud cover is {}%, meets pclouds threshold of {}%'
-            if asset_passes_filter else
-            'Asset cloud cover is {}%, fails to meet pclouds threshold of {}%')
-        verbose_out(msg.format(cloud_cover, pclouds), 3)
-        return asset_passes_filter
+        return cls(download_fp).filter(pclouds)
 
     def load_image(self):
         """Load this asset into a GeoImage and return it."""
@@ -165,7 +160,7 @@ class hlsAsset(Asset):
         return image
 
 
-class hlsData(Data):
+class hlsData(gips.data.core.CloudCoverData):
     version = '1.0.0'
     Asset = hlsAsset
 
@@ -177,12 +172,6 @@ class hlsData(Data):
     @classmethod
     def normalize_tile_string(cls, tile_string):
         return sentinel2.sentinel2Data.normalize_tile_string(tile_string)
-
-    # TODO copy sentinel-2 to implement pclouds
-    #def filter(self, pclouds=100, **kwargs):
-        #return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
-
-    need_fetch_kwargs = True
 
     @classmethod
     def add_filter_args(cls, parser):

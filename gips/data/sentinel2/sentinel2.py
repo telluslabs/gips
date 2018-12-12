@@ -104,7 +104,8 @@ class sentinel2Repository(Repository):
         return e.x0(), e.x1(), e.y0(), e.y1()
 
 
-class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
+class sentinel2Asset(gips.data.core.CloudCoverAsset,
+                     gips.data.core.GoogleStorageMixin):
     Repository = sentinel2Repository
 
     gs_bucket_name = 'gcp-public-data-sentinel-2'
@@ -646,19 +647,6 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         assert entry['double']['name'] == 'cloudcoverpercentage'
         return float(entry['double']['content'])
 
-    def filter(self, pclouds=100, **kwargs):
-        if pclouds >= 100:
-            return True
-        cc = self.cloud_cover()
-        asset_passes_filter = cc <= pclouds
-        if asset_passes_filter:
-            msg = 'Asset cloud cover is {} %, meets pclouds threshold of {} %'
-        else:
-            msg = ('Asset cloud cover is {} %,'
-                   ' fails to meet pclouds threshold of {} %')
-        utils.verbose_out(msg.format(cc, pclouds), 3)
-        return asset_passes_filter
-
     def save_tile_md_file(self, path):
         if self.asset == 'L1C':
             tile_md_fn = next(fn for fn in self.datafiles()
@@ -836,7 +824,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         return tile_polygon.intersection(wkt_loads(footprint_wkt)).wkt
 
 
-class sentinel2Data(Data):
+class sentinel2Data(gips.data.core.CloudCoverData):
     name = 'Sentinel2'
     version = '0.1.1'
     Asset = sentinel2Asset
@@ -902,8 +890,6 @@ class sentinel2Data(Data):
         's2rep':        'ref',
         'cloudmask':	'cfmask',
     }
-
-    need_fetch_kwargs = True
 
     def plan_work(self, requested_products, overwrite):
         """Plan processing run using requested products & their dependencies.
@@ -978,17 +964,6 @@ class sentinel2Data(Data):
             err_msg = "Tile string '{}' doesn't match MGRS format (eg '04QFJ')".format(tile_string)
             raise IOError(err_msg)
         return tile_string.upper()
-
-    @classmethod
-    def add_filter_args(cls, parser):
-        """Add custom filtering options for sentinel2."""
-        help_str = ('cloud percentage threshold; assets with cloud cover'
-                    ' percentages higher than this value will be filtered out')
-        parser.add_argument('--pclouds', help=help_str,
-                            type=cls.natural_percentage, default=100)
-
-    def filter(self, pclouds=100, **kwargs):
-        return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
     def prep_meta(self, additional=None):
         meta = super(sentinel2Data, self).prep_meta(
