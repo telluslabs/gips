@@ -18,8 +18,6 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
-from __future__ import print_function
-
 import os
 import re
 import datetime
@@ -47,6 +45,12 @@ class hlsRepository(Repository):
     description = 'harmonized Landsat & Sentinel-2 data provided by NASA'
     _tile_attribute = 'Name'
 
+    @classmethod
+    def get_setting(cls, key):
+        if key == 'tiles':
+            return sentinel2.sentinel2Repository.get_setting('tiles')
+        return super(hlsRepository, cls).get_setting(key)
+
 
 class hlsAsset(Asset):
     Repository = hlsRepository
@@ -54,6 +58,7 @@ class hlsAsset(Asset):
     _sensors = {
         'L30': {
             'description': 'Landsat-8 OLI harmonized surface reflectance',
+            'colors': landsat.landsatAsset._sensors['LC8']['colors'],
         },
         'S30': {
             'description': 'Sentinel-2 MSI harmonized surface reflectance',
@@ -64,7 +69,6 @@ class hlsAsset(Asset):
         }
     }
 
-    # TODO not sure if want '^' at beginning?  is <atype> really needed?
     # literal for asset type is subbed in below
     _asset_fn_pat_base = (r'^HLS\.(?P<atype>{})\.T(?P<tile>\d\d[A-Z]{{3}})'
         r'\.(?P<date>\d{{7}})\.v(?P<version>...)\.hdf$')
@@ -158,8 +162,6 @@ class hlsData(Data):
 
     _productgroups = {}
     _products = {}
-    # TODO does L30 support all these?
-    # TODO does S30 support all these?
     gips.data.core.add_gippy_index_products(
         _products, _productgroups, _ordered_asset_types)
 
