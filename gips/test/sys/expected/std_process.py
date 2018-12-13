@@ -6,6 +6,7 @@ from .. import util
 from . import modis_process
 from . import merra_process
 from . import sentinel2_process
+from . import hls_process
 
 expectations = {}
 
@@ -25,6 +26,7 @@ expectations['modis'] = modis_process.expectations
 expectations['merra'] = merra_process.expectations
 
 expectations['sentinel2'] = sentinel2_process.expectations
+expectations['hls'] = hls_process.expectations
 
 mark_spec['sentinel2'] = util.slow
 
