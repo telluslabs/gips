@@ -25,6 +25,7 @@ import sys
 import os
 from datetime import datetime
 import traceback
+import collections
 
 import gippy
 from gippy.algorithms import CookieCutter
@@ -81,10 +82,12 @@ class Tiles(object):
             raise Exception('Site required for creating mosaics')
         start = datetime.now()
         bname = self.date.strftime('%Y%j')
-        for product in self.products.products:
-            sensor = self.which_sensor(product)
-            if sensor is None:
-                continue
+
+        # look in each Data() and dig out its (sensor, product_type) pairs
+        sp_pile = [(s, p) for d in self.tiles.values() for (s, p) in d.filenames
+                        if p in self.products.products]
+        # work on each product in turn, gathering up filenames as needed
+        for (sensor, product) in sp_pile:
             # create data directory when it is needed
             mkdir(datadir)
             # TODO - this is assuming a tif file.  Use gippy FileExtension function when it is exposed
@@ -155,11 +158,16 @@ class Tiles(object):
                 color = [colors[s], Colors.OFF]
         return color[0] + prod + color[1]
 
-
     def pprint(self, dformat='%j', colors=None):
-        """ Print coverage for each and every asset """
-        #assets = [a for a in self.dataclass.Asset._assets]
+        """Print each scene's asset coverage & products.
+
+        dformat is to format the date;
+        colors is a mapping from sensors to ptypes
+        """
+        # print DOY on the left
         sys.stdout.write('{:^12}'.format(self.date.strftime(dformat)))
+
+        # print coverage percentages for each asset
         asset_coverage = self.asset_coverage()
         for a in sorted(asset_coverage):
             cov = asset_coverage[a]
@@ -170,13 +178,17 @@ class Tiles(object):
                 text = ' ' * 10
             sys.stdout.write(text)
 
-        products = [p for t in self.tiles for p in self.tiles[t].products]
-        # Check product is available for all tiles before reporting as processed
-        prods = []
-        for p in set(products):
-            if products.count(p) == len(self.tiles):
-                prods.append(p)
-        for p in sorted(set(prods)):
-            text = self._colorize_product(p, colors)
-            sys.stdout.write(' ' + text)
+        # print product types, colored by sensor, but only if there's a product
+        # in each of the tiles
+        s_pt = collections.defaultdict(list)
+        for s, pt in self.tiles.values()[0].filenames:
+            if all((s, pt) in d.filenames for d in self.tiles.values()):
+                s_pt[s].append(pt)
+        for s in sorted(s_pt):
+            sys.stdout.write(' ')
+            p_type_str = ' '.join(sorted(s_pt[s]))
+            try:
+                sys.stdout.write(colors[s] + p_type_str + Colors.OFF)
+            except (TypeError, KeyError):
+                sys.stdout.write(p_type_str)
         sys.stdout.write('\n')
