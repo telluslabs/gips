@@ -181,32 +181,16 @@ class hlsData(gips.data.core.CloudCoverData):
         parser.add_argument('--pclouds', help=help_str,
                             type=cls.natural_percentage, default=100)
 
-    def prep_meta(self, additional=None):
-        meta = super(hlsData, self).prep_meta(
-            self.current_asset().filename, additional)
-        return meta
+    def process_indices(self, a_obj, indices):
+        """Make the given indices from the given asset.
 
-    def current_asset(self):
-        """Pick the currently-preferred asset type."""
-        return next(self.assets[at]
-                    for at in _ordered_asset_types if at in self.assets)
-
-    @Data.proc_temp_dir_manager
-    def process(self, products=None, overwrite=False, **kwargs):
-        """Hope you like index products."""
+        indices' values are the keys, split by hyphen, eg {ndvi-toa':
+        ['ndvi', 'toa']} (technically it's useless here, as no argumentated
+        products are supported; doing it for consistency).
+        """
         # TODO another place that can be DRY'd out; several drivers process similarly
-        products = self.needed_products(products, overwrite)
-        if len(products) == 0:
-            verbose_out('No new processing required.', 5)
-            return
-
-        indices = products.groups()['Index']
-        metadata = self.prep_meta()
-        a_obj = self.current_asset()
-
-        # indices' values are the keys, split by hyphen, eg {ndvi-toa':
-        # ['ndvi', 'toa']} (technically it's useless here, as no argumentated
-        # products are supported; doing it for consistency).
+        verbose_out('Starting processing on {} for {}'.format(
+            a_obj.atd_str(), indices.keys()), 4)
         gippy_input = {} # gippy wants p-types mapped to output filenames
         tempfps_to_ptypes = {} # AddFile needs a map of p-types to filenames
         for prod_type, pt_split in indices.items():
@@ -215,8 +199,18 @@ class hlsData(gips.data.core.CloudCoverData):
             tempfps_to_ptypes[temp_fp] = prod_type
 
         prodout = gippy.algorithms.Indices(
-            a_obj.load_image(), gippy_input, metadata)
+            a_obj.load_image(), gippy_input, self.prep_meta(a_obj.filename))
 
         for temp_fp in prodout.values():
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, tempfps_to_ptypes[temp_fp], archived_fp)
+
+    @Data.proc_temp_dir_manager
+    def process(self, products=None, overwrite=False, **kwargs):
+        """Hope you like index products."""
+        products = self.needed_products(products, overwrite)
+        if len(products) == 0:
+            verbose_out('No new processing required.', 5)
+            return
+        indices = products.groups()['Index']
+        [self.process_indices(ao, indices) for ao in self.assets.values()]

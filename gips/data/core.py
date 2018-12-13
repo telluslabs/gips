@@ -403,6 +403,10 @@ class Asset(object):
         s = self._sensors[self.sensor]
         return s[keys[0]] if len(keys) == 1 else [s[k] for k in keys]
 
+    def atd_str(self):
+        return 'ATD {} {} {}'.format(
+            self.asset, self.tile, self.date.strftime('%Y%j'))
+
     @classmethod
     def get_setting(cls, key):
         """Convenience method to acces Repository's get_setting."""
@@ -1235,6 +1239,8 @@ class Data(object):
         Optionally, also add a listing for the product file to the
         inventory database.
         """
+        utils.verbose_out('adding {} {} {} to Data object'.format(
+            sensor, product, filename), 5)
         self.filenames[(sensor, product)] = filename
         # TODO - currently assumes single sensor for each product
         self.sensors[product] = sensor
