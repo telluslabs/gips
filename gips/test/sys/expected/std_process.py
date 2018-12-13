@@ -17,6 +17,7 @@ lite_mark_spec = { k: util.lite for k in [
     ('landsat', 'ndvi-toa'),
     ('sentinel2', 'evi-toa'),
     ('prism', 'ppt'),
+    ('hls', 'ndvi'),
     #('sar', 'sign'), # TODO automate arttifact-* pytest.ini values
 ]}
 
