@@ -162,8 +162,8 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
             # https://landsat.usgs.gov/what-are-band-designations-landsat-satellites
             'bands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
             'oldbands': ['1', '2', '3', '4', '5', '6', '7', '9', '10', '11'],
-            'colors': ["COASTAL", "BLUE", "GREEN", "RED", "NIR",
-                       "SWIR1", "SWIR2", "CIRRUS", "LWIR", "LWIR2"],
+            'colors': ("COASTAL", "BLUE", "GREEN", "RED", "NIR",
+                       "SWIR1", "SWIR2", "CIRRUS", "LWIR", "LWIR2"),
             'bandlocs': [0.443, 0.4825, 0.5625, 0.655, 0.865,
                          1.610, 2.2, 1.375, 10.8, 12.0],
             'bandwidths': [0.01, 0.0325, 0.0375, 0.025, 0.02,

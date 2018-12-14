@@ -61,6 +61,33 @@ The data.core classes are the base classes that are used by individual Data modu
 For a new dataset create children of Repository, Asset, and Data
 """
 
+gippy_index_product_glossary = (
+    ('ndvi',   'Normalized Difference Vegetation Index'),
+    ('evi',    'Enhanced Vegetation Index'),
+    ('lswi',   'Land Surface Water Index'),
+    ('ndsi',   'Normalized Difference Snow Index'),
+    ('bi',     'Brightness Index'),
+    ('satvi',  'Soil-Adjusted Total Vegetation Index'),
+    ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
+    ('vari',   'Visible Atmospherically Resistant Index'),
+    ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
+    # index products related to tillage
+    ('ndti',   'Normalized Difference Tillage Index'),
+    ('crc',    'Crop Residue Cover (uses BLUE)'),
+    ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
+    ('isti',   'Inverse Standard Tillage Index'),
+    ('sti',    'Standard Tillage Index'),
+)
+
+def add_gippy_index_products(p_dict, p_groups, a_types):
+    """Add index products to a driver's Data._products & _productgroups."""
+    p_groups['Index'] = [i for (i, _) in gippy_index_product_glossary]
+    p_dict.update(
+        (p, {'description': d,
+             'assets': a_types,
+             'bands': [{'name': p, 'units': Data._unitless}]}
+         ) for p, d in gippy_index_product_glossary)
+
 def _gs_stop_trying(e):
     """Should backoff keep retrying based on this HTTPError?
     
@@ -376,6 +403,10 @@ class Asset(object):
         s = self._sensors[self.sensor]
         return s[keys[0]] if len(keys) == 1 else [s[k] for k in keys]
 
+    def atd_str(self):
+        return 'ATD {} {} {}'.format(
+            self.asset, self.tile, self.date.strftime('%Y%j'))
+
     @classmethod
     def get_setting(cls, key):
         """Convenience method to acces Repository's get_setting."""
@@ -429,9 +460,11 @@ class Asset(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
+    @classmethod
     def _quarantine_file(cls, filepath, error):
         """if problem with a file, move to quarantine"""
         #TODO: make this ORM compatible
+        error.tb_text = traceback.format_exc()
         utils.report_error(error, 'Quarantining ' + filepath)
         qname = os.path.join(cls.Repository.path('quarantine'), os.path.basename(filepath))
         if not os.path.exists(qname):
@@ -687,11 +720,41 @@ class Asset(object):
             return None
         return {'basename': bn, 'url': url}
 
+    @classmethod
+    def download(cls, url, fp, **kwargs):
+        """Override this method to provide custom download code."""
+        raise NotImplementedError('download not supported for' + cls.__name__)
 
     @classmethod
-    def fetch(cls, *args, **kwargs):
-        """ Fetch stub """
-        raise NotImplementedError("Fetch not supported for this data source")
+    def stage_asset(cls, asset_full_path):
+        """Copy the given asset to the stage."""
+        stage_full_path = os.path.join(cls.Repository.path('stage'),
+                                       os.path.basename(asset_full_path))
+        os.rename(asset_full_path, stage_full_path) # atomic on POSIX
+        return stage_full_path
+
+    @classmethod
+    def fetch(cls, a_type, tile, date, **fetch_kwargs):
+        """Standard fetch method; calls query_service() and download().
+
+        Outputs from query_service and fetch_kwargs are passed in to
+        download as kwargs, so one can talk to the other in a standard
+        way.
+        """
+        qs_rv = cls.query_service(a_type, tile, date, **fetch_kwargs)
+        if qs_rv is None:
+            return []
+        stage_dir_fp = cls.Repository.path('stage')
+        if os.path.exists(os.path.join(stage_dir_fp, qs_rv['basename'])):
+            utils.verbose_out('Asset `{}` needed but already in stage/,'
+                              ' skipping.'.format(qs_rv['basename']))
+            return []
+        with utils.make_temp_dir(prefix='fetch-', dir=stage_dir_fp) as td_fp:
+            qs_rv['download_fp'] = os.path.join(td_fp, qs_rv['basename'])
+            fetch_kwargs.update(**qs_rv)
+            if cls.download(**fetch_kwargs):
+                return [cls.stage_asset(qs_rv['download_fp'])]
+        return []
 
     @classmethod
     def ftp_connect(cls, working_directory):
@@ -1176,6 +1239,8 @@ class Data(object):
         Optionally, also add a listing for the product file to the
         inventory database.
         """
+        utils.verbose_out('adding {} {} {} to Data object'.format(
+            sensor, product, filename), 5)
         self.filenames[(sensor, product)] = filename
         # TODO - currently assumes single sensor for each product
         self.sensors[product] = sensor
@@ -1354,23 +1419,20 @@ class Data(object):
     @classmethod
     def fetch(cls, products, tiles, textent, update=False, **kwargs):
         """ Download data for tiles and add to archive. update forces fetch """
-        assets = cls.products2assets(products)
         fetched = []
         fetch_kwargs = kwargs if cls.need_fetch_kwargs else {}
-        # TODO rewrite this to back off the indentation
-        for a in assets:
-            for t in tiles:
-                asset_dates = cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                for d in asset_dates: # we say dates but really datetimes
-                    if not cls.need_to_fetch(a, t, d, update, **fetch_kwargs):
-                        continue
-                    with utils.error_handler(
-                            'Problem fetching asset for {}, {}, {}'.format(
-                                a, t, d.strftime("%y-%m-%d")),
-                            continuable=True):
-                        cls.Asset.fetch(a, t, d, **fetch_kwargs)
-                        # fetched may contain both fetched things and unfetchable things
-                        fetched.append((a, t, d))
+        atd_pile = ((a, t, d)
+            for a in cls.products2assets(products)
+            for t in tiles
+            for d in cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
+                if cls.need_to_fetch(a, t, d, update, **fetch_kwargs))
+        for a, t, d in atd_pile:
+            err_msg = 'Problem fetching asset for {}, {}, {}'.format(
+                a, t, d.strftime("%y-%m-%d"))
+            with utils.error_handler(err_msg, continuable=True):
+                cls.Asset.fetch(a, t, d, **fetch_kwargs)
+                # fetched may contain both fetched and unfetchable things
+                fetched.append((a, t, d))
 
         return fetched
 
@@ -1513,3 +1575,46 @@ class Data(object):
                 os.remove(full_path)
 
         return archived_aol
+
+
+# TODO rebase other drivers on these subclasses as needed
+class CloudCoverAsset(Asset):
+    """Adds filtering support to the Asset class.
+
+    Together with CloudCoverData, lets Assets and Data objects work
+    together to filter by cloud cover. It needs Asset.cloud_cover() to
+    be implemented.
+    """
+    def filter(self, pclouds=100.0, **kwargs):
+        if pclouds >= 100.0:
+            return True
+        cc = self.cloud_cover()
+        asset_passes_filter = cc <= pclouds
+        msg = ('Asset cloud cover is {}%, meets pclouds threshold of {}%'
+               if asset_passes_filter else
+               'Asset cloud cover is {}%, fails to meet pclouds threshold of {}%')
+        utils.verbose_out(msg.format(cc, pclouds), 3)
+        return asset_passes_filter
+
+
+class CloudCoverData(Data):
+    """Adds filtering support to a Data class.
+
+    Together with CloudCoverAsset, lets Assets and Data objects work
+    together to filter by cloud cover.
+    """
+    need_fetch_kwargs = True
+
+    @classmethod
+    def add_filter_args(cls, parser):
+        super(CloudCoverData, cls).add_filter_args(parser)
+        help_str = ('cloud percentage threshold; assets with cloud cover'
+                    ' percentages higher than this value will be filtered out')
+        parser.add_argument('--pclouds', help=help_str,
+                            type=cls.natural_percentage, default=100.0)
+
+    def filter(self, pclouds=100.0, **kwargs):
+        # in case filter() actually does something someday
+        if not super(CloudCoverData, self).filter(**kwargs):
+            return False
+        return all([a.filter(pclouds, **kwargs) for a in self.assets.values()])

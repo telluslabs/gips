@@ -26,6 +26,7 @@ STD_ARGS = {
     'sentinel2': ('sentinel2', '-s', util.DURHAM_SHP_PATH, '-d2017-183', '-v4'),
     'sar': ('sar', '-t', 'N07E099', 'N19E100', 'N00E099', '-d2009,2015', '-v4'),
     'daymet' : ('daymet', '-d', '1993-1-18', '-s', util.DURHAM_SHP_PATH),
+    'hls': tuple(('hls -v4 -d2016-156 -s ' + util.DURHAM_SHP_PATH).split()),
 }
 
 setup_attempted = []
@@ -66,7 +67,6 @@ def setup_repo_data(driver):
         print(driver, 'asset files already present; no setup needed')
         return
 
-    #print('Installing', driver, 'assets from', sanitized_uh)
     print('Installing', driver, 'assets from', das_path)
     try:
         temp_dir = tempfile.mkdtemp()

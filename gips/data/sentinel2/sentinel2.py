@@ -104,7 +104,8 @@ class sentinel2Repository(Repository):
         return e.x0(), e.x1(), e.y0(), e.y1()
 
 
-class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
+class sentinel2Asset(gips.data.core.CloudCoverAsset,
+                     gips.data.core.GoogleStorageMixin):
     Repository = sentinel2Repository
 
     gs_bucket_name = 'gcp-public-data-sentinel-2'
@@ -120,8 +121,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                  '07', '08', '8A', '09', '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
             'colors':
-                ["COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
-                 "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"],
+                ("COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
+                 "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"),
             # center wavelength of band in micrometers, CF:
             # https://earth.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/radiometric
             'bandlocs':
@@ -519,7 +520,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                 p.communicate()
                 if p.returncode != 0:
                     raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-                cls.stage_asset(output_full_path, output_file_name)
+                cls.stage_asset(output_full_path)
             finally:
                 shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
         return [output_full_path]
@@ -583,15 +584,6 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
         return assets, overwritten_assets
 
-
-    @classmethod
-    def stage_asset(cls, asset_full_path, asset_base_name):
-        """Copy the given asset to the stage."""
-        stage_path = cls.Repository.path('stage')
-        stage_full_path = os.path.join(stage_path, asset_base_name)
-        os.rename(asset_full_path, stage_full_path) # on POSIX, if it works, it's atomic
-
-
     @classmethod
     def ds_tile_list(cls, file_name):
         """Extract a list of tiles from the given datastrip-style asset."""
@@ -654,19 +646,6 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             entry = entry[0]
         assert entry['double']['name'] == 'cloudcoverpercentage'
         return float(entry['double']['content'])
-
-    def filter(self, pclouds=100, **kwargs):
-        if pclouds >= 100:
-            return True
-        cc = self.cloud_cover()
-        asset_passes_filter = cc <= pclouds
-        if asset_passes_filter:
-            msg = 'Asset cloud cover is {} %, meets pclouds threshold of {} %'
-        else:
-            msg = ('Asset cloud cover is {} %,'
-                   ' fails to meet pclouds threshold of {} %')
-        utils.verbose_out(msg.format(cc, pclouds), 3)
-        return asset_passes_filter
 
     def save_tile_md_file(self, path):
         if self.asset == 'L1C':
@@ -845,16 +824,12 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         return tile_polygon.intersection(wkt_loads(footprint_wkt)).wkt
 
 
-class sentinel2Data(Data):
+class sentinel2Data(gips.data.core.CloudCoverData):
     name = 'Sentinel2'
     version = '0.1.1'
     Asset = sentinel2Asset
 
     _productgroups = {
-        'Index': [
-            'ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari',
-            'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti',
-        ],
         'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
                     'spm', 'spm2016', 'turbidity', 'acoflags'],
     }
@@ -887,30 +862,8 @@ class sentinel2Data(Data):
         },
     }
 
-    # add index products to _products
-    _products.update(
-        (p, {'description': d,
-             'assets': _asset_types,
-             'bands': [{'name': p, 'units': Data._unitless}]}
-        ) for p, d in [
-            # duplicated in modis and landsat; may be worth it to DRY out
-            ('ndvi',   'Normalized Difference Vegetation Index'),
-            ('evi',    'Enhanced Vegetation Index'),
-            ('lswi',   'Land Surface Water Index'),
-            ('ndsi',   'Normalized Difference Snow Index'),
-            ('bi',     'Brightness Index'),
-            ('satvi',  'Soil-Adjusted Total Vegetation Index'),
-            ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
-            ('vari',   'Visible Atmospherically Resistant Index'),
-            ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
-            # index products related to tillage
-            ('ndti',   'Normalized Difference Tillage Index'),
-            ('crc',    'Crop Residue Cover (uses BLUE)'),
-            ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
-            ('isti',   'Inverse Standard Tillage Index'),
-            ('sti',    'Standard Tillage Index'),
-        ]
-    )
+    gips.data.core.add_gippy_index_products(
+        _products, _productgroups, _asset_types)
 
     # indices not processed by gippy.Indices(); L1CGS not supported:
     _products.update(
@@ -937,8 +890,6 @@ class sentinel2Data(Data):
         's2rep':        'ref',
         'cloudmask':	'cfmask',
     }
-
-    need_fetch_kwargs = True
 
     def plan_work(self, requested_products, overwrite):
         """Plan processing run using requested products & their dependencies.
@@ -1013,17 +964,6 @@ class sentinel2Data(Data):
             err_msg = "Tile string '{}' doesn't match MGRS format (eg '04QFJ')".format(tile_string)
             raise IOError(err_msg)
         return tile_string.upper()
-
-    @classmethod
-    def add_filter_args(cls, parser):
-        """Add custom filtering options for sentinel2."""
-        help_str = ('cloud percentage threshold; assets with cloud cover'
-                    ' percentages higher than this value will be filtered out')
-        parser.add_argument('--pclouds', help=help_str,
-                            type=cls.natural_percentage, default=100)
-
-    def filter(self, pclouds=100, **kwargs):
-        return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
     def prep_meta(self, additional=None):
         meta = super(sentinel2Data, self).prep_meta(
