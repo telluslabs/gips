@@ -161,6 +161,7 @@ class hlsAsset(gips.data.core.CloudCoverAsset):
 
 
 class hlsData(gips.data.core.CloudCoverData):
+    name = 'hls'
     version = '1.0.0'
     Asset = hlsAsset
 
@@ -172,14 +173,6 @@ class hlsData(gips.data.core.CloudCoverData):
     @classmethod
     def normalize_tile_string(cls, tile_string):
         return sentinel2.sentinel2Data.normalize_tile_string(tile_string)
-
-    @classmethod
-    def add_filter_args(cls, parser):
-        """Add custom filtering options for landsat."""
-        help_str = ('cloud percentage threshold; assets with cloud cover'
-                    ' percentages higher than this value will be filtered out')
-        parser.add_argument('--pclouds', help=help_str,
-                            type=cls.natural_percentage, default=100)
 
     def process_indices(self, a_obj, indices):
         """Make the given indices from the given asset.
@@ -207,7 +200,7 @@ class hlsData(gips.data.core.CloudCoverData):
 
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
-        """Hope you like index products."""
+        """Generate hls products, presently gippy indices."""
         products = self.needed_products(products, overwrite)
         if len(products) == 0:
             verbose_out('No new processing required.', 5)

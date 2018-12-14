@@ -67,7 +67,6 @@ def setup_repo_data(driver):
         print(driver, 'asset files already present; no setup needed')
         return
 
-    #print('Installing', driver, 'assets from', sanitized_uh)
     print('Installing', driver, 'assets from', das_path)
     try:
         temp_dir = tempfile.mkdtemp()
