@@ -9,7 +9,7 @@
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
+#    the Free Software Foundation; either version 3 of the License, or
 #    (at your option) any later version.
 #
 #    This program is distributed in the hope that it will be useful,
@@ -52,6 +52,7 @@ setup(
     description='Geospatial Image Processing System',
     author='Matthew Hanson',
     author_email='matt.a.hanson@gmail.com',
+    license='GNU General Public License v3 (GPLv3)',
     packages=find_packages(),
     package_data={
         '': ['*.shp', '*.prj', '*.shx', '*.dbf', '*.csv'],
@@ -86,4 +87,7 @@ setup(
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,
+    classifiers=[
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    ],
 )
