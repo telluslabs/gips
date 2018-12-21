@@ -105,7 +105,9 @@ class SpatialExtent(object):
             # both be passed from elsewhere. for now, preferentially
             # use rastermask if provided.
             if rastermask is not None:
-                with utils.make_temp_dir(prefix='spatialfactory') as td:
+                with utils.make_temp_dir(
+                    prefix='spatialfactory', dir=dataclass.Asset.Repository.path('stage')
+                ) as td:
                     vectorfile = os.path.join(td, os.path.basename(rastermask)[:-4] + '.shp')
                     features = open_vector(utils.vectorize(rastermask, vectorfile), where='DN=1')
                     for f in features:
