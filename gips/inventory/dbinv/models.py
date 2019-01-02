@@ -40,4 +40,4 @@ class Product(models.Model):
 
     class Meta:
         # These four columns uniquely identify an asset file
-        unique_together = ('driver', 'product', 'tile', 'date')
+        unique_together = ('driver', 'product', 'sensor', 'tile', 'date')
