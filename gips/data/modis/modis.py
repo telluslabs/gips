@@ -175,6 +175,8 @@ class modisAsset(Asset):
         self._version = float('{}.{}'.format(collection, file_version))
 
 
+    # s3refactor probably we need to cross-grade modis to query_service;
+    # see landsat's for reference
     @classmethod
     def query_provider(cls, asset, tile, date):
         """Find out from the modis servers what assets are available.
@@ -218,6 +220,7 @@ class modisAsset(Asset):
                           '{} at {}'.format(pattern, mainurl), 4)
         return None, None
 
+    # s3refactor rewrite; see landsat's for reference
     @classmethod
     def fetch(cls, asset, tile, date):
         qs_rv = cls.query_service(asset, tile, date)
