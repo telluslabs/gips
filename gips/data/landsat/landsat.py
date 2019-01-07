@@ -441,17 +441,8 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
             for ds in ['LANDSAT_8_C1', 'LANDSAT_ETM_C1', 'LANDSAT_TM_C1']
         }
 
-    # s3refactor - sorta; put a version of this in modisAsset
-    # modis version (complete S3 url):
-    #                   at   col  h  v   y doy
-    # s3://modis-pds/MCD43A4.006/21/11/2017006/
-    #       MCD43A4.A2017006.h21v11.006.2017018074804_B01.TIF
     _s3_bucket_name = 'landsat-pds'
     _s3_url = 'https://landsat-pds.s3.amazonaws.com/'
-
-    # take advantage of gips' search order (tile is outer, date is inner)
-    # and cache search outcomes
-    _query_s3_cache = (None, None) # prefix, search results
 
     @classmethod
     def query_s3(cls, tile, date, pclouds=100):
@@ -462,7 +453,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
         given scene.  Filters by the given cloud percentage.
         """
         # for finding assets matching the tile
-        # s3refactor - need a method or similar to compute key prefix; modis varies from landsat
         key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
         # match something like:  'LC08_L1TP_013030_20170402_20170414_01_T1'
         # filters for date and also tier
@@ -473,30 +463,9 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
         re_string = key_prefix + fname_fragment
         filter_re = re.compile(re_string)
 
-        missing_auth_vars = tuple(
-                set(['AWS_SECRET_ACCESS_KEY', 'AWS_ACCESS_KEY_ID'])
-                - set(os.environ.keys()))
-        if len(missing_auth_vars) > 0:
-            raise EnvironmentError("Missing AWS S3 auth credentials:"
-                                   "  {}".format(missing_auth_vars))
+        keys = cls.s3_prefix_search(key_prefix)
 
-        # on repeated searches, chances are we have a cache we can use
-        expected_prefix, keys = cls._query_s3_cache
-        if expected_prefix != key_prefix:
-            verbose_out("New prefix detected; refreshing S3 query cache.", 5)
-            # find the layer and metadata files matching the current scene
-            import boto3 # import here so it only breaks if it's actually needed
-            s3 = boto3.resource('s3')
-            bucket = s3.Bucket(cls._s3_bucket_name)
-            keys = [o.key for o in bucket.objects.filter(Prefix=key_prefix)]
-            cls._query_s3_cache = key_prefix, keys
-            verbose_out("Found {} S3 keys while searching for for key fragment"
-                        " '{}'".format(len(keys), key_prefix), 5)
-        else:
-            verbose_out("Found {} cached search results for S3 key fragment"
-                        " '{}'".format(len(keys), key_prefix), 5)
-
-        # s3refactor this block is mostly different for modis
+        # s3refactor here down
         _30m_tifs = []
         _15m_tif = mtl_txt = qa_tif = None
         for key in keys:
@@ -511,16 +480,14 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
             elif key.endswith('.TIF'):
                 _30m_tifs.append(key)
 
-        # s3refactor this block is mostly different for modis
         if len(_30m_tifs) != 10 or None in (_15m_tif, mtl_txt, qa_tif):
             verbose_out('Found no complete S3 asset for'
                         ' (C1S3, {}, {})'.format(tile, date), 4)
             return None
 
-        # s3refactor this block may be common to both landsat and modis
+        # s3refactor don't do this for modis; cloud cover makes no sense
         if pclouds < 100:
             mtl_content = requests.get(cls._s3_url + mtl_txt).text
-            # s3refactor write this method for modis
             cc = cls.cloud_cover_from_mtl_text(mtl_content)
             if cc > pclouds:
                 cc_msg = ('C1S3 asset found for ({}, {}), but cloud cover'

@@ -176,12 +176,33 @@ class GoogleStorageMixin(object):
         return ofiles
 
 
+def validate_s3_env_vars():
+    vs = set(['AWS_SECRET_ACCESS_KEY', 'AWS_ACCESS_KEY_ID'])
+    missing = tuple(vs - set(os.environ.keys()))
+    if len(missing) > 0:
+        raise EnvironmentError(
+            "Missing AWS S3 auth credentials:  {}".format(missing))
+
+
+# TODO mixin with one not-really-classmethod is not a mixin at all
 class S3Mixin(object):
-    """Mix this into a class (probably Asset) to use data in AWS S3.
+    """Mix this into a subclass of Asset to use data in AWS S3.
 
     <subclass requirements go here>
     """
-    pass
+    @classmethod
+    @lru_cache(maxsize=1)
+    def s3_prefix_search(cls, prefix):
+        validate_s3_env_vars()
+        # find the layer and metadata files matching the current scene
+        import boto3 # import here so it only breaks if it's actually needed
+        s3 = boto3.resource('s3')
+        bucket = s3.Bucket(cls._s3_bucket_name)
+        keys = [o.key for o in bucket.objects.filter(Prefix=prefix)]
+        utils.verbose_out("Found {} S3 keys while searching for for key fragment"
+                    " '{}'".format(len(keys), prefix), 5)
+        return keys
+
 
 
 class Repository(object):

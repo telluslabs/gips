@@ -249,6 +249,17 @@ class modisAsset(Asset):
                           '{} at {}'.format(pattern, mainurl), 4)
         return None
 
+    # complete S3 url:  at   col  h  v   y doy
+    # s3://modis-pds/MCD43A4.006/21/11/2017006/
+    #       MCD43A4.A2017006.h21v11.006.2017018074804_B01.TIF
+    _s3_bucket_name = 'modis-pds'
+    _s3_url = 'https://modis-pds.s3.amazonaws.com/'
+
+    # TODO not sure this is needed since the search key is deterministiriaciamiticstic?
+    # take advantage of gips' search order (tile is outer, date is inner)
+    # and cache search outcomes
+    _query_s3_cache = (None, None) # prefix, search results
+
     @classmethod
     def query_s3(cls, tile, date):
         print('yo dawg imma query s3')
