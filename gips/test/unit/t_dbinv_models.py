@@ -28,7 +28,6 @@ def t_product_field_uniqueness():
     a1 = models.Product(**params)
     a1.save()
 
-    # these two can vary without preventing the uniqueness constraint to be violated
     params['name'] = '/repo/modis/tiles/h11v02/2010318/xxx.tif'
     a2 = models.Product(**params)
     with pytest.raises(django.db.IntegrityError):
