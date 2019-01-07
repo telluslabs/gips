@@ -100,6 +100,7 @@ def _gs_stop_trying(e):
             and e.response.status_code != 429
             and (499 < e.response.status_code < 600))
 
+
 class GoogleStorageMixin(object):
     """Mix this into a class (probably Asset) to use data in google storage.
 
@@ -173,6 +174,14 @@ class GoogleStorageMixin(object):
             else:
                 ofiles.append(i)
         return ofiles
+
+
+class S3Mixin(object):
+    """Mix this into a class (probably Asset) to use data in AWS S3.
+
+    <subclass requirements go here>
+    """
+    pass
 
 
 class Repository(object):
@@ -580,11 +589,15 @@ class Asset(object):
 
         return extant_fnames + [ffn for (_, ffn) in extracted_fnames]
 
+    cloud_storage_a_types = () # override in subclass as needed
+
+    def in_cloud_storage(self):
+        """Is this asset's data fetched from the cloud on-demand?"""
+        return self.asset in self.cloud_storage_a_types
+
     ##########################################################################
     # Class methods
     ##########################################################################
-
-
     @classmethod
     def discover(cls, tile, date, asset=None):
         """Factory function returns list of Assets for this tile and date.

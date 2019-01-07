@@ -88,7 +88,6 @@ class landsatRepository(Repository):
     description = 'Landsat 5 (TM), 7 (ETM+), 8 (OLI)'
     _tile_attribute = 'PR'
 
-    # s3refactor copy for modis
     default_settings = {
         'source': 'usgs',
         'asset-preference': ('C1', 'C1S3', 'C1GS', 'DN'),
@@ -100,7 +99,8 @@ class landsatRepository(Repository):
         return tile.zfill(6)
 
 
-class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
+class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
+                          gips.data.core.S3Mixin):
     """ Landsat asset (original raw tar file) """
     Repository = landsatRepository
 
@@ -190,7 +190,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
         }
     }
 
-    # s3refactor copy for modis
     # filename minus extension so that C1 & C1S3 both use the same pattern
     # example:  LC08_L1TP_013030_20151225_20170224_01_T1
     _c1_base_pattern = (
@@ -199,6 +198,7 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
         r'(?P<processing_date>\d{8})_'
         r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})')
 
+    cloud_storage_a_types = ('C1S3', 'C1GS') # in order of current preference
     _assets = {
         # DN & SR assets are no longer fetchable
         'DN': {
@@ -224,7 +224,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
             'pattern': _c1_base_pattern + r'\.tar\.gz$',
             'latency': 12,
         },
-        # s3refactor copy for modis
         'C1S3': {
             'sensors': ['LC8'],
             'pattern': _c1_base_pattern + r'_S3\.json$',
@@ -312,14 +311,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
         if self.sensor not in self._sensors.keys():
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
-
-    # s3refactor add to modisAsset to be picked up my Mixin
-    cloud_storage_a_types = ('C1S3', 'C1GS') # in order of current preference
-
-    # s3refactor refactor for modis
-    def in_cloud_storage(self):
-        """Is this asset's data fetched from the cloud on-demand?"""
-        return self.asset in self.cloud_storage_a_types
 
     # s3refactor for modis
     def band_paths(self):
@@ -1138,6 +1129,7 @@ class landsatData(Data):
             band_files.append(output_path)
         return band_files
 
+    # s3refactor DRY for modis' use
     @property
     def preferred_asset(self):
         if getattr(self, '_preferred_asset', None):

@@ -59,6 +59,11 @@ class modisRepository(Repository):
     # the default tile ID
     _tile_attribute = "tileid"
 
+    default_settings = {
+        'source': 'usgs',
+        'asset-preference': ('MCD43A4', 'MCD43A4S3'), # prefer local to remote
+    }
+
 
 class modisAsset(Asset):
     Repository = modisRepository
@@ -73,12 +78,21 @@ class modisAsset(Asset):
     # modis data used to be free for all, now you have to log in, hence no assets skip auth.
     _skip_auth = []
 
-    _asset_re_tail = '\.A.{7}\.h.{2}v.{2}\..{3}\..{13}\.hdf$'
+    _asset_re_common = r'\.A.{7}\.h.{2}v.{2}\..{3}\..{13}'
+    _asset_re_tail = _asset_re_common + r'\.hdf$'
 
+    cloud_storage_a_types = 'MCD43A4S3',
     _assets = {
         #Band info:  https://modis.gsfc.nasa.gov/about/specifications.php
         'MCD43A4': {
             'pattern': '^MCD43A4' + _asset_re_tail,
+            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
+            'startdate': datetime.date(2000, 2, 18),
+            'latency': 15,
+        },
+        'MCD43A4S3': {
+            'pattern': '^MCD43A4' + _asset_re_common + r'_S3\.json$',
+            # TODO confirm these values
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': 15,
