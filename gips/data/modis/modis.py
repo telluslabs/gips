@@ -32,8 +32,10 @@ import urllib
 import urllib2
 
 import math
+
 import numpy as np
 import requests
+from backports.functools_lru_cache import lru_cache
 
 import gippy
 from gippy.algorithms import Indices
@@ -63,6 +65,22 @@ class modisRepository(Repository):
         'source': 'usgs',
         'asset-preference': ('MCD43A4', 'MCD43A4S3'), # prefer local to remote
     }
+
+    @classmethod
+    def validate_setting(cls, key, value):
+        """Validate source and asset-preference settings; otherwise no-op."""
+        # landsat, modis, and sentinel-2 all have copies of this;
+        # may be worth consolidation
+        if key == 'source' and value not in ('s3', 'usgs'):
+            raise ValueError("modis' 'source' setting is '{}', but valid"
+                             " values are 's3' or 'usgs'".format(value))
+        if key == 'asset-preference':
+            valid_atl = default_settings['asset-preference']
+            warts = set(value) - set(valid_atl)
+            if warts:
+                raise ValueError("Valid 'asset-preferences' for modis are {};"
+                    " invalid values found:  {}".format(valid_atl, warts))
+        return value
 
 
 class modisAsset(Asset):
@@ -188,11 +206,8 @@ class modisAsset(Asset):
         file_version = int(parts[4]) # datetimestamp near end of the filename
         self._version = float('{}.{}'.format(collection, file_version))
 
-
-    # s3refactor probably we need to cross-grade modis to query_service;
-    # see landsat's for reference
     @classmethod
-    def query_provider(cls, asset, tile, date):
+    def query_usgs(cls, asset, tile, date):
         """Find out from the modis servers what assets are available.
 
         Uses the given (asset, tile, date) tuple as a search key, and
@@ -203,7 +218,7 @@ class modisAsset(Asset):
         if asset == "MCD12Q1" and (month, day) != (1, 1):
             utils.verbose_out("Cannot fetch MCD12Q1:  Land cover data"
                               " are only available for Jan. 1", 1, stream=sys.stderr)
-            return None, None
+            return None
 
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (
@@ -218,7 +233,7 @@ class modisAsset(Asset):
         with utils.error_handler(err_msg):
             response = cls.Repository.managed_request(mainurl, verbosity=2)
             if response is None:
-                return None, None
+                return None
 
         for item in response.readlines():
             # screen-scrape the content of the page and extract the full name of the needed file
@@ -229,10 +244,25 @@ class modisAsset(Asset):
                     continue
                 basename = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', basename])
-                return basename, url
+                return {'basename': basename, 'url': url}
         utils.verbose_out('Unable to find remote match for '
                           '{} at {}'.format(pattern, mainurl), 4)
-        return None, None
+        return None
+
+    @classmethod
+    def query_s3(cls, tile, date):
+        print('yo dawg imma query s3')
+
+    @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
+    def query_service(cls, asset, tile, date):
+        """Subclass from Asset to disambiguate between S3 & USGS assets."""
+        if not cls.available(asset, date):
+            return None
+        data_src = cls.get_setting('source')
+        if data_src == 's3': # *only* query for s3 data; don't query for usgs
+            return cls.query_s3(tile, date) if asset == 'MCD43A4S3' else None
+        return cls.query_usgs(asset, tile, date)
 
     # s3refactor rewrite; see landsat's for reference
     @classmethod
@@ -401,6 +431,11 @@ class modisData(Data):
     }
 
     _products.update(_index_product_entries)
+
+    # support S3 source data for compatible products
+    for pdict in _products.values():
+        if 'MCD43A4' in pdict['assets']:
+            pdict['assets'].append('MCD43A4S3')
 
     def asset_check(self, prod_type):
         """Is an asset available for the current scene and product?

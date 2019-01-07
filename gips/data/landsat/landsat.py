@@ -1044,7 +1044,6 @@ class landsatData(Data):
 
     gips.atmosphere.add_acolite_product_dicts(_products, 'DN', 'C1')
 
-    # s3refactor add to modis
     for pname, pdict in _products.items():
         if 'C1' in pdict['assets']:
             pdict['assets'] += ['C1S3', 'C1GS']
