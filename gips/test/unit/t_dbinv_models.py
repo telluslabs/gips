@@ -12,7 +12,6 @@ def t_asset_field_uniqueness():
     a1 = models.Asset(**params)
     a1.save()
 
-    # these two can vary without preventing the uniqueness constraint to be violated
     params['sensor'] = 'xxx'
     params['name'] = '/repo/modis/tiles/h11v02/2010318/xxx.hdf'
     a2 = models.Asset(**params)
