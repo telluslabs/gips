@@ -203,6 +203,18 @@ class S3Mixin(object):
                     " '{}'".format(len(keys), prefix), 5)
         return keys
 
+    @classmethod
+    def s3_stage_asset_json(cls, content, basename):
+        """Saves the given content as a json blob to the stage."""
+        # this may be refactorable with the gs mixin's gs_stage_asset
+        if cls.Repository.in_stage(basename): # skip if there already
+            return
+        stage_dir_fp = cls.Repository.path('stage')
+        with utils.make_temp_dir(prefix='fetch-s3-', dir=stage_dir_fp) as td:
+            tmp_fp = td + '/' + basename
+            with open(tmp_fp, 'w') as tfo:
+                json.dump(content, tfo)
+            shutil.copy(tmp_fp, stage_dir_fp)
 
 
 class Repository(object):
@@ -217,6 +229,14 @@ class Repository(object):
     _subdirs = ['tiles', 'stage', 'quarantine', 'composites']
 
     default_settings = {}
+
+    @classmethod
+    def in_stage(cls, basename):
+        """Tests for the existence of the file in this driver's stage dir."""
+        if os.path.exists(os.path.join(cls.path('stage'), basename)):
+            utils.verbose_out('File `{}` already in stage/'.format(basename), 2)
+            return True
+        return False
 
     @classmethod
     def feature2tile(cls, feature):
@@ -778,12 +798,10 @@ class Asset(object):
         qs_rv = cls.query_service(a_type, tile, date, **fetch_kwargs)
         if qs_rv is None:
             return []
-        stage_dir_fp = cls.Repository.path('stage')
-        if os.path.exists(os.path.join(stage_dir_fp, qs_rv['basename'])):
-            utils.verbose_out('Asset `{}` needed but already in stage/,'
-                              ' skipping.'.format(qs_rv['basename']))
+        if cls.Repository.in_stage(qs_rv['basename']): # skip if there already
             return []
-        with utils.make_temp_dir(prefix='fetch-', dir=stage_dir_fp) as td_fp:
+        with utils.make_temp_dir(prefix='fetch-',
+                                 dir=cls.Repository.path('stage')) as td_fp:
             qs_rv['download_fp'] = os.path.join(td_fp, qs_rv['basename'])
             fetch_kwargs.update(**qs_rv)
             if cls.download(**fetch_kwargs):

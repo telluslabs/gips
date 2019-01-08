@@ -722,14 +722,7 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
             'qa-band': vsi_prefix + qa_tif,
             'mtl': cls._s3_url + mtl_txt,
         }
-
-        # TODO refactor:  cls.gs_stage_asset(basename, asset_content)
-        with utils.make_temp_dir(prefix='fetch',
-                                 dir=cls.Repository.path('stage')) as tmp_dir:
-            tmp_fp = tmp_dir + '/' + basename
-            with open(tmp_fp, 'w') as tfo:
-                json.dump(asset_content, tfo)
-            shutil.copy(tmp_fp, cls.Repository.path('stage'))
+        cls.s3_stage_asset_json(asset_content, basename)
 
     @classmethod
     def fetch_gs(cls, basename, keys):
