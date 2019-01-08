@@ -755,9 +755,9 @@ class Asset(object):
         return {'basename': bn, 'url': url}
 
     @classmethod
-    def download(cls, url, fp, **kwargs):
+    def download(cls, url, download_fp, **kwargs):
         """Override this method to provide custom download code."""
-        raise NotImplementedError('download not supported for' + cls.__name__)
+        raise NotImplementedError('download not supported for ' + cls.__name__)
 
     @classmethod
     def stage_asset(cls, asset_full_path):

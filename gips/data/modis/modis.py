@@ -305,24 +305,28 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
             return cls.query_s3(tile, date) if asset == 'MCD43A4S3' else None
         return cls.query_usgs(asset, tile, date)
 
-    # s3refactor rewrite; see landsat's for reference
+    @classmethod
+    def download(cls, url, download_fp, **ignored):
+        """Download the URL to the given full path, handling auth & errors."""
+        response = cls.Repository.managed_request(url)
+        if response is None:
+            return False
+        with open(download_fp, 'wb') as fd:
+            fd.write(response.read())
+        return True
+
     @classmethod
     def fetch(cls, asset, tile, date):
+        if asset != 'MCD43A4S3':
+            return super(modisAsset, cls).fetch(asset, tile, date)
+
         qs_rv = cls.query_service(asset, tile, date)
         if qs_rv is None:
             return []
-        basename, url = qs_rv['basename'], qs_rv['url']
-        with utils.error_handler(
-                "Asset fetch error ({})".format(url), continuable=True):
-            response = cls.Repository.managed_request(url)
-            if response is None:
-                return []
-            outpath = os.path.join(cls.Repository.path('stage'), basename)
-            with open(outpath, 'wb') as fd:
-                fd.write(response.read())
-            utils.verbose_out('Retrieved ' + basename, 2)
-            return [outpath]
-        return []
+        #import pdb; pdb.set_trace()
+        #basename, url = qs_rv['basename'], qs_rv.get('url')
+        #outpath = os.path.join(cls.Repository.path('stage'), basename)
+        return ['something'] # TODO
 
 # index product types and descriptions
 _index_products = [
