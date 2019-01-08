@@ -485,7 +485,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
                         ' (C1S3, {}, {})'.format(tile, date), 4)
             return None
 
-        # s3refactor don't do this for modis; cloud cover makes no sense
         if pclouds < 100:
             mtl_content = requests.get(cls._s3_url + mtl_txt).text
             cc = cls.cloud_cover_from_mtl_text(mtl_content)
@@ -502,7 +501,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
             verbose_out('Found complete C1S3 asset for'
                         ' ({}, {})'.format(tile, date), 3)
 
-        # s3refactor this *looks* common?
         # have to custom sort thanks to 'B1.TIF' instead of 'B01.TIF':
         def sort_key_f(key):
             match = re.search(r'B(\d+).TIF$', key)

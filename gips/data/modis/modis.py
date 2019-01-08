@@ -40,6 +40,7 @@ from backports.functools_lru_cache import lru_cache
 import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
+import gips.data.core
 from gips.utils import VerboseOut, settings
 from gips import utils
 
@@ -83,7 +84,7 @@ class modisRepository(Repository):
         return value
 
 
-class modisAsset(Asset):
+class modisAsset(Asset, gips.data.core.S3Mixin):
     Repository = modisRepository
 
     _sensors = {
@@ -255,14 +256,43 @@ class modisAsset(Asset):
     _s3_bucket_name = 'modis-pds'
     _s3_url = 'https://modis-pds.s3.amazonaws.com/'
 
-    # TODO not sure this is needed since the search key is deterministiriaciamiticstic?
-    # take advantage of gips' search order (tile is outer, date is inner)
-    # and cache search outcomes
-    _query_s3_cache = (None, None) # prefix, search results
+    @classmethod
+    def parse_tile(cls, tile_id):
+        """If given, eg, 'h12v04', returns ('12', '04')."""
+        return tile_id[1:3], tile_id[4:6]
 
     @classmethod
     def query_s3(cls, tile, date):
-        print('yo dawg imma query s3')
+        """Look in S3 for modis asset components and assemble links to same."""
+        h, v = cls.parse_tile(tile)
+        prefix = 'MCD43A4.006/{}/{}/{}/'.format(h, v, date.strftime('%Y%j'))
+        keys = cls.s3_prefix_search(prefix)
+        tifs = []
+        qa_tifs = []
+        json_md = None
+        for k in keys:
+            if k.endswith('qa.TIF'):
+                qa_tifs.append(k)
+            elif k.endswith('.TIF'):
+                tifs.append(k)
+            elif k.endswith('_meta.json'):
+                json_md = k
+            #elif k.endswith('.hdf.xml'): # xml believed to be unneeded
+            #    xml_md = k
+
+        if len(tifs) != len(qa_tifs) != 7 or json_md is None:
+            utils.verbose_out('Found no complete S3 asset for'
+                              ' (MCD43A4S3, {}, {})'.format(tile, date), 4)
+            return None
+        utils.verbose_out('Found complete S3 asset for'
+                          ' (MCD43A4S3, {}, {})'.format(tile, date), 3)
+        tifs.sort()
+        qa_tifs.sort()
+        # turn this:  MCD43A4.006/12/04/2017330/MCD43A4.A2017330.h12v04.006.2017341210453_B01.TIF
+        # into this:  MCD43A4.A2017330.h12v04.006.2017341210453_S3.json
+        asset_bn = os.path.basename(tifs[0])[:-8] + '_S3.json'
+        return {'basename': asset_bn, 'json_md': json_md,
+                'tifs': tifs, 'qa_tifs': qa_tifs}
 
     @classmethod
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
