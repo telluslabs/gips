@@ -51,6 +51,7 @@ def binmask(arr, bit):
     """
     return arr & (1 << (bit - 1)) == (1 << (bit - 1))
 
+MCD43A4, MCD43A4S3 = 'MCD43A4', 'MCD43A4S3' # for help spell-checking
 
 class modisRepository(Repository):
     name = 'Modis'
@@ -64,7 +65,7 @@ class modisRepository(Repository):
 
     default_settings = {
         'source': 'usgs',
-        'asset-preference': ('MCD43A4', 'MCD43A4S3'), # prefer local to remote
+        'asset-preference': (MCD43A4, MCD43A4S3), # prefer local to remote
     }
 
     @classmethod
@@ -100,16 +101,16 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
     _asset_re_common = r'\.A.{7}\.h.{2}v.{2}\..{3}\..{13}'
     _asset_re_tail = _asset_re_common + r'\.hdf$'
 
-    cloud_storage_a_types = 'MCD43A4S3',
+    cloud_storage_a_types = MCD43A4S3,
     _assets = {
         #Band info:  https://modis.gsfc.nasa.gov/about/specifications.php
-        'MCD43A4': {
+        MCD43A4: {
             'pattern': '^MCD43A4' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
             'latency': 15,
         },
-        'MCD43A4S3': {
+        MCD43A4S3: {
             'pattern': '^MCD43A4' + _asset_re_common + r'_S3\.json$',
             # TODO confirm these values
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
@@ -192,10 +193,10 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         """ Inspect a single file and get some metadata """
         super(modisAsset, self).__init__(filename)
 
-        bname = os.path.basename(filename)
-        parts = bname.split('.')
+        parts = re.split(r'\.|_', os.path.basename(filename))
 
-        self.asset = parts[0]
+        if parts[0] == MCD43A4:
+            self.asset = MCD43A4S3 if parts[-1] == 'json' else MCD43A4
         self.tile = parts[2]
         self.sensor = parts[0][:3]
 
@@ -272,13 +273,11 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         json_md = None
         for k in keys:
             if k.endswith('qa.TIF'):
-                qa_tifs.append(k)
+                qa_tifs.append(cls.s3_vsi_prefix(k))
             elif k.endswith('.TIF'):
-                tifs.append(k)
+                tifs.append(cls.s3_vsi_prefix(k))
             elif k.endswith('_meta.json'):
-                json_md = k
-            #elif k.endswith('.hdf.xml'): # xml believed to be unneeded
-            #    xml_md = k
+                json_md = cls._s3_url + k
 
         if len(tifs) != len(qa_tifs) != 7 or json_md is None:
             utils.verbose_out('Found no complete S3 asset for'
@@ -302,7 +301,7 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
             return None
         data_src = cls.get_setting('source')
         if data_src == 's3': # *only* query for s3 data; don't query for usgs
-            return cls.query_s3(tile, date) if asset == 'MCD43A4S3' else None
+            return cls.query_s3(tile, date) if asset == MCD43A4S3 else None
         return cls.query_usgs(asset, tile, date)
 
     @classmethod
@@ -317,16 +316,13 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
 
     @classmethod
     def fetch(cls, asset, tile, date):
-        if asset != 'MCD43A4S3':
+        if asset != MCD43A4S3:
             return super(modisAsset, cls).fetch(asset, tile, date)
-
+        # else do S3 fetch
         qs_rv = cls.query_service(asset, tile, date)
-        if qs_rv is None:
-            return []
-        #import pdb; pdb.set_trace()
-        #basename, url = qs_rv['basename'], qs_rv.get('url')
-        #outpath = os.path.join(cls.Repository.path('stage'), basename)
-        return ['something'] # TODO
+        if qs_rv is not None:
+            basename = qs_rv.pop('basename')
+            cls.s3_stage_asset_json(qs_rv, basename)
 
 # index product types and descriptions
 _index_products = [
@@ -350,7 +346,7 @@ _index_products = [
 
 _index_product_entries = {
     pt: {'bands': [pt], 'description': descr,
-         'assets': ['MCD43A4'], 'sensor': 'MCD',
+         'assets': [MCD43A4], 'sensor': 'MCD',
          'startdate': datetime.date(2000, 2, 18), 'latency': 15}
     for pt, descr in _index_products}
 
@@ -373,7 +369,7 @@ class modisData(Data):
         'indices': {
             'description': 'Land indices (deprecated,'
                            ' see indices product group)',
-            'assets': ['MCD43A4'],
+            'assets': [MCD43A4],
             'sensor': 'MCD',
             'bands': ['ndvi', 'lswi', 'vari', 'brgt', 'satvi', 'evi'],
             'startdate': datetime.date(2000, 2, 18),
@@ -479,8 +475,8 @@ class modisData(Data):
 
     # support S3 source data for compatible products
     for pdict in _products.values():
-        if 'MCD43A4' in pdict['assets']:
-            pdict['assets'].append('MCD43A4S3')
+        if MCD43A4 in pdict['assets']:
+            pdict['assets'].append(MCD43A4S3)
 
     def asset_check(self, prod_type):
         """Is an asset available for the current scene and product?

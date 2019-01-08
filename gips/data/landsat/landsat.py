@@ -714,12 +714,11 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
         #   /LC08_L1TP_013030_20171128_20171207_01_T1
         #   /LC08_L1TP_013030_20171128_20171207_01_T1_B10.TIF
         # see also:  http://www.gdal.org/gdal_virtual_file_systems.html
-        vsi_prefix = '/vsis3_streaming/{}/'.format(cls._s3_bucket_name)
         asset_content = {
             # can/should add metadata/versioning info here
-            '30m-bands': [vsi_prefix + t for t in _30m_tifs],
-            '15m-band': vsi_prefix + _15m_tif,
-            'qa-band': vsi_prefix + qa_tif,
+            '30m-bands': [cls.s3_vsi_prefix(t) for t in _30m_tifs],
+            '15m-band': cls.s3_vsi_prefix(_15m_tif),
+            'qa-band': cls.s3_vsi_prefix(qa_tif),
             'mtl': cls._s3_url + mtl_txt,
         }
         cls.s3_stage_asset_json(asset_content, basename)
