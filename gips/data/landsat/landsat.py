@@ -312,7 +312,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
 
-    # s3refactor for modis
     def band_paths(self):
         if not self.in_cloud_storage():
             raise NotImplementedError(
@@ -409,7 +408,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
         utils.verbose_out(msg.format(scene_cloud_cover, pclouds), 3)
         return asset_passes_filter
 
-    # s3refactor put in mixin for modis
     def load_c1_json(self):
         """Load the content from a C1 json asset and return it."""
         if not self.in_cloud_storage():
@@ -457,7 +455,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
         # match something like:  'LC08_L1TP_013030_20170402_20170414_01_T1'
         # filters for date and also tier
         # TODO all things not just T1 ----------------vv
-        # s3refactor
         fname_fragment = r'L..._...._{}_{}_\d{{8}}_.._T1'.format(
                 tile, date.strftime('%Y%m%d'))
         re_string = key_prefix + fname_fragment
@@ -465,7 +462,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
 
         keys = cls.s3_prefix_search(key_prefix)
 
-        # s3refactor here down
         _30m_tifs = []
         _15m_tif = mtl_txt = qa_tif = None
         for key in keys:
@@ -508,7 +504,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
             return int(match.group(1)) if match else 99
         _30m_tifs.sort(key=sort_key_f)
 
-        # s3refactor different; probably not worth DRYing
         filename = re.search(fname_fragment, _15m_tif).group(0) + '_S3.json'
         verbose_out("Constructed S3 asset filename:  " + filename, 5)
         return {'basename': filename,
@@ -702,7 +697,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin,
             os.rename(os.path.join(dldir, granules[0]),
                       os.path.join(stage_dir, granules[0]))
 
-    # s3refactor support both modis and landsat
     @classmethod
     def fetch_s3(cls, basename, _30m_tifs, _15m_tif, qa_tif, mtl_txt):
         """Fetches AWS S3 assets; currently only 'C1S3' assets.
@@ -1796,7 +1790,6 @@ class landsatData(Data):
             if asset_type == 'C1GS':
                 paths = self._download_gcs_bands(self._temp_proc_dir)
             else:
-                # s3refactor have to capture this in modis' processing code
                 paths = asset_obj.band_paths()
             self._time_report("Finished gathering band files")
         except NotImplementedError:
