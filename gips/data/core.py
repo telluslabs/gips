@@ -184,7 +184,6 @@ def validate_s3_env_vars():
             "Missing AWS S3 auth credentials:  {}".format(missing))
 
 
-# TODO mixin with one not-really-classmethod is not a mixin at all
 class S3Mixin(object):
     """Mix this into a subclass of Asset to use data in AWS S3.
 
@@ -538,6 +537,8 @@ class Asset(object):
                 return match
         raise ValueError("Unparseable asset file name:  " + self.filename)
 
+    _datafiles_json_key = None
+
     def datafiles(self):
         """Get list of readable datafiles from asset.
 
@@ -558,14 +559,14 @@ class Asset(object):
             elif zipfile.is_zipfile(self.filename):
                 datafiles = zipfile.ZipFile(self.filename).namelist()
             elif self.filename.endswith('json'):
-                # take strings at the top level, or in lists at the top level
-                # TODO this is brittle; drivers implementing json assets
-                # should override this method to handle their specific needs
                 with open(self.filename) as fp:
                     content = json.load(fp)
-                raw_df = []
-                for v in content.values():
-                    raw_df += v if type(v) is list else [v]
+                # follow the driver's config about where to find things...
+                if self._datafiles_json_key is not None:
+                    raw_df = content[self._datafiles_json_key]
+                else: # else take strings and lists of strings at the top level
+                    raw_df = sum([v if type(v) is list else [v]
+                                  for v in content.values()], [])
                 datafiles = tuple(v.encode('ascii', 'ignore')
                                   for v in raw_df if isinstance(v, basestring))
             else: # Try subdatasets

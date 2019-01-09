@@ -256,6 +256,7 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
     #       MCD43A4.A2017006.h21v11.006.2017018074804_B01.TIF
     _s3_bucket_name = 'modis-pds'
     _s3_url = 'https://modis-pds.s3.amazonaws.com/'
+    _datafiles_json_key = 'tifs'
 
     @classmethod
     def parse_tile(cls, tile_id):
@@ -346,7 +347,7 @@ _index_products = [
 
 _index_product_entries = {
     pt: {'bands': [pt], 'description': descr,
-         'assets': [MCD43A4], 'sensor': 'MCD',
+         'assets': [MCD43A4, MCD43A4S3], 'sensor': 'MCD',
          'startdate': datetime.date(2000, 2, 18), 'latency': 15}
     for pt, descr in _index_products}
 
@@ -473,17 +474,13 @@ class modisData(Data):
 
     _products.update(_index_product_entries)
 
-    # support S3 source data for compatible products
-    for pdict in _products.values():
-        if MCD43A4 in pdict['assets']:
-            pdict['assets'].append(MCD43A4S3)
-
-    def asset_check(self, prod_type):
+    def asset_check(self, prod_type, single=False):
         """Is an asset available for the current scene and product?
 
         Returns the last found asset, or else None, its version, the
         complete lists of missing and available assets, and lastly, an array
         of pseudo-filepath strings suitable for consumption by gdal/gippy.
+        If `single`, these strings are limited to the last found asset.
         """
         # return values
         asset = None
@@ -505,9 +502,9 @@ class modisData(Data):
             else:
                 availassets.append(asset)
                 allsds.extend(sds)
-                version = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
-
-        return asset, version, missingassets, availassets, allsds
+                version = int(re.findall(r'M.*\.(\d{3})\.\d{13}[._]', sds[0])[0])
+        return (availassets[-1], version, missingassets, availassets,
+                sds if single else allsds)
 
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
@@ -1036,14 +1033,15 @@ class modisData(Data):
         requested_ipt = products.groups()['Index'].keys()
         if requested_ipt:
             model_pt = requested_ipt[0] # all should be similar
-            asset, version, _, availassets, allsds = self.asset_check(model_pt)
+            asset, version, _, _, allsds = self.asset_check(model_pt, single=True)
             if asset is None:
                 raise IOError('Found no assets for {}'.format(
                     requested_ipt))
             if version < 6:
                 raise IOError('index products require MCD43A4 version 6,'
                               ' but found {}'.format(version))
-            img = gippy.GeoImage(allsds[7:]) # don't need the QC bands
+            # don't need the QC bands so leave out some rasters ------v
+            img = gippy.GeoImage(allsds[(0 if asset == MCD43A4S3 else 7):])
 
             # GIPPY uses expected band names to find data:
             """
@@ -1066,11 +1064,9 @@ class modisData(Data):
             sensor = self._products[model_pt]['sensor']
             prod_spec = {pt: self.temp_product_filename(sensor, pt)
                          for pt in requested_ipt}
-
-            a_fnames = [self.assets[at].filename for at in availassets]
-            pt_to_temp_fps = Indices(img, prod_spec,
-                    self.prep_meta(a_fnames, {'VERSION': '1.0'}))
-
+            prepped_md = self.prep_meta([self.assets[asset].filename],
+                                        {'VERSION': '1.0'})
+            pt_to_temp_fps = Indices(img, prod_spec, prepped_md)
             for pt, temp_fp in pt_to_temp_fps.items():
                 archived_fp = self.archive_temp_path(temp_fp)
                 self.AddFile(sensor, pt, archived_fp)
