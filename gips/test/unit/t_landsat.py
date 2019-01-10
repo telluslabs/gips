@@ -126,13 +126,6 @@ sample_c1s3_keys = {
         'c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_MTL.txt',
 }
 
-@pytest.yield_fixture
-def c1s3_cache_control():
-    saved_cache = landsat.landsatAsset._query_s3_cache
-    landsat.landsatAsset._query_s3_cache = (None, None)
-    yield
-    landsat.landsatAsset._query_s3_cache = saved_cache
-
 @pytest.fixture
 def m_query_s3(mocker):
     mocker.patch.object(landsat.landsatAsset.Repository, 'get_setting',
@@ -179,7 +172,7 @@ s3_qs_expected['basename'] = \
     (25.0, None),
 ])
 def t_landsatAsset_query_service_s3(
-        pclouds, expected, mocker, m_query_s3, c1s3_cache_control):
+        pclouds, expected, mocker, m_query_s3):
     """Confirms method works for the normal case."""
     m_get = m_query_s3
     m_get().text = cloud_cover_snippet(50.0)
@@ -221,19 +214,3 @@ sample_c1s3_asset_content = {
     u'mtl': u'https://landsat-pds.s3.amazonaws.com/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_MTL.txt',
     u'qa-band': u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_BQA.TIF',
 }
-
-def t_landsatAsset_fetch_s3(mocker, m_query_service,
-                            m_get_setting, mock_context_manager):
-    """Check the content passed in to json.dump to confirm the method."""
-    dc = 'dontcare'
-    m_query_service.return_value = {'basename': dc}
-    m_query_service.return_value.update(sample_c1s3_keys)
-    mock_context_manager(landsat.utils, 'make_temp_dir', 'fake-temp-dir')
-    mocker.patch.object(landsat, 'open')
-    m_json_dump = mocker.patch.object(landsat, 'json').dump
-    m_shutil_copy = mocker.patch.object(landsat.shutil, 'copy')
-
-    landsat.landsatAsset.fetch('C1S3', dc, dc)
-
-    # this means "the first argument of the call" -----------vvvvvv
-    assert sample_c1s3_asset_content == m_json_dump.call_args[0][0]
