@@ -108,14 +108,13 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
             'pattern': '^MCD43A4' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15,
+            'latency': 15, # this may need to be revised; see S3 version
         },
         MCD43A4S3: {
             'pattern': '^MCD43A4' + _asset_re_common + r'_S3\.json$',
-            # TODO confirm these values
-            'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
+            # this date appears wrong but no better value is documented
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15,
+            'latency': 10,
         },
         'MCD43A2': {
             'pattern': '^MCD43A2' + _asset_re_tail,
@@ -302,9 +301,11 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         if not cls.available(asset, date):
             return None
         data_src = cls.get_setting('source')
-        if data_src == 's3': # *only* query for s3 data; don't query for usgs
-            return cls.query_s3(tile, date) if asset == MCD43A4S3 else None
-        return cls.query_usgs(asset, tile, date)
+        if data_src == 's3' and asset == MCD43A4S3:
+            return cls.query_s3(tile, date)
+        if data_src != 's3' and asset != MCD43A4S3:
+            return cls.query_usgs(asset, tile, date)
+        return None
 
     @classmethod
     def download(cls, url, download_fp, **ignored):
@@ -414,6 +415,7 @@ class modisData(Data):
         'temp': {
             'description': 'Surface temperature data',
             'assets': ['MOD11A1', 'MYD11A1'],
+            'asset-usage': all,
             'sensor': 'MOD-MYD',
             'bands': [
                 'temperature-daytime-terra',
@@ -428,6 +430,7 @@ class modisData(Data):
         'obstime': {
             'description': 'MODIS Terra/Aqua overpass time',
             'assets': ['MOD11A1', 'MYD11A1'],
+            'asset-usage': all,
             'sensor': 'MOD-MYD',
             'bands': [
                 'observation-time-daytime-terra',
@@ -478,10 +481,10 @@ class modisData(Data):
     def asset_check(self, prod_type):
         """Is an asset available for the current scene and product?
 
-        Returns the last found asset, or else None, its version, the
-        complete lists of missing and available assets, and lastly, an array
-        of pseudo-filepath strings suitable for consumption by gdal/gippy.
-        Sorts by asset-preference setting.
+        Returns complete list of available and missing assets, the last
+        found asset version, the complete lists of missing and available
+        assets, and an array of pseudo-filepath strings suitable for
+        consumption by gdal/gippy. Sorts by asset-preference setting.
         """
         version = None
         missingassets = []

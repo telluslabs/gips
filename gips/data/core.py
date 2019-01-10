@@ -187,7 +187,9 @@ def validate_s3_env_vars():
 class S3Mixin(object):
     """Mix this into a subclass of Asset to use data in AWS S3.
 
-    <subclass requirements go here>
+    To use S3 data, subclasses must:
+        * set cls._s3_bucket_name
+        * set up query & fetch methods to call the methods below
     """
     @classmethod
     @lru_cache(maxsize=1)

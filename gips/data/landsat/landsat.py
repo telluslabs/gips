@@ -1079,7 +1079,6 @@ class landsatData(Data):
             band_files.append(output_path)
         return band_files
 
-    # s3refactor DRY for modis' use
     @property
     def preferred_asset(self):
         if getattr(self, '_preferred_asset', None):
