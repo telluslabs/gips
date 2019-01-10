@@ -77,7 +77,7 @@ class modisRepository(Repository):
             raise ValueError("modis' 'source' setting is '{}', but valid"
                              " values are 's3' or 'usgs'".format(value))
         if key == 'asset-preference':
-            valid_atl = default_settings['asset-preference']
+            valid_atl = cls.default_settings['asset-preference']
             warts = set(value) - set(valid_atl)
             if warts:
                 raise ValueError("Valid 'asset-preferences' for modis are {};"
@@ -195,8 +195,9 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
 
         parts = re.split(r'\.|_', os.path.basename(filename))
 
-        if parts[0] == MCD43A4:
-            self.asset = MCD43A4S3 if parts[-1] == 'json' else MCD43A4
+        self.asset = parts[0]
+        if self.asset == MCD43A4 and parts[-1] == 'json':
+            self.asset = MCD43A4S3
         self.tile = parts[2]
         self.sensor = parts[0][:3]
 
@@ -474,22 +475,24 @@ class modisData(Data):
 
     _products.update(_index_product_entries)
 
-    def asset_check(self, prod_type, single=False):
+    def asset_check(self, prod_type):
         """Is an asset available for the current scene and product?
 
         Returns the last found asset, or else None, its version, the
         complete lists of missing and available assets, and lastly, an array
         of pseudo-filepath strings suitable for consumption by gdal/gippy.
-        If `single`, these strings are limited to the last found asset.
+        Sorts by asset-preference setting.
         """
-        # return values
-        asset = None
         version = None
         missingassets = []
         availassets = []
         allsds = []
 
-        for asset in self._products[prod_type]['assets']:
+        pd = self._products[prod_type]
+        a_usage = pd.get('asset-usage', any)
+        if a_usage not in (any, all):
+            raise ValueError('Valid values for asset-usage are any and all')
+        for asset in self.Repository.sorted_asset_types(pd['assets']):
             # many asset types won't be found for the current scene
             if asset not in self.assets:
                 missingassets.append(asset)
@@ -500,11 +503,12 @@ class modisData(Data):
                 utils.report_error(e, 'Error reading datafiles for ' + asset)
                 missingassets.append(asset)
             else:
+                version = int(re.findall(r'M.*\.(\d{3})\.\d{13}[._]', sds[0])[0])
+                if a_usage is any:
+                    return [asset], missingassets, version, sds
                 availassets.append(asset)
                 allsds.extend(sds)
-                version = int(re.findall(r'M.*\.(\d{3})\.\d{13}[._]', sds[0])[0])
-        return (availassets[-1], version, missingassets, availassets,
-                sds if single else allsds)
+        return availassets, missingassets, version, allsds
 
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
@@ -524,7 +528,7 @@ class modisData(Data):
             if prod_type in self._productgroups['Index']:
                 continue # indices handled differently below
             start = datetime.datetime.now()
-            asset, version, missingassets, availassets, allsds = \
+            availassets, missingassets, version, allsds = \
                 self.asset_check(prod_type)
 
             if not availassets:
@@ -1033,7 +1037,8 @@ class modisData(Data):
         requested_ipt = products.groups()['Index'].keys()
         if requested_ipt:
             model_pt = requested_ipt[0] # all should be similar
-            asset, version, _, _, allsds = self.asset_check(model_pt, single=True)
+            availassets, _, version, allsds = self.asset_check(model_pt)
+            asset = availassets[0]
             if asset is None:
                 raise IOError('Found no assets for {}'.format(
                     requested_ipt))

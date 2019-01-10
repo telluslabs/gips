@@ -293,6 +293,13 @@ class Repository(object):
     # Child classes should not generally have to override anything below here
     ##########################################################################
     @classmethod
+    def sorted_asset_types(cls, asset_type_list):
+        """Return copy of input sorted by asset preference setting."""
+        at_pref = cls.get_setting('asset-preference')
+        k = lambda at: at_pref.index(at) if at in at_pref else len(at_pref)
+        return sorted(asset_type_list, key=k)
+
+    @classmethod
     def get_setting(cls, key):
         """Get given setting from settings.REPOS[driver].
 
