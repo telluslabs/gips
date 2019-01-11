@@ -25,13 +25,7 @@ def setup():
     if setup_complete:
         return
     if use_orm():
-        # For orm support for hls, this constraint violation needs remedy:
-        # IntegrityError: UNIQUE constraint failed:
-        #   dbinv_product.driver, dbinv_product.product,
-        #   dbinv_product.tile, dbinv_product.date
-        # this is because hls can produce two ndvi (say) that only vary by
-        # sensor & asset type.
-        busted_drivers = ('sarannual', 'hls')
+        busted_drivers = 'sarannual',
 
         if driver_for_dbinv_feature_toggle in busted_drivers:
             raise Exception("Inventory database does not support '{}'.  Set"
