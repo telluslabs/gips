@@ -49,7 +49,7 @@ import gippy
 from gips import __version__ as __gips_version__
 from gips.core import SpatialExtent, TemporalExtent
 from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
-from gips.data.core import Repository, Asset, Data
+from gips.data.core import Repository, Data
 import gips.data.core
 from gips.atmosphere import SIXS, MODTRAN
 import gips.atmosphere
@@ -99,7 +99,8 @@ class landsatRepository(Repository):
         return tile.zfill(6)
 
 
-class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
+class landsatAsset(gips.data.core.CloudCoverAsset,
+                   gips.data.core.GoogleStorageMixin):
     """ Landsat asset (original raw tar file) """
     Repository = landsatRepository
 
@@ -389,28 +390,6 @@ class landsatAsset(Asset, gips.data.core.GoogleStorageMixin):
         # Indexing an Element instance returns its children
         self.meta['cloud-cover'] = float(xml.find(xml_magic_string)[0].text)
         return self.meta['cloud-cover']
-
-    def filter(self, pclouds=100, **kwargs):
-        """
-        Filters current asset, currently based on cloud cover.
-
-        pclouds is a number between 0 and 100.
-
-        kwargs is reserved for future filtering parameters.
-        """
-        if pclouds >= 100:
-            return True
-
-        scene_cloud_cover = self.cloud_cover()
-
-        asset_passes_filter = scene_cloud_cover <= pclouds
-        if asset_passes_filter:
-            msg = 'Asset cloud cover is {} %, meets pclouds threshold of {} %'
-        else:
-            msg = ('Asset cloud cover is {} %,'
-                   ' fails to meet pclouds threshold of {} %')
-        utils.verbose_out(msg.format(scene_cloud_cover, pclouds), 3)
-        return asset_passes_filter
 
     def load_c1_json(self):
         """Load the content from a C1 json asset and return it."""
@@ -774,7 +753,7 @@ def unitless_bands(*bands):
     return [{'name': b, 'units': Data._unitless} for b in bands]
 
 
-class landsatData(Data):
+class landsatData(gips.data.core.CloudCoverData):
     name = 'Landsat'
     version = '1.0.1'
 
@@ -1650,25 +1629,14 @@ class landsatData(Data):
                             self.basename, prodout.keys(), endtime - start), 1)
                 ## end ACOLITE
 
-    need_fetch_kwargs = True
-
-    @classmethod
-    def add_filter_args(cls, parser):
-        """Add custom filtering options for landsat."""
-        help_str = ('cloud percentage threshold; assets with cloud cover'
-                    ' percentages higher than this value will be filtered out')
-        parser.add_argument('--pclouds', help=help_str,
-                            type=cls.natural_percentage, default=100)
-
     def filter(self, pclouds=100, sensors=None, **kwargs):
         """Check if Data object passes filter.
 
         User can't enter pclouds, but can pass in --sensors.  kwargs
         isn't used.
         """
-        if pclouds < 100:
-            if not all([a.filter(pclouds) for a in self.assets.values()]):
-                return False
+        if not super(landsatData, self).filter(pclouds, **kwargs):
+            return False
         if sensors:
             if type(sensors) is str:
                 sensors = [sensors]
