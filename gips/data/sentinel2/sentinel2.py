@@ -85,11 +85,12 @@ class sentinel2Repository(Repository):
         if key == 'source' and value not in ('esa', 'gs'):
             raise ValueError("Sentinel-2's 'source' setting is '{}',"
                     " but valid values are 'esa' or 'gs'".format(value))
-        if key == 'asset-preference':
+        elif key == 'asset-preference':
             warts = set(value) - set(_asset_types)
             if warts:
                 raise ValueError("Valid 'asset-preferences' for Sentinel-2"
-                        " are {}; invalid values found:  {}".format(warts))
+                        " are {}; invalid values found:  {}".format(
+                    _asset_types, warts))
         return value
 
     @classmethod

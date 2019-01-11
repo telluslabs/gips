@@ -32,12 +32,15 @@ import urllib
 import urllib2
 
 import math
+
 import numpy as np
 import requests
+from backports.functools_lru_cache import lru_cache
 
 import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
+import gips.data.core
 from gips.utils import VerboseOut, settings
 from gips import utils
 
@@ -48,6 +51,7 @@ def binmask(arr, bit):
     """
     return arr & (1 << (bit - 1)) == (1 << (bit - 1))
 
+MCD43A4, MCD43A4S3 = 'MCD43A4', 'MCD43A4S3' # for help spell-checking
 
 class modisRepository(Repository):
     name = 'Modis'
@@ -59,8 +63,29 @@ class modisRepository(Repository):
     # the default tile ID
     _tile_attribute = "tileid"
 
+    default_settings = {
+        'source': 'usgs',
+        'asset-preference': (MCD43A4, MCD43A4S3), # prefer local to remote
+    }
 
-class modisAsset(Asset):
+    @classmethod
+    def validate_setting(cls, key, value):
+        """Validate source and asset-preference settings; otherwise no-op."""
+        # landsat, modis, and sentinel-2 all have copies of this;
+        # may be worth consolidation
+        if key == 'source' and value not in ('s3', 'usgs'):
+            raise ValueError("modis' 'source' setting is '{}', but valid"
+                             " values are 's3' or 'usgs'".format(value))
+        if key == 'asset-preference':
+            valid_atl = cls.default_settings['asset-preference']
+            warts = set(value) - set(valid_atl)
+            if warts:
+                raise ValueError("Valid 'asset-preferences' for modis are {};"
+                    " invalid values found:  {}".format(valid_atl, warts))
+        return value
+
+
+class modisAsset(Asset, gips.data.core.S3Mixin):
     Repository = modisRepository
 
     _sensors = {
@@ -73,15 +98,23 @@ class modisAsset(Asset):
     # modis data used to be free for all, now you have to log in, hence no assets skip auth.
     _skip_auth = []
 
-    _asset_re_tail = '\.A.{7}\.h.{2}v.{2}\..{3}\..{13}\.hdf$'
+    _asset_re_common = r'\.A.{7}\.h.{2}v.{2}\..{3}\..{13}'
+    _asset_re_tail = _asset_re_common + r'\.hdf$'
 
+    cloud_storage_a_types = MCD43A4S3,
     _assets = {
         #Band info:  https://modis.gsfc.nasa.gov/about/specifications.php
-        'MCD43A4': {
+        MCD43A4: {
             'pattern': '^MCD43A4' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15,
+            'latency': 15, # this may need to be revised; see S3 version
+        },
+        MCD43A4S3: {
+            'pattern': '^MCD43A4' + _asset_re_common + r'_S3\.json$',
+            # this date appears wrong but no better value is documented
+            'startdate': datetime.date(2000, 2, 18),
+            'latency': 10,
         },
         'MCD43A2': {
             'pattern': '^MCD43A2' + _asset_re_tail,
@@ -159,10 +192,11 @@ class modisAsset(Asset):
         """ Inspect a single file and get some metadata """
         super(modisAsset, self).__init__(filename)
 
-        bname = os.path.basename(filename)
-        parts = bname.split('.')
+        parts = re.split(r'\.|_', os.path.basename(filename))
 
         self.asset = parts[0]
+        if self.asset == MCD43A4 and parts[-1] == 'json':
+            self.asset = MCD43A4S3
         self.tile = parts[2]
         self.sensor = parts[0][:3]
 
@@ -174,9 +208,8 @@ class modisAsset(Asset):
         file_version = int(parts[4]) # datetimestamp near end of the filename
         self._version = float('{}.{}'.format(collection, file_version))
 
-
     @classmethod
-    def query_provider(cls, asset, tile, date):
+    def query_usgs(cls, asset, tile, date):
         """Find out from the modis servers what assets are available.
 
         Uses the given (asset, tile, date) tuple as a search key, and
@@ -187,7 +220,7 @@ class modisAsset(Asset):
         if asset == "MCD12Q1" and (month, day) != (1, 1):
             utils.verbose_out("Cannot fetch MCD12Q1:  Land cover data"
                               " are only available for Jan. 1", 1, stream=sys.stderr)
-            return None, None
+            return None
 
         mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
         pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (
@@ -202,7 +235,7 @@ class modisAsset(Asset):
         with utils.error_handler(err_msg):
             response = cls.Repository.managed_request(mainurl, verbosity=2)
             if response is None:
-                return None, None
+                return None
 
         for item in response.readlines():
             # screen-scrape the content of the page and extract the full name of the needed file
@@ -213,28 +246,86 @@ class modisAsset(Asset):
                     continue
                 basename = cpattern.findall(item)[0]
                 url = ''.join([mainurl, '/', basename])
-                return basename, url
+                return {'basename': basename, 'url': url}
         utils.verbose_out('Unable to find remote match for '
                           '{} at {}'.format(pattern, mainurl), 4)
-        return None, None
+        return None
+
+    # complete S3 url:  at   col  h  v   y doy
+    # s3://modis-pds/MCD43A4.006/21/11/2017006/
+    #       MCD43A4.A2017006.h21v11.006.2017018074804_B01.TIF
+    _s3_bucket_name = 'modis-pds'
+    _s3_url = 'https://modis-pds.s3.amazonaws.com/'
+    _datafiles_json_key = 'tifs'
+
+    @classmethod
+    def parse_tile(cls, tile_id):
+        """If given, eg, 'h12v04', returns ('12', '04')."""
+        return tile_id[1:3], tile_id[4:6]
+
+    @classmethod
+    def query_s3(cls, tile, date):
+        """Look in S3 for modis asset components and assemble links to same."""
+        h, v = cls.parse_tile(tile)
+        prefix = 'MCD43A4.006/{}/{}/{}/'.format(h, v, date.strftime('%Y%j'))
+        keys = cls.s3_prefix_search(prefix)
+        tifs = []
+        qa_tifs = []
+        json_md = None
+        for k in keys:
+            if k.endswith('qa.TIF'):
+                qa_tifs.append(cls.s3_vsi_prefix(k))
+            elif k.endswith('.TIF'):
+                tifs.append(cls.s3_vsi_prefix(k))
+            elif k.endswith('_meta.json'):
+                json_md = cls._s3_url + k
+
+        if len(tifs) != len(qa_tifs) != 7 or json_md is None:
+            utils.verbose_out('Found no complete S3 asset for'
+                              ' (MCD43A4S3, {}, {})'.format(tile, date), 4)
+            return None
+        utils.verbose_out('Found complete S3 asset for'
+                          ' (MCD43A4S3, {}, {})'.format(tile, date), 3)
+        tifs.sort()
+        qa_tifs.sort()
+        # turn this:  MCD43A4.006/12/04/2017330/MCD43A4.A2017330.h12v04.006.2017341210453_B01.TIF
+        # into this:  MCD43A4.A2017330.h12v04.006.2017341210453_S3.json
+        asset_bn = os.path.basename(tifs[0])[:-8] + '_S3.json'
+        return {'basename': asset_bn, 'json_md': json_md,
+                'tifs': tifs, 'qa_tifs': qa_tifs}
+
+    @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
+    def query_service(cls, asset, tile, date):
+        """Subclass from Asset to disambiguate between S3 & USGS assets."""
+        if not cls.available(asset, date):
+            return None
+        data_src = cls.get_setting('source')
+        if data_src == 's3' and asset == MCD43A4S3:
+            return cls.query_s3(tile, date)
+        if data_src != 's3' and asset != MCD43A4S3:
+            return cls.query_usgs(asset, tile, date)
+        return None
+
+    @classmethod
+    def download(cls, url, download_fp, **ignored):
+        """Download the URL to the given full path, handling auth & errors."""
+        response = cls.Repository.managed_request(url)
+        if response is None:
+            return False
+        with open(download_fp, 'wb') as fd:
+            fd.write(response.read())
+        return True
 
     @classmethod
     def fetch(cls, asset, tile, date):
+        if asset != MCD43A4S3:
+            return super(modisAsset, cls).fetch(asset, tile, date)
+        # else do S3 fetch
         qs_rv = cls.query_service(asset, tile, date)
-        if qs_rv is None:
-            return []
-        basename, url = qs_rv['basename'], qs_rv['url']
-        with utils.error_handler(
-                "Asset fetch error ({})".format(url), continuable=True):
-            response = cls.Repository.managed_request(url)
-            if response is None:
-                return []
-            outpath = os.path.join(cls.Repository.path('stage'), basename)
-            with open(outpath, 'wb') as fd:
-                fd.write(response.read())
-            utils.verbose_out('Retrieved ' + basename, 2)
-            return [outpath]
-        return []
+        if qs_rv is not None:
+            basename = qs_rv.pop('basename')
+            cls.s3_stage_asset_json(qs_rv, basename)
 
 # index product types and descriptions
 _index_products = [
@@ -258,7 +349,7 @@ _index_products = [
 
 _index_product_entries = {
     pt: {'bands': [pt], 'description': descr,
-         'assets': ['MCD43A4'], 'sensor': 'MCD',
+         'assets': [MCD43A4, MCD43A4S3], 'sensor': 'MCD',
          'startdate': datetime.date(2000, 2, 18), 'latency': 15}
     for pt, descr in _index_products}
 
@@ -281,7 +372,7 @@ class modisData(Data):
         'indices': {
             'description': 'Land indices (deprecated,'
                            ' see indices product group)',
-            'assets': ['MCD43A4'],
+            'assets': [MCD43A4],
             'sensor': 'MCD',
             'bands': ['ndvi', 'lswi', 'vari', 'brgt', 'satvi', 'evi'],
             'startdate': datetime.date(2000, 2, 18),
@@ -324,6 +415,7 @@ class modisData(Data):
         'temp': {
             'description': 'Surface temperature data',
             'assets': ['MOD11A1', 'MYD11A1'],
+            'asset-usage': all,
             'sensor': 'MOD-MYD',
             'bands': [
                 'temperature-daytime-terra',
@@ -338,6 +430,7 @@ class modisData(Data):
         'obstime': {
             'description': 'MODIS Terra/Aqua overpass time',
             'assets': ['MOD11A1', 'MYD11A1'],
+            'asset-usage': all,
             'sensor': 'MOD-MYD',
             'bands': [
                 'observation-time-daytime-terra',
@@ -388,18 +481,21 @@ class modisData(Data):
     def asset_check(self, prod_type):
         """Is an asset available for the current scene and product?
 
-        Returns the last found asset, or else None, its version, the
-        complete lists of missing and available assets, and lastly, an array
-        of pseudo-filepath strings suitable for consumption by gdal/gippy.
+        Returns complete list of available and missing assets, the last
+        found asset version, the complete lists of missing and available
+        assets, and an array of pseudo-filepath strings suitable for
+        consumption by gdal/gippy. Sorts by asset-preference setting.
         """
-        # return values
-        asset = None
         version = None
         missingassets = []
         availassets = []
         allsds = []
 
-        for asset in self._products[prod_type]['assets']:
+        pd = self._products[prod_type]
+        a_usage = pd.get('asset-usage', any)
+        if a_usage not in (any, all):
+            raise ValueError('Valid values for asset-usage are any and all')
+        for asset in self.Repository.sorted_asset_types(pd['assets']):
             # many asset types won't be found for the current scene
             if asset not in self.assets:
                 missingassets.append(asset)
@@ -410,11 +506,12 @@ class modisData(Data):
                 utils.report_error(e, 'Error reading datafiles for ' + asset)
                 missingassets.append(asset)
             else:
+                version = int(re.findall(r'M.*\.(\d{3})\.\d{13}[._]', sds[0])[0])
+                if a_usage is any:
+                    return [asset], missingassets, version, sds
                 availassets.append(asset)
                 allsds.extend(sds)
-                version = int(re.findall('M.*\.(\d{3})\.\d{13}\.hdf', sds[0])[0])
-
-        return asset, version, missingassets, availassets, allsds
+        return availassets, missingassets, version, allsds
 
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
@@ -434,7 +531,7 @@ class modisData(Data):
             if prod_type in self._productgroups['Index']:
                 continue # indices handled differently below
             start = datetime.datetime.now()
-            asset, version, missingassets, availassets, allsds = \
+            availassets, missingassets, version, allsds = \
                 self.asset_check(prod_type)
 
             if not availassets:
@@ -943,14 +1040,16 @@ class modisData(Data):
         requested_ipt = products.groups()['Index'].keys()
         if requested_ipt:
             model_pt = requested_ipt[0] # all should be similar
-            asset, version, _, availassets, allsds = self.asset_check(model_pt)
+            availassets, _, version, allsds = self.asset_check(model_pt)
+            asset = availassets[0]
             if asset is None:
                 raise IOError('Found no assets for {}'.format(
                     requested_ipt))
             if version < 6:
                 raise IOError('index products require MCD43A4 version 6,'
                               ' but found {}'.format(version))
-            img = gippy.GeoImage(allsds[7:]) # don't need the QC bands
+            # don't need the QC bands so leave out some rasters ------v
+            img = gippy.GeoImage(allsds[(0 if asset == MCD43A4S3 else 7):])
 
             # GIPPY uses expected band names to find data:
             """
@@ -973,11 +1072,9 @@ class modisData(Data):
             sensor = self._products[model_pt]['sensor']
             prod_spec = {pt: self.temp_product_filename(sensor, pt)
                          for pt in requested_ipt}
-
-            a_fnames = [self.assets[at].filename for at in availassets]
-            pt_to_temp_fps = Indices(img, prod_spec,
-                    self.prep_meta(a_fnames, {'VERSION': '1.0'}))
-
+            prepped_md = self.prep_meta([self.assets[asset].filename],
+                                        {'VERSION': '1.0'})
+            pt_to_temp_fps = Indices(img, prod_spec, prepped_md)
             for pt, temp_fp in pt_to_temp_fps.items():
                 archived_fp = self.archive_temp_path(temp_fp)
                 self.AddFile(sensor, pt, archived_fp)

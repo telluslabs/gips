@@ -100,7 +100,8 @@ class landsatRepository(Repository):
 
 
 class landsatAsset(gips.data.core.CloudCoverAsset,
-                   gips.data.core.GoogleStorageMixin):
+                   gips.data.core.GoogleStorageMixin,
+                   gips.data.core.S3Mixin):
     """ Landsat asset (original raw tar file) """
     Repository = landsatRepository
 
@@ -198,6 +199,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
         r'(?P<processing_date>\d{8})_'
         r'(?P<coll_num>\d{2})_(?P<coll_cat>.{2})')
 
+    cloud_storage_a_types = ('C1S3', 'C1GS') # in order of current preference
     _assets = {
         # DN & SR assets are no longer fetchable
         'DN': {
@@ -311,12 +313,6 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             raise Exception("Sensor %s not supported: %s" % (self.sensor, filename))
         self._version = self.version
 
-    cloud_storage_a_types = ('C1S3', 'C1GS') # in order of current preference
-
-    def in_cloud_storage(self):
-        """Is this asset's data fetched from the cloud on-demand?"""
-        return self.asset in self.cloud_storage_a_types
-
     def band_paths(self):
         if not self.in_cloud_storage():
             raise NotImplementedError(
@@ -425,10 +421,6 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
     _s3_bucket_name = 'landsat-pds'
     _s3_url = 'https://landsat-pds.s3.amazonaws.com/'
 
-    # take advantage of gips' search order (tile is outer, date is inner)
-    # and cache search outcomes
-    _query_s3_cache = (None, None) # prefix, search results
-
     @classmethod
     def query_s3(cls, tile, date, pclouds=100):
         """Handles AWS S3 queries for landsat data.
@@ -447,30 +439,8 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
         re_string = key_prefix + fname_fragment
         filter_re = re.compile(re_string)
 
-        missing_auth_vars = tuple(
-                set(['AWS_SECRET_ACCESS_KEY', 'AWS_ACCESS_KEY_ID'])
-                - set(os.environ.keys()))
-        if len(missing_auth_vars) > 0:
-            raise EnvironmentError("Missing AWS S3 auth credentials:"
-                                   "  {}".format(missing_auth_vars))
+        keys = cls.s3_prefix_search(key_prefix)
 
-        # on repeated searches, chances are we have a cache we can use
-        expected_prefix, keys = cls._query_s3_cache
-        if expected_prefix != key_prefix:
-            verbose_out("New prefix detected; refreshing S3 query cache.", 5)
-            # find the layer and metadata files matching the current scene
-            import boto3 # import here so it only breaks if it's actually needed
-            s3 = boto3.resource('s3')
-            bucket = s3.Bucket(cls._s3_bucket_name)
-            keys = [o.key for o in bucket.objects.filter(Prefix=key_prefix)]
-            cls._query_s3_cache = key_prefix, keys
-            verbose_out("Found {} S3 keys while searching for for key fragment"
-                        " '{}'".format(len(keys), key_prefix), 5)
-        else:
-            verbose_out("Found {} cached search results for S3 key fragment"
-                        " '{}'".format(len(keys), key_prefix), 5)
-
-        # A rare instance of a stupid for-loop being the right choice:
         _30m_tifs = []
         _15m_tif = mtl_txt = qa_tif = None
         for key in keys:
@@ -717,22 +687,14 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
         #   /LC08_L1TP_013030_20171128_20171207_01_T1
         #   /LC08_L1TP_013030_20171128_20171207_01_T1_B10.TIF
         # see also:  http://www.gdal.org/gdal_virtual_file_systems.html
-        vsi_prefix = '/vsis3_streaming/{}/'.format(cls._s3_bucket_name)
         asset_content = {
             # can/should add metadata/versioning info here
-            '30m-bands': [vsi_prefix + t for t in _30m_tifs],
-            '15m-band': vsi_prefix + _15m_tif,
-            'qa-band': vsi_prefix + qa_tif,
+            '30m-bands': [cls.s3_vsi_prefix(t) for t in _30m_tifs],
+            '15m-band': cls.s3_vsi_prefix(_15m_tif),
+            'qa-band': cls.s3_vsi_prefix(qa_tif),
             'mtl': cls._s3_url + mtl_txt,
         }
-
-        # TODO refactor:  cls.gs_stage_asset(basename, asset_content)
-        with utils.make_temp_dir(prefix='fetch',
-                                 dir=cls.Repository.path('stage')) as tmp_dir:
-            tmp_fp = tmp_dir + '/' + basename
-            with open(tmp_fp, 'w') as tfo:
-                json.dump(asset_content, tfo)
-            shutil.copy(tmp_fp, cls.Repository.path('stage'))
+        cls.s3_stage_asset_json(asset_content, basename)
 
     @classmethod
     def fetch_gs(cls, basename, keys):

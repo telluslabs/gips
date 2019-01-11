@@ -74,7 +74,8 @@ def setup_repo_data(driver):
             #sh.wget('--recursive', '--no-directories', url_head)
             for fn in remote_files:
                 shutil.copy(os.path.join(das_path, fn), temp_dir)
-            sh.gips_archive(driver)
+            sh.gips_archive(driver, '-v99',
+                            _err='/dev/stderr', _out='/dev/stdout')
     finally:
         shutil.rmtree(temp_dir)
     print(driver, "data installation complete.")

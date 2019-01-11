@@ -100,6 +100,7 @@ def _gs_stop_trying(e):
             and e.response.status_code != 429
             and (499 < e.response.status_code < 600))
 
+
 class GoogleStorageMixin(object):
     """Mix this into a class (probably Asset) to use data in google storage.
 
@@ -175,6 +176,53 @@ class GoogleStorageMixin(object):
         return ofiles
 
 
+def validate_s3_env_vars():
+    vs = set(['AWS_SECRET_ACCESS_KEY', 'AWS_ACCESS_KEY_ID'])
+    missing = tuple(vs - set(os.environ.keys()))
+    if len(missing) > 0:
+        raise EnvironmentError(
+            "Missing AWS S3 auth credentials:  {}".format(missing))
+
+
+class S3Mixin(object):
+    """Mix this into a subclass of Asset to use data in AWS S3.
+
+    To use S3 data, subclasses must:
+        * set cls._s3_bucket_name
+        * set up query & fetch methods to call the methods below
+    """
+    @classmethod
+    @lru_cache(maxsize=1)
+    def s3_prefix_search(cls, prefix):
+        validate_s3_env_vars()
+        # find the layer and metadata files matching the current scene
+        import boto3 # import here so it only breaks if it's actually needed
+        s3 = boto3.resource('s3')
+        bucket = s3.Bucket(cls._s3_bucket_name)
+        keys = [o.key for o in bucket.objects.filter(Prefix=prefix)]
+        utils.verbose_out("Found {} S3 keys while searching for for key fragment"
+                    " '{}'".format(len(keys), prefix), 5)
+        return keys
+
+    @classmethod
+    def s3_stage_asset_json(cls, content, basename):
+        """Saves the given content as a json blob to the stage."""
+        # this may be refactorable with the gs mixin's gs_stage_asset
+        if cls.Repository.in_stage(basename): # skip if there already
+            return
+        stage_dir_fp = cls.Repository.path('stage')
+        with utils.make_temp_dir(prefix='fetch-s3-', dir=stage_dir_fp) as td:
+            tmp_fp = td + '/' + basename
+            with open(tmp_fp, 'w') as tfo:
+                json.dump(content, tfo)
+            shutil.copy(tmp_fp, stage_dir_fp)
+
+    @classmethod
+    def s3_vsi_prefix(cls, key):
+        """Add a vsi3_streaming prefix to the given S3 key"""
+        return '/vsis3_streaming/{}/{}'.format(cls._s3_bucket_name, key)
+
+
 class Repository(object):
     """ Singleton (all classmethods) of file locations and sensor tiling system  """
     # Description of the data source
@@ -187,6 +235,14 @@ class Repository(object):
     _subdirs = ['tiles', 'stage', 'quarantine', 'composites']
 
     default_settings = {}
+
+    @classmethod
+    def in_stage(cls, basename):
+        """Tests for the existence of the file in this driver's stage dir."""
+        if os.path.exists(os.path.join(cls.path('stage'), basename)):
+            utils.verbose_out('File `{}` already in stage/'.format(basename), 2)
+            return True
+        return False
 
     @classmethod
     def feature2tile(cls, feature):
@@ -238,6 +294,13 @@ class Repository(object):
     ##########################################################################
     # Child classes should not generally have to override anything below here
     ##########################################################################
+    @classmethod
+    def sorted_asset_types(cls, asset_type_list):
+        """Return copy of input sorted by asset preference setting."""
+        at_pref = cls.get_setting('asset-preference')
+        k = lambda at: at_pref.index(at) if at in at_pref else len(at_pref)
+        return sorted(asset_type_list, key=k)
+
     @classmethod
     def get_setting(cls, key):
         """Get given setting from settings.REPOS[driver].
@@ -483,6 +546,8 @@ class Asset(object):
                 return match
         raise ValueError("Unparseable asset file name:  " + self.filename)
 
+    _datafiles_json_key = None
+
     def datafiles(self):
         """Get list of readable datafiles from asset.
 
@@ -503,14 +568,14 @@ class Asset(object):
             elif zipfile.is_zipfile(self.filename):
                 datafiles = zipfile.ZipFile(self.filename).namelist()
             elif self.filename.endswith('json'):
-                # take strings at the top level, or in lists at the top level
-                # TODO this is brittle; drivers implementing json assets
-                # should override this method to handle their specific needs
                 with open(self.filename) as fp:
                     content = json.load(fp)
-                raw_df = []
-                for v in content.values():
-                    raw_df += v if type(v) is list else [v]
+                # follow the driver's config about where to find things...
+                if self._datafiles_json_key is not None:
+                    raw_df = content[self._datafiles_json_key]
+                else: # else take strings and lists of strings at the top level
+                    raw_df = sum([v if type(v) is list else [v]
+                                  for v in content.values()], [])
                 datafiles = tuple(v.encode('ascii', 'ignore')
                                   for v in raw_df if isinstance(v, basestring))
             else: # Try subdatasets
@@ -580,11 +645,15 @@ class Asset(object):
 
         return extant_fnames + [ffn for (_, ffn) in extracted_fnames]
 
+    cloud_storage_a_types = () # override in subclass as needed
+
+    def in_cloud_storage(self):
+        """Is this asset's data fetched from the cloud on-demand?"""
+        return self.asset in self.cloud_storage_a_types
+
     ##########################################################################
     # Class methods
     ##########################################################################
-
-
     @classmethod
     def discover(cls, tile, date, asset=None):
         """Factory function returns list of Assets for this tile and date.
@@ -721,9 +790,9 @@ class Asset(object):
         return {'basename': bn, 'url': url}
 
     @classmethod
-    def download(cls, url, fp, **kwargs):
+    def download(cls, url, download_fp, **kwargs):
         """Override this method to provide custom download code."""
-        raise NotImplementedError('download not supported for' + cls.__name__)
+        raise NotImplementedError('download not supported for ' + cls.__name__)
 
     @classmethod
     def stage_asset(cls, asset_full_path):
@@ -744,12 +813,10 @@ class Asset(object):
         qs_rv = cls.query_service(a_type, tile, date, **fetch_kwargs)
         if qs_rv is None:
             return []
-        stage_dir_fp = cls.Repository.path('stage')
-        if os.path.exists(os.path.join(stage_dir_fp, qs_rv['basename'])):
-            utils.verbose_out('Asset `{}` needed but already in stage/,'
-                              ' skipping.'.format(qs_rv['basename']))
+        if cls.Repository.in_stage(qs_rv['basename']): # skip if there already
             return []
-        with utils.make_temp_dir(prefix='fetch-', dir=stage_dir_fp) as td_fp:
+        with utils.make_temp_dir(prefix='fetch-',
+                                 dir=cls.Repository.path('stage')) as td_fp:
             qs_rv['download_fp'] = os.path.join(td_fp, qs_rv['basename'])
             fetch_kwargs.update(**qs_rv)
             if cls.download(**fetch_kwargs):
