@@ -33,10 +33,11 @@ setup_attempted = []
 
 def setup_repo_data(driver):
     """Use gips_inventory to ensure assets are present."""
-    if driver in setup_attempted or not pytest.config.getoption('setup_repo'):
+    if (driver in setup_attempted or
+            not pytest._config_saved_by_gips.getoption('setup_repo')):
         return
 
-    as_path = pytest.config.getini('artifact-store-path')
+    as_path = pytest._config_saved_by_gips.getini('artifact-store-path')
 
     das_path = os.path.join(as_path, driver) # technically should be der_path
 
@@ -61,7 +62,8 @@ def setup_repo_data(driver):
 
     local_files = [os.path.basename(fp) for fp in
         glob.glob(os.path.join(
-            pytest.config.getini('data-repo'), driver, 'tiles', '*/*/*'))]
+            pytest._config_saved_by_gips.getini('data-repo'),
+            driver, 'tiles', '*/*/*'))]
 
     if set(remote_files).issubset(set(local_files)):
         print(driver, 'asset files already present; no setup needed')
