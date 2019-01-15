@@ -22,8 +22,9 @@ import os
 import re
 import datetime
 
-import requests
 from backports.functools_lru_cache import lru_cache
+import requests
+import numpy
 import gippy
 
 from gips.data.core import Repository, Data
@@ -170,7 +171,14 @@ class hlsData(gips.data.core.CloudCoverData):
     Asset = hlsAsset
 
     _productgroups = {}
-    _products = {}
+    _products = {
+        'cloudmask': {
+            'assets': list(_ordered_asset_types),
+            'description': ('Union of cirrus, cloud, adjacent cloud, and'
+                            ' cloud shadow bits from the QA band'),
+            'latency': 1,
+            'bands': [{'name': 'cloudmask', 'units': Data._unitless}]},
+    }
     gips.data.core.add_gippy_index_products(
         _products, _productgroups, _ordered_asset_types)
 
@@ -202,12 +210,39 @@ class hlsData(gips.data.core.CloudCoverData):
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, tempfps_to_ptypes[temp_fp], archived_fp)
 
+    def process_cloudmask(self):
+        """Produce the cloudmask product."""
+        for a_obj in self.assets.values():
+            src_img = gippy.GeoImage(a_obj.filename)
+            # for both asset types the QA band is the last one
+            qa_nparray = src_img[len(src_img) - 1].Read()
+            # cirrus, cloud, adjacent cloud, cloud shadow are bits 0 to 3,
+            # where bit 0 is LSB; value of 1 means that thing is present there.
+            mask = (qa_nparray & 0b00001111) > 0 # on edit update Mask_params
+
+            # build the product file
+            temp_fp = self.temp_product_filename(a_obj.sensor, 'cloudmask')
+            imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Byte, 1)
+            imgout[0].Write(mask.astype(numpy.uint8))
+            imgout.SetNoData(0) # needed due to particulars of gdal_merge
+            imgout.SetMeta(self.prep_meta(
+                a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
+            # imgout.Process() # TODO needed?
+            archived_fp = self.archive_temp_path(temp_fp)
+            self.AddFile(a_obj.sensor, 'cloudmask', archived_fp)
+
     @Data.proc_temp_dir_manager
-    def process(self, products=None, overwrite=False, **kwargs):
-        """Generate hls products, presently gippy indices."""
+    def process(self, products=None, overwrite=False):
+        """Generate hls products."""
         products = self.needed_products(products, overwrite)
         if len(products) == 0:
             verbose_out('No new processing required.', 5)
             return
+        # thus we never have to write an `if val[0] == 'ref':` block
+        # (for other drivers do getattr(...)(*pl[1:]) for args, eg 'toa')
+        [getattr(self, 'process_' + pl[0])()
+                for pl in products.standard.values()]
+
         indices = products.groups()['Index']
-        [self.process_indices(ao, indices) for ao in self.assets.values()]
+        if indices:
+            [self.process_indices(ao, indices) for ao in self.assets.values()]
