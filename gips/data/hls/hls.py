@@ -241,7 +241,7 @@ class hlsData(gips.data.core.CloudCoverData):
         # thus we never have to write an `if val[0] == 'ref':` block
         # (for other drivers do getattr(...)(*pl[1:]) for args, eg 'toa')
         [getattr(self, 'process_' + pl[0])()
-                for pl in products.standard.values()]
+                for pl in products.groups()['Standard'].values()]
 
         indices = products.groups()['Index']
         if indices:
