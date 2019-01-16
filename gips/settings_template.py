@@ -5,11 +5,11 @@
 #    AUTHOR: Matthew Hanson
 #    EMAIL:  matt.a.hanson@gmail.com
 #
-#    Copyright (C) 2014 Applied Geosolutions
+#    Copyright (C) 2014-2018 Applied Geosolutions
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
+#    the Free Software Foundation; either version 3 of the License, or
 #    (at your option) any later version.
 #
 #    This program is distributed in the hope that it will be useful,
@@ -111,6 +111,9 @@ REPOS = {
     'daymet': {
         'repository': '$TLD/daymet',
     },
+    'hls': {
+        'repository': '$TLD/hls',
+    }
 }
 
 

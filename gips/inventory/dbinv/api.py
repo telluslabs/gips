@@ -247,8 +247,9 @@ def update_or_add_product(driver, product, tile, date, sensor, name):
         'product':  product,
         'tile':     tile,
         'date':     date,
+        'sensor':   sensor,
     }
-    update_vals = {'sensor': sensor, 'name': name}
+    update_vals = {'name': name}
     (asset, created) = models.Product.objects.update_or_create(defaults=update_vals, **query_vals)
     return asset # in case the user needs it
 

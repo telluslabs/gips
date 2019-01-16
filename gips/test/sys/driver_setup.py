@@ -26,16 +26,18 @@ STD_ARGS = {
     'sentinel2': ('sentinel2', '-s', util.DURHAM_SHP_PATH, '-d2017-183', '-v4'),
     'sar': ('sar', '-t', 'N07E099', 'N19E100', 'N00E099', '-d2009,2015', '-v4'),
     'daymet' : ('daymet', '-d', '1993-1-18', '-s', util.DURHAM_SHP_PATH),
+    'hls': tuple(('hls -v4 -d2016-156 -s ' + util.DURHAM_SHP_PATH).split()),
 }
 
 setup_attempted = []
 
 def setup_repo_data(driver):
     """Use gips_inventory to ensure assets are present."""
-    if driver in setup_attempted or not pytest.config.getoption('setup_repo'):
+    if (driver in setup_attempted or
+            not pytest._config_saved_by_gips.getoption('setup_repo')):
         return
 
-    as_path = pytest.config.getini('artifact-store-path')
+    as_path = pytest._config_saved_by_gips.getini('artifact-store-path')
 
     das_path = os.path.join(as_path, driver) # technically should be der_path
 
@@ -60,13 +62,13 @@ def setup_repo_data(driver):
 
     local_files = [os.path.basename(fp) for fp in
         glob.glob(os.path.join(
-            pytest.config.getini('data-repo'), driver, 'tiles', '*/*/*'))]
+            pytest._config_saved_by_gips.getini('data-repo'),
+            driver, 'tiles', '*/*/*'))]
 
     if set(remote_files).issubset(set(local_files)):
         print(driver, 'asset files already present; no setup needed')
         return
 
-    #print('Installing', driver, 'assets from', sanitized_uh)
     print('Installing', driver, 'assets from', das_path)
     try:
         temp_dir = tempfile.mkdtemp()
@@ -74,7 +76,8 @@ def setup_repo_data(driver):
             #sh.wget('--recursive', '--no-directories', url_head)
             for fn in remote_files:
                 shutil.copy(os.path.join(das_path, fn), temp_dir)
-            sh.gips_archive(driver)
+            sh.gips_archive(driver, '-v99',
+                            _err='/dev/stderr', _out='/dev/stdout')
     finally:
         shutil.rmtree(temp_dir)
     print(driver, "data installation complete.")

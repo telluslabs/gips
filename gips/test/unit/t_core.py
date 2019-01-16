@@ -242,18 +242,16 @@ def t_Data_archive_assets_update_case(orm, mocker, asset_and_replacement):
 
 def t_query_service_caching(mpo):
     bn, url = 'basename.hdf', 'http://www.himom.com/'
-    m_query_provider = mpo(modis.modisAsset, 'query_provider')
-    m_query_provider.return_value = (bn, url)
+    m_available = mpo(modis.modisAsset, 'available')
+    m_available.return_value = False
     modis.modisAsset.query_service.cache_clear() # in case it's not empty atm
 
     atd = ('MOD11A1', 'h12v04', datetime.datetime(2012, 12, 1, 0, 0))
     actual_first = modis.modisAsset.query_service(*atd)
     actual_second = modis.modisAsset.query_service(*atd)
 
-    expected_for_both = {'basename': bn, 'url': url}
-
-    assert (m_query_provider.call_count == 1 # should use the cache 2nd time
-            and actual_first == actual_second == expected_for_both)
+    assert (m_available.call_count == 1 # should use the cache 2nd time
+            and actual_first == actual_second == None)
 
 class GipsDriverModules(object):
     """Introspect the GIPS codebase and load all the driver modules."""

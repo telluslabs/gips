@@ -5,11 +5,11 @@
 #    AUTHOR: Matthew Hanson
 #    EMAIL:  matt.a.hanson@gmail.com
 #
-#    Copyright (C) 2014 Applied Geosolutions
+#    Copyright (C) 2014-2018 Applied Geosolutions
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
+#    the Free Software Foundation; either version 3 of the License, or
 #    (at your option) any later version.
 #
 #    This program is distributed in the hope that it will be useful,
@@ -105,12 +105,11 @@ class SpatialExtent(object):
             # both be passed from elsewhere. for now, preferentially
             # use rastermask if provided.
             if rastermask is not None:
-                with utils.make_temp_dir(prefix='spatialfactory') as td:
-                    vectorfile = os.path.join(td, os.path.basename(rastermask)[:-4] + '.shp')
-                    features = open_vector(utils.vectorize(rastermask, vectorfile), where='DN=1')
-                    for f in features:
-                        extents.append(cls(dataclass, feature=f, rastermask=rastermask,
-                                           tiles=tiles, pcov=pcov, ptile=ptile))
+                vectorfile = os.path.join(os.path.dirname(rastermask), os.path.basename(rastermask)[:-4] + '.shp')
+                features = open_vector(utils.vectorize(rastermask, vectorfile), where='DN=1')
+                for f in features:
+                    extents.append(cls(dataclass, feature=f, rastermask=rastermask,
+                                        tiles=tiles, pcov=pcov, ptile=ptile))
             else:
                 features = open_vector(site, key, where)
                 for f in features:
