@@ -1,50 +1,47 @@
-FROM ubuntu:16.04
+FROM gippy-0.3.x
 
-RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
-       /etc/apt/sources.list \
-    && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 314DF160 \
-    && apt-get -y update \
-    && apt-get install -y \
-    python python-apt \
-    python-pip \
-    gfortran \
-    libboost-system1.58.0 \
-    libboost-log1.58.0 \
-    libboost-all-dev \
-    libfreetype6-dev \
-    libgnutls-dev \
-    libatlas-base-dev \
-    libgdal-dev \
-    libcurl4-gnutls-dev \
-    gdal-bin \
-    python-numpy \
-    python-scipy \
-    python-gdal \
-    swig2.0 \
-    wget \
-    awscli \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install -U pip==9.0.3 setuptools wheel \
-    && pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy
+ARG GIPS_UID
+RUN apt-get update \
+    && apt-get -y install libcurl4-gnutls-dev
 
 COPY . /gips
 
-RUN cd /gips \
-    && pip install -r dev_requirements.txt \
-    && pip install --process-dependency-links -e . \
-    && echo "stty cols 240 rows 60" >> /root/.bashrc
+COPY conf/sixs /usr/local/bin/sixs
+COPY conf/ortho /usr/local/bin/ortho
+COPY conf/gips_creds.sh /gips/gips_creds.sh
 
-RUN apt-get -y purge \
-       gfortran \
-       libboost-all-dev \
-       libfreetype6-dev \
-       libatlas-base-dev \
-       libgdal-dev \
-       swig2.0 \
+ENV GIPS_OVERRIDE_VERSION='0.0.0-dev'
+
+# note settings.py is removed, then regenerated with gips_config, then edited.
+# pre-install cython to work around a cftime issue; no longer needed when this
+# is fixed:  https://github.com/Unidata/cftime/issues/34
+# GIPS_ORM is set false for hls; once hls is compatible with the ORM, that
+# line can be removed
+RUN cd /gips \
+    && chmod +x /usr/local/bin/sixs \
+    && chmod +x /usr/local/bin/ortho \
+    && pip install -U pip 'idna<2.8' Cython \
+    && /usr/local/bin/pip install -r dev_requirements.txt \
+    && /usr/local/bin/pip install -e file:///gips/ \
+    && rm -f /gips/gips/settings.py /gips/pytest.ini \
+    && gips_config env -r /archive -e rbraswell@indigoag.com \
+    #&& openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh  -pass file:/root/.ssh/gitlab_ci \
+    && eval $(cat gips_creds.sh) \
+    && sed -i~ \
+ 	   -e "s/^EARTHDATA_USER.*/EARTHDATA_USER = \"${EARTHDATA_USER}\"/" \
+ 	   -e "s/^EARTHDATA_PASS.*/EARTHDATA_PASS = \"${EARTHDATA_PASS}\"/" \
+	   -e "s/^USGS_USER.*/USGS_USER = \"${USGS_USER}\"/" \
+ 	   -e "s/^USGS_PASS.*/USGS_PASS = \"${USGS_PASS}\"/" \
+	   -e "s/^ESA_USER.*/ESA_USER = \"${ESA_USER}\"/" \
+ 	   -e "s/^ESA_PASS.*/ESA_PASS = \"${ESA_PASS}\"/" \
+           /gips/gips/settings.py \
+    && echo 'GIPS_ORM = False\n' >> /gips/gips/settings.py \
+    && tar xfvz conf/aod.composites.tgz -C /archive > /dev/null \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /gips/conf \
     && apt-get -y autoremove \
     && apt-get -y autoclean
 
-VOLUME /archive
-VOLUME /gips
-VOLUME /conf
+COPY docker/pytest-ini /gips/pytest.ini
+
 WORKDIR /gips

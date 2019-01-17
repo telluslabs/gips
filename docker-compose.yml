@@ -1,0 +1,11 @@
+version: '3'
+services:
+  gippy:
+    build:
+      context: ./docker
+      dockerfile: gippy-install.docker
+    image: gippy-0.3.x
+  gips:
+    build:
+      context: .
+    image: telluslabs/gips
