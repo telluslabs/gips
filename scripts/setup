@@ -19,6 +19,9 @@ fi
 # GIPS lives in a separate open source repo
 #CONFDIR=${PWD}/conf
 
+aws s3 cp s3://rob-scratch/gips/gips_init.tgz ./
+tar xvfz gips_init.tgz
+
 # the GIPS container needs some content that is not in the GIPS repo:
 # data center credentials, sixs, long term mean AOD, project-specific vector data
 #mkdir -p $CONFDIR/vector
