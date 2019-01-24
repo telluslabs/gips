@@ -98,7 +98,7 @@ def _gs_stop_trying(e):
     """
     return (e.response is not None
             and e.response.status_code != 429
-            and (499 < e.response.status_code < 600))
+            and not (499 < e.response.status_code < 600))
 
 
 class GoogleStorageMixin(object):
