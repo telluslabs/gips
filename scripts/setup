@@ -2,6 +2,11 @@
 
 set -e
 
+# get  initialization stuff
+cd $GIPS_HOME
+aws s3 cp s3://${GIPS_S3}/gips_init.tgz ./
+tar xvfz gips_init.tgz
+
 # TODO: Check for version numbers based on minimum system requirements
 # TODO: Check that code is executed from top of repo
 
@@ -15,14 +20,7 @@ if ! [ -x "$(command -v docker-compose)" ]; then
   exit 1
 fi
 
-# pull and initialize a GIPS processing instance and ancillary data
-# GIPS lives in a separate open source repo
-#CONFDIR=${PWD}/conf
-
-# the GIPS container needs some content that is not in the GIPS repo:
-# data center credentials, sixs, long term mean AOD, project-specific vector data
-#mkdir -p $CONFDIR/vector
-#aws s3 sync s3://rob-scratch/gips/conf ${CONFDIR}
-#aws s3 sync s3://rob-scratch/gips/vector ${CONFDIR}/vector
-
 ./scripts/update "$@"
+
+docker run telluslabs/gips cp -r gips.egg-info /export
+mv ${GIPS_DATA}/gips.egg-info ${GIPS_HOME}/
