@@ -108,11 +108,12 @@ class GoogleStorageMixin(object):
     """
     _gs_query_url_base = 'https://www.googleapis.com/storage/v1/b/{}/o'
     _gs_object_url_base = 'http://storage.googleapis.com/{}/'
+    _gs_backoff_max = int(os.environ.get('MAX_GS_BACKOFF', 245))
 
     @classmethod
     @backoff.on_exception(backoff.expo,
                           requests.exceptions.RequestException,
-                          max_time=120,
+                          max_time=_gs_backoff_max,
                           giveup=_gs_stop_trying)
     def gs_api_search(cls, prefix, delimiter='/'):
         """Convenience wrapper for searching in google cloud storage."""
@@ -148,7 +149,7 @@ class GoogleStorageMixin(object):
     @classmethod
     @backoff.on_exception(backoff.expo,
                               requests.exceptions.RequestException,
-                              max_time=120,
+                              max_time=_gs_backoff_max,
                               giveup=_gs_stop_trying)
     def gs_backoff_downloader(cls, src, dst, chunk_size=512 * 1024):
         r = requests.get(src, stream=True)# NOTE the stream=True
