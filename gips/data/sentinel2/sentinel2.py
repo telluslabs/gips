@@ -1223,7 +1223,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             "-a", "%s/allbands.vrt" % self._temp_proc_dir,
             "-z", "%s/angles.img" % self._temp_proc_dir,
             "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
-            "--cloudprobthreshold", "12.5",
+            "--cloudprobthreshold", "22.5",
             "-v",
         ]
         # Temp dir for intermediaries that pyfmask generates in the current
