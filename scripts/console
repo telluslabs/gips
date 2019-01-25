@@ -2,6 +2,8 @@
 
 set -e
 
+source init.sh
+
 export TAG=${1:-latest}
 
 docker-compose run \
