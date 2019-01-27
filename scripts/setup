@@ -2,7 +2,7 @@
 
 set -e
 
-source init.sh
+eval $(cat gips_creds.sh)
 aws s3 cp s3://${GIPS_S3}/gips_init.tgz ./
 tar xvfz gips_init.tgz
 
@@ -21,5 +21,13 @@ fi
 
 ./scripts/update "$@"
 
-docker run telluslabs/gips cp -r gips.egg-info /export
-mv ${GIPS_DATA}/gips.egg-info ${GIPS_HOME}/
+# TODO: There has got to be a better way to do this
+# Using /export as a way to get two important items out of the container
+
+docker run -v ${GIPS_DATA}:/export ${OWNER}/gips cp -r gips.egg-info /export
+cp -r ${GIPS_DATA}/gips.egg-info ${GIPS_HOME}/
+rm -rf ${GIPS_DATA}/gips.egg-info
+
+docker run -v ${GIPS_DATA}:/export ${OWNER}/gips cp -r gips/settings.py /export
+cp -r ${GIPS_DATA}/settings.py ${GIPS_HOME}/gips/
+rm -rf ${GIPS_DATA}/settings.py

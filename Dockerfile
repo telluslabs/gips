@@ -6,9 +6,8 @@ RUN apt-get update \
 
 COPY . /gips
 
-COPY init/sixs /usr/local/bin/sixs
-COPY init/ortho /usr/local/bin/ortho
-COPY init/gips_creds.sh /gips/gips_creds.sh
+COPY gips_init/sixs /usr/local/bin/sixs
+COPY gips_init/ortho /usr/local/bin/ortho
 
 ENV GIPS_OVERRIDE_VERSION='0.0.0-dev'
 
@@ -36,9 +35,9 @@ RUN cd /gips \
  	   -e "s/^ESA_PASS.*/ESA_PASS = \"${ESA_PASS}\"/" \
            /gips/gips/settings.py \
     && echo 'GIPS_ORM = False\n' >> /gips/gips/settings.py \
-    && tar xfvz init/aod.composites.tgz -C /archive > /dev/null \
+    && tar xfvz gips_init/aod.composites.tgz -C /archive > /dev/null \
     && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /gips/init \
+    && rm -rf /gips/gips_init \
     && apt-get -y autoremove \
     && apt-get -y autoclean
 
