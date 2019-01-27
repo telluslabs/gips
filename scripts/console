@@ -2,6 +2,7 @@
 
 set -e
 
+eval $(cat gips_creds.sh)
 export TAG=${1:-latest}
 
 docker-compose run \
