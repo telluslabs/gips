@@ -24,7 +24,6 @@ RUN cd /gips \
     && /usr/local/bin/pip install -e file:///gips/ \
     && rm -f /gips/gips/settings.py /gips/pytest.ini \
     && gips_config env -r /archive -e rbraswell@indigoag.com \
-    #&& openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh  -pass file:/root/.ssh/gitlab_ci \
     && eval $(cat gips_creds.sh) \
     && sed -i~ \
  	   -e "s/^EARTHDATA_USER.*/EARTHDATA_USER = \"${EARTHDATA_USER}\"/" \
@@ -37,7 +36,7 @@ RUN cd /gips \
     && echo 'GIPS_ORM = False\n' >> /gips/gips/settings.py \
     && tar xfvz gips_init/aod.composites.tgz -C /archive > /dev/null \
     && rm -rf /var/lib/apt/lists/* \
-    && rm -rf /gips/gips_init \
+    && rm -rf /gips/gips_init* \
     && apt-get -y autoremove \
     && apt-get -y autoclean
 

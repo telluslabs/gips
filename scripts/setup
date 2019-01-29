@@ -31,3 +31,5 @@ rm -rf ${GIPS_DATA}/gips.egg-info
 docker run -v ${GIPS_DATA}:/export ${OWNER}/gips cp -r gips/settings.py /export
 cp -r ${GIPS_DATA}/settings.py ${GIPS_HOME}/gips/
 rm -rf ${GIPS_DATA}/settings.py
+
+rm -rf ${GIPS_HOME}/gips_init.tgz
