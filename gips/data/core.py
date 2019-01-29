@@ -205,17 +205,16 @@ class S3Mixin(object):
         return keys
 
     @classmethod
-    def s3_stage_asset_json(cls, content, basename):
-        """Saves the given content as a json blob to the stage."""
+    def s3_archive_asset_json(cls, content, basename):
+        """Archives the given content as a json blob."""
         # this may be refactorable with the gs mixin's gs_stage_asset
-        if cls.Repository.in_stage(basename): # skip if there already
-            return
         stage_dir_fp = cls.Repository.path('stage')
         with utils.make_temp_dir(prefix='fetch-s3-', dir=stage_dir_fp) as td:
             tmp_fp = td + '/' + basename
             with open(tmp_fp, 'w') as tfo:
                 json.dump(content, tfo)
-            shutil.copy(tmp_fp, stage_dir_fp)
+            # we already saved the file so might as well update=True:
+            cls._archivefile(tmp_fp, update=True)
 
     @classmethod
     def s3_vsi_prefix(cls, key):
@@ -791,7 +790,9 @@ class Asset(object):
 
     @classmethod
     def download(cls, url, download_fp, **kwargs):
-        """Override this method to provide custom download code."""
+        """Override this method to provide custom download code.
+
+        Return True on download success."""
         raise NotImplementedError('download not supported for ' + cls.__name__)
 
     @classmethod
@@ -803,12 +804,13 @@ class Asset(object):
         return stage_full_path
 
     @classmethod
-    def fetch(cls, a_type, tile, date, **fetch_kwargs):
+    def fetch(cls, a_type, tile, date, update, **fetch_kwargs):
         """Standard fetch method; calls query_service() and download().
 
         Outputs from query_service and fetch_kwargs are passed in to
         download as kwargs, so one can talk to the other in a standard
-        way.
+        way.  It returns a list of file paths even though this is always
+        ignored by callers in gips.
         """
         qs_rv = cls.query_service(a_type, tile, date, **fetch_kwargs)
         if qs_rv is None:
@@ -820,7 +822,9 @@ class Asset(object):
             qs_rv['download_fp'] = os.path.join(td_fp, qs_rv['basename'])
             fetch_kwargs.update(**qs_rv)
             if cls.download(**fetch_kwargs):
-                return [cls.stage_asset(qs_rv['download_fp'])]
+                ao, _, _ = cls._archivefile(qs_rv['download_fp'], update)
+                utils.verbose_out('Retrieved and archived ' + ao.filename, 2)
+                return [ao.filename]
         return []
 
     @classmethod
@@ -1497,7 +1501,15 @@ class Data(object):
             err_msg = 'Problem fetching asset for {}, {}, {}'.format(
                 a, t, d.strftime("%y-%m-%d"))
             with utils.error_handler(err_msg, continuable=True):
-                cls.Asset.fetch(a, t, d, **fetch_kwargs)
+                # check feature toggle to know how to call fetch():
+                if getattr(cls, 'inline_archive', False):
+                    # if fetch promises to archive inline, pass in update flag
+                    cls.Asset.fetch(a, t, d, update, **fetch_kwargs)
+                else:
+                    # otherwise, no update flag & do archiving here
+                    cls.Asset.fetch(a, t, d, **fetch_kwargs)
+                    cls.archive_assets(cls.Asset.Repository.path('stage'),
+                                       update=update)
                 # fetched may contain both fetched and unfetchable things
                 fetched.append((a, t, d))
 

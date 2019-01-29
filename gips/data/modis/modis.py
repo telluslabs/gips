@@ -318,14 +318,14 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         return True
 
     @classmethod
-    def fetch(cls, asset, tile, date):
+    def fetch(cls, asset, tile, date, update):
         if asset != MCD43A4S3:
-            return super(modisAsset, cls).fetch(asset, tile, date)
+            return super(modisAsset, cls).fetch(asset, tile, date, update)
         # else do S3 fetch
         qs_rv = cls.query_service(asset, tile, date)
         if qs_rv is not None:
             basename = qs_rv.pop('basename')
-            cls.s3_stage_asset_json(qs_rv, basename)
+            cls.s3_archive_asset_json(qs_rv, basename)
 
 # index product types and descriptions
 _index_products = [
@@ -359,6 +359,7 @@ class modisData(Data):
     name = 'Modis'
     version = '1.0.0'
     Asset = modisAsset
+    inline_archive = True
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         #"Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],

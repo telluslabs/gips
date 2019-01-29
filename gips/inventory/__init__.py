@@ -238,8 +238,6 @@ class DataInventory(Inventory):
                 utils.prune_unhashable(kwargs).items() if k != 'tiles'}
             dataclass.fetch(self.products.base, self.spatial.tiles,
                             self.temporal, self.update, **fetch_kwargs)
-            archived_assets = dataclass.archive_assets(
-                    Repository.path('stage'), update=self.update)
 
             if orm.use_orm():
                 # save metadata about the fetched assets in the database

@@ -694,7 +694,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             'qa-band': cls.s3_vsi_prefix(qa_tif),
             'mtl': cls._s3_url + mtl_txt,
         }
-        cls.s3_stage_asset_json(asset_content, basename)
+        cls.s3_archive_asset_json(asset_content, basename)
 
     @classmethod
     def fetch_gs(cls, basename, keys):
