@@ -830,10 +830,11 @@ class sentinel2Data(gips.data.core.CloudCoverData):
     version = '0.1.1'
     Asset = sentinel2Asset
 
-    _productgroups = {
-        'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
-                    'spm', 'spm2016', 'turbidity', 'acoflags'],
-    }
+    _productgroups = {'ACOLITE': [
+        'rhow', 'oc2chl', 'oc3chl', 'fai', 'spm', 'spm2016',
+        'turbidity', 'acoflags', 'gonschl', 'gons740chl', 'moses3bchl',
+        'moses3b740chl', 'mishrachl', 'ndci',
+    ]}
 
     _products = {
         # standard products
@@ -875,7 +876,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             ('s2rep',   'Sentinel-2 Red Edge Position')])
 
     # acolite doesn't (yet?) support google storage sentinel-2 data
-    atmosphere.add_acolite_product_dicts(_products, 'L1C')
+    atmosphere.add_acolite_product_dicts(_products, 'L1C', s2=True)
 
     _product_dependencies = {
         'indices':      'ref',
