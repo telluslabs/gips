@@ -30,7 +30,6 @@ import datetime
 
 import urllib
 import urllib2
-import json
 import math
 
 import numpy as np
@@ -314,9 +313,8 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
     def download(cls, a_type, download_fp, **kwargs):
         """Download the URL to the given full path, handling auth & errors."""
         if a_type == MCD43A4S3:
-            with open(download_fp, 'w') as tfo:
-                kwargs.pop('basename')
-                json.dump(kwargs, tfo)
+            kwargs.pop('basename')
+            utils.json_dump(kwargs, download_fp)
             return True
         response = cls.Repository.managed_request(kwargs['url'])
         if response is None:

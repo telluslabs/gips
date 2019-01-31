@@ -33,6 +33,7 @@ import commands
 import shutil
 import traceback
 import datetime
+import json
 
 import numpy as np
 import requests
@@ -89,6 +90,11 @@ VerboseOut = verbose_out # VerboseOut name is deprecated
 ##############################################################################
 # Filesystem functions
 ##############################################################################
+
+def json_dump(object, file_path):
+    """Write the object as json to the given file path."""
+    with open(file_path, 'w') as tfo:
+        json.dump(object, tfo)
 
 def File2List(filename):
     """Return contents of file as a list of lines, sans newlines."""

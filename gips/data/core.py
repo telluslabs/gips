@@ -811,7 +811,6 @@ class Asset(object):
             fetch_kwargs.update(**qs_rv)
             if cls.download(**fetch_kwargs):
                 ao, _, _ = cls._archivefile(qs_rv['download_fp'], update)
-                utils.verbose_out('Retrieved and archived ' + ao.filename, 2)
                 return [ao.filename]
         return []
 
