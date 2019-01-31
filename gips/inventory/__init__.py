@@ -212,7 +212,8 @@ class ProjectInventory(Inventory):
 class DataInventory(Inventory):
     """ Manager class for data inventories (collection of Tiles class) """
 
-    def __init__(self, dataclass, spatial, temporal, products=None, fetch=False, update=False, **kwargs):
+    def __init__(self, dataclass, spatial, temporal, products=None,
+                 fetch=False, update=False, **kwargs):
         """ Create a new inventory
         :dataclass: The Data class to use (e.g., LandsatData, ModisData)
         :spatial: The SpatialExtent requested

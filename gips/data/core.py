@@ -1495,12 +1495,14 @@ class Data(object):
         atd_pile = ((a, t, d)
             for a in cls.products2assets(products)
             for t in tiles
-            for d in cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                if cls.need_to_fetch(a, t, d, update, **fetch_kwargs))
+            for d in cls.Asset.dates(
+                a, t, textent.datebounds, textent.daybounds))
         for a, t, d in atd_pile:
             err_msg = 'Problem fetching asset for {}, {}, {}'.format(
                 a, t, d.strftime("%y-%m-%d"))
             with utils.error_handler(err_msg, continuable=True):
+                if not cls.need_to_fetch(a, t, d, update, **fetch_kwargs):
+                    continue
                 # check feature toggle to know how to call fetch():
                 if getattr(cls, 'inline_archive', False):
                     # if fetch promises to archive inline, pass in update flag
