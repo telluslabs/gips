@@ -30,7 +30,7 @@ import datetime
 
 import urllib
 import urllib2
-
+import json
 import math
 
 import numpy as np
@@ -301,31 +301,29 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         if not cls.available(asset, date):
             return None
         data_src = cls.get_setting('source')
+        rv = None
         if data_src == 's3' and asset == MCD43A4S3:
-            return cls.query_s3(tile, date)
+            rv = cls.query_s3(tile, date)
         if data_src != 's3' and asset != MCD43A4S3:
-            return cls.query_usgs(asset, tile, date)
-        return None
+            rv = cls.query_usgs(asset, tile, date)
+        if rv is not None:
+            rv['a_type'] = asset
+        return rv
 
     @classmethod
-    def download(cls, url, download_fp, **ignored):
+    def download(cls, a_type, download_fp, **kwargs):
         """Download the URL to the given full path, handling auth & errors."""
-        response = cls.Repository.managed_request(url)
+        if a_type == MCD43A4S3:
+            with open(download_fp, 'w') as tfo:
+                kwargs.pop('basename')
+                json.dump(kwargs, tfo)
+            return True
+        response = cls.Repository.managed_request(kwargs['url'])
         if response is None:
             return False
         with open(download_fp, 'wb') as fd:
             fd.write(response.read())
         return True
-
-    @classmethod
-    def fetch(cls, asset, tile, date, update):
-        if asset != MCD43A4S3:
-            return super(modisAsset, cls).fetch(asset, tile, date, update)
-        # else do S3 fetch
-        qs_rv = cls.query_service(asset, tile, date)
-        if qs_rv is not None:
-            basename = qs_rv.pop('basename')
-            cls.s3_archive_asset_json(qs_rv, basename)
 
 # index product types and descriptions
 _index_products = [

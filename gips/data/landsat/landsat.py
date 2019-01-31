@@ -634,11 +634,14 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             raise ValueError("Invalid data source '{}'; valid sources:"
                              " {}".format(data_src, c1_sources))
         # perform the query, but on a_type-source mismatch, do nothing
-        return {
+        rv = {
             ('C1', 'usgs'): cls.query_c1,
             ('C1S3', 's3'): cls.query_s3,
             ('C1GS', 'gs'): cls.query_gs,
         }.get((asset, data_src), lambda *_: None)(tile, date, pclouds)
+        if rv is not None:
+            rv['a_type'] = asset
+        return rv
 
     @classmethod
     def fetch(cls, asset, tile, date, **fetch_kwargs):

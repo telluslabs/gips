@@ -205,18 +205,6 @@ class S3Mixin(object):
         return keys
 
     @classmethod
-    def s3_archive_asset_json(cls, content, basename):
-        """Archives the given content as a json blob."""
-        # this may be refactorable with the gs mixin's gs_stage_asset
-        stage_dir_fp = cls.Repository.path('stage')
-        with utils.make_temp_dir(prefix='fetch-s3-', dir=stage_dir_fp) as td:
-            tmp_fp = td + '/' + basename
-            with open(tmp_fp, 'w') as tfo:
-                json.dump(content, tfo)
-            # we already saved the file so might as well update=True:
-            cls._archivefile(tmp_fp, update=True)
-
-    @classmethod
     def s3_vsi_prefix(cls, key):
         """Add a vsi3_streaming prefix to the given S3 key"""
         return '/vsis3_streaming/{}/{}'.format(cls._s3_bucket_name, key)
