@@ -1864,7 +1864,8 @@ class landsatData(gips.data.core.CloudCoverData):
         delta = timedelta(1)
 
         if self.date < date(2017, 1, 1):
-            date_found = starting_date = date(2017, self.date.month, self.date.day)
+            date_found = starting_date = date(2017, 1, 1) + (
+                self.date - date(self.date.year, 1, 1))
         else:
             date_found = starting_date = self.date
 
