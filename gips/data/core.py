@@ -828,28 +828,6 @@ class Asset(object):
         return conn
 
     @classmethod
-    def fetch_ftp(cls, asset, tile, date):
-        """ Fetch via FTP """
-        url = cls._assets[asset].get('url', '')
-        if url == '':
-            raise Exception("%s: URL not defined for asset %s" % (cls.__name__, asset))
-        VerboseOut('%s: fetch tile %s for %s' % (asset, tile, date), 3)
-        ftpurl = url.split('/')[0]
-        ftpdir = url[len(ftpurl):]
-        with utils.error_handler("Error downloading from {}".format(ftpurl)):
-            ftp = ftplib.FTP(ftpurl)
-            ftp.login('anonymous', settings().EMAIL)
-            pth = os.path.join(ftpdir, date.strftime('%Y'), date.strftime('%j'))
-            ftp.set_pasv(True)
-            ftp.cwd(pth)
-
-            for f in ftp.nlst('*'):
-                VerboseOut("Downloading %s" % f, 2)
-                ftp.retrbinary('RETR %s' % f,
-                               open(os.path.join(cls.Repository.path('stage'), f), "wb").write)
-            ftp.close()
-
-    @classmethod
     def archive(cls, path, recursive=False, keep=False, update=False):
         """Move asset into the archive.
 
@@ -1002,6 +980,60 @@ class Asset(object):
         else:
             return (asset, numlinks, overwritten_ao)
         # should return asset instance
+
+
+class FtpAsset(Asset):
+    """Some assets rely on FTP for downloading; they work mostly the same.
+
+    Needed attributes to be an FtpAsset:
+        * cls._host should be set to the ftp server hosting the assets.
+        * Set cls._assets[*]['ftp-basedir'], to which the year is attached;
+        see below.
+    """
+    @classmethod
+    def ftp_connect(cls, working_directory):
+        """Connect to an FTP server and chdir according to the args.
+
+        Returns the ftplib connection object."""
+        utils.verbose_out('Connecting to {}'.format(cls._host), 5)
+        conn = ftplib.FTP(cls._host)
+        conn.login('anonymous', settings().EMAIL)
+        conn.set_pasv(True)
+        utils.verbose_out('Changing to {}'.format(working_directory), 5)
+        conn.cwd(working_directory)
+        return conn
+
+    @classmethod
+    def choose_asset(cls, a_type, tile, date, remote_fn_list):
+        """Of the given filenames, which is the asset of choice?"""
+        raise NotImplementedError()
+
+    @classmethod
+    def local_base_name(cls, a_type, tile, date, remote_bn):
+        """The remote filename may vary from the one we'll use locally."""
+        return remote_bn
+
+    @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
+    def query_service(cls, asset, tile, date):
+        """Search for a matching asset in an ftp store."""
+        if not cls.available(asset, date):
+            return None
+        wd = os.path.join(cls._assets[asset]['ftp-basedir'], str(date.year))
+        conn = cls.ftp_connect(wd)
+        remote_bn = cls.choose_asset(asset, tile, date, conn.nlst())
+        conn.quit()
+        return {'basename': cls.local_base_name(asset, tile, date, remote_bn),
+                'remote_bn': remote_bn, 'wd': wd}
+
+    @classmethod
+    def download(cls, download_fp, remote_bn, wd, **ignored):
+        """Download the asset given by URL, saving it to tmp_fp."""
+        conn = cls.ftp_connect(wd)
+        with open(download_fp, "wb") as temp_fo:
+            conn.retrbinary('RETR ' + remote_bn, temp_fo.write)
+        conn.quit()
+        return True
 
 
 class Data(object):

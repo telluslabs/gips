@@ -33,7 +33,8 @@ import ftplib
 import tempfile
 from gips.core import SpatialExtent, TemporalExtent
 
-from gips.data.core import Repository, Asset, Data
+from gips.data.core import Repository, Data
+import gips.data.core
 
 from gips.utils import settings, List2File
 from gips import utils
@@ -53,7 +54,7 @@ class prismRepository(Repository):
     _tile_attribute = 'id'
 
 
-class prismAsset(Asset):
+class prismAsset(gips.data.core.FtpAsset):
     Repository = prismRepository
     _sensors = {
         'prism': {'description': 'Daily Gridded Climate Data'}
@@ -69,19 +70,19 @@ class prismAsset(Asset):
     _assets = {
         '_ppt': {
             'pattern': r'^PRISM_ppt_.+?\.zip$',
-            'path': '/daily/ppt',
+            'ftp-basedir': '/daily/ppt',
             'startdate': _startdate,
             'latency': _latency,
         },
         '_tmin': {
             'pattern': r'^PRISM_tmin_.+?\.zip$',
-            'path': '/daily/tmin',
+            'ftp-basedir': '/daily/tmin',
             'startdate': _startdate,
             'latency': _latency,
         },
         '_tmax': {
             'pattern': r'^PRISM_tmax_.+?\.zip$',
-            'path': '/daily/tmax',
+            'ftp-basedir': '/daily/tmax',
             'startdate': _startdate,
             'latency': _latency,
         },
@@ -91,55 +92,6 @@ class prismAsset(Asset):
         'provisional': 2,
         'early': 1,
     }
-
-    @classmethod
-    def ftp_connect(cls, asset, date):
-        """As super, but make the working dir out of (asset, date)."""
-        wd = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'))
-        return super(prismAsset, cls).ftp_connect(wd)
-
-    @classmethod
-    def query_provider(cls, asset, tile, date):
-        """Determine availability of data for the given (asset, tile, date).
-
-        Re-use the given ftp connection if possible; Returns (basename,
-        None) on success; (None, None) otherwise."""
-        if asset not in cls._assets:
-            raise ValueError('{} has no defined asset for {}'.format(cls.Repository.name, asset))
-        conn = cls.ftp_connect(asset, date)
-        # get the list of filenames for the year, filter down to the specific date
-        filenames = [fn for fn in conn.nlst() if date.strftime('%Y%m%d') in fn]
-        conn.quit()
-        if 0 == len(filenames):
-            return None, None
-        # choose the one that has the most favorable stability & version values (usually only one)
-        return max(filenames, key=(lambda x: prismAsset(x)._version)), None
-
-
-    @classmethod
-    def fetch(cls, asset, tile, date):
-        """Fetch to the stage.
-
-        Returns a list with one item, the full path to the staged asset.
-        """
-        utils.verbose_out('%s: fetch tile %s for %s' % (asset, tile, date), 3)
-        qs_rv = cls.query_service(asset, tile, date)
-        if qs_rv is None:
-            return []
-        asset_fn = qs_rv['basename']
-        with utils.error_handler("Error downloading from " + cls._host, continuable=True):
-            ftp = cls.ftp_connect(asset, date) # starts chdir'd to the right directory
-            stage_dir_fp = cls.Repository.path('stage')
-            stage_fp = os.path.join(stage_dir_fp, asset_fn)
-            with utils.make_temp_dir(prefix='fetchtmp', dir=stage_dir_fp) as td_name:
-                temp_fp = os.path.join(td_name, asset_fn)
-                utils.verbose_out("Downloading " + asset_fn, 2)
-                with open(temp_fp, "wb") as temp_fo:
-                    ftp.retrbinary('RETR ' + asset_fn, temp_fo.write)
-                ftp.quit()
-                os.rename(temp_fp, stage_fp)
-            return [stage_fp]
-        return []
 
     def __init__(self, filename):
         """ Inspect a PRISM file """
@@ -172,12 +124,20 @@ class prismAsset(Asset):
             List2File(datafiles, indexfile)
             return datafiles
 
+    @classmethod
+    def choose_asset(cls, a_type, tile, date, remote_fn_list):
+        """Choose the most favorable stability & version (often only one)."""
+        return max(
+               (fn for fn in remote_fn_list if date.strftime('%Y%m%d') in fn),
+               key=(lambda x: prismAsset(x)._version))
+
 
 class prismData(Data):
     """ A tile (CONUS State) of PRISM """
     name = 'PRISM'
     version = __version__
     Asset = prismAsset
+    inline_archive = True
     # Prism official docs at http://www.prism.oregonstate.edu/FAQ/ say:
     # "Dataset values are stored . . . precipitation as millimeters and
     # temperature as degrees Celsius."
