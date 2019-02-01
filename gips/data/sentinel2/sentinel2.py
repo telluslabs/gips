@@ -438,10 +438,9 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             return None
 
         # handle cloud cover
-        with tempfile.NamedTemporaryFile() as content:
-            cls.gs_backoff_downloader(cls.gs_object_url_base() + keys['tile-md'], content.name)
-            cc = cls.cloud_cover_from_et(
-                    ElementTree.parse(content.name))
+        r = cls.gs_backoff_get(cls.gs_object_url_base() + keys['tile-md'])
+        cc = cls.cloud_cover_from_et(
+                ElementTree.parse(StringIO.StringIO(r.text)))
         if cc > pclouds:
             cc_msg = ('C1GS asset found for {}, but cloud cover'
                       ' percentage ({}%) fails to meet threshold ({}%)')
@@ -673,9 +672,8 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                 return ElementTree.parse(metadata_zf)
 
     def xml_subtree_gs(self, md_file_type):
-        with tempfile.NamedTemporaryFile() as content:
-            self.gs_backoff_downloader(self.json_content[md_file_type + '-md'], content.name)
-            return ElementTree.parse(content.name)
+        r = self.gs_backoff_get(self.json_content[md_file_type + '-md'])
+        return ElementTree.fromstring(r.content)
 
     def xml_subtree(self, md_file_type, *tags):
         tree = {'L1C': self.xml_subtree_esa,
