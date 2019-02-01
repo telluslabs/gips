@@ -1,31 +1,49 @@
+"""
+Any detail here is mostly pointless, this is a one-off intended to get CDL tiles
+
+If multitemporal repo and GIPS coexisted we could add a composite step and this
+would be potentially generally useful
+"""
+
 from __future__ import print_function
 
 import os
 import click
+
+from backports import tempfile
 
 from make_global_tiles import make_tileimg
 
 from pdb import set_trace
 
 
-TMPFILE = "/tmp/output.txt"
+LOGFILE = "/tmp/output.txt"
 
 PRODUCTFILE = "/export/{asset}_{product}_ks/0/{year}001_{asset}_{product}.tif"
 
-S3LOC = "s3://tellus-s3-vault/product/analysis_tiles/cdl_all/{}/{}.tif"
+S3LOC = "s3://tellus-s3-vault/product/analysis_tiles/{product}_{window}/{year}/{tileid}.tif"
 
-MASKFILE = "/export/mask_tiles/{}_1_1.tif"
+MASKFILE = "{dirname}/{tileid}_1_1.tif"
 
 GIPS_CMD = "gips_export {asset} -p {product} -r {maskfile} -d {year} "\
-"--days 1,1 -v4 --outdir /export/{asset}_{product}_ks --notld --fetch --overwrite > {tmpfile}"
+"--days 1,1 -v4 --outdir /export/{asset}_{product}_ks --notld --fetch --overwrite > {logfile}"
 
 AWS_CMD = "aws s3 cp {} {} > {}"
+
+LOCAL_VOLUME = '/tmp'
+
+
+def temporary_directory():
+    """Create temporary directory on local volume"""
+    return tempfile.TemporaryDirectory(dir=LOCAL_VOLUME)
+
 
 @click.command()
 @click.option('-a', '--asset', help='')
 @click.option('-p', '--product', help='')
 @click.option('-y', '--year', help='')
-def main(asset, product, year):
+@click.option('-w', '--window', help='')
+def main(asset, product, year, window):
 
 	h0 = 519
 	v0 = 333
@@ -38,32 +56,34 @@ def main(asset, product, year):
 
 			tileid = '{}_{}'.format(htile, vtile)
 
-			print('make_tileimg', tileid)
-			make_tileimg('/export/mask_tiles/', tileid, '1,1')
+			with temporary_directory() as tmp_dir:
 
-			maskfile = MASKFILE.format(tileid)
+				print('make_tileimg', tileid)
+				make_tileimg(tmp_dir, tileid, '1,1')
 
-			gips_cmd = GIPS_CMD.format(asset=asset, product=product, maskfile=maskfile, year=year, tmpfile=TMPFILE)
-			print(gips_cmd)
-			os.system(gips_cmd)
-			print(open(TMPFILE).read())
+				maskfile = MASKFILE.format(dirname=tmp_dir, tileid=tileid)
 
-			productfile = PRODUCTFILE.format(asset=asset, product=product, year=year)
-			s3loc = S3LOC.format(year, tileid)
+				# TODO: don't you like how I avoided using subprocess, sh, or commands?
+				gips_cmd = GIPS_CMD.format(asset=asset, product=product, maskfile=maskfile, year=year, logfile=LOGFILE)
+				print(gips_cmd)
+				os.system(gips_cmd)
+				print(open(LOGFILE).read())
+				os.remove(LOGFILE)
 
-			aws_cmd = AWS_CMD.format(productfile, s3loc, TMPFILE)
+				productfile = PRODUCTFILE.format(asset=asset, product=product, year=year)
+				s3loc = S3LOC.format(product=product, window=window, year=year, tileid=tileid)
 
-			print(aws_cmd)
-			os.system(aws_cmd)
-			print(open(TMPFILE).read())
+				aws_cmd = AWS_CMD.format(productfile, s3loc, LOGFILE)
+				print(aws_cmd)
+				os.system(aws_cmd)
+				print(open(LOGFILE).read())
+				os.remove(LOGFILE)
 
-			print('removing', productfile)
-			os.remove(productfile)
+				print('removing', productfile)
+				os.remove(productfile)
 
-			print('removing', maskfile)
-			os.remove(maskfile)
-
-	os.remove(TMPFILE)
+				print('removing', maskfile)
+				os.remove(maskfile)
 
 
 if __name__ == "__main__":
