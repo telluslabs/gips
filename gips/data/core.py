@@ -160,6 +160,16 @@ class GoogleStorageMixin(object):
                     f.write(chunk)
 
     @classmethod
+    @backoff.on_exception(backoff.expo,
+                              requests.exceptions.RequestException,
+                              max_time=_gs_backoff_max,
+                              giveup=_gs_stop_trying)
+    def gs_backoff_get(cls, src, stream=False):
+        r = requests.get(src, stream=stream)# NOTE the stream=True
+        r.raise_for_status()
+        return r
+
+    @classmethod
     def _cache_if_vsicurl(cls, filelist, tmpdir):
         '''Google Storage-based assets use vsicurl paths.  This method will
         download GS objects to a local dir, and returns the resulting list of

@@ -438,8 +438,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             return None
 
         # handle cloud cover
-        r = requests.get(cls.gs_object_url_base() + keys['tile-md'])
-        r.raise_for_status()
+        r = cls.gs_backoff_get(cls.gs_object_url_base() + keys['tile-md'])
         cc = cls.cloud_cover_from_et(
                 ElementTree.parse(StringIO.StringIO(r.text)))
         if cc > pclouds:
@@ -655,11 +654,8 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             self.extract((tile_md_fn,), path)
             return os.path.join(path, tile_md_fn)
         # L1CGS case:
-        r = requests.get(self.json_content['tile-md'])
-        r.raise_for_status()
         fp = os.path.join(path, 'MTD_TL.xml')
-        with open(fp, 'wb') as fo:
-            fo.write(r.content)
+        self.gs_backoff_downloader(self.json_content['tile-md'], fp)
         return fp
 
     def xml_subtree_esa(self, md_file_type):
@@ -676,8 +672,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                 return ElementTree.parse(metadata_zf)
 
     def xml_subtree_gs(self, md_file_type):
-        r = requests.get(self.json_content[md_file_type + '-md'])
-        r.raise_for_status()
+        r = self.gs_backoff_get(self.json_content[md_file_type + '-md'])
         return ElementTree.fromstring(r.content)
 
     def xml_subtree(self, md_file_type, *tags):
