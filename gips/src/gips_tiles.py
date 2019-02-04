@@ -41,49 +41,54 @@ def temporary_directory():
 @click.command()
 @click.option('-a', '--asset', help='')
 @click.option('-p', '--product', help='')
-@click.option('-y', '--year', help='')
+@click.option('-y', '--years', help='')
 @click.option('-w', '--window', help='')
-def main(asset, product, year, window):
+def main(asset, product, years, window):
 
 	h0 = 519
 	v0 = 333
 
-	for i in range(51):
-		for j in range(21):
+	years = years.split(',')
+	years = [int(y) for y in years]
 
-			htile = h0 + i
-			vtile = v0 + j
+	for year in years:
 
-			tileid = '{}_{}'.format(htile, vtile)
+		for i in range(51):
+			for j in range(21):
 
-			with temporary_directory() as tmp_dir:
+				htile = h0 + i
+				vtile = v0 + j
 
-				print('make_tileimg', tileid)
-				make_tileimg(tmp_dir, tileid, '1,1')
+				tileid = '{}_{}'.format(htile, vtile)
 
-				maskfile = MASKFILE.format(dirname=tmp_dir, tileid=tileid)
+				with temporary_directory() as tmp_dir:
 
-				# TODO: don't you like how I avoided using subprocess, sh, or commands?
-				gips_cmd = GIPS_CMD.format(asset=asset, product=product, maskfile=maskfile, year=year, logfile=LOGFILE)
-				print(gips_cmd)
-				os.system(gips_cmd)
-				print(open(LOGFILE).read())
-				os.remove(LOGFILE)
+					print('make_tileimg', tileid)
+					make_tileimg(tmp_dir, tileid, '1,1')
 
-				productfile = PRODUCTFILE.format(asset=asset, product=product, year=year)
-				s3loc = S3LOC.format(product=product, window=window, year=year, tileid=tileid)
+					maskfile = MASKFILE.format(dirname=tmp_dir, tileid=tileid)
 
-				aws_cmd = AWS_CMD.format(productfile, s3loc, LOGFILE)
-				print(aws_cmd)
-				os.system(aws_cmd)
-				print(open(LOGFILE).read())
-				os.remove(LOGFILE)
+					# TODO: don't you like how I avoided using subprocess, sh, or commands?
+					gips_cmd = GIPS_CMD.format(asset=asset, product=product, maskfile=maskfile, year=year, logfile=LOGFILE)
+					print(gips_cmd)
+					os.system(gips_cmd)
+					print(open(LOGFILE).read())
+					os.remove(LOGFILE)
 
-				print('removing', productfile)
-				os.remove(productfile)
+					productfile = PRODUCTFILE.format(asset=asset, product=product, year=year)
+					s3loc = S3LOC.format(product=product, window=window, year=year, tileid=tileid)
 
-				print('removing', maskfile)
-				os.remove(maskfile)
+					aws_cmd = AWS_CMD.format(productfile, s3loc, LOGFILE)
+					print(aws_cmd)
+					os.system(aws_cmd)
+					print(open(LOGFILE).read())
+					os.remove(LOGFILE)
+
+					print('removing', productfile)
+					os.remove(productfile)
+
+					print('removing', maskfile)
+					os.remove(maskfile)
 
 
 if __name__ == "__main__":
