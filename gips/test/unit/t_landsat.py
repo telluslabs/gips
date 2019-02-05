@@ -71,10 +71,6 @@ def m_usgs_lib(mocker):
     if saved_usgs is not None:
         sys.modules['usgs'] = saved_usgs
 
-@pytest.fixture
-def m_query_service(mpo):
-    return mpo(landsat.landsatAsset, 'query_service')
-
 def t_landsatAsset_query_service_c1_success_case(
         mocker, m_ee_login, m_get_setting, m_load_ee_search_keys, m_usgs_lib):
     """Confirms method works for the normal case."""
@@ -96,6 +92,7 @@ def t_landsatAsset_query_service_c1_success_case(
     expected = {'basename': 'basename.tar.gz',
                 'scene_id': 'scene-id',
                 'dataset': m_dataset,
+                'a_type': 'C1',
                 #'sceneCloudCover': 0.6, # presently unused
                 #'landCloudCover': 0.6,
                 }
@@ -106,6 +103,7 @@ def t_landsatAsset_query_service_c1_success_case(
     assert expected == actual
 
 sample_c1s3_keys = {
+    'a_type': 'C1S3', # not a part of the asset but it's returned by query_s3
     '_15m_tif':
         'c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B8.TIF',
     '_30m_tifs': [
@@ -180,37 +178,3 @@ def t_landsatAsset_query_service_s3(
     actual = landsat.landsatAsset.query_service(
             'C1S3', '027033', datetime.date(2017, 5, 6), pclouds)
     assert expected == actual
-
-def t_landsatAsset_fetch_c1(mocker, m_query_service, m_ee_login, m_get_setting,
-                            m_usgs_lib, mock_context_manager):
-    dc = 'dontcare'
-    asset_fn = 'fake-asset.tar.gz'
-    m_query_service.return_value = {'basename': asset_fn,
-                                    'scene_id': dc, 'dataset': dc}
-    mock_context_manager(landsat.utils, 'make_temp_dir', 'fake-temp-dir')
-    m_get_setting.return_value = 'driver-dir'
-    mocker.patch.object(landsat.homura, 'download')
-    mocker.patch.object(landsat.os, 'listdir').return_value = [asset_fn]
-    m_rename = mocker.patch.object(landsat.os, 'rename')
-    landsat.landsatAsset.fetch('C1', dc, dc)
-    expected = mocker.call(
-        'fake-temp-dir/' + asset_fn, 'driver-dir/stage/' + asset_fn)
-    assert (m_rename.call_count == 1
-            and expected == m_rename.call_args)
-
-sample_c1s3_asset_content = {
-    u'15m-band': u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B8.TIF',
-    u'30m-bands': [
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B1.TIF',
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B2.TIF',
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B3.TIF',
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B4.TIF',
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B5.TIF',
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B6.TIF',
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B7.TIF',
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B9.TIF',
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B10.TIF',
-        u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_B11.TIF'],
-    u'mtl': u'https://landsat-pds.s3.amazonaws.com/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_MTL.txt',
-    u'qa-band': u'/vsis3_streaming/landsat-pds/c1/L8/027/033/LC08_L1TP_027033_20170506_20170515_01_T1/LC08_L1TP_027033_20170506_20170515_01_T1_BQA.TIF',
-}

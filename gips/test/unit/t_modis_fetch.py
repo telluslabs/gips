@@ -64,7 +64,7 @@ def t_managed_request_returns_none(fetch_mocks, a_type, tile, date, url):
     This happens for any 4xx error, 5xx error, and similar."""
     (_, managed_request, _, _, open, _) = fetch_mocks
     managed_request.return_value = None
-    actual = modis.modisAsset.download(url, 'fake-download-path')
+    actual = modis.modisAsset.download(a_type, 'fake-download-path', url=url)
     assert actual == False and 0 == open.call_count
 
 # VERY truncated snippet of an actual listing file
@@ -151,7 +151,7 @@ def t_http_matching_listings(mocker, fetch_mocks, a_type, tile, date, asset_fn, 
     content.read.return_value = asset_content
 
     expected = ['driver-dir/stage/' + asset_fn]
-    actual = modis.modisAsset.download('some-url', 'some-file-path')
+    actual = modis.modisAsset.download(a_type, 'some-file-path', url='some-url')
 
     # assertions
     assert (actual == True

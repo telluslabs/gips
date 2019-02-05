@@ -13,25 +13,18 @@ from gips.inventory import DataInventory, dbinv
 from gips.data.modis.modis import modisData, modisAsset
 from gips.core import SpatialExtent, TemporalExtent
 
-@pytest.fixture
-def di_init_mocks(mpo, orm):
-    """Appropriate mocks for DataInventory.__init__."""
-    mpo(modisData, 'fetch') # behavior not super important
-    mpo(modisData.Asset, 'archive') # has to return list of modisAssets
-    return (modisData.fetch,
-            modisData.Asset.archive,
-            mock.patch('gips.inventory.dbinv.add_asset'))
 
-
-def t_data_inventory_db_save(di_init_mocks):
+def t_data_inventory_db_save(mpo, orm):
     """Confirm DataInventory() saves to the inventory DB on fetch."""
     from gips.inventory.dbinv import models
-    (m_fetch, m_archive, m_add_asset) = di_init_mocks
+    m_fetch = mpo(modisAsset, 'fetch')
+    m_need_to_fetch = mpo(modisData, 'need_to_fetch')
+    m_need_to_fetch.return_value = True
     # need some filenames . . .
-    assets = [modisAsset(fn) for fn in asset_filenames]
+    aol = [modisAsset(fn) for fn in asset_filenames]
     # normally _archivefile would set this attrib:
-    [setattr(asset, 'archived_filename', asset.filename) for asset in assets]
-    m_archive.return_value = assets, []
+    [setattr(ao, 'archived_filename', ao.filename) for ao in aol]
+    m_fetch.return_value = aol
 
     # specify spatial & temporal
     tiles = ['h12v04', 'h13v05', 'h12v05', 'h13v04']
