@@ -136,16 +136,6 @@ class GoogleStorageMixin(object):
         return vsi_magic_string + cls.gs_object_url_base()
 
     @classmethod
-    def gs_stage_asset(cls, basename, urls):
-        """Write the urls as json to the given basename in the stage."""
-        stage_dn = cls.Repository.path('stage')
-        with utils.make_temp_dir(prefix='fetch', dir=stage_dn) as tmp_dir:
-            tmp_fp = tmp_dir + '/' + basename
-            with open(tmp_fp, 'w') as tfo:
-                json.dump(urls, tfo)
-            shutil.copy(tmp_fp, stage_dn)
-
-    @classmethod
     @backoff.on_exception(backoff.expo,
                               requests.exceptions.RequestException,
                               max_time=120,
