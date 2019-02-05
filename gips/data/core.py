@@ -792,13 +792,18 @@ class Asset(object):
         return stage_full_path
 
     @classmethod
-    def fetch(cls, a_type, tile, date, update, **fetch_kwargs):
+    def fetch(cls, a_type, tile, date, update=None, archive=False,
+              **fetch_kwargs):
         """Standard fetch method; calls query_service() and download().
 
         Outputs from query_service and fetch_kwargs are passed in to
         download as kwargs, so one can talk to the other in a standard
         way.  It returns a list of file paths even though this is always
         ignored by callers in gips.
+
+        `archive` controls whether downloaded assets go to the stage or
+        are archived directly.  Once issue 365 is fixed it should be
+        removed.
         """
         qs_rv = cls.query_service(a_type, tile, date, **fetch_kwargs)
         if qs_rv is None:
@@ -810,8 +815,10 @@ class Asset(object):
             qs_rv['download_fp'] = os.path.join(td_fp, qs_rv['basename'])
             fetch_kwargs.update(**qs_rv)
             if cls.download(**fetch_kwargs):
-                ao, _, _ = cls._archivefile(qs_rv['download_fp'], update)
-                return [ao.filename]
+                if archive:
+                    ao, _, _ = cls._archivefile(qs_rv['download_fp'], update)
+                    return [ao.filename]
+                return [cls.stage_asset(qs_rv['download_fp'])]
         return []
 
     @classmethod
@@ -819,6 +826,7 @@ class Asset(object):
         """Connect to an FTP server and chdir according to the args.
 
         Returns the ftplib connection object."""
+        # TODO chirps is last caller; remove this method once it's gone
         utils.verbose_out('Connecting to {}'.format(cls._host), 5)
         conn = ftplib.FTP(cls._host)
         conn.login('anonymous', settings().EMAIL)
@@ -1524,10 +1532,11 @@ class Data(object):
                     continue
                 # check feature toggle to know how to call fetch():
                 if getattr(cls, 'inline_archive', False):
-                    # if fetch promises to archive inline, pass in update flag
-                    cls.Asset.fetch(a, t, d, update, **fetch_kwargs)
+                    # if fetch promises to archive inline:
+                    cls.Asset.fetch(a, t, d, update, archive=True,
+                                    **fetch_kwargs)
                 else:
-                    # otherwise, no update flag & do archiving here
+                    # otherwise, it put assets in stage; do staging here
                     cls.Asset.fetch(a, t, d, **fetch_kwargs)
                     cls.archive_assets(cls.Asset.Repository.path('stage'),
                                        update=update)
