@@ -237,8 +237,8 @@ class DataInventory(Inventory):
             # conflicts with the explicit tiles argument.
             fetch_kwargs = {k: v for (k, v) in
                 utils.prune_unhashable(kwargs).items() if k != 'tiles'}
-            dataclass.fetch(self.products.base, self.spatial.tiles,
-                            self.temporal, self.update, **fetch_kwargs)
+            archived_assets = dataclass.fetch(self.products.base,
+                self.spatial.tiles, self.temporal, self.update, **fetch_kwargs)
 
             if orm.use_orm():
                 # save metadata about the fetched assets in the database

@@ -807,8 +807,8 @@ class Asset(object):
             if cls.download(**fetch_kwargs):
                 if archive:
                     ao, _, _ = cls._archivefile(qs_rv['download_fp'], update)
-                    return [ao.filename]
-                return [cls.stage_asset(qs_rv['download_fp'])]
+                    return [ao]
+                cls.stage_asset(qs_rv['download_fp'])
         return []
 
     @classmethod
@@ -827,7 +827,7 @@ class Asset(object):
 
     @classmethod
     def archive(cls, path, recursive=False, keep=False, update=False):
-        """Move asset into the archive.
+        """Move asset files into the archive.
 
         Pass in a path to a file or a directory.  If a directory, its
         contents are scanned for assets and any found are archived; it
@@ -835,7 +835,7 @@ class Asset(object):
         assets are given hard links in the archive.  The original is
         then removed, unless `keep`. If a found asset would replace an
         extant archived asset, replacement is only performed if
-        `update`.  kwargs is unused and likely without purpose.
+        `update`.
 
         Returns a pair of lists:  A list of Asset objects that were archived,
         and a list of asset objects whose files have been overwritten (by the
@@ -1523,16 +1523,13 @@ class Data(object):
                 # check feature toggle to know how to call fetch():
                 if getattr(cls, 'inline_archive', False):
                     # if fetch promises to archive inline:
-                    cls.Asset.fetch(a, t, d, update, archive=True,
-                                    **fetch_kwargs)
+                    fetched += cls.Asset.fetch(a, t, d, update, archive=True,
+                                               **fetch_kwargs)
                 else:
                     # otherwise, it put assets in stage; do staging here
                     cls.Asset.fetch(a, t, d, **fetch_kwargs)
-                    cls.archive_assets(cls.Asset.Repository.path('stage'),
-                                       update=update)
-                # fetched may contain both fetched and unfetchable things
-                fetched.append((a, t, d))
-
+                    fetched += cls.archive_assets(
+                        cls.Asset.Repository.path('stage'), update=update)
         return fetched
 
     @classmethod
