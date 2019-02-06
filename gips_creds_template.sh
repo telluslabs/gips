@@ -8,4 +8,4 @@ export EARTHDATA_PASS="" # NASA Earthdata password
 export USGS_USER="" # USGS Earthexplorer username
 export USGS_PASS="" # USGS Earthexplorer password
 export ESA_USER="" # ESA Copernicus username
-export ESA_PASS="" # ESA Copernicus username
+export ESA_PASS="" # ESA Copernicus password
