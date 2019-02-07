@@ -178,6 +178,12 @@ class hlsData(gips.data.core.CloudCoverData):
                             ' cloud shadow bits from the QA band'),
             'latency': 1,
             'bands': [{'name': 'cloudmask', 'units': Data._unitless}]},
+        'cmask': {
+            'assets': list(_ordered_asset_types),
+            'description': ('logical.not(union of cirrus, cloud, adjacent cloud, and'
+                            ' cloud shadow bits from the QA band)'),
+            'latency': 1,
+            'bands': [{'name': 'cmask', 'units': Data._unitless}]},
     }
     gips.data.core.add_gippy_index_products(
         _products, _productgroups, _ordered_asset_types)
@@ -210,6 +216,26 @@ class hlsData(gips.data.core.CloudCoverData):
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, tempfps_to_ptypes[temp_fp], archived_fp)
 
+    def process_cmask(self):
+        """Produce the cloudmask product."""
+        for a_obj in self.assets.values():
+            src_img = gippy.GeoImage(a_obj.filename)
+            # for both asset types the QA band is the last one
+            qa_nparray = src_img[len(src_img) - 1].Read()
+            # cirrus, cloud, adjacent cloud, cloud shadow are bits 0 to 3,
+            # where bit 0 is LSB; value of 1 means that thing is present there.
+            mask = 1 - ((qa_nparray & 0b00001111) > 0) # on edit update Mask_params
+            # build the product file
+            temp_fp = self.temp_product_filename(a_obj.sensor, 'cmask')
+            imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Byte, 1)
+            imgout[0].Write(mask.astype(numpy.uint8))
+            #imgout.SetNoData(0) # needed due to particulars of gdal_merge
+            imgout.SetMeta(self.prep_meta(
+                a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
+            # imgout.Process() # TODO needed?
+            archived_fp = self.archive_temp_path(temp_fp)
+            self.AddFile(a_obj.sensor, 'cmask', archived_fp)
+
     def process_cloudmask(self):
         """Produce the cloudmask product."""
         for a_obj in self.assets.values():
@@ -219,7 +245,6 @@ class hlsData(gips.data.core.CloudCoverData):
             # cirrus, cloud, adjacent cloud, cloud shadow are bits 0 to 3,
             # where bit 0 is LSB; value of 1 means that thing is present there.
             mask = (qa_nparray & 0b00001111) > 0 # on edit update Mask_params
-
             # build the product file
             temp_fp = self.temp_product_filename(a_obj.sensor, 'cloudmask')
             imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Byte, 1)
