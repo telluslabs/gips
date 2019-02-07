@@ -344,7 +344,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             if os.path.exists(self.filename):
                 c1json_content = self.load_c1_json()
                 utils.verbose_out('requesting ' + c1json_content['mtl'], 4)
-                text = requests.get(c1json_content['mtl']).text
+                text = self.gs_backoff_get(c1json_content['mtl']).text
             else:
                 query_results = self.query_gs(self.tile, self.date)
                 if query_results is None:
@@ -352,7 +352,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
                                   ' ({}, {})'.format(self.tile, self.date))
                 url = cls.gs_object_url_base() + query_results['keys']['mtl']
                 utils.verbose_out('requesting ' + url, 4)
-                text = requests.get(url).text
+                text = self.gs_backoff_get(url).text
         elif os.path.exists(self.filename):
             mtlfilename = self.extract(
                 [f for f in self.datafiles() if f.endswith('MTL.txt')]
@@ -559,8 +559,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
 
         # handle pclouds
         if pclouds < 100:
-            r = requests.get(cls.gs_object_url_base() + keys['mtl'])
-            r.raise_for_status()
+            r = cls.gs_backoff_get(cls.gs_object_url_base() + keys['mtl'])
             cc = cls.cloud_cover_from_mtl_text(r.text)
             if cc > pclouds:
                 cc_msg = ('C1GS asset found for ({}, {}), but cloud cover'
@@ -1623,7 +1622,7 @@ class landsatData(gips.data.core.CloudCoverData):
         asset_obj = self.assets[asset_type]
         c1_json = asset_obj.load_c1_json()
         if c1_json:
-            r = requests.get(c1_json['mtl'])
+            r = self.Asset.gs_backoff_get(c1_json['mtl'])
             r.raise_for_status()
             text = r.text
             qafn = c1_json['qa-band'].encode('ascii', 'ignore')
@@ -2056,7 +2055,7 @@ class landsatData(gips.data.core.CloudCoverData):
             if os.path.exists(asset.filename):
                 c1json_content = asset.load_c1_json()
                 utils.verbose_out('requesting ' + c1json_content['mtl'], 4)
-                text = requests.get(c1json_content['mtl']).text
+                text = self.Asset.gs_backoff_get(c1json_content['mtl']).text
             else:
                 query_results = asset.query_gs(asset.tile, asset.date)
                 if query_results is None:
@@ -2064,7 +2063,7 @@ class landsatData(gips.data.core.CloudCoverData):
                                   ' ({}, {})'.format(self.tile, self.date))
                 url = cls.gs_object_url_base() + query_results['keys']['mtl']
                 utils.verbose_out('requesting ' + url, 4)
-                text = requests.get(url).text
+                text = self.Asset.gs_backoff_get(url).text
         else:
             print('asset is "{}"'.format(asset.asset))
             mtl = asset.extract([f for f in asset.datafiles() if f.endswith("MTL.txt")])[0]

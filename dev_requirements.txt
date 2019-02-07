@@ -1,4 +1,4 @@
-pytest
+pytest!=4.2.0  # temp pin to apease django
 pytest-timeout
 pytest-mock
 pytest-django

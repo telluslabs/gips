@@ -395,7 +395,7 @@ class MODTRAN():
     fout.close()
     """
 
-_aco_prod_templs = {
+_s2_ls_aco_prod_templs = {
     'rhow': { # product passed in eg process_acolite(products={'rhow':...}...)
         'description': 'Water-Leaving Radiance-Reflectance',
         'acolite-product': 'rhow_*', #'rhow_vnir', # passed to acolite in l2w_parameters
@@ -427,7 +427,7 @@ _aco_prod_templs = {
         'offset': 250.,
         'dtype': 'int16',
         'toa': True,
-        'bands': [{'name': 'oc2chl', 'units': Data._unitless}],
+        'bands': [{'name': 'oc2chl', 'units': 'ug/l'}],
     },
     'oc3chl': {
         'description': 'Blue-Green Ratio Chlorophyll Algorithm using bands 443, 483, & 561',
@@ -437,7 +437,7 @@ _aco_prod_templs = {
         'offset': 250.,
         'dtype': 'int16',
         'toa': True,
-        'bands': [{'name': 'oc3chl', 'units': Data._unitless}],
+        'bands': [{'name': 'oc3chl', 'units': 'ug/l'}],
     },
     'fai': {
         'description': 'Floating Algae Index',
@@ -491,12 +491,55 @@ _aco_prod_templs = {
     },
 }
 
-def add_acolite_product_dicts(_products, *assets):
+def _generate_chl_pdict(p_type, aco_type, description):
+    return {'description': description,
+            'acolite-product': aco_type,
+            'acolite-key': aco_type,
+            'gain': 0.0125, # cribbed from above chl ptype
+            'offset': 250.,
+            'dtype': 'int16',
+            'toa': True,
+            'bands': [{'name': p_type, 'units': 'ug/l'}]}
+
+_s2_aco_prod_templs = {pt: _generate_chl_pdict(pt, at, d) for (pt, at, d) in [
+    ('gonschl', 'chl_re_gons',
+        'Chlorophyll a concentration, red edge algorithm,'
+        ' based on L1C band 6 (780nm)'),
+    ('gons740chl', 'chl_re_gons740',
+        'Chlorophyll a concentration, red edge algorithm,'
+        ' based on L1C band 5 (740nm)'),
+    ('moses3bchl', 'chl_re_moses3b',
+        'Chlorophyll a concentration, 3 band red edge algorithm,'
+        ' L1C band 6 (780nm) used as reference'),
+    ('moses3b740chl', 'chl_re_moses3b740',
+        'Chlorophyll a concentration, 3 band red edge algorithm,'
+        ' L1C band 5 (740nm) used as reference'),
+    ('mishrachl', 'chl_re_mishra',
+        'Chlorophyll a concentration, based on NDCI'),
+]}
+
+_s2_aco_prod_templs['ndci'] = {
+    'description': 'Normalised Difference Chlorophyll Index',
+    'acolite-product': 'ndci',
+    'acolite-key': 'ndci',
+    'offset': 0.0, 'gain': 0.0001, 'dtype': 'int16',
+    'toa': True,
+    'bands': [{'name': 'ndci', 'units': Data._unitless}],
+}
+
+# don't need to deepcopy because usage is reads only
+_aco_prod_templs = _s2_ls_aco_prod_templs.copy()
+_aco_prod_templs.update(_s2_aco_prod_templs)
+
+def add_acolite_product_dicts(_products, *assets, **kwargs):
     """Add the acolite product dicts to the given Data._products.
 
-    'assets' is different for each driver, so pass it in."""
+    'assets' is different for each driver, so pass it in.  pass in s2=True
+    to get Sentinel-2 products added, otherwise standard ones are added."""
     # make copies just in case anything is modified
     aco_prods = copy.deepcopy(_aco_prod_templs)
+    if kwargs.get('s2', False):
+        aco_prods.update(copy.deepcopy(_s2_aco_prod_templs))
     for inner in aco_prods.values():
         inner['assets'] = list(assets) # just in case, don't re-use the list
     _products.update(aco_prods)
