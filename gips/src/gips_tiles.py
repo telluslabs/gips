@@ -26,7 +26,7 @@ S3LOC = "s3://tellus-s3-vault/product/analysis_tiles/{product}_{window}/{year}/{
 MASKFILE = "{dirname}/{tileid}_1_1.tif"
 
 GIPS_CMD = "gips_export {asset} -p {product} -r {maskfile} -d {year} "\
-"--days 1,1 -v4 --outdir /export/{asset}_{product}_ks --notld --fetch --overwrite > {logfile}"
+"--days {dayrange} -v4 --outdir /export/{asset}_{product}_ks --notld --fetch --overwrite > {logfile}"
 
 AWS_CMD = "aws s3 cp {} {} > {}"
 
@@ -39,14 +39,25 @@ def temporary_directory():
 
 
 @click.command()
-@click.option('-a', '--asset', help='')
-@click.option('-p', '--product', help='')
-@click.option('-y', '--years', help='')
+@click.option('-a', '--asset', required=True, help='')
+@click.option('-p', '--product', required=True, help='')
+@click.option('-y', '--years', required=True, help='')
 @click.option('-w', '--window', help='')
-def main(asset, product, years, window):
+@click.option('-d', '--dayrange', help='')
+def main(asset, product, years, window, dayrange):
 
 	h0 = 519
 	v0 = 333
+
+    if asset == "cdl":
+    	if window is None:
+        	window = "all"
+        else:
+        	assert window == "all"
+        if dayrange is None:
+            dayrange = "1,1"
+        else:
+        	assert dayrange = "1,1"
 
 	years = years.split(',')
 	years = [int(y) for y in years]
@@ -69,7 +80,9 @@ def main(asset, product, years, window):
 					maskfile = MASKFILE.format(dirname=tmp_dir, tileid=tileid)
 
 					# TODO: don't you like how I avoided using subprocess, sh, or commands?
-					gips_cmd = GIPS_CMD.format(asset=asset, product=product, maskfile=maskfile, year=year, logfile=LOGFILE)
+					gips_cmd = GIPS_CMD.format(asset=asset, product=product, maskfile=maskfile,
+						year=year, dayrange=dayrange, logfile=LOGFILE)
+
 					print(gips_cmd)
 					os.system(gips_cmd)
 					print(open(LOGFILE).read())
