@@ -114,7 +114,8 @@ class GIPSParser(argparse.ArgumentParser):
         else:
             parser = self
         group = parser.add_argument_group('processing options')
-        group.add_argument('--overwrite', help='Overwrite existing output file(s)', default=False, action='store_true')
+        group.add_argument('--overwrite', help='Overwrite existing output file(s)',
+                           default=False, action='store_true')
         group.add_argument('--format', help='Format for output file', default="GTiff")
         h = ('Don\'t process. Instead, generate batch file with single '
              'gips_process command on each line.  \'overwrite\', '

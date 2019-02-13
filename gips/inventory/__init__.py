@@ -212,7 +212,8 @@ class ProjectInventory(Inventory):
 class DataInventory(Inventory):
     """ Manager class for data inventories (collection of Tiles class) """
 
-    def __init__(self, dataclass, spatial, temporal, products=None, fetch=False, update=False, **kwargs):
+    def __init__(self, dataclass, spatial, temporal, products=None,
+                 fetch=False, update=False, **kwargs):
         """ Create a new inventory
         :dataclass: The Data class to use (e.g., LandsatData, ModisData)
         :spatial: The SpatialExtent requested
@@ -236,10 +237,8 @@ class DataInventory(Inventory):
             # conflicts with the explicit tiles argument.
             fetch_kwargs = {k: v for (k, v) in
                 utils.prune_unhashable(kwargs).items() if k != 'tiles'}
-            dataclass.fetch(self.products.base, self.spatial.tiles,
-                            self.temporal, self.update, **fetch_kwargs)
-            archived_assets = dataclass.archive_assets(
-                    Repository.path('stage'), update=self.update)
+            archived_assets = dataclass.fetch(self.products.base,
+                self.spatial.tiles, self.temporal, self.update, **fetch_kwargs)
 
             if orm.use_orm():
                 # save metadata about the fetched assets in the database

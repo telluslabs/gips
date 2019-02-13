@@ -613,7 +613,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
 
     @classmethod
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
-    def query_service(cls, asset, tile, date, pclouds=90.0, **fetch_kwargs):
+    def query_service(cls, asset, tile, date, pclouds=90.0, **ignored):
         """As superclass with optional argument:
 
         Finds assets matching the arguments, where pcover is maximum
@@ -633,33 +633,28 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             raise ValueError("Invalid data source '{}'; valid sources:"
                              " {}".format(data_src, c1_sources))
         # perform the query, but on a_type-source mismatch, do nothing
-        return {
+        rv = {
             ('C1', 'usgs'): cls.query_c1,
             ('C1S3', 's3'): cls.query_s3,
             ('C1GS', 'gs'): cls.query_gs,
         }.get((asset, data_src), lambda *_: None)(tile, date, pclouds)
+        if rv is not None:
+            rv['a_type'] = asset
+        return rv
 
     @classmethod
-    def fetch(cls, asset, tile, date, **fetch_kwargs):
-        """Fetch the asset given by the given parameters.
-
-        Many arguments are unused, but must be present for compatibility.
-        """
-        qs_rv = cls.query_service(asset, tile, date, **fetch_kwargs)
-        if qs_rv is None:
-            return []
-        basename = qs_rv.pop('basename')
-
-        if asset == 'C1':
-            return cls.fetch_c1(**qs_rv)
-        if asset == 'C1S3':
-            return cls.fetch_s3(basename, **qs_rv)
-        if asset == 'C1GS':
-            return cls.fetch_gs(basename, **qs_rv)
-        raise ValueError('Unfetchable asset type: {}'.format(asset))
+    def download(cls, a_type, download_fp, **kwargs):
+        """Downloads the asset defined by the kwargs to the full path."""
+        methods = {'C1': cls.download_c1,
+                   'C1S3': cls.download_s3,
+                   'C1GS': cls.download_gs,
+                   }
+        if a_type not in methods:
+            raise ValueError('Unfetchable asset type: {}'.format(asset))
+        return methods[a_type](download_fp, **kwargs)
 
     @classmethod
-    def fetch_c1(cls, scene_id, dataset):
+    def download_c1(cls, download_fp, scene_id, dataset, **ignored):
         """Fetches the C1 asset defined by the arguments."""
         stage_dir = cls.Repository.path('stage')
         api_key = cls.ee_login()
@@ -672,14 +667,15 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             if len(granules) == 0:
                 raise Exception("Download didn't seem to"
                                 " produce a file:  {}".format(str(granules)))
-            os.rename(os.path.join(dldir, granules[0]),
-                      os.path.join(stage_dir, granules[0]))
+            os.rename(os.path.join(dldir, granules[0]), download_fp)
+        return True
 
     @classmethod
-    def fetch_s3(cls, basename, _30m_tifs, _15m_tif, qa_tif, mtl_txt):
+    def download_s3(cls, download_fp, _30m_tifs, _15m_tif, qa_tif, mtl_txt,
+                    **ignored):
         """Fetches AWS S3 assets; currently only 'C1S3' assets.
 
-        Doesn't fetch much; instead it constructs a VRT-based tarball.
+        Doesn't fetch much; instead it constructs VRT-based json.
         """
         # construct VSI paths; sample (split into lines):
         # /vsis3_streaming/landsat-pds/c1/L8/013/030
@@ -693,21 +689,24 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             'qa-band': cls.s3_vsi_prefix(qa_tif),
             'mtl': cls._s3_url + mtl_txt,
         }
-        cls.s3_stage_asset_json(asset_content, basename)
+        utils.json_dump(asset_content, download_fp)
+        return True
 
     @classmethod
-    def fetch_gs(cls, basename, keys):
+    def download_gs(cls, download_fp, keys, **ignored):
         """Assembles C1 assets that link into Google Cloud Storage.
 
         Constructs a json file containing /vsicurl_streaming/ paths,
         similarly to S3 assets.
         """
-        cls.gs_stage_asset(basename, {
+        content = {
             'mtl':     cls.gs_object_url_base() + keys['mtl'],
             'qa-band': cls.gs_vsi_prefix() + keys['qa-band'],
             'spectral-bands': [cls.gs_vsi_prefix() + u
                                for u in keys['spectral-bands']],
-        })
+        }
+        utils.json_dump(content, download_fp)
+        return True
 
 
 def unitless_bands(*bands):
@@ -717,6 +716,7 @@ def unitless_bands(*bands):
 class landsatData(gips.data.core.CloudCoverData):
     name = 'Landsat'
     version = '1.0.1'
+    inline_archive = True
 
     Asset = landsatAsset
 
