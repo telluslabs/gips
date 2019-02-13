@@ -29,7 +29,7 @@ run_tests:
     - docker run --dns=10.0.4.1 --rm
       -v /net/cluster/projects/gips-dev/sys-test-assets/:/artifact-store
       gips_test_$CI_COMMIT_REF_SLUG
-      pytest -r es -vv --slow --setup-repo --sys -s 
+      pytest -r es -vv --slow --setup-repo --sys -s -m lite
 
     # TODO get this CI pipeline up to passing
     # - docker run --dns=10.0.4.1 --rm
