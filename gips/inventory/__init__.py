@@ -85,7 +85,7 @@ class Inventory(object):
         """ Return color for sensor """
         return self._colors[list(self.sensor_set).index(sensor)]
 
-    def pprint(self, md=False):
+    def pprint(self, md=False, size=False):
         """ Print the inventory """
         if len(self.data) == 0:
             print 'No matching files in inventory'
@@ -103,6 +103,21 @@ class Inventory(object):
             oldyear = date.year
         if self.numfiles != 0:
             VerboseOut("\n\n%s files on %s dates" % (self.numfiles, len(self.dates)), 1)
+        if size:
+            filelist_gen = (
+                tile.filenames.values() + [a.filename for a in tile.assets.values()]
+                for tiles in self.data.values()
+                for tile in tiles.tiles.values()
+            )
+            total_size = sum(
+                sum(os.stat(f).st_size for f in fl)
+                for fl in filelist_gen
+            )
+            sitename = self.spatial.sitename
+            if sitename == 'tiles':
+                sitename += str(self.spatial.tiles)
+            print('{} includes {:.0f} Mebibytes of local gips archive data'
+                  .format(sitename, total_size / 2 ** 20))
 
 
 class ProjectInventory(Inventory):
