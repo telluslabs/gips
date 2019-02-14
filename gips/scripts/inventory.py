@@ -38,13 +38,10 @@ desired, eg:
 
 from __future__ import print_function
 
-import sys
-import traceback
-
 from gips import __version__ as gipsversion
 from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
-from gips.utils import Colors, verbose_out, open_vector, import_data_class
+from gips.utils import Colors
 from gips import utils
 from gips.inventory import DataInventory
 from gips.inventory import dbinv, orm
@@ -94,7 +91,8 @@ def main():
         )
         for extent in extents:
             inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
-            inv.pprint(md=args.md)            
+            inv.pprint(md=args.md, size=args.size)
+
 
     utils.gips_exit() # produce a summary error report then quit with a proper exit status
 
