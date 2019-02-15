@@ -63,7 +63,7 @@ class modisRepository(Repository):
     _tile_attribute = "tileid"
 
     default_settings = {
-        'source': 'usgs',
+        'source': 'earthdata',
         'asset-preference': (MCD43A4, MCD43A4S3), # prefer local to remote
     }
 
@@ -72,9 +72,9 @@ class modisRepository(Repository):
         """Validate source and asset-preference settings; otherwise no-op."""
         # landsat, modis, and sentinel-2 all have copies of this;
         # may be worth consolidation
-        if key == 'source' and value not in ('s3', 'usgs'):
+        if key == 'source' and value not in ('s3', 'earthdata'):
             raise ValueError("modis' 'source' setting is '{}', but valid"
-                             " values are 's3' or 'usgs'".format(value))
+                             " values are 's3' or 'earthdata'".format(value))
         if key == 'asset-preference':
             valid_atl = cls.default_settings['asset-preference']
             warts = set(value) - set(valid_atl)
@@ -208,7 +208,7 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         self._version = float('{}.{}'.format(collection, file_version))
 
     @classmethod
-    def query_usgs(cls, asset, tile, date):
+    def query_earthdata(cls, asset, tile, date):
         """Find out from the modis servers what assets are available.
 
         Uses the given (asset, tile, date) tuple as a search key, and
@@ -304,7 +304,7 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         if data_src == 's3' and asset == MCD43A4S3:
             rv = cls.query_s3(tile, date)
         if data_src != 's3' and asset != MCD43A4S3:
-            rv = cls.query_usgs(asset, tile, date)
+            rv = cls.query_earthdata(asset, tile, date)
         if rv is not None:
             rv['a_type'] = asset
         return rv

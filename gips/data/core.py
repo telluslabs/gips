@@ -207,8 +207,8 @@ class S3Mixin(object):
 
     @classmethod
     def s3_vsi_prefix(cls, key):
-        """Add a vsi3_streaming prefix to the given S3 key"""
-        return '/vsis3_streaming/{}/{}'.format(cls._s3_bucket_name, key)
+        """Add a vsi3 prefix to the given S3 key"""
+        return '/vsis3/{}/{}'.format(cls._s3_bucket_name, key)
 
 
 class Repository(object):
