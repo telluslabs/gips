@@ -1,0 +1,2 @@
+GIPS_DATA=""
+GIPS_HOME=""
