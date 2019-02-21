@@ -464,6 +464,8 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
         utils.verbose_out(
             'queried ATD {} {} {}, found '.format(asset, tile, date)
             + ('nothing' if rv is None else rv['basename']), 5)
+        if rv is None:
+            return None
         rv['a_type'] = asset
         return rv
 
