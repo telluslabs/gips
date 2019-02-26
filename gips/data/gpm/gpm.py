@@ -26,6 +26,11 @@ from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, settings
 from gips import utils
 
+class gpmRepository(Repository):
+    name = 'GPM'
+    description = 'Global Precipitation Measurement Mission (GPM)'
+    # NASA assets require special authentication
+
 class gpmAsset(Asset):
     _sensors = {'GPM': {'description': 'Integrated Multi-satellite Retrievals '
                                        'for GPM'}}
