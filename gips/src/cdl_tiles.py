@@ -76,7 +76,7 @@ def run(shpfile, year):
 @click.option('--years', '-y')
 def main(shapefile, years):
 
-    # e.g. python cdl_tiles.py --s /export/kansas/kansas_tiles.shp -y 2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018
+    # e.g. python cdl_tiles.py -s /export/kansas/kansas_tiles.shp -y 2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018
 
     years = [int(y) for y in years.split(',')]
     for year in years:
