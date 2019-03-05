@@ -20,7 +20,7 @@ from pdb import set_trace
 
 LOGFILE = "/tmp/output.txt"
 
-PRODUCTFILE = "/export/{asset}_{product}_ks/0/{year}001_{asset}_{product}.tif"
+PRODUCTFILE = "/export/{asset}_{product}/0/{year}001_{asset}_{product}.tif"
 
 S3LOC = "s3://tellus-s3-vault/product/analysis_tiles/{product}_{window}/{year}/{tileid}.tif"
 

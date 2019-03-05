@@ -6,3 +6,4 @@ scripttest
 envoy # deprecated
 sh
 fiona
+backports.tempfile
