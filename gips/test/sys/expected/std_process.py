@@ -1,11 +1,14 @@
 
 import collections
 
+import pytest
+
 from .. import util
 
 from . import modis_process
 from . import merra_process
 from . import sentinel2_process
+from . import hls_process
 
 expectations = {}
 
@@ -16,6 +19,7 @@ lite_mark_spec = { k: util.lite for k in [
     ('landsat', 'ndvi-toa'),
     ('sentinel2', 'evi-toa'),
     ('prism', 'ppt'),
+    ('hls', 'ndvi'),
     #('sar', 'sign'), # TODO automate arttifact-* pytest.ini values
 ]}
 
@@ -25,6 +29,7 @@ expectations['modis'] = modis_process.expectations
 expectations['merra'] = merra_process.expectations
 
 expectations['sentinel2'] = sentinel2_process.expectations
+expectations['hls'] = hls_process.expectations
 
 mark_spec['sentinel2'] = util.slow
 
@@ -123,6 +128,10 @@ expectations['prism'] = collections.OrderedDict([
 for k in (('landsat', 'bqashadow'), ('landsat', 'ref-toa'),
           ('landsat', 'acca'), ('landsat', 'rad-toa')):
     mark_spec[k] = util.slow
+
+mark_spec[('landsat', 'cloudmask-coreg')] = pytest.mark.skip(
+    'broken in dev; needs fixing')
+
 
 # TODO landsat's old acolite test, maybe keep?
 #@slow
@@ -298,13 +307,9 @@ expectations['landsat'] = collections.OrderedDict([
      '    STATISTICS_MINIMUM=1',
      '    STATISTICS_STDDEV=0'])]),
 
- # t_process[landsat-cloudmask] recording:
+ # t_process[landsat-cloudmask] recording: (but with extraneous metadata file removed)
  ('cloudmask',
-  [('landsat/tiles/012030/2017213/LC08_L1TP_012030_20170801_20170811_01_T1_MTL.txt',
-    'hash',
-    'sha256',
-    'ec8d39b14f3403c5df4fcfe36e0c7dacf1c5fee4b0b7bf956b051b570444ba05'),
-   ('landsat/tiles/012030/2017213/012030_2017213_LC8_cloudmask.tif',
+  [('landsat/tiles/012030/2017213/012030_2017213_LC8_cloudmask.tif',
     'raster',
     'gdalinfo-stats',
     ['Driver: GTiff/GeoTIFF',

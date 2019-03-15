@@ -5,11 +5,11 @@
 #    AUTHOR: Matthew Hanson
 #    EMAIL:  matt.a.hanson@gmail.com
 #
-#    Copyright (C) 2014 Applied Geosolutions
+#    Copyright (C) 2014-2018 Applied Geosolutions
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
+#    the Free Software Foundation; either version 3 of the License, or
 #    (at your option) any later version.
 #
 #    This program is distributed in the hope that it will be useful,
@@ -33,7 +33,10 @@ import commands
 import shutil
 import traceback
 import datetime
+import json
+
 import numpy as np
+import requests
 
 import gippy
 from gippy import GeoVector
@@ -87,6 +90,11 @@ VerboseOut = verbose_out # VerboseOut name is deprecated
 ##############################################################################
 # Filesystem functions
 ##############################################################################
+
+def json_dump(object, file_path):
+    """Write the object as json to the given file path."""
+    with open(file_path, 'w') as tfo:
+        json.dump(object, tfo)
 
 def File2List(filename):
     """Return contents of file as a list of lines, sans newlines."""
@@ -171,7 +179,6 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
         else:
             print('GIPS_DEBUG: Orphaning {}'.format(absolute_pathname))
 
-
 def find_files(regex, path='.'):
     """Find filenames in the given directory that match the regex.
 
@@ -254,9 +261,8 @@ def data_sources():
     for key in sorted(repos.keys()):
         if not os.path.isdir(repos[key]['repository']):
             raise Exception('ERROR: archive %s is not a directory or is not available' % key)
-        with error_handler(continuable=True):
-            repo = import_repository_class(key)
-            sources[key] = repo.description
+        repo = import_repository_class(key)
+        sources[key] = repo.description
     return sources
 
 
@@ -637,3 +643,11 @@ def stringify_meta_dict(md):
             return str(o)
 
     return {str(k): stringify(v) for (k, v) in md.items()}
+
+def http_download(url, full_path, chunk_size=512 * 1024):
+    """Download a file via http GET, saving to the given file path."""
+    r = requests.get(url, stream=True)
+    r.raise_for_status()
+    with open(full_path, 'wb') as fo:
+        # 'if c' filters out keep-alive new chunks
+        [fo.write(c) for c in r.iter_content(chunk_size=chunk_size) if c]

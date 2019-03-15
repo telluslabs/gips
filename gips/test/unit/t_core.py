@@ -145,20 +145,6 @@ def m_fetch(mocker):
 df_args = (['rad', 'ndvi', 'bqashadow'], ['012030'],
            core.TemporalExtent('2017-08-01'))
 
-def t_data_fetch_base_case(mocker, m_discover_asset, m_query_service, m_fetch):
-    """Test base case of data.core.Data.fetch.
-
-    It should return data about the fetch on success, and shouldn't
-    raise an exception."""
-    # setup
-    a_types = ('C1', 'C1GS', 'C1S3')
-    atds = [(a, '012030', dt(2017, 8, 1, 0, 0)) for a in a_types]
-    expected_calls = [mocker.call(*atd) for atd in atds]
-    # call
-    actual = landsatData.fetch(*df_args)
-    # assertions
-    assert atds == actual and expected_calls == m_fetch.call_args_list
-
 def t_data_fetch_error_case(mocker, m_discover_asset, m_query_service, m_fetch):
     """Test error case of data.core.Data.fetch.
 
@@ -242,18 +228,16 @@ def t_Data_archive_assets_update_case(orm, mocker, asset_and_replacement):
 
 def t_query_service_caching(mpo):
     bn, url = 'basename.hdf', 'http://www.himom.com/'
-    m_query_provider = mpo(modis.modisAsset, 'query_provider')
-    m_query_provider.return_value = (bn, url)
+    m_available = mpo(modis.modisAsset, 'available')
+    m_available.return_value = False
     modis.modisAsset.query_service.cache_clear() # in case it's not empty atm
 
     atd = ('MOD11A1', 'h12v04', datetime.datetime(2012, 12, 1, 0, 0))
     actual_first = modis.modisAsset.query_service(*atd)
     actual_second = modis.modisAsset.query_service(*atd)
 
-    expected_for_both = {'basename': bn, 'url': url}
-
-    assert (m_query_provider.call_count == 1 # should use the cache 2nd time
-            and actual_first == actual_second == expected_for_both)
+    assert (m_available.call_count == 1 # should use the cache 2nd time
+            and actual_first == actual_second == None)
 
 class GipsDriverModules(object):
     """Introspect the GIPS codebase and load all the driver modules."""

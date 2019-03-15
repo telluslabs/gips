@@ -99,6 +99,9 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     """Process user config & command-line options."""
+    # pytest.config was deprecated, and the only alternatives are worse,
+    # so monkey-patch in our own
+    pytest._config_saved_by_gips = config
     record_path = config.getoption('record')
     if record_path and os.path.lexists(record_path):
         raise IOError("Record file already exists at {}".format(record_path))

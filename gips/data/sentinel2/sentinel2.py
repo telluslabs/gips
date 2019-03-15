@@ -6,7 +6,7 @@
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
+#    the Free Software Foundation; either version 3 of the License, or
 #    (at your option) any later version.
 #
 #    This program is distributed in the hope that it will be useful,
@@ -85,11 +85,12 @@ class sentinel2Repository(Repository):
         if key == 'source' and value not in ('esa', 'gs'):
             raise ValueError("Sentinel-2's 'source' setting is '{}',"
                     " but valid values are 'esa' or 'gs'".format(value))
-        if key == 'asset-preference':
+        elif key == 'asset-preference':
             warts = set(value) - set(_asset_types)
             if warts:
                 raise ValueError("Valid 'asset-preferences' for Sentinel-2"
-                        " are {}; invalid values found:  {}".format(warts))
+                        " are {}; invalid values found:  {}".format(
+                    _asset_types, warts))
         return value
 
     @classmethod
@@ -104,7 +105,8 @@ class sentinel2Repository(Repository):
         return e.x0(), e.x1(), e.y0(), e.y1()
 
 
-class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
+class sentinel2Asset(gips.data.core.CloudCoverAsset,
+                     gips.data.core.GoogleStorageMixin):
     Repository = sentinel2Repository
 
     gs_bucket_name = 'gcp-public-data-sentinel-2'
@@ -120,8 +122,8 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                  '07', '08', '8A', '09', '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
             'colors':
-                ["COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
-                 "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"],
+                ("COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
+                 "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"),
             # center wavelength of band in micrometers, CF:
             # https://earth.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/radiometric
             'bandlocs':
@@ -168,7 +170,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         'L1C': {
             'source': 'esa',
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
-            # is used for both original and shortened post-2016-12-07 assets.
+            # is used for both datastrip and single-tile assets.
             'pattern': _asset_fn_pat_base + '\.zip$',
             'startdate': _start_date,
             'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
@@ -182,15 +184,17 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         }
     }
 
-    original = 'original'
-    _2016_12_07 = datetime.datetime(2016, 12, 7, 0, 0) # first day of new-style assets, UTC
+    ds_style = 'datastrip-style' # can't be downloaded anymore; deprecated
+    st_style = 'single-tile-style'
+    # first day of new-style assets, UTC
+    st_style_start_date = datetime.datetime(2016, 12, 7, 0, 0)
 
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
     _tile_re = '(?P<tile>\d\d[A-Z]{3})'
     # example, note that leading tile code is spliced in by Asset.fetch:
     # 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
-    _orig_name_re = (
+    _ds_name_re = (
         '(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
         '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
         'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
@@ -200,7 +204,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
         '_\d{8}T\d{6}.zip') # repeated observation datetime for no known reason
 
-    _2016_12_07_name_re = (
+    _name_re = (
         '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
         '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
         'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
@@ -211,11 +215,12 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
     )
 
     _asset_styles = {
-        'original': {
-            # original-style assets can't use the same name for downloading and archiving, because
-            # each downloaded file contains multiple tiles of data
-            'downloaded-name-re': _orig_name_re,
-            'archived-name-re': '^' + _tile_re + '_' + _orig_name_re,
+        ds_style: {
+            # datastrip-style assets can't use the same name for
+            # downloading and archiving, because each downloaded file
+            # contains multiple tiles of data
+            'downloaded-name-re': _ds_name_re,
+            'archived-name-re': '^' + _tile_re + '_' + _ds_name_re,
             # raster file pattern
             # TODO '/.*/' can be misleading due to '/' satisfying '.', so rework into '/[^/]*/'
             'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_T{tileid}_B(?P<band>\d[\dA]).jp2$',
@@ -223,12 +228,14 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             # updated assumption: only XML file in DATASTRIP/ (not including subdirs)
             'datastrip-md-re': '^.*/DATASTRIP/[^/]+/[^/]*.xml$',
             'tile-md-re': '^.*/GRANULE/.*_T{tileid}_.*/.*_T{tileid}.xml$',
-            'asset-md-re': '^.*/S2.*\.xml$',
+            # example asset metadata path:
+            # S2A_OPER_PRD_MSIL1C_PDMC_20160904T192336_R126_V20160903T164322_20160903T164911.SAFE/
+            #   S2A_OPER_MTD_SAFL1C_PDMC_20160904T192336_R126_V20160903T164322_20160903T164911.xml
+            'asset-md-re': r'^[^/]+/S2[AB]_[^/]+\.xml$',
         },
-        _2016_12_07: {
-            # post-2016 assets use their downloaded FN as their archived FN
-            'downloaded-name-re': _2016_12_07_name_re,
-            'archived-name-re': _2016_12_07_name_re,
+        st_style: {
+            'downloaded-name-re': _name_re,
+            'archived-name-re': _name_re,
             # raster file pattern
             'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B(?P<band>\d[\dA]).jp2$',
             # internal metadata file patterns
@@ -244,7 +251,7 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
     def __init__(self, filename):
         """Inspect a single file and set some metadata.
 
-        Both shortened and original longer file name & content structure are supported:
+        File naming convention:
         https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
         """
         super(sentinel2Asset, self).__init__(filename)
@@ -279,13 +286,13 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                 self.meta['cloud-cover'] = self.json_content['cloud-cover']
 
     @classmethod
-    def get_style_regexes(cls, style, tile_id, compile=False):
+    def get_style_regexes(cls, style, tile_id=None, compile=False):
         """Returns regexes for the given style.
 
         This lets one locate internal metadata.
         """
         sr = copy.deepcopy(cls._asset_styles[style])
-        if style == cls.original:
+        if style == cls.ds_style:
             sr['raster-re']       = sr['raster-re'].format(tileid=tile_id)
             sr['tile-md-re']      = sr['tile-md-re'].format(tileid=tile_id)
             sr['datastrip-md-re'] = sr['datastrip-md-re'].format(
@@ -304,18 +311,9 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         url_head = 'https://scihub.copernicus.eu/dhus/search?q='
         #                vvvvvvvv--- sort by processing date so always get the newest one
         url_tail = '&orderby=ingestiondate desc&format=json'
-        if date < cls._2016_12_07: # original style
-            # compute the center coordinate of the tile
-            x0, x1, y0, y1 = cls.Repository.tile_lat_lon(tile)
-            lat, lon = (y0 + y1)/2, (x0 + x1)/2
-            #                                                  year mon  day
-            url_search_string = ('filename:S2?_OPER_PRD_MSIL1C_*_{}{:02}{:02}T??????.SAFE'
-                                 '%20AND%20footprint:%22Intersects({},%20{})%22') # <-- lat/lon
-            search_url = url_head + url_search_string.format(year, month, day, lat, lon) + url_tail
-        else:
-            #                                      year mon  day                    tile
-            url_search_string = 'filename:S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'
-            search_url = url_head + url_search_string.format(year, month, day, tile) + url_tail
+        #                                      year mon  day                    tile
+        url_search_string = 'filename:S2?_MSIL1C_{}{:02}{:02}T??????_N????_R???_T{}_*.SAFE'
+        search_url = url_head + url_search_string.format(year, month, day, tile) + url_tail
 
         auth = HTTPBasicAuth(username, password)
         r = requests.get(search_url, auth=auth)
@@ -350,33 +348,20 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                 raise IOError("Unexpected 'rel' attribute in search link")
             asset_url = entry['link'][0]['href']
             output_file_name = entry['title'] + '.zip'
+            assert entry['double']['name'] == 'cloudcoverpercentage'
+            cloud_cover = float(entry['double']['content'])
 
-        if pclouds < 100:
-            asset = cls(output_file_name)
-            if not asset.filter(pclouds):
-                return None
+        if pclouds < 100 and cloud_cover > pclouds:
+            return None
 
         return {'basename': output_file_name, 'url': asset_url}
 
     @classmethod
-    def query_gs(cls, tile, date, pclouds):
-        """Query google's store of sentinel-2 data for the given scene."""
-        prefix_template = 'tiles/{}/{}/{}/{}_MSIL1C_{}'
-        # It might be S2A or S2B, find out which one
-        for sensor in cls._sensors.keys():
-            search_prefix = prefix_template.format(
-                tile[0:2], tile[2], tile[3:], sensor, date.strftime('%Y%m%d'))
-            # only going to be one prefix, if any are found
-            prefix = cls.gs_api_search(search_prefix).get(
-                'prefixes', [None])[0]
-            if prefix is not None:
-                break
-        if prefix is None:
-            return None
+    def query_gs_find_keys(cls, style, tile, tile_prefix, gs_keys):
+        """Searches the google storage keys for a complete asset.
 
-        # search for the parts of the asset we need
-        style = cls.original if date < cls._2016_12_07 else cls._2016_12_07
-
+        Only searches for the given style.
+        """
         style_regexes = cls.get_style_regexes(style, tile, compile=True)
         band_regex = style_regexes['raster-re']
         md_regexes = {'datastrip-md': style_regexes['datastrip-md-re'],
@@ -386,16 +371,18 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         expected_key_set = set(md_regexes.keys() + ['spectral-bands'])
         expected_band_cnt = len(cls._sensors['S2A']['band-strings'])
         bands = []
-        keys = {'spectral-bands': bands}
-        for i in cls.gs_api_search(prefix, delimiter=None)['items']:
-            k = i['name']
-            if len(bands) < expected_band_cnt and band_regex.match(k):
+        asset_keys = {'spectral-bands': bands}
+        for k in gs_keys:
+            p = k.replace(tile_prefix, '', 1)
+            if len(bands) < expected_band_cnt and band_regex.match(p):
                 bands.append(k)
-            else:
-                for md_key, regex in md_regexes.items():
-                    if regex.match(k):
-                        keys[md_key] = k
-                        del md_regexes[md_key] # don't repeat useless searches
+                continue
+            for md_key, regex in md_regexes.items():
+                if regex.match(p):
+                    utils.verbose_out('query_gs_find_keys found {}:'
+                                      '  {}'.format(md_key, k), 5)
+                    asset_keys[md_key] = k
+                    del md_regexes[md_key] # don't repeat useless searches
 
         # sort correctly despite the wart in the band numbering scheme ('8A')
         def band_sort_key(fn):
@@ -404,33 +391,63 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         bands.sort(key=band_sort_key)
 
         # check for asset completeness
+        problems = []
         if expected_band_cnt != len(bands):
-            utils.verbose_out("Found GS asset wasn't complete for"
-                              " (L1CGS, {}, {}); expected {} bands but got {}.".format(
-                tile, date, expected_band_cnt, len(bands)), 2)
-            return None
-        missing_keys = expected_key_set - set(keys.keys())
+            problems.append("expected {} bands but got {}".format(
+                expected_band_cnt, len(bands)))
+        missing_keys = expected_key_set - set(asset_keys.keys())
         if missing_keys:
-            utils.verbose_out("Found GS asset wasn't complete for"
-                              " (L1CGS, {}, {}); keys not found: {}".format(
-                tile, date, missing_keys), 2)
+            problems.append("keys not found: {}".format(missing_keys))
+        if problems:
+            raise IOError('; '.join(problems))
+        return asset_keys
+
+    @classmethod
+    def query_gs(cls, tile, date, pclouds):
+        """Query google's store of sentinel-2 data for the given scene."""
+        atd_triad = '(L1CGS, {}, {})'.format(tile, date.strftime('%Y-%j'))
+        tile_prefix = 'tiles/{}/{}/{}/'.format(tile[0:2], tile[2], tile[3:])
+        # use a template to handle S2A vs. S2B
+        prefix_template = tile_prefix + '{}_MSIL1C_' + date.strftime('%Y%m%d')
+        for sensor in cls._sensors.keys():
+            search_prefix = prefix_template.format(sensor)
+            # only going to be one prefix, if any are found
+            prefix = cls.gs_api_search(search_prefix).get(
+                'prefixes', [None])[0]
+            if prefix is not None:
+                break
+        if prefix is None:
+            return None
+
+        gs_keys = [i['name'] for i in
+                   cls.gs_api_search(prefix, delimiter=None)['items']]
+
+        # ESA & google may take awhile to finish reprocessing old data
+        # into single-tile assets, so for now, support both.
+        keys = None
+        for style in (cls.st_style, cls.ds_style):
+            try:
+                keys = cls.query_gs_find_keys(style, tile, tile_prefix, gs_keys)
+            except IOError as ioe:
+                utils.verbose_out('{} asset for {} was incomplete: {}'.format(
+                    style, atd_triad, ioe), 5)
+            else:
+                break
+        if keys is None:
+            utils.verbose_out('No complete asset for {}'.format(atd_triad), 5)
             return None
 
         # handle cloud cover
-        r = requests.get(cls.gs_object_url_base() + keys['tile-md'])
-        r.raise_for_status()
+        r = cls.gs_backoff_get(cls.gs_object_url_base() + keys['tile-md'])
         cc = cls.cloud_cover_from_et(
                 ElementTree.parse(StringIO.StringIO(r.text)))
         if cc > pclouds:
-            cc_msg = ('C1GS asset found for ({}, {}), but cloud cover'
+            cc_msg = ('C1GS asset found for {}, but cloud cover'
                       ' percentage ({}%) fails to meet threshold ({}%)')
-            utils.verbose_out(cc_msg.format(tile, date, cc, pclouds), 3)
+            utils.verbose_out(cc_msg.format(atd_triad, cc, pclouds), 3)
             return None
         # save it in the asset file to reduce network traffic
         keys['cloud-cover'] = cc
-
-        utils.verbose_out('Found complete L1CGS asset for'
-                          ' ({}, {})'.format(tile, date), 3)
         return dict(basename=(prefix.split('/')[-2] + '_gs.json'), keys=keys)
 
     @classmethod
@@ -447,41 +464,34 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         utils.verbose_out(
             'queried ATD {} {} {}, found '.format(asset, tile, date)
             + ('nothing' if rv is None else rv['basename']), 5)
+        if rv is None:
+            return None
+        rv['a_type'] = asset
         return rv
 
     @classmethod
-    def fetch_gs(cls, asset, tile, date, pclouds):
-        """Fetch from Google Storage, but only if asset type is L1CGS"""
-        qs_rv = cls.query_service(asset, tile, date, pclouds)
-        if qs_rv is None:
-            return []
-        keys = qs_rv['keys']
+    def download(cls, a_type, download_fp, **kwargs):
+        """Download from the configured source for the asset type."""
+        methods = {'L1C': cls.download_esa, 'L1CGS': cls.download_gs}
+        if a_type not in methods:
+            raise ValueError('Unfetchable asset type: {}'.format(asset))
+        return methods[a_type](download_fp, **kwargs)
+
+    @classmethod
+    def download_gs(cls, download_fp, keys, **ignored):
+        """Assembles json blob; doens't actually download anything."""
         # keys have been checked in query_gs already, so just take 'em
         a_content = {k: cls.gs_object_url_base() + keys[k]
                      for k in keys if k.endswith('-md')}
         a_content['spectral-bands'] = [
             cls.gs_vsi_prefix() + b for b in keys['spectral-bands']]
         a_content['cloud-cover'] = keys['cloud-cover']
-        cls.gs_stage_asset(qs_rv['basename'], a_content)
+        utils.json_dump(a_content, download_fp)
+        return True
 
     @classmethod
-    def fetch_esa(cls, asset, tile, date, pclouds):
+    def download_esa(cls, download_fp, url, basename, **ignored):
         """Fetch an asset from ESA if asset type is L1C."""
-        qs_rv = cls.query_service(asset, tile, date, pclouds)
-        if qs_rv is None:
-            return []
-        output_file_name, asset_url = (qs_rv['basename'], qs_rv['url'])
-
-        # old-style assets cover many tiles, so there may be duplication of
-        # effort; avoid that by aborting if the stage already contains the
-        # desired asset
-        full_staged_path = os.path.join(cls.Repository.path('stage'),
-                                        output_file_name)
-        if os.path.exists(full_staged_path):
-            utils.verbose_out('Asset `{}` needed but already in stage/,'
-                              ' skipping.'.format(output_file_name))
-            return []
-
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage
@@ -491,45 +501,31 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
                               ' --no-verbose --output-document="{}" "{}"')
         if gippy.Options.Verbose() != 0:
             fetch_cmd_template += ' --show-progress --progress=dot:giga'
-        utils.verbose_out("Fetching " + output_file_name)
-        with utils.error_handler("Error performing asset download '({})'".format(asset_url)):
-            tmp_dir_full_path = tempfile.mkdtemp(dir=cls.Repository.path('stage'))
-            try:
-                output_full_path = os.path.join(tmp_dir_full_path, output_file_name)
-                fetch_cmd = fetch_cmd_template.format(
-                        username, password, output_full_path, asset_url)
-                args = shlex.split(fetch_cmd)
-                p = subprocess.Popen(args)
-                p.communicate()
-                if p.returncode != 0:
-                    raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-                cls.stage_asset(output_full_path, output_file_name)
-            finally:
-                shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
-        return [output_full_path]
-
-    @classmethod
-    def fetch(cls, asset, tile, date, pclouds=100, **ignored):
-        """Fetch an asset."""
-        source = cls.get_setting('source')
-        return {'esa': cls.fetch_esa,
-                'gs':  cls.fetch_gs, }[source](asset, tile, date, pclouds)
+        utils.verbose_out("Fetching " + basename, 5)
+        with utils.error_handler(
+                "Error performing asset download '({})'".format(url)):
+            fetch_cmd = fetch_cmd_template.format(
+                    username, password, download_fp, url)
+            args = shlex.split(fetch_cmd)
+            p = subprocess.Popen(args)
+            p.communicate()
+            if p.returncode != 0:
+                raise IOError("Expected wget exit status 0, got {}".format(
+                    p.returncode))
+        return True
 
     @classmethod
     def archive(cls, path, recursive=False, keep=False, update=False):
-        """Archive original and new-style Sentinel-2 assets.
+        """Archive Sentinel-2 assets.
 
-        Original-style Sentinel-2 assets have special archiving needs
-        due to their multi-tile nature, so this method archives them
-        specially using hard links.
+        Datastrip assets have special archiving needs due to their
+        multi-tile nature, so this method archives them specially using
+        hard links.
         """
         if recursive:
             raise ValueError('Recursive asset search not supported by Sentinel-2 driver.')
 
-        found_files = {
-            'original': [],
-            cls._2016_12_07: [],
-        }
+        found_files = {cls.ds_style: [], cls.st_style: []}
 
         # find all the files that resemble assets in the given spot
         fn_pile = sum([utils.find_files(cls._assets[at]['pattern'], path)
@@ -547,14 +543,14 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
         assets = []
         overwritten_assets = []
-        for fn in found_files[cls._2016_12_07]:
+        for fn in found_files[cls.st_style]:
             new_aol, new_overwritten_aol = super(sentinel2Asset, cls).archive(
                     fn, False, keep, update)
             assets += new_aol
             overwritten_assets += new_overwritten_aol
 
-        for fn in found_files['original']:
-            tile_list = cls.tile_list(fn)
+        for fn in found_files[cls.ds_style]:
+            tile_list = cls.ds_tile_list(fn)
             # use the stage dir since it's likely not to break anything (ie on same filesystem)
             with utils.make_temp_dir(dir=cls.Repository.path('stage')) as tdname:
                 for tile in tile_list:
@@ -570,34 +566,20 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
 
         return assets, overwritten_assets
 
-
     @classmethod
-    def stage_asset(cls, asset_full_path, asset_base_name):
-        """Copy the given asset to the stage."""
-        stage_path = cls.Repository.path('stage')
-        stage_full_path = os.path.join(stage_path, asset_base_name)
-        os.rename(asset_full_path, stage_full_path) # on POSIX, if it works, it's atomic
-
-
-    @classmethod
-    def tile_list(cls, file_name):
-        """Extract a list of tiles from the given old-style asset."""
-        # find an xml file with a very long name in the top-level .SAFE/ directory
-        # eg
-        # S2A_OPER_MTD_SAFL1C_PDMC_20161030T191653_R079_V20161030T095132_20161030T095132.xml
+    def ds_tile_list(cls, file_name):
+        """Extract a list of tiles from the given datastrip-style asset."""
         tiles = set()
-        file_pattern = cls._asset_styles['original']['raster-re'].format(tileid=cls._tile_re)
+        file_pattern = cls._asset_styles[cls.ds_style]['raster-re'].format(
+            tileid=cls._tile_re)
         p = re.compile(file_pattern)
         with zipfile.ZipFile(file_name) as asset_zf:
             for f in asset_zf.namelist():
                 m = p.match(f)
                 if m:
                     tiles.add(m.group('tile'))
-        if not tiles:
-            raise Exception(
-                'Datastrip asset contains no tiles???? ({})'
-                .format(file_name)
-            )
+        if len(tiles) == 0:
+            raise IOError(file_name + ' contains no raster files')
         return list(tiles)
 
     @classmethod
@@ -626,16 +608,17 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
             return self.meta['cloud-cover']
         if os.path.exists(self.filename):
             with utils.make_temp_dir() as tmpdir:
-                metadata_file = [
-                    f for f in self.datafiles()
-                    if re.match(self.style_res['tile-md-re'], f)
-                ][0]
+                metadata_file = next(f for f in self.datafiles()
+                    if re.match(self.style_res['tile-md-re'], f))
                 self.extract([metadata_file], path=tmpdir)
                 tree = ElementTree.parse(tmpdir + '/' + metadata_file)
             self.meta['cloud-cover'] = self.cloud_cover_from_et(tree)
             return self.meta['cloud-cover']
 
-        results = self.query_scihub(self.tile, self.date)
+        results = self.query_scihub(
+            self.tile,
+            datetime.datetime.strptime(self.date.strftime('%Y-%m-%d'),'%Y-%m-%d')
+        )
         try:
             entry = results['feed']['entry']
         except:
@@ -646,31 +629,15 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         assert entry['double']['name'] == 'cloudcoverpercentage'
         return float(entry['double']['content'])
 
-    def filter(self, pclouds=100, **kwargs):
-        if pclouds >= 100:
-            return True
-        cc = self.cloud_cover()
-        asset_passes_filter = cc <= pclouds
-        if asset_passes_filter:
-            msg = 'Asset cloud cover is {} %, meets pclouds threshold of {} %'
-        else:
-            msg = ('Asset cloud cover is {} %,'
-                   ' fails to meet pclouds threshold of {} %')
-        utils.verbose_out(msg.format(cc, pclouds), 3)
-        return asset_passes_filter
-
     def save_tile_md_file(self, path):
         if self.asset == 'L1C':
-            tile_md_fn = next(fn for fn in ao.datafiles()
-                              if self.style_res['tile-md-re'].match(name))
+            tile_md_fn = next(fn for fn in self.datafiles()
+                              if re.match(self.style_res['tile-md-re'], fn))
             self.extract((tile_md_fn,), path)
             return os.path.join(path, tile_md_fn)
         # L1CGS case:
-        r = requests.get(self.json_content['tile-md'])
-        r.raise_for_status()
         fp = os.path.join(path, 'MTD_TL.xml')
-        with open(fp, 'wb') as fo:
-            fo.write(r.content)
+        self.gs_backoff_downloader(self.json_content['tile-md'], fp)
         return fp
 
     def xml_subtree_esa(self, md_file_type):
@@ -680,20 +647,26 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         """
         file_pattern = self.style_res[md_file_type + '-md-re']
         metadata_fn = next(fn for fn in self.datafiles() if re.match(file_pattern, fn))
+        utils.verbose_out(
+            'Found {} metadata file:  {}'.format(md_file_type, metadata_fn), 5)
         with zipfile.ZipFile(self.filename) as asset_zf:
             with asset_zf.open(metadata_fn) as metadata_zf:
                 return ElementTree.parse(metadata_zf)
 
     def xml_subtree_gs(self, md_file_type):
-        r = requests.get(self.json_content[md_file_type + '-md'])
-        r.raise_for_status()
+        r = self.gs_backoff_get(self.json_content[md_file_type + '-md'])
         return ElementTree.fromstring(r.content)
 
     def xml_subtree(self, md_file_type, *tags):
         tree = {'L1C': self.xml_subtree_esa,
                 'L1CGS': self.xml_subtree_gs,
                }[self.asset](md_file_type)
-        stl = [next(tree.iter(at)) for at in tags]
+        try:
+            stl = [next(tree.iter(at)) for at in tags]
+        except StopIteration:
+            err_str = "For Sentinel-2 {} {} {}, couldn't find {} in {}"
+            raise IOError(err_str.format(
+                self.asset, self.date, self.tile, tags, md_file_type))
         return stl if len(stl) > 1 else stl[0]
 
     def tile_metadata(self):
@@ -823,25 +796,23 @@ class sentinel2Asset(Asset, gips.data.core.GoogleStorageMixin):
         wkt_points = ", ".join([y + " " + x for x, y in list(zipped_points)])
         footprint_wkt = "POLYGON (({}))".format(wkt_points)
 
-        # For old style assets, `Global_Footprint` is the entire swath,
+        # For datastrip assets, `Global_Footprint` is the entire swath,
         # so intersect it with tile boundary to get actual footprint.
         tile_polygon = wkt_loads(self.get_geometry())
         return tile_polygon.intersection(wkt_loads(footprint_wkt)).wkt
 
 
-class sentinel2Data(Data):
+class sentinel2Data(gips.data.core.CloudCoverData):
     name = 'Sentinel2'
     version = '0.1.1'
     Asset = sentinel2Asset
+    inline_archive = True
 
-    _productgroups = {
-        'Index': [
-            'ndvi', 'evi', 'lswi', 'ndsi', 'bi', 'satvi', 'msavi2', 'vari',
-            'brgt', 'ndti', 'crc', 'crcm', 'isti', 'sti',
-        ],
-        'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
-                    'spm655', 'turbidity', 'acoflags'],
-    }
+    _productgroups = {'ACOLITE': [
+        'rhow', 'oc2chl', 'oc3chl', 'fai', 'spm', 'spm2016',
+        'turbidity', 'acoflags', 'gonschl', 'gons740chl', 'moses3bchl',
+        'moses3b740chl', 'mishrachl', 'ndci',
+    ]}
 
     _products = {
         # standard products
@@ -871,36 +842,19 @@ class sentinel2Data(Data):
         },
     }
 
-    # add index products to _products
+    gips.data.core.add_gippy_index_products(
+        _products, _productgroups, _asset_types)
+
+    # indices not processed by gippy.Indices(); L1CGS not supported:
     _products.update(
-        (p, {'description': d,
-             'assets': _asset_types,
+        (p, {'description': d, 'assets': ('L1C',),
              'bands': [{'name': p, 'units': Data._unitless}]}
         ) for p, d in [
-            # duplicated in modis and landsat; may be worth it to DRY out
-            ('ndvi',   'Normalized Difference Vegetation Index'),
-            ('evi',    'Enhanced Vegetation Index'),
-            ('lswi',   'Land Surface Water Index'),
-            ('ndsi',   'Normalized Difference Snow Index'),
-            ('bi',     'Brightness Index'),
-            ('satvi',  'Soil-Adjusted Total Vegetation Index'),
-            ('msavi2', 'Modified Soil-adjusted Vegetation Index'),
-            ('vari',   'Visible Atmospherically Resistant Index'),
-            ('brgt',   'VIS and NIR reflectance, weighted by solar energy distribution.'),
-            # index products related to tillage
-            ('ndti',   'Normalized Difference Tillage Index'),
-            ('crc',    'Crop Residue Cover (uses BLUE)'),
-            ('crcm',   'Crop Residue Cover, Modified (uses GREEN)'),
-            ('isti',   'Inverse Standard Tillage Index'),
-            ('sti',    'Standard Tillage Index'),
-            # not processed by gippy.Indices() but still indices products:
             ('mtci',    'MERIS Terrestrial Chlorophyll Index'),
-            ('s2rep',   'Sentinel-2 Red Edge Position'),
-        ]
-    )
+            ('s2rep',   'Sentinel-2 Red Edge Position')])
 
     # acolite doesn't (yet?) support google storage sentinel-2 data
-    atmosphere.add_acolite_product_dicts(_products, 'L1C')
+    atmosphere.add_acolite_product_dicts(_products, 'L1C', s2=True)
 
     _product_dependencies = {
         'indices':      'ref',
@@ -916,18 +870,6 @@ class sentinel2Data(Data):
         's2rep':        'ref',
         'cloudmask':	'cfmask',
     }
-
-    need_fetch_kwargs = True
-
-    @classmethod
-    def need_to_fetch(cls, a_type, tile, date, update, **fetch_kwargs):
-        if date < sentinel2Asset._2016_12_07:
-            # must be an original-style asset, which has many tiles at
-            # query time, so there's no easy way to tell if we can skip the
-            # download or not.  So, just assume the worst and fetch it.
-            return True
-        return super(sentinel2Data, cls).need_to_fetch(
-                a_type, tile, date, update, **fetch_kwargs)
 
     def plan_work(self, requested_products, overwrite):
         """Plan processing run using requested products & their dependencies.
@@ -983,6 +925,13 @@ class sentinel2Data(Data):
         self._product_images[product] = image
         return image
 
+    def _drop_geoimage_cache(self):
+        """GeoImage objects hold a file handle.  Dropping them to avoid
+        filesystme complications.
+        """
+        for k in self._product_images:
+            v = self._product_images.pop(k)
+            del v
 
     @classmethod
     def normalize_tile_string(cls, tile_string):
@@ -995,17 +944,6 @@ class sentinel2Data(Data):
             err_msg = "Tile string '{}' doesn't match MGRS format (eg '04QFJ')".format(tile_string)
             raise IOError(err_msg)
         return tile_string.upper()
-
-    @classmethod
-    def add_filter_args(cls, parser):
-        """Add custom filtering options for sentinel2."""
-        help_str = ('cloud percentage threshold; assets with cloud cover'
-                    ' percentages higher than this value will be filtered out')
-        parser.add_argument('--pclouds', help=help_str,
-                            type=cls.natural_percentage, default=100)
-
-    def filter(self, pclouds=100, **kwargs):
-        return all([asset.filter(pclouds, **kwargs) for asset in self.assets.values()])
 
     def prep_meta(self, additional=None):
         meta = super(sentinel2Data, self).prep_meta(
@@ -1026,6 +964,24 @@ class sentinel2Data(Data):
             # Use zipfile directly using GDAL's virtual filesystem
             return [os.path.join('/vsizip/' + ao.filename, f) for f in fnl]
 
+    def _download_gcs_bands(self, output_dir):
+        if self.current_asset().asset != 'L1CGS':
+            raise
+
+        self._time_report('Start download from GCS')
+        band_files = []
+        for path in self.raster_paths():
+            match = re.match("/[\w_]+/(.+)", path)
+            url = match.group(1)
+            output_path = os.path.join(
+                output_dir, os.path.basename(url)
+            )
+            if not os.path.exists(output_path):
+                self.Asset.gs_backoff_downloader(url, output_path)
+            band_files.append(output_path)
+        self._time_report('Finished download from GCS ({} bands)'.format(len(band_files)))
+        return band_files
+
     def ref_toa_geoimage(self):
         """Make a proto-product which acts as a basis for several products.
 
@@ -1041,8 +997,12 @@ class sentinel2Data(Data):
                                     self.basename + '_ref-toa.vrt')
         cmd_args = ('gdalbuildvrt -tr 20 20 -separate'
                     ' -srcnodata 0 -vrtnodata 0').split(' ')
+        if ao.asset == 'L1CGS':
+            raster_paths = self._download_gcs_bands(self._temp_proc_dir)
+        else:
+            raster_paths = self.raster_paths()
         cmd_args += [vrt_filename] + [
-            f for f in self.raster_paths() if f[-6:-4] in indices_bands]
+            f for f in raster_paths if f[-6:-4] in indices_bands]
         p = subprocess.Popen(cmd_args)
         p.communicate()
         if p.returncode != 0:
@@ -1163,29 +1123,20 @@ class sentinel2Data(Data):
 
     def process_acolite(self, aco_prods):
         a_obj, sensor = self.current_asset(), self.current_sensor()
-        self._time_report("Starting acolite processing") # for {}".format(x.keys()))
+        self._time_report("Starting acolite processing")
         # let acolite use a subdirectory in this run's tempdir:
-        aco_tmp_dir = self.generate_temp_path('acolite')
-        os.mkdir(aco_tmp_dir)
-        acolite_product_spec = {'meta': self.prep_meta()}
-        for p in aco_prods:
-            # TODO use tempdirs to match current gips practices
-            fn = os.path.join(self.path, self.product_filename(sensor, p))
-            aps_p = acolite_product_spec[p] = {'fname': fn}
-            aps_p.update(self._products[p])
-            aps_p.pop('assets')
+        aco_dn = self.generate_temp_path('acolite')
+        os.mkdir(aco_dn)
+        # TODO use self.temp_product_filename(sensor, prod_type)
+        # then copy into self.path the right way
+        p_spec = {p: os.path.join(self.path, self.product_filename(sensor, p))
+                  for p in aco_prods}
+        layer_02_abs_fn = next(fn for fn in self.raster_paths()
+                               if fn.endswith('_B02.jp2'))
+        model_image = gippy.GeoImage(layer_02_abs_fn)
 
-        w_lon, e_lon, s_lat, n_lat = self.Repository.tile_lat_lon(a_obj.tile)
-        roi = None
-        if a_obj.style == 'original':
-            roi = (s_lat, w_lon, n_lat, e_lon)
-
-        prodout = atmosphere.process_acolite(
-                a_obj, aco_tmp_dir, acolite_product_spec,
-                a_obj.style_res['raster-re'],
-                extracted_asset_glob='*.SAFE',
-                roi=roi,
-                band='02')
+        prodout = atmosphere.process_acolite(a_obj, aco_dn, p_spec,
+                self.prep_meta(), model_image, "*.SAFE")
 
         [self.AddFile(sensor, pt, fn) for pt, fn in prodout.items()]
         self._time_report(' -> {}: processed {}'.format(
@@ -1226,13 +1177,18 @@ class sentinel2Data(Data):
 
         DEVNULL = open(os.devnull, 'w')
 
+        print("ASSET", ao.asset)
+        if ao.asset == 'L1CGS':
+            band_files = self._download_gcs_bands(self._temp_proc_dir)
+        else:
+            band_files = self.raster_paths()
         gdalbuildvrt_args = [
             "gdalbuildvrt",
             "-resolution", "user",
             "-tr", "20", "20",
             "-separate",
             "%s/allbands.vrt" % self._temp_proc_dir,
-        ] + self.raster_paths()
+        ] + band_files
         subprocess.check_call(gdalbuildvrt_args, stderr=DEVNULL)
 
         # set up commands
@@ -1255,16 +1211,10 @@ class sentinel2Data(Data):
             prev_wd = os.getcwd()
             os.chdir(tdir)
             try:
-                utils.verbose_out('running: ' + ' '.join(angles_cmd_list), 3)
-                subprocess.check_call(
-                    angles_cmd_list,
-                    #stderr=DEVNULL
-                )
-                utils.verbose_out('running: ' + ' '.join(fmask_cmd_list), 3)
-                subprocess.check_call(
-                    fmask_cmd_list,
-                    stderr=DEVNULL
-                )
+                self._time_report('running: ' + ' '.join(angles_cmd_list))
+                subprocess.check_call(angles_cmd_list)
+                self._time_report('running: ' + ' '.join(fmask_cmd_list))
+                subprocess.check_call(fmask_cmd_list)
             finally:
                 os.chdir(prev_wd)
 
@@ -1376,7 +1326,10 @@ class sentinel2Data(Data):
         are found.  Products are saved to a well-known or else specified
         directory.  kwargs is unused, and is present for compatibility.
         """
-        self._time_report('Starting processing for this temporal-spatial unit')
+        a_obj = self.current_asset()
+        self._time_report(
+            'Starting processing for Sentinel-2 {} {} {}'.format(
+            a_obj.asset, a_obj.tile, a_obj.date))
         products = self.needed_products(products, overwrite)
         if len(products) == 0:
             utils.verbose_out('No new processing required.')
@@ -1385,11 +1338,10 @@ class sentinel2Data(Data):
 
         work = self.plan_work(products.requested.keys(), overwrite) # see if we can save any work
 
-        if self.current_asset().asset == 'L1CGS':
-            no_can_do = work & set(('mtci-toa', 'mtci', 's2rep-toa', 's2rep'))
-            if no_can_do:
-                raise NotImplementedError(
-                    'Not supported for L1CGS assets:  ' + ' '.join(no_can_do))
+        if (a_obj.asset == 'L1C' and a_obj.style == a_obj.ds_style and
+                work & set(self._productgroups['ACOLITE'])):
+            raise NotImplementedError(
+                "Datastrip assets aren't compatible with acolite")
 
         # only do the bits that need doing
         if 'ref-toa' in work:
@@ -1419,7 +1371,7 @@ class sentinel2Data(Data):
         # Process standard products
         for prod_type in products.groups()['Standard']:
             err_msg = 'Error creating product {} for {}'.format(
-                    prod_type, self.current_asset().basename)
+                    prod_type, a_obj.basename)
             with utils.error_handler(err_msg, continuable=True):
                 self._time_report('Starting {} processing'.format(prod_type))
                 temp_fp = self.temp_product_filename(sensor, prod_type)
@@ -1473,3 +1425,6 @@ class sentinel2Data(Data):
 
         self._product_images = {} # hint for gc; may be needed due to C++/swig weirdness
         self._time_report('Processing complete for this spatial-temporal unit')
+
+        ## Drop GeoImage cache
+        self._drop_geoimage_cache()

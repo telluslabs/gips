@@ -62,19 +62,10 @@ def t_managed_request_returns_none(fetch_mocks, a_type, tile, date, url):
     """Unit test for handling cases when managed_request returns None.
 
     This happens for any 4xx error, 5xx error, and similar."""
-    # setup & mocks
-    (m_query_service, managed_request, _, _, open, _) = fetch_mocks
-    m_query_service.return_value = {'basename': 'whatever.hdf', 'url': url}
+    (_, managed_request, _, _, open, _) = fetch_mocks
     managed_request.return_value = None
-
-    # call
-    actual = modis.modisAsset.fetch(a_type, tile, date)
-
-    # assertions:
-    assert ([] == actual
-            and (url,) == managed_request.call_args[0]
-            # It should skip the I/O code except for managed_request
-            and 0 == open.call_count)
+    actual = modis.modisAsset.download(a_type, 'fake-download-path', url=url)
+    assert actual == False and 0 == open.call_count
 
 # VERY truncated snippet of an actual listing file
 MYD11A1_listing = [
@@ -156,19 +147,16 @@ asset_content = ("If you think you understand, you don't.\n"
 @pytest.mark.parametrize('a_type, tile, date, asset_fn, url', http_200_params)
 def t_http_matching_listings(mocker, fetch_mocks, a_type, tile, date, asset_fn, url):
     """Query http server, extract asset URL, then download it."""
-    (m_query_service, managed_request, m_get_setting, content, open, file
-     ) = fetch_mocks
-    m_query_service.return_value = {'basename': asset_fn, 'url': url}
+    (_, managed_request, _, content, open, file) = fetch_mocks
     content.read.return_value = asset_content
 
     expected = ['driver-dir/stage/' + asset_fn]
-    actual = modis.modisAsset.fetch(a_type, tile, date)
+    actual = modis.modisAsset.download(a_type, 'some-file-path', url='some-url')
 
     # assertions
-    assert (expected == actual
-            and (url,) == managed_request.call_args[0]
+    assert (actual == True
             and 1 == content.read.call_count
             # did we open the right filename?
-            and open.call_args[0][0].endswith(asset_fn)
+            and open.call_args[0][0] == 'some-file-path'
             # file write assertions:  open(...) as fd && fd.write(...)
             and (asset_content,) == file.write.call_args[0])

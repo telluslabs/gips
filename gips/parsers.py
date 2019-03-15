@@ -5,11 +5,11 @@
 #    AUTHOR: Matthew Hanson
 #    EMAIL:  matt.a.hanson@gmail.com
 #
-#    Copyright (C) 2014 Applied Geosolutions
+#    Copyright (C) 2014-2018 Applied Geosolutions
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation; either version 2 of the License, or
+#    the Free Software Foundation; either version 3 of the License, or
 #    (at your option) any later version.
 #
 #    This program is distributed in the hope that it will be useful,
@@ -95,6 +95,8 @@ class GIPSParser(argparse.ArgumentParser):
         group.add_argument('--%tile', dest='ptile', help='Threshold of %% tile used', default=0, type=int)
         group.add_argument('--fetch', help='Fetch any missing data (if supported)',
                            default=False, action='store_true')
+        group.add_argument('--size', help='Compute size of data specified (MiB)',
+                           default=False, action='store_true')
         group.add_argument('--update', help='Force fetch and/ or update data (if supported)', default=False, action='store_true')
         parser.add_argument(
             '--chunksize', help='Chunk size in MB', default=128.0, type=float
@@ -114,7 +116,8 @@ class GIPSParser(argparse.ArgumentParser):
         else:
             parser = self
         group = parser.add_argument_group('processing options')
-        group.add_argument('--overwrite', help='Overwrite existing output file(s)', default=False, action='store_true')
+        group.add_argument('--overwrite', help='Overwrite existing output file(s)',
+                           default=False, action='store_true')
         group.add_argument('--format', help='Format for output file', default="GTiff")
         h = ('Don\'t process. Instead, generate batch file with single '
              'gips_process command on each line.  \'overwrite\', '

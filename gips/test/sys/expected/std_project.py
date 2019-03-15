@@ -4,6 +4,7 @@ from .. import util
 
 from . import modis_project
 from . import merra_project
+from . import hls_export
 from . import std_process
 
 mark_spec = std_process.lite_mark_spec.copy()
@@ -12,6 +13,7 @@ expectations = {}
 expectations['modis'] = modis_project.expectations
 
 expectations['merra'] = merra_project.expectations
+expectations['hls'] = hls_export.expectations
 
 expectations['aod'] = collections.OrderedDict([
  # t_project[aod-aod] recording:
