@@ -1179,6 +1179,22 @@ class landsatData(gips.data.core.CloudCoverData):
             with utils.error_handler('Error reading ' + basename(self.assets[asset].filename)):
                 img = self._readraw(asset)
 
+            # This is landsat, so always just one sensor for a given date
+            sensor = self.sensors[asset]
+
+            if asset.startswith('C1'):
+                # BQA in C1 labels pixels 1 if they are suspect.  In the case
+                # of LC8, 1:='terrain occlusion", and
+                # for LE7 and LT5 1:= "dropped pixel"
+                #
+                # In either case:
+                # qaimg[i,j] == 1 <==> band[x][i,j] is suspect
+                # XOR(1., qaimg[i,j]) > 0 <==> qaimg[i,j] == 1.
+                qaimg = self._readqa(asset)
+                img.AddMask(qaimg[0].BXOR(1) > 0)
+
+            asset_fn = self.assets[asset].filename
+
             meta = self.assets[asset].meta['bands']
             visbands = self.assets[asset].visbands
             lwbands = self.assets[asset].lwbands
@@ -1262,11 +1278,6 @@ class landsatData(gips.data.core.CloudCoverData):
             for col in self.assets[asset].lwbands:
                 reflimg[col] = (((img[col].pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
                         ) * meta[col]['K2'] - 273.15
-
-            # This is landsat, so always just one sensor for a given date
-            sensor = self.sensors[asset]
-
-            asset_fn = self.assets[asset].filename
 
             # Process standard products (this is in the 'DN' block)
             for key, val in groups['Standard'].items():
