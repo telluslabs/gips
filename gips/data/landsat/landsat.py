@@ -1183,15 +1183,15 @@ class landsatData(gips.data.core.CloudCoverData):
             sensor = self.sensors[asset]
 
             if asset.startswith('C1'):
-                # BQA in C1 labels pixels 1 if they are suspect.  In the case
-                # of LC8, 1:='terrain occlusion", and
-                # for LE7 and LT5 1:= "dropped pixel"
-                #
-                # In either case:
-                # qaimg[i,j] == 1 <==> band[x][i,j] is suspect
-                # XOR(1., qaimg[i,j]) > 0 <==> qaimg[i,j] == 1.
+                # BQA in C1 defines value 1 as "designated fill", in addition to any
+                # no data value defined for a band.  As BQA value 0 is
+                # undefined, and has not been seen in any assets thus far -- so
+                # also excluding 0 is OK.
+                # N.B. the label "designated fill" is mutually exclusive with
+                #      all other bqa labels.
+                #      See https://landsat.usgs.gov/collectionqualityband
                 qaimg = self._readqa(asset)
-                img.AddMask(qaimg[0].BXOR(1) > 0)
+                img.AddMask(qaimg[0] > 1)
 
             asset_fn = self.assets[asset].filename
 
