@@ -20,6 +20,8 @@ import math
 import numpy as np
 import requests
 
+import ogr, osr
+
 import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
