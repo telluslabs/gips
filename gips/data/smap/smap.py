@@ -44,14 +44,14 @@ class smapAsset(Asset):
     _assets = {
         'SM_P_E': {
             'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.002',
-            'pattern': r'SMAP\_.{2}\_SM\_P\_E\_.{8}\_.{6}\_.{3}\.h5',
+            'pattern': r'SMAP\_.{2}\_SM\_P\_E\_.{8}\_.{6}\_.{3}\.h5$',
             'description': 'Passive Enhanced Radiometer Based SM at 9KM',
             'startdate': datetime.date(2015, 3, 31),
             'latency': 1,
         },
         'SM_P': {
             'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP.005',
-            'pattern': r'SMAP\_.{2}\_SM\_P\_.{8}\_.{6}\_.{3}\.h5',
+            'pattern': r'SMAP\_.{2}\_SM\_P\_.{8}\_.{6}\_.{3}\.h5$',
             'description': 'Passive Original Radiometer Based SM at 36KM',
             'startdate': datetime.date(2015, 3, 31),
             'latency': 1,
