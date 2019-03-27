@@ -150,8 +150,7 @@ class smapData(Data):
             'startdate': datetime.date(2015, 3, 31),
             'sensor': 'RAD',
             'latency': 1,
-            '_geotransform': (-17367530.44516138, 36032.220850622405123, 0,
-                              7314540.79258289, 0, -36032.217290640393912),
+
         },
         'smpe': {
             'description': 'SMAP SM AM Acquisiton posted on enhanced 9km grid',
@@ -160,8 +159,7 @@ class smapData(Data):
             'startdate': datetime.date(2015, 3, 31),
             'sensor': 'RAD',
             'latency': 1,
-            '_geotransform': (-17367530.44516138, 9000.0, 0, 7314540.79258289,
-                              0, -9000.0),
+
         }
     }
 
@@ -193,6 +191,33 @@ class smapData(Data):
                 allsds.extend(sds)
 
         return asset, missingassets, availassets, allsds
+
+    def geotransform(self,img):
+        """This function provides the geotranform information needed for output tif"""
+        # Proj4 format of SMAP _projection
+        projection='+proj=cea +lon_0=0 +lat_ts=30 +ellps=WGS84 +units=m'
+        srs = osr.SpatialReference()
+        srs.ImportFromProj4(projection)
+
+        # WGS84 projection reference
+        OSR_WGS84_REF = osr.SpatialReference()
+        OSR_WGS84_REF.ImportFromEPSG(4326)
+
+        # OSR transformation
+        wgs84_to_image_transformation = osr.CoordinateTransformation(OSR_WGS84_REF, srs)
+        point = ogr.Geometry(ogr.wkbPoint)
+        x1,y1 = -1*int(img.Meta('Metadata_Extent_eastBoundLongitude')),float(img.Meta('Metadata_Extent_northBoundLatitude'))
+        point.AddPoint(x1, y1)
+        point.Transform(wgs84_to_image_transformation)
+        x2,y2 = point.GetX(), point.GetY()
+
+        # resolution calculation
+        xcount = img.XSize()
+        ycount = img.YSize()
+        xres = (-1*x2-x2)/xcount
+        yres = (-1*y2-y2)/ycount
+        
+        return np.array([x2, xres, 0, y2, 0, yres])
 
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
@@ -230,14 +255,14 @@ class smapData(Data):
             imgdata = img.Read()
             imgout = gippy.GeoImage(fname, img.XSize(), img.YSize(), 1,
                                     gippy.GDT_Float32)
-            del img
             imgout.SetNoData(-9999.0)
             imgout.SetOffset(0.0)
             imgout.SetGain(1.0)
             imgout.SetBandName('Soil Moisture', 1)
             imgout.SetProjection(self._projection)
-            imgout.SetAffine(np.array(self._products[prod_type]
-                                      ['_geotransform']))
+            imgout.SetAffine(self.geotransform(img))
+            del img
+
             imgout[0].Write(imgdata)
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
