@@ -7,7 +7,7 @@ export TAG=${1:-latest}
 
 docker-compose run \
     -v "$HOME/.aws:/root/.aws" \
-    -v "$GIPS_DATA:/export" \
+    -v "$GIPS_DATA:/archive" \
     -v "$GIPS_HOME:/gips" \
     gips \
     /bin/bash
