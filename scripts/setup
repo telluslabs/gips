@@ -3,7 +3,6 @@
 set -e
 
 eval $(cat gips_creds.sh)
-aws s3 cp s3://${GIPS_S3}/gips_init.tgz ./
 tar xvfz gips_init.tgz
 
 # TODO: Check for version numbers based on minimum system requirements
