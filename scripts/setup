@@ -3,6 +3,7 @@
 set -e
 
 eval $(cat gips_creds.sh)
+aws s3 cp s3://${GIPS_S3}/gips_init.tgz ./
 tar xvfz gips_init.tgz
 
 # TODO: Check for version numbers based on minimum system requirements
@@ -23,11 +24,11 @@ fi
 # TODO: There has got to be a better way to do this
 # Using /archive as a way to get two important items out of the container
 
-docker run -v ${GIPS_DATA}:/archive ${OWNER}/gips cp -r gips.egg-info /archive
+docker run -v ${GIPS_DATA}:/archive telluslabs/gips cp -r gips.egg-info /archive
 cp -r ${GIPS_DATA}/gips.egg-info ${GIPS_HOME}/
 rm -rf ${GIPS_DATA}/gips.egg-info
 
-docker run -v ${GIPS_DATA}:/archive ${OWNER}/gips cp -r gips/settings.py /archive
+docker run -v ${GIPS_DATA}:/archive telluslabs/gips cp -r gips/settings.py /archive
 cp -r ${GIPS_DATA}/settings.py ${GIPS_HOME}/gips/
 rm -rf ${GIPS_DATA}/settings.py
 
