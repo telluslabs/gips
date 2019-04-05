@@ -21,6 +21,8 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
+from __future__ import print_function
+
 import os
 from gips import __version__
 from gips.parsers import GIPSParser
@@ -32,6 +34,7 @@ from gips.inventory import orm
 
 import boto3
 import zipfile
+import shutil
 
 
 TMPDIR = "/tmp"
@@ -49,11 +52,12 @@ def main():
     args = parser0.parse_args()
 
     cls = utils.gips_script_setup(args.command, args.stop_on_error)
-    print title
+    print(title)
 
     with utils.error_handler():
 
-        if args.site.startswith('s3'):
+        if args.site.startswith('s3://'):
+
             S3 = boto3.resource('s3')
             s3path = args.site.lstrip('s3://')
 
@@ -66,11 +70,21 @@ def main():
                 zipped = zipfile.ZipFile(zippath)
                 zipped.extractall(TMPDIR)
                 shppath = os.path.splitext(zippath)[0] + '.shp'
-
             else:
                 raise Exception('unzipped shapefiles not suppoerted yet')
 
             args.site = shppath
+
+        if args.outdir.startswith('s3://'):
+            S3 = boto3.resource('s3')
+            s3path = args.outdir.lstrip('s3://')
+            dirname = s3path.split('/')[-1]
+            s3_bucket = s3path.split('/')[0]
+            s3_key = "/".join(s3path.split('/')[1:])
+            s3outdir = args.outdir
+            args.outdir = os.path.join(TMPDIR, dirname)
+        else:
+            s3outdir = None
 
         extents = SpatialExtent.factory(
             cls, site=args.site, rastermask=args.rastermask,
@@ -109,6 +123,24 @@ def main():
                     .format(str(t_extent), str(t_extent)),
                     2,
                 )
+
+    if s3outdir is not None:
+
+        outpath = args.outdir
+        zippath = outpath + ".zip"
+        shutil.make_archive(outpath, 'zip', args.outdir)
+        zipname = os.path.split(zippath)[-1]
+
+        S3 = boto3.resource('s3')
+
+        s3path = s3outdir.lstrip('s3://')
+        s3_bucket = s3path.split('/')[0]
+        s3_key = "/".join(s3path.split('/')[1:]) + ".zip"
+
+        print('uploading', zippath, s3_bucket, s3_key)
+        S3.meta.client.upload_file(zippath, s3_bucket, s3_key)
+
+
 
     utils.gips_exit() # produce a summary error report then quit with a proper exit status
 
