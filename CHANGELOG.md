@@ -9,6 +9,10 @@ and this project adheres to
 ### Added
 - mask out Landsat C1 edge effect isues (E-W edge and SLC-off)
 
+### Changed
+- use RedEdge4 as NIR band for index computations -- it is
+  more similar to LC8's NIR.
+
 ## v0.13.0
 ### Added
 - add support to fetch MODIS MCD43A4 from AWS S3
