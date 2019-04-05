@@ -30,6 +30,12 @@ from gips import utils
 from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import orm
 
+import boto3
+import zipfile
+
+
+TMPDIR = "/tmp"
+
 
 def main():
     title = Colors.BOLD + 'GIPS Data Export (v%s)' % __version__ + Colors.OFF
@@ -46,6 +52,26 @@ def main():
     print title
 
     with utils.error_handler():
+
+        if args.site.startswith('s3'):
+            S3 = boto3.resource('s3')
+            s3path = args.site.lstrip('s3://')
+
+            if args.site.endswith('.zip'):
+                filename = s3path.split('/')[-1]
+                s3_bucket = s3path.split('/')[0]
+                s3_key = "/".join(s3path.split('/')[1:])
+                zippath = os.path.join(TMPDIR, filename)
+                S3.Bucket(s3_bucket).download_file(s3_key, zippath)
+                zipped = zipfile.ZipFile(zippath)
+                zipped.extractall(TMPDIR)
+                shppath = os.path.splitext(zippath)[0] + '.shp'
+
+            else:
+                raise Exception('unzipped shapefiles not suppoerted yet')
+
+            args.site = shppath
+
         extents = SpatialExtent.factory(
             cls, site=args.site, rastermask=args.rastermask,
             key=args.key, where=args.where, tiles=args.tiles,
