@@ -1886,10 +1886,10 @@ class landsatData(gips.data.core.CloudCoverData):
         inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
         landsat_footprint = wkt_loads(self.assets[next(iter(self.assets))].get_geometry())
+        geo_images = self._s2_tiles_for_coreg(
+            inventory, starting_date, landsat_footprint
+        )
         if geo_images:
-            geo_images = self._s2_tiles_for_coreg(
-                inventory, starting_date, landsat_footprint
-            )
             geo_images = self.Asset._cache_if_vsicurl(geo_images, tmpdir)
             date_found = starting_date
 
