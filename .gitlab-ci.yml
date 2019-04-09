@@ -57,7 +57,8 @@ run_tests:
 
 publish_image:
   stage: deploy
-  only: tags
+  only:
+    - tags
   script:
     - apt-get update && apt-get -y install wget git
     - wget -O sixs ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/sixs
