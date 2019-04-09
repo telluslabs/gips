@@ -1231,7 +1231,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         try:
                             # on error, use the unshifted image
                             s2_export = self.sentinel2_coreg_export(tmpdir_fp)
-                            self.run_arop(s2_export)
+                            self.run_arop(s2_export, img['NIR'].Filename())
                         except NoSentinelError:
                             verbose_out(
                                 'No Sentinel found for co-registration', 4)
@@ -1883,13 +1883,17 @@ class landsatData(gips.data.core.CloudCoverData):
         self._time_report("querying for most recent sentinel2 images")
 
         # TODO: DRY the following statement which is repeated 3 times here
-        # BUG: This inventory is never inspected, and tosses out temporally
-        #      coincident sentinel2 from being used for coregistration
         inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
         landsat_footprint = wkt_loads(self.assets[next(iter(self.assets))].get_geometry())
+        if geo_images:
+            geo_images = self._s2_tiles_for_coreg(
+                inventory, starting_date, landsat_footprint
+            )
+            geo_images = self.Asset._cache_if_vsicurl(geo_images, tmpdir)
+            date_found = starting_date
 
-        while True:
+        while not geo_images:
             if delta > timedelta(90):
                 raise NoSentinelError(
                     "didn't find s2 images in this utm zone {}, (pathrow={},date={})"
@@ -1935,7 +1939,7 @@ class landsatData(gips.data.core.CloudCoverData):
         self._time_report("done with s2 export")
         return tmpdir + '/sentinel_mosaic.bin'
 
-    def run_arop(self, base_band_filename):
+    def run_arop(self, base_band_filename, warp_band_filename):
         """
         Runs AROP's `ortho` program.
 
@@ -1951,21 +1955,18 @@ class landsatData(gips.data.core.CloudCoverData):
             nir_band = asset._sensors[asset.sensor]['bands'][
                 asset._sensors[asset.sensor]['colors'].index('NIR')
             ]
-            warp_band_filenames = [
-                f for f in asset.datafiles()
-                        if f.endswith("B{}.TIF".format(nir_band))
-            ]
             if asset_type not in ['C1GS', 'C1S3']:
-                warp_band_filenames = ['/vsitar/' + os.path.join(asset.filename, f) for f in warp_band_filenames]
+                warp_band_filename = '/vsitar/' + os.path.join(asset.filename, warp_band_filename)
 
+            # TODO:  I believe this is a singleton, so it should go away
             warp_bands_bin = []
-            for band in warp_band_filenames:
-                band_bin = basename(band) + '.bin'
-                cmd = ["gdal_translate", "-of", "ENVI",
-                       band,
-                       os.path.join(tmpdir, band_bin)]
-                subprocess.call(args=cmd, cwd=tmpdir)
-                warp_bands_bin.append(band_bin)
+
+            band_bin = basename(warp_band_filename) + '.bin'
+            cmd = ["gdal_translate", "-of", "ENVI",
+                   warp_band_filename,
+                   os.path.join(tmpdir, band_bin)]
+            subprocess.call(args=cmd, cwd=tmpdir)
+            warp_bands_bin.append(band_bin)
 
             # make parameter file
             with open(os.path.join(os.path.dirname(__file__), 'input_file_tmp.inp'), 'r') as input_template:
