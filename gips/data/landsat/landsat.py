@@ -1883,6 +1883,8 @@ class landsatData(gips.data.core.CloudCoverData):
         self._time_report("querying for most recent sentinel2 images")
 
         # TODO: DRY the following statement which is repeated 3 times here
+        # BUG: This inventory is never inspected, and tosses out temporally
+        #      coincident sentinel2 from being used for coregistration
         inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
         landsat_footprint = wkt_loads(self.assets[next(iter(self.assets))].get_geometry())
