@@ -1,0 +1,23 @@
+FROM gippy-03x-release
+
+ARG GIPS_VERSION
+USER root
+RUN apt-get update \
+    && apt-get -y install libcurl4-gnutls-dev 
+
+
+COPY sixs /usr/local/bin/sixs
+copy ortho /usr/local/bin/ortho
+
+RUN chmod +x /usr/local/bin/sixs \
+    &&  chmod +x /usr/local/bin/ortho \
+    && pip install https://github.com/Applied-GeoSolutions/gips/archive/v${GIPS_VERSION}.tar.gz \
+    && gips_config env -r /archive -e anonymous@anywhere.net \
+    && groupadd -g 10023 gips \
+    && useradd -m -r -u 10023 -g gips gips \
+    && chown -R gips:gips /archive 
+
+
+USER gips
+RUN gips_config user 
+WORKDIR /home/gips
