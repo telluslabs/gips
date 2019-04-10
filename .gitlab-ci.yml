@@ -7,7 +7,7 @@ make_image:
     - wget -O gitlab_ci ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gitlab_ci
     - wget -O gips_creds.sh.enc ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gips_creds.sh.enc
     - cp /home/icooke/bin/ortho ./
-    - git checkout $CI_COMMIT_REF_NAME
+    - git checkout $CI_COMMIT_SHA
     - docker build -t gippy-0.3.x -f docker/gippy-install.docker docker
     - docker build --no-cache
       --build-arg GIPS_UID=$(id -u)
@@ -63,15 +63,16 @@ publish_image:
     - apt-get update && apt-get -y install wget git
     - wget -O sixs ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/sixs
     - wget -O ortho ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/ortho
-    - git checkout $CI_COMMIT_REF_NAME
+    - git checkout $CI_COMMIT_SHA
     - VERSION=$(PYTHONPATH=. python -c 'import gips ; print(gips.__version__)')
     - test -z "$(docker image ls --quiet gips:$VERSION)" -a "v$VERSION" = "$CI_COMMIT_REF_NAME"
     - docker build -t gippy-03x-release -f docker/gippy-release.docker docker
     - docker build --no-cache
       --build-arg GIPS_VERSION=$VERSION
-      -t gips:$VERSION
       -t registry.ags.io/gips:$VERSION
       -f docker/gips-production.docker .
+    - docker push registry.ags.io/gips:$VERSION
+    - docker rmi registry.ags.io/gips:$VERSION
   tags:
     - gipsdev
   after_script:
