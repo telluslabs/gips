@@ -64,7 +64,7 @@ publish_image:
     - wget -O sixs ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/sixs
     - wget -O ortho ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/ortho
     - git checkout $CI_COMMIT_REF_NAME
-    - VERSION=$(PYTHONPATH=. python -c 'import gips ; print(optis.__version__)')
+    - VERSION=$(PYTHONPATH=. python -c 'import gips ; print(gips.__version__)')
     - test -z "$(docker image ls --quiet gips:$VERSION)" -a "v$VERSION" = "$CI_COMMIT_REF_NAME"
     - docker build -t gippy-03x-release -f docker/gippy-release.docker docker
     - docker build --no-cache
