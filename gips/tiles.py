@@ -100,7 +100,10 @@ class Tiles(object):
                         utils.make_temp_dir(dir=datadir,
                                             prefix='mosaic') as tmp_dir:
                     tmp_fp = os.path.join(tmp_dir, fn) # for safety
-                    filenames = [self.tiles[t].filenames[(sensor, product)] for t in self.tiles]
+                    filenames = [self.tiles[t].filenames[(sensor, product)]
+                                 for t in self.tiles
+                                 if (sensor, product) in self.tiles[t].filenames
+                    ]
                     images = gippy.GeoImages(filenames)
                     if self.spatial.rastermask is not None:
                         gridded_mosaic(images, tmp_fp,
