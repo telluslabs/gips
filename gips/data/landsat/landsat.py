@@ -1738,7 +1738,11 @@ class landsatData(gips.data.core.CloudCoverData):
         """
         md = self.meta(asset_type)
         if self.assets[asset_type].in_cloud_storage():
-            return gippy.GeoImage(md['qafilename'])
+            qafilename = self.Asset._cache_if_vsicurl(
+                md['qafilename'],
+                self._temp_proc_dir
+            )
+            return gippy.GeoImage(qafilename)
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract files
             qadatafile = self.assets[asset_type].extract([md['qafilename']])
