@@ -5,7 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [UNRELEASED]
+## v0.14.4
+### Fixed
+- fixed bug in mosaicking code where scene is missing a product
 
 ## v0.14.3
 ### Fixed
