@@ -7,15 +7,17 @@ RUN apt-get update \
 
 
 COPY sixs /usr/local/bin/sixs
-copy ortho /usr/local/bin/ortho
+COPY ortho /usr/local/bin/ortho
+COPY . /tmp/gips
 
 RUN chmod +x /usr/local/bin/sixs \
-    &&  chmod +x /usr/local/bin/ortho \
-    && pip install https://github.com/Applied-GeoSolutions/gips/archive/v${GIPS_VERSION}.tar.gz \
+    && chmod +x /usr/local/bin/ortho \
+    && pip install file:///tmp/gips \
     && gips_config env -r /archive -e anonymous@anywhere.net \
     && groupadd -g 10023 gips \
     && useradd -m -r -u 10023 -g gips gips \
-    && chown -R gips:gips /archive 
+    && chown -R gips:gips /archive \
+    && rm -rf /tmp/gips
 
 
 USER gips
