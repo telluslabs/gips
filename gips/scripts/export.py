@@ -32,16 +32,103 @@ from gips import utils
 from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import orm
 
+from backports import tempfile
 import boto3
 import zipfile
 import shutil
 
 
-TMPDIR = "/tmp"
+def run_export(args):
+
+    cls = utils.gips_script_setup(args.command, args.stop_on_error)
+
+    with utils.error_handler():
+        with tempfile.TemporaryDirectory() as tmpdir:
+
+            if args.site.startswith('s3://'):
+                S3 = boto3.resource('s3')
+                s3path = args.site.lstrip('s3://')
+                assert args.site.endswith('.zip'), "unzipped shapefiles not supported yet"
+                filename = s3path.split('/')[-1]
+                s3_bucket = s3path.split('/')[0]
+                s3_key = "/".join(s3path.split('/')[1:])
+                zippath = os.path.join(tmpdir, filename)
+                S3.Bucket(s3_bucket).download_file(s3_key, zippath)
+                zipped = zipfile.ZipFile(zippath)
+                zipped.extractall(tmpdir)
+                shppath = os.path.splitext(zippath)[0] + '.shp'
+                args.site = shppath
+            else:
+                shppath = None
+
+            if args.outdir.startswith('s3://'):
+                S3 = boto3.resource('s3')
+                s3path = args.outdir.lstrip('s3://')
+                dirname = s3path.split('/')[-1]
+                s3_bucket = s3path.split('/')[0]
+                s3_key = "/".join(s3path.split('/')[1:])
+                s3outdir = args.outdir
+                args.outdir = os.path.join(tmpdir, dirname)
+            else:
+                s3outdir = None
+
+            extents = SpatialExtent.factory(
+                cls, site=args.site, rastermask=args.rastermask,
+                key=args.key, where=args.where, tiles=args.tiles,
+                pcov=args.pcov, ptile=args.ptile
+            )
+
+            # create tld: SITENAME--KEY_DATATYPE_SUFFIX
+            if args.notld:
+                tld = args.outdir
+            else:
+                key = '' if args.key == '' else '--' + args.key
+                suffix = '' if args.suffix == '' else '_' + args.suffix
+                res = '' if args.res is None else '_%sx%s' % (args.res[0], args.res[1])
+                bname = (
+                    extents[0].site.LayerName() +
+                    key + res + '_' + args.command + suffix
+                )
+                tld = os.path.join(args.outdir, bname)
+
+            for extent in extents:
+                t_extent = TemporalExtent(args.dates, args.days)
+                inv = DataInventory(cls, extent, t_extent, **vars(args))
+                datadir = os.path.join(tld, extent.site.Value())
+                if inv.numfiles > 0:
+                    inv.mosaic(
+                        datadir=datadir, tree=args.tree, overwrite=args.overwrite,
+                        res=args.res, interpolation=args.interpolation,
+                        crop=args.crop, alltouch=args.alltouch,
+                    )
+                    inv = ProjectInventory(datadir)
+                    inv.pprint()
+                else:
+                    VerboseOut(
+                        'No data found for {} within temporal extent {}'
+                        .format(str(t_extent), str(t_extent)),
+                        2,
+                    )
+
+
+            if s3outdir is not None and os.path.exists(args.outdir):
+                outpath = args.outdir
+                zippath = outpath + ".zip"
+                shutil.make_archive(outpath, 'zip', args.outdir)
+                zipname = os.path.split(zippath)[-1]
+
+                S3 = boto3.resource('s3')
+                s3path = s3outdir.lstrip('s3://')
+                s3_bucket = s3path.split('/')[0]
+                s3_key = "/".join(s3path.split('/')[1:]) + ".zip"
+
+                print('uploading', zippath, s3_bucket, s3_key)
+                S3.meta.client.upload_file(zippath, s3_bucket, s3_key)
 
 
 def main():
     title = Colors.BOLD + 'GIPS Data Export (v%s)' % __version__ + Colors.OFF
+    print(title)
 
     # argument parsing
     parser0 = GIPSParser(description=title)
@@ -51,96 +138,7 @@ def main():
     parser0.add_warp_parser()
     args = parser0.parse_args()
 
-    cls = utils.gips_script_setup(args.command, args.stop_on_error)
-    print(title)
-
-    with utils.error_handler():
-
-        if args.site.startswith('s3://'):
-
-            S3 = boto3.resource('s3')
-            s3path = args.site.lstrip('s3://')
-
-            if args.site.endswith('.zip'):
-                filename = s3path.split('/')[-1]
-                s3_bucket = s3path.split('/')[0]
-                s3_key = "/".join(s3path.split('/')[1:])
-                zippath = os.path.join(TMPDIR, filename)
-                S3.Bucket(s3_bucket).download_file(s3_key, zippath)
-                zipped = zipfile.ZipFile(zippath)
-                zipped.extractall(TMPDIR)
-                shppath = os.path.splitext(zippath)[0] + '.shp'
-            else:
-                raise Exception('unzipped shapefiles not suppoerted yet')
-
-            args.site = shppath
-
-        if args.outdir.startswith('s3://'):
-            S3 = boto3.resource('s3')
-            s3path = args.outdir.lstrip('s3://')
-            dirname = s3path.split('/')[-1]
-            s3_bucket = s3path.split('/')[0]
-            s3_key = "/".join(s3path.split('/')[1:])
-            s3outdir = args.outdir
-            args.outdir = os.path.join(TMPDIR, dirname)
-        else:
-            s3outdir = None
-
-        extents = SpatialExtent.factory(
-            cls, site=args.site, rastermask=args.rastermask,
-            key=args.key, where=args.where, tiles=args.tiles,
-            pcov=args.pcov, ptile=args.ptile
-        )
-
-        # create tld: SITENAME--KEY_DATATYPE_SUFFIX
-        if args.notld:
-            tld = args.outdir
-        else:
-            key = '' if args.key == '' else '--' + args.key
-            suffix = '' if args.suffix == '' else '_' + args.suffix
-            res = '' if args.res is None else '_%sx%s' % (args.res[0], args.res[1])
-            bname = (
-                extents[0].site.LayerName() +
-                key + res + '_' + args.command + suffix
-            )
-            tld = os.path.join(args.outdir, bname)
-
-        for extent in extents:
-            t_extent = TemporalExtent(args.dates, args.days)
-            inv = DataInventory(cls, extent, t_extent, **vars(args))
-            datadir = os.path.join(tld, extent.site.Value())
-            if inv.numfiles > 0:
-                inv.mosaic(
-                    datadir=datadir, tree=args.tree, overwrite=args.overwrite,
-                    res=args.res, interpolation=args.interpolation,
-                    crop=args.crop, alltouch=args.alltouch,
-                )
-                inv = ProjectInventory(datadir)
-                inv.pprint()
-            else:
-                VerboseOut(
-                    'No data found for {} within temporal extent {}'
-                    .format(str(t_extent), str(t_extent)),
-                    2,
-                )
-
-    if s3outdir is not None:
-
-        outpath = args.outdir
-        zippath = outpath + ".zip"
-        shutil.make_archive(outpath, 'zip', args.outdir)
-        zipname = os.path.split(zippath)[-1]
-
-        S3 = boto3.resource('s3')
-
-        s3path = s3outdir.lstrip('s3://')
-        s3_bucket = s3path.split('/')[0]
-        s3_key = "/".join(s3path.split('/')[1:]) + ".zip"
-
-        print('uploading', zippath, s3_bucket, s3_key)
-        S3.meta.client.upload_file(zippath, s3_bucket, s3_key)
-
-
+    run_export(args)
 
     utils.gips_exit() # produce a summary error report then quit with a proper exit status
 
