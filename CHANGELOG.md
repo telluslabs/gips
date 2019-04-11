@@ -7,6 +7,10 @@ and this project adheres to
 
 ## [UNRELEASED]
 
+## v0.14.4
+### Fixed
+- fixed bug in mosaicking code where scene is missing a product
+
 ## v0.14.3
 ### Fixed
 - another case of not using gcs backoff downloader.
