@@ -33,6 +33,7 @@ import commands
 import shutil
 import traceback
 import datetime
+import time
 import json
 
 import numpy as np
@@ -175,9 +176,35 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
         yield absolute_pathname
     finally:
         if 'GIPS_DEBUG' not in os.environ:
-            shutil.rmtree(absolute_pathname)
+            rm_num_tries = max(1, os.environ.get('GIPS_RMTREE_TRIES', 4))
+            rm_delay = max(0.1, os.environ.get('GIPS_RMTREE_DELAY', .5))
+            for tries in range(1, rm_num_tries + 1):
+                try:
+                    shutil.rmtree(absolute_pathname)
+                except Exception as e:
+                    ### This whole block is ugly, but somehow the directory is
+                    ### not emptying out immediately, but it is emptying out eventually.
+                    if tries == rm_num_tries:
+                        raise
+                    # it can occur that it has now been deleted, so break
+                    if not os.path.exists(absolute_pathname):
+                        verbose_out('tempdir: infintesimal delay on deletion', 4)
+                        break
+                    verbose_out('GIPS_RMTREE_DELAY: delaying {} sec'
+                                .format(rm_delay), 3)
+                    time.sleep(rm_delay)
+                    # though less likely, post-delay it could have been deleted, so break
+                    if not os.path.exists(absolute_pathname):
+                        verbose_out('tempdir: {} sec delay on deletion'
+                                    .format(rm_delay), 3)
+                        break
+                    verbose_out(
+                        'GIPS_RMTREE_TRIES: Trying again (try {} of {}): {}'
+                        .format(tries, rm_num_tries, absolute_pathname), 3
+                    )
         else:
-            print('GIPS_DEBUG: Orphaning {}'.format(absolute_pathname))
+            verbose_out('GIPS_DEBUG: Orphaning {}'
+                        .format(absolute_pathname), 1)
 
 def find_files(regex, path='.'):
     """Find filenames in the given directory that match the regex.

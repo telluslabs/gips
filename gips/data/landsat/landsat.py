@@ -1192,6 +1192,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 #      See https://landsat.usgs.gov/collectionqualityband
                 qaimg = self._readqa(asset)
                 img.AddMask(qaimg[0] > 1)
+                qaimg = None
 
             asset_fn = self.assets[asset].filename
 
@@ -1321,6 +1322,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     elif val[0] == 'cloudmask':
                         qaimg = self._readqa(asset)
                         npqa = qaimg.Read()  # read image file into numpy array
+                        qaimg = None
                         # https://landsat.usgs.gov/collectionqualityband
                         # cloudmaskmask = (cloud and
                         #                  (cc_low or cc_med or cc_high)
@@ -1484,6 +1486,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         imgout[0].SetNoData(0)
                         qaimg = self._readqa(asset)
                         qadata = qaimg.Read()
+                        qaimg = None
                         fill = binmask(qadata, 1)
                         dropped = binmask(qadata, 2)
                         terrain = binmask(qadata, 3)
@@ -1526,8 +1529,7 @@ class landsatData(gips.data.core.CloudCoverData):
                             affine[0] += coreg_xshift
                             affine[3] += coreg_yshift
                             imgout.SetAffine(affine)
-                        imgout.Process()
-
+                    imgout.Process()
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
                     self.AddFile(sensor, key, archive_fp)
@@ -1600,6 +1602,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     verbose_out(' -> {}: processed {} in {}'.format(
                             self.basename, prodout.keys(), endtime - start), 1)
                 ## end ACOLITE
+            reflimg = None
 
     def filter(self, pclouds=100, sensors=None, **kwargs):
         """Check if Data object passes filter.
@@ -1739,7 +1742,7 @@ class landsatData(gips.data.core.CloudCoverData):
         md = self.meta(asset_type)
         if self.assets[asset_type].in_cloud_storage():
             qafilename = self.Asset._cache_if_vsicurl(
-                md['qafilename'],
+                [md['qafilename']],
                 self._temp_proc_dir
             )
             return gippy.GeoImage(qafilename)
