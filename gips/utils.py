@@ -33,6 +33,7 @@ import commands
 import shutil
 import traceback
 import datetime
+import time
 import json
 
 import numpy as np
@@ -175,7 +176,22 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
         yield absolute_pathname
     finally:
         if 'GIPS_DEBUG' not in os.environ:
-            shutil.rmtree(absolute_pathname)
+            rm_num_tries = max(1, os.environ.get('GIPS_RMTREE_TRIES', 4))
+            rm_delay = max(0.1, os.environ.get('GIPS_RMTREE_DELAY', .5))
+            for tries in range(1, rm_num_tries + 1):
+                try:
+                    shutil.rmtree(absolute_pathname)
+                except Exception as e:
+                    if tries == rm_num_tries:
+                        raise
+                    if not os.path.exists(absolute_pathname):
+                        break
+                    print('GIPS_RMTREE_DELAY: delaying {} sec'.format(rm_delay))
+                    time.sleep(rm_delay)
+                    if not os.path.exists(absolute_pathname):
+                        break
+                    print('GIPS_RMTREE_TRIES: Trying again (try {} of {}): {}'
+                          .format(tries, rm_num_tries, absolute_pathname))
         else:
             print('GIPS_DEBUG: Orphaning {}'.format(absolute_pathname))
 
