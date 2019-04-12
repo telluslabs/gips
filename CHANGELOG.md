@@ -5,7 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [UNRELEASED]
+## v0.14.5
+### Fixed
+- was passing str, instead of list-of-str, to landsat's `_cache_if_vsicurl`
+### Added
+- retry scheme for deletion of temp directories
+### Changed
+- utils code was using print instead of verbose_out
 
 ## v0.14.4
 ### Fixed
