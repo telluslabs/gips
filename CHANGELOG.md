@@ -4,10 +4,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
 ## [UNRELEASED]
+
+
+## v0.14.5
+### Fixed
+- was passing str, instead of list-of-str, to landsat's `_cache_if_vsicurl`
+### Added
+- retry scheme for deletion of temp directories
+### Changed
+- utils code was using print instead of verbose_out
+
+## v0.14.4
+### Fixed
+- fixed bug in mosaicking code where scene is missing a product
+
+## v0.14.3
+### Fixed
+- another case of not using gcs backoff downloader.
+
+## v0.14.2
+### Fixed
+- fixed bug from unstaging coreg testing tweaks.
+
+## v0.14.1
+### Fixed
+- (#641) gips not using gcs downloader for coreg imagery
+- (notix) gips coreg search skipping s2 search on same day
+
+## v0.14.0
 ### Added
 - mask out Landsat C1 edge effect isues (E-W edge and SLC-off)
+
+### Changed
+- use RedEdge4 as NIR band for index computations -- it is
+  more similar to LC8's NIR.
 
 ## v0.13.0
 ### Added

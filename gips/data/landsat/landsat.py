@@ -1195,6 +1195,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 #      See https://landsat.usgs.gov/collectionqualityband
                 qaimg = self._readqa(asset)
                 img.AddMask(qaimg[0] > 1)
+                qaimg = None
 
             asset_fn = self.assets[asset].filename
 
@@ -1234,7 +1235,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         try:
                             # on error, use the unshifted image
                             s2_export = self.sentinel2_coreg_export(tmpdir_fp)
-                            self.run_arop(s2_export)
+                            self.run_arop(s2_export, img['NIR'].Filename())
                         except NoSentinelError:
                             verbose_out(
                                 'No Sentinel found for co-registration', 4)
@@ -1324,6 +1325,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     elif val[0] == 'cloudmask':
                         qaimg = self._readqa(asset)
                         npqa = qaimg.Read()  # read image file into numpy array
+                        qaimg = None
                         # https://landsat.usgs.gov/collectionqualityband
                         # cloudmaskmask = (cloud and
                         #                  (cc_low or cc_med or cc_high)
@@ -1487,6 +1489,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         imgout[0].SetNoData(0)
                         qaimg = self._readqa(asset)
                         qadata = qaimg.Read()
+                        qaimg = None
                         fill = binmask(qadata, 1)
                         dropped = binmask(qadata, 2)
                         terrain = binmask(qadata, 3)
@@ -1529,8 +1532,7 @@ class landsatData(gips.data.core.CloudCoverData):
                             affine[0] += coreg_xshift
                             affine[3] += coreg_yshift
                             imgout.SetAffine(affine)
-                        imgout.Process()
-
+                    imgout.Process()
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
                     self.AddFile(sensor, key, archive_fp)
@@ -1603,6 +1605,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     verbose_out(' -> {}: processed {} in {}'.format(
                             self.basename, prodout.keys(), endtime - start), 1)
                 ## end ACOLITE
+            reflimg = None
 
     def filter(self, pclouds=100, sensors=None, **kwargs):
         """Check if Data object passes filter.
@@ -1741,7 +1744,11 @@ class landsatData(gips.data.core.CloudCoverData):
         """
         md = self.meta(asset_type)
         if self.assets[asset_type].in_cloud_storage():
-            return gippy.GeoImage(md['qafilename'])
+            qafilename = self.Asset._cache_if_vsicurl(
+                [md['qafilename']],
+                self._temp_proc_dir
+            )
+            return gippy.GeoImage(qafilename)
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract files
             qadatafile = self.assets[asset_type].extract([md['qafilename']])
@@ -1889,8 +1896,14 @@ class landsatData(gips.data.core.CloudCoverData):
         inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
         landsat_footprint = wkt_loads(self.assets[next(iter(self.assets))].get_geometry())
+        geo_images = self._s2_tiles_for_coreg(
+            inventory, starting_date, landsat_footprint
+        )
+        if geo_images:
+            geo_images = self.Asset._cache_if_vsicurl(geo_images, tmpdir)
+            date_found = starting_date
 
-        while True:
+        while not geo_images:
             if delta > timedelta(90):
                 raise NoSentinelError(
                     "didn't find s2 images in this utm zone {}, (pathrow={},date={})"
@@ -1936,7 +1949,7 @@ class landsatData(gips.data.core.CloudCoverData):
         self._time_report("done with s2 export")
         return tmpdir + '/sentinel_mosaic.bin'
 
-    def run_arop(self, base_band_filename):
+    def run_arop(self, base_band_filename, warp_band_filename):
         """
         Runs AROP's `ortho` program.
 
@@ -1952,21 +1965,18 @@ class landsatData(gips.data.core.CloudCoverData):
             nir_band = asset._sensors[asset.sensor]['bands'][
                 asset._sensors[asset.sensor]['colors'].index('NIR')
             ]
-            warp_band_filenames = [
-                f for f in asset.datafiles()
-                        if f.endswith("B{}.TIF".format(nir_band))
-            ]
             if asset_type not in ['C1GS', 'C1S3']:
-                warp_band_filenames = ['/vsitar/' + os.path.join(asset.filename, f) for f in warp_band_filenames]
+                warp_band_filename = '/vsitar/' + os.path.join(asset.filename, warp_band_filename)
 
+            # TODO:  I believe this is a singleton, so it should go away
             warp_bands_bin = []
-            for band in warp_band_filenames:
-                band_bin = basename(band) + '.bin'
-                cmd = ["gdal_translate", "-of", "ENVI",
-                       band,
-                       os.path.join(tmpdir, band_bin)]
-                subprocess.call(args=cmd, cwd=tmpdir)
-                warp_bands_bin.append(band_bin)
+
+            band_bin = basename(warp_band_filename) + '.bin'
+            cmd = ["gdal_translate", "-of", "ENVI",
+                   warp_band_filename,
+                   os.path.join(tmpdir, band_bin)]
+            subprocess.call(args=cmd, cwd=tmpdir)
+            warp_bands_bin.append(band_bin)
 
             # make parameter file
             with open(os.path.join(os.path.dirname(__file__), 'input_file_tmp.inp'), 'r') as input_template:

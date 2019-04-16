@@ -121,9 +121,11 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                 ['01', '02', '03', '04', '05', '06',
                  '07', '08', '8A', '09', '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
+            ## N.B.> swapped colors for 8 and 8a for better corespondence with
+            ## landsat 
             'colors':
                 ("COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
-                 "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"),
+                 "REDEDGE3", "REDEDGE4", "NIR",  "WV",  "CIRRUS",   "SWIR1",    "SWIR2"),
             # center wavelength of band in micrometers, CF:
             # https://earth.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/radiometric
             'bandlocs':
