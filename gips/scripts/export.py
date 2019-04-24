@@ -45,7 +45,7 @@ def run_export(args):
     with utils.error_handler():
         with tempfile.TemporaryDirectory() as tmpdir:
 
-            if args.site.startswith('s3://'):
+            if args.site is not None and args.site.startswith('s3://'):
                 S3 = boto3.resource('s3')
                 s3path = args.site.lstrip('s3://')
                 assert args.site.endswith('.zip'), "unzipped shapefiles not supported yet"
