@@ -49,7 +49,10 @@ class Args(object):
     pass
 
 
-def process(jobid):
+@click.command()
+@click.option('--jobid', '-j', type=int, help='Job index')
+def main(jobid):
+
     title = Colors.BOLD + 'GIPS Data Export (v%s)' % __version__ + Colors.OFF
     print(title)
 
@@ -86,10 +89,12 @@ def process(jobid):
         args.site = "s3://tl-octopus/user/gips/vector/ag_phenocam_tiles_5070.zip"
         args.key = "tileid"
 
-        doy = jobid % 366
-        fid = jobid / 366
+        doy = jobid % 365
+        fid = jobid / 365
 
-        args.outdir = "s3://tl-octopus/user/gips/export/ag_phenocam_tiles_{}_{}_{}".format(jobid, doy, fid)
+        # args.outdir = "/archive/export/ag_phenocam_tiles_{}_{}_{}".format(jobid, doy, fid)
+        args.outdir = "s3://rob-scratch/gips/export/ag_phenocam_tiles_{}_{}".format(doy, fid)
+
 
         args.dates = "2017-{}".format(str(doy+1).zfill(3))
         args.where = "FID={}".format(fid)
@@ -108,26 +113,5 @@ def process(jobid):
         utils.gips_exit()
 
 
-@click.group()
-def cli():
-    pass
-
-
-@click.command()
-@click.option('--jobid', '-j', type=int, help='Job index')
-def process(jobid):
-    run_process(jobid)
-
-
-@click.command()
-def combine():
-    run_combine(offset, limit, localdir)
-
-
-cli.add_command(process)
-cli.add_command(combine)
-
-
 if __name__ == "__main__":
-    cli()
-
+    main()
