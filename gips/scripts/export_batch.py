@@ -59,7 +59,7 @@ def main(name, jobid):
     args = Args()
     args.command = "hls"
     args.products = ['ndvi', 'lswi', 'brgt', 'cmask']
-    args.res = [30., 30.]
+    args.res = [20., 20.]
     args.stop_on_error = "False"
     args.suffix = ""
     args.format = "GTiff"
@@ -74,7 +74,7 @@ def main(name, jobid):
     args.fetch = True
     args.crop = False
     args.overwrite = False
-    args.alltouch = False
+    args.alltouch = True
     args.tree = False
     args.size = False
     args.update = False
@@ -84,7 +84,6 @@ def main(name, jobid):
     args.batchout = None
     args.sensors = None
     args.key = ''
-
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
@@ -111,7 +110,6 @@ def main(name, jobid):
         doy = jobid
 
         for fid in range(nfeatures):
-
             print(fid)
 
             args.site = "s3://tl-octopus/user/gips/vector/{}.zip".format(name)
