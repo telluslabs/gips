@@ -86,7 +86,16 @@ class SpatialExtent(object):
     @classmethod
     def factory(cls, dataclass, site=None, rastermask=None,
                 key='', where='', tiles=None, pcov=0.0, ptile=0.0):
-        """ Create array of SpatialExtent instances """
+        """Create array of SpatialExtent instances.
+
+        site is a path to a shapefile.
+        rastermask is a path to a specially-constructed tif (other formats?).
+            It is used as a mask that defines the spatial extent (how?).
+        key is used as the PrimaryKey of `site` (gippy weirdness I dunno).
+        where is an expression-like string used to filter the shapes in `site`.
+        pcov and ptile are percentage thresholds used as filters (TODO
+            specifics).
+        """
         if tiles is not None:
             tiles = [dataclass.normalize_tile_string(t) for t in tiles]
 

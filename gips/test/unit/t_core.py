@@ -145,20 +145,6 @@ def m_fetch(mocker):
 df_args = (['rad', 'ndvi', 'bqashadow'], ['012030'],
            core.TemporalExtent('2017-08-01'))
 
-def t_data_fetch_base_case(mocker, m_discover_asset, m_query_service, m_fetch):
-    """Test base case of data.core.Data.fetch.
-
-    It should return data about the fetch on success, and shouldn't
-    raise an exception."""
-    # setup
-    a_types = ('C1', 'C1GS', 'C1S3')
-    atds = [(a, '012030', dt(2017, 8, 1, 0, 0)) for a in a_types]
-    expected_calls = [mocker.call(*atd) for atd in atds]
-    # call
-    actual = landsatData.fetch(*df_args)
-    # assertions
-    assert atds == actual and expected_calls == m_fetch.call_args_list
-
 def t_data_fetch_error_case(mocker, m_discover_asset, m_query_service, m_fetch):
     """Test error case of data.core.Data.fetch.
 

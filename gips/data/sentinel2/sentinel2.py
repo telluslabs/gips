@@ -121,9 +121,11 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                 ['01', '02', '03', '04', '05', '06',
                  '07', '08', '8A', '09', '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
+            ## N.B.> swapped colors for 8 and 8a for better corespondence with
+            ## landsat 
             'colors':
                 ("COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
-                 "REDEDGE3", "NIR",  "REDEDGE4", "WV",  "CIRRUS",   "SWIR1",    "SWIR2"),
+                 "REDEDGE3", "REDEDGE4", "NIR",  "WV",  "CIRRUS",   "SWIR1",    "SWIR2"),
             # center wavelength of band in micrometers, CF:
             # https://earth.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/radiometric
             'bandlocs':
@@ -438,8 +440,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             return None
 
         # handle cloud cover
-        r = requests.get(cls.gs_object_url_base() + keys['tile-md'])
-        r.raise_for_status()
+        r = cls.gs_backoff_get(cls.gs_object_url_base() + keys['tile-md'])
         cc = cls.cloud_cover_from_et(
                 ElementTree.parse(StringIO.StringIO(r.text)))
         if cc > pclouds:
@@ -465,41 +466,34 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
         utils.verbose_out(
             'queried ATD {} {} {}, found '.format(asset, tile, date)
             + ('nothing' if rv is None else rv['basename']), 5)
+        if rv is None:
+            return None
+        rv['a_type'] = asset
         return rv
 
     @classmethod
-    def fetch_gs(cls, asset, tile, date, pclouds):
-        """Fetch from Google Storage, but only if asset type is L1CGS"""
-        qs_rv = cls.query_service(asset, tile, date, pclouds)
-        if qs_rv is None:
-            return []
-        keys = qs_rv['keys']
+    def download(cls, a_type, download_fp, **kwargs):
+        """Download from the configured source for the asset type."""
+        methods = {'L1C': cls.download_esa, 'L1CGS': cls.download_gs}
+        if a_type not in methods:
+            raise ValueError('Unfetchable asset type: {}'.format(asset))
+        return methods[a_type](download_fp, **kwargs)
+
+    @classmethod
+    def download_gs(cls, download_fp, keys, **ignored):
+        """Assembles json blob; doens't actually download anything."""
         # keys have been checked in query_gs already, so just take 'em
         a_content = {k: cls.gs_object_url_base() + keys[k]
                      for k in keys if k.endswith('-md')}
         a_content['spectral-bands'] = [
             cls.gs_vsi_prefix() + b for b in keys['spectral-bands']]
         a_content['cloud-cover'] = keys['cloud-cover']
-        cls.gs_stage_asset(qs_rv['basename'], a_content)
+        utils.json_dump(a_content, download_fp)
+        return True
 
     @classmethod
-    def fetch_esa(cls, asset, tile, date, pclouds):
+    def download_esa(cls, download_fp, url, basename, **ignored):
         """Fetch an asset from ESA if asset type is L1C."""
-        qs_rv = cls.query_service(asset, tile, date, pclouds)
-        if qs_rv is None:
-            return []
-        output_file_name, asset_url = (qs_rv['basename'], qs_rv['url'])
-
-        # datastrip-style assets cover many tiles, so there may be
-        # duplication of effort; avoid that by aborting if the stage
-        # already contains the desired asset
-        full_staged_path = os.path.join(cls.Repository.path('stage'),
-                                        output_file_name)
-        if os.path.exists(full_staged_path):
-            utils.verbose_out('Asset `{}` needed but already in stage/,'
-                              ' skipping.'.format(output_file_name))
-            return []
-
         username = cls.Repository.get_setting('username')
         password = cls.Repository.get_setting('password')
         # download the asset via the asset URL, putting it in a temp folder, then move to the stage
@@ -509,29 +503,18 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                               ' --no-verbose --output-document="{}" "{}"')
         if gippy.Options.Verbose() != 0:
             fetch_cmd_template += ' --show-progress --progress=dot:giga'
-        utils.verbose_out("Fetching " + output_file_name)
-        with utils.error_handler("Error performing asset download '({})'".format(asset_url)):
-            tmp_dir_full_path = tempfile.mkdtemp(dir=cls.Repository.path('stage'))
-            try:
-                output_full_path = os.path.join(tmp_dir_full_path, output_file_name)
-                fetch_cmd = fetch_cmd_template.format(
-                        username, password, output_full_path, asset_url)
-                args = shlex.split(fetch_cmd)
-                p = subprocess.Popen(args)
-                p.communicate()
-                if p.returncode != 0:
-                    raise IOError("Expected wget exit status 0, got {}".format(p.returncode))
-                cls.stage_asset(output_full_path)
-            finally:
-                shutil.rmtree(tmp_dir_full_path) # always remove the dir even if things break
-        return [output_full_path]
-
-    @classmethod
-    def fetch(cls, asset, tile, date, pclouds=100, **ignored):
-        """Fetch an asset."""
-        source = cls.get_setting('source')
-        return {'esa': cls.fetch_esa,
-                'gs':  cls.fetch_gs, }[source](asset, tile, date, pclouds)
+        utils.verbose_out("Fetching " + basename, 5)
+        with utils.error_handler(
+                "Error performing asset download '({})'".format(url)):
+            fetch_cmd = fetch_cmd_template.format(
+                    username, password, download_fp, url)
+            args = shlex.split(fetch_cmd)
+            p = subprocess.Popen(args)
+            p.communicate()
+            if p.returncode != 0:
+                raise IOError("Expected wget exit status 0, got {}".format(
+                    p.returncode))
+        return True
 
     @classmethod
     def archive(cls, path, recursive=False, keep=False, update=False):
@@ -655,11 +638,8 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             self.extract((tile_md_fn,), path)
             return os.path.join(path, tile_md_fn)
         # L1CGS case:
-        r = requests.get(self.json_content['tile-md'])
-        r.raise_for_status()
         fp = os.path.join(path, 'MTD_TL.xml')
-        with open(fp, 'wb') as fo:
-            fo.write(r.content)
+        self.gs_backoff_downloader(self.json_content['tile-md'], fp)
         return fp
 
     def xml_subtree_esa(self, md_file_type):
@@ -676,8 +656,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                 return ElementTree.parse(metadata_zf)
 
     def xml_subtree_gs(self, md_file_type):
-        r = requests.get(self.json_content[md_file_type + '-md'])
-        r.raise_for_status()
+        r = self.gs_backoff_get(self.json_content[md_file_type + '-md'])
         return ElementTree.fromstring(r.content)
 
     def xml_subtree(self, md_file_type, *tags):
@@ -829,11 +808,13 @@ class sentinel2Data(gips.data.core.CloudCoverData):
     name = 'Sentinel2'
     version = '0.1.1'
     Asset = sentinel2Asset
+    inline_archive = True
 
-    _productgroups = {
-        'ACOLITE': ['rhow', 'oc2chl', 'oc3chl', 'fai',
-                    'spm', 'spm2016', 'turbidity', 'acoflags'],
-    }
+    _productgroups = {'ACOLITE': [
+        'rhow', 'oc2chl', 'oc3chl', 'fai', 'spm', 'spm2016',
+        'turbidity', 'acoflags', 'gonschl', 'gons740chl', 'moses3bchl',
+        'moses3b740chl', 'mishrachl', 'ndci',
+    ]}
 
     _products = {
         # standard products
@@ -875,7 +856,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             ('s2rep',   'Sentinel-2 Red Edge Position')])
 
     # acolite doesn't (yet?) support google storage sentinel-2 data
-    atmosphere.add_acolite_product_dicts(_products, 'L1C')
+    atmosphere.add_acolite_product_dicts(_products, 'L1C', s2=True)
 
     _product_dependencies = {
         'indices':      'ref',

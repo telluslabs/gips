@@ -39,6 +39,7 @@ def main():
     group = parser.add_argument_group('masking options')
     group.add_argument('--filemask', help='Mask all files with this static mask', default=None)
     group.add_argument('--pmask', help='Mask files with this corresponding product', nargs='*', default=[])
+    group.add_argument('--invert', help='Invert the masks from corresponding products', nargs='*', default=[])
     h = 'Write mask to original image instead of creating new image'
     group.add_argument('--original', help=h, default=False, action='store_true')
     h = 'Overwrite existing files when creating new'
@@ -82,7 +83,12 @@ def main():
                         img.AddMask(mask_file[0])
                         meta = basename(args.filemask) + ' '
                     for mask in available_masks:
-                        img.AddMask(inv[date].open(mask)[0])
+                        mask_img = inv[date].open(mask)[0]
+                        if mask in args.invert:
+                            mask_img.SetNoData(utils.np.nan)
+                            mask_img = mask_img.BXOR(1)
+                            meta += 'inverted-'
+                        img.AddMask(mask_img)
                         meta = meta + basename(inv[date][mask]) + ' '
                     if meta != '':
                         if args.original:
