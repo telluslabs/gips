@@ -38,6 +38,23 @@ import zipfile
 import shutil
 
 
+def get_s3_shppath(args, tmpdir):
+    S3 = boto3.resource('s3')
+    s3path = args.site.lstrip('s3://')
+    assert args.site.endswith('.zip'), "unzipped shapefiles not supported yet"
+    filename = s3path.split('/')[-1]
+    s3_bucket = s3path.split('/')[0]
+    s3_key = "/".join(s3path.split('/')[1:])
+    zippath = os.path.join(tmpdir, filename)
+    S3.Bucket(s3_bucket).download_file(s3_key, zippath)
+    zipped = zipfile.ZipFile(zippath)
+    for f in zipped.filelist:
+        ext = os.path.splitext(f.filename)[1]
+        f.filename = 'shapefile{}'.format(ext)
+        zipped.extract(f, path=tmpdir)
+    shppath = os.path.join(os.path.split(zippath)[0], 'shapefile.shp')
+
+
 def run_export(args):
 
     cls = utils.gips_script_setup(args.command, args.stop_on_error)
@@ -46,17 +63,7 @@ def run_export(args):
         with tempfile.TemporaryDirectory() as tmpdir:
 
             if args.site is not None and args.site.startswith('s3://'):
-                S3 = boto3.resource('s3')
-                s3path = args.site.lstrip('s3://')
-                assert args.site.endswith('.zip'), "unzipped shapefiles not supported yet"
-                filename = s3path.split('/')[-1]
-                s3_bucket = s3path.split('/')[0]
-                s3_key = "/".join(s3path.split('/')[1:])
-                zippath = os.path.join(tmpdir, filename)
-                S3.Bucket(s3_bucket).download_file(s3_key, zippath)
-                zipped = zipfile.ZipFile(zippath)
-                zipped.extractall(tmpdir)
-                shppath = os.path.splitext(zippath)[0] + '.shp'
+                shppath = get_s3_shppath(args, tmpdir)
                 args.site = shppath
             else:
                 shppath = None

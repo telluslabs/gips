@@ -32,7 +32,7 @@ from gips import utils
 from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import orm
 
-from gips.scripts.export import run_export
+from gips.scripts.export import run_export, get_s3_shppath
 
 import click
 import glob
@@ -63,7 +63,7 @@ def main(name, jobid):
     args.stop_on_error = "False"
     args.suffix = ""
     args.format = "GTiff"
-    args.verbose = 4
+    args.verbose = 5
     args.interpolation = 0
     args.ptile = 0
     args.pcov = 0
@@ -88,18 +88,7 @@ def main(name, jobid):
     with tempfile.TemporaryDirectory() as tmpdir:
 
         args.site = "s3://tl-octopus/user/gips/vector/{}.zip".format(name)
-
-        # get the number of features TLDR
-        S3 = boto3.resource('s3')
-        s3path = args.site.lstrip('s3://')
-        filename = s3path.split('/')[-1]
-        s3_bucket = s3path.split('/')[0]
-        s3_key = "/".join(s3path.split('/')[1:])
-        zippath = os.path.join(tmpdir, filename)
-        S3.Bucket(s3_bucket).download_file(s3_key, zippath)
-        zipped = zipfile.ZipFile(zippath)
-        zipped.extractall(tmpdir)
-        shppath = os.path.splitext(zippath)[0] + '.shp'
+        shppath = get_s3_shppath(args, tmpdir)
         driver = ogr.GetDriverByName('ESRI Shapefile')
         source = driver.Open(shppath, 0)
         layer = source.GetLayer()
@@ -113,7 +102,7 @@ def main(name, jobid):
             print(fid)
 
             args.site = "s3://tl-octopus/user/gips/vector/{}.zip".format(name)
-            args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}".format(name, doy, fid)
+            args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}".format(name, name, doy, fid)
 
             args.dates = "2017-{}".format(str(doy+1).zfill(3))
             args.where = "FID={}".format(fid)
