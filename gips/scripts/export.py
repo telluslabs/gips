@@ -38,10 +38,11 @@ import zipfile
 import shutil
 
 
-def get_s3_shppath(args, tmpdir):
+def get_s3_shppath(s3path, tmpdir):
+    print('s3path', s3path)
     S3 = boto3.resource('s3')
-    s3path = args.site.lstrip('s3://')
-    assert args.site.endswith('.zip'), "unzipped shapefiles not supported yet"
+    s3path = s3path.lstrip('s3://')
+    assert s3path.endswith('.zip'), "unzipped shapefiles not supported yet"
     filename = s3path.split('/')[-1]
     s3_bucket = s3path.split('/')[0]
     s3_key = "/".join(s3path.split('/')[1:])
@@ -53,6 +54,7 @@ def get_s3_shppath(args, tmpdir):
         f.filename = 'shapefile{}'.format(ext)
         zipped.extract(f, path=tmpdir)
     shppath = os.path.join(os.path.split(zippath)[0], 'shapefile.shp')
+    return shppath
 
 
 def run_export(args):
@@ -63,7 +65,7 @@ def run_export(args):
         with tempfile.TemporaryDirectory() as tmpdir:
 
             if args.site is not None and args.site.startswith('s3://'):
-                shppath = get_s3_shppath(args, tmpdir)
+                shppath = get_s3_shppath(args.site, tmpdir)
                 args.site = shppath
             else:
                 shppath = None

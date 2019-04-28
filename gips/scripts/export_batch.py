@@ -44,21 +44,25 @@ import boto3
 import zipfile
 
 
+from pdb import set_trace
+
+
+
 class Args(object):
     pass
 
 
 @click.command()
-@click.option('--name', '-n', type=str, help='Job name')
 @click.option('--jobid', '-j', type=int, help='Job index')
-def main(name, jobid):
+def main(jobid):
 
     title = Colors.BOLD + 'GIPS Data Export (v%s)' % __version__ + Colors.OFF
     print(title)
 
     args = Args()
     args.command = "hls"
-    args.products = ['ndvi', 'lswi', 'brgt', 'cmask']
+    # args.products = ['ndvi', 'lswi', 'brgt', 'cmask']
+    args.products = ['ndvi', 'cmask']
     args.res = [20., 20.]
     args.stop_on_error = "False"
     args.suffix = ""
@@ -87,8 +91,25 @@ def main(name, jobid):
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
-        args.site = "s3://tl-octopus/user/gips/vector/{}.zip".format(name)
-        shppath = get_s3_shppath(args, tmpdir)
+        # get name and year
+
+        confpath = os.path.join(tmpdir, 'config')
+        S3 = boto3.resource('s3')
+        S3.Bucket('tl-octopus').download_file('user/gips/config', confpath)
+
+        config = eval(open(confpath).read())
+
+        year = config['year']
+
+        s3shpfile = config['shapefile']
+        name = s3shpfile.split('/')[-1].split('.zip')[0]
+
+
+        # args.site = "s3://tl-octopus/user/gips/vector/{}.zip".format(name)
+
+
+
+        shppath = get_s3_shppath(s3shpfile, tmpdir)
         driver = ogr.GetDriverByName('ESRI Shapefile')
         source = driver.Open(shppath, 0)
         layer = source.GetLayer()
@@ -101,10 +122,12 @@ def main(name, jobid):
         for fid in range(nfeatures):
             print(fid)
 
-            args.site = "s3://tl-octopus/user/gips/vector/{}.zip".format(name)
-            args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}".format(name, name, doy, fid)
+            # args.site = "s3://tl-octopus/user/gips/vector/{}.zip".format(name)
 
-            args.dates = "2017-{}".format(str(doy+1).zfill(3))
+            args.site = s3shpfile
+            args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}_{}".format(name, name, year, doy, fid)
+
+            args.dates = "{}-{}".format(year, str(doy+1).zfill(3))
             args.where = "FID={}".format(fid)
 
             print(args.dates)
