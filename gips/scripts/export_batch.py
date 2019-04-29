@@ -98,16 +98,9 @@ def main(jobid):
         S3.Bucket('tl-octopus').download_file('user/gips/config', confpath)
 
         config = eval(open(confpath).read())
-
         year = config['year']
-
         s3shpfile = config['shapefile']
         name = s3shpfile.split('/')[-1].split('.zip')[0]
-
-
-        # args.site = "s3://tl-octopus/user/gips/vector/{}.zip".format(name)
-
-
 
         shppath = get_s3_shppath(s3shpfile, tmpdir)
         driver = ogr.GetDriverByName('ESRI Shapefile')
@@ -121,8 +114,6 @@ def main(jobid):
 
         for fid in range(nfeatures):
             print(fid)
-
-            # args.site = "s3://tl-octopus/user/gips/vector/{}.zip".format(name)
 
             args.site = s3shpfile
             args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}_{}".format(name, name, year, doy, fid)
