@@ -30,7 +30,6 @@ import datetime
 
 import urllib
 import urllib2
-
 import math
 
 import numpy as np
@@ -64,7 +63,7 @@ class modisRepository(Repository):
     _tile_attribute = "tileid"
 
     default_settings = {
-        'source': 'usgs',
+        'source': 'earthdata',
         'asset-preference': (MCD43A4, MCD43A4S3), # prefer local to remote
     }
 
@@ -73,9 +72,9 @@ class modisRepository(Repository):
         """Validate source and asset-preference settings; otherwise no-op."""
         # landsat, modis, and sentinel-2 all have copies of this;
         # may be worth consolidation
-        if key == 'source' and value not in ('s3', 'usgs'):
+        if key == 'source' and value not in ('s3', 'earthdata'):
             raise ValueError("modis' 'source' setting is '{}', but valid"
-                             " values are 's3' or 'usgs'".format(value))
+                             " values are 's3' or 'earthdata'".format(value))
         if key == 'asset-preference':
             valid_atl = cls.default_settings['asset-preference']
             warts = set(value) - set(valid_atl)
@@ -209,7 +208,7 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         self._version = float('{}.{}'.format(collection, file_version))
 
     @classmethod
-    def query_usgs(cls, asset, tile, date):
+    def query_earthdata(cls, asset, tile, date):
         """Find out from the modis servers what assets are available.
 
         Uses the given (asset, tile, date) tuple as a search key, and
@@ -301,31 +300,28 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         if not cls.available(asset, date):
             return None
         data_src = cls.get_setting('source')
+        rv = None
         if data_src == 's3' and asset == MCD43A4S3:
-            return cls.query_s3(tile, date)
+            rv = cls.query_s3(tile, date)
         if data_src != 's3' and asset != MCD43A4S3:
-            return cls.query_usgs(asset, tile, date)
-        return None
+            rv = cls.query_earthdata(asset, tile, date)
+        if rv is not None:
+            rv['a_type'] = asset
+        return rv
 
     @classmethod
-    def download(cls, url, download_fp, **ignored):
+    def download(cls, a_type, download_fp, **kwargs):
         """Download the URL to the given full path, handling auth & errors."""
-        response = cls.Repository.managed_request(url)
+        if a_type == MCD43A4S3:
+            kwargs.pop('basename')
+            utils.json_dump(kwargs, download_fp)
+            return True
+        response = cls.Repository.managed_request(kwargs['url'])
         if response is None:
             return False
         with open(download_fp, 'wb') as fd:
             fd.write(response.read())
         return True
-
-    @classmethod
-    def fetch(cls, asset, tile, date):
-        if asset != MCD43A4S3:
-            return super(modisAsset, cls).fetch(asset, tile, date)
-        # else do S3 fetch
-        qs_rv = cls.query_service(asset, tile, date)
-        if qs_rv is not None:
-            basename = qs_rv.pop('basename')
-            cls.s3_stage_asset_json(qs_rv, basename)
 
 # index product types and descriptions
 _index_products = [
@@ -359,6 +355,7 @@ class modisData(Data):
     name = 'Modis'
     version = '1.0.0'
     Asset = modisAsset
+    inline_archive = True
     _productgroups = {
         "Nadir BRDF-Adjusted 16-day": ['indices', 'quality'],
         #"Terra/Aqua Daily": ['snow', 'temp', 'obstime', 'fsnow'],

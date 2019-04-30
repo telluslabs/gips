@@ -344,7 +344,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             if os.path.exists(self.filename):
                 c1json_content = self.load_c1_json()
                 utils.verbose_out('requesting ' + c1json_content['mtl'], 4)
-                text = requests.get(c1json_content['mtl']).text
+                text = self.gs_backoff_get(c1json_content['mtl']).text
             else:
                 query_results = self.query_gs(self.tile, self.date)
                 if query_results is None:
@@ -352,7 +352,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
                                   ' ({}, {})'.format(self.tile, self.date))
                 url = cls.gs_object_url_base() + query_results['keys']['mtl']
                 utils.verbose_out('requesting ' + url, 4)
-                text = requests.get(url).text
+                text = self.gs_backoff_get(url).text
         elif os.path.exists(self.filename):
             mtlfilename = self.extract(
                 [f for f in self.datafiles() if f.endswith('MTL.txt')]
@@ -559,8 +559,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
 
         # handle pclouds
         if pclouds < 100:
-            r = requests.get(cls.gs_object_url_base() + keys['mtl'])
-            r.raise_for_status()
+            r = cls.gs_backoff_get(cls.gs_object_url_base() + keys['mtl'])
             cc = cls.cloud_cover_from_mtl_text(r.text)
             if cc > pclouds:
                 cc_msg = ('C1GS asset found for ({}, {}), but cloud cover'
@@ -617,7 +616,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
 
     @classmethod
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
-    def query_service(cls, asset, tile, date, pclouds=90.0, **fetch_kwargs):
+    def query_service(cls, asset, tile, date, pclouds=90.0, **ignored):
         """As superclass with optional argument:
 
         Finds assets matching the arguments, where pcover is maximum
@@ -637,33 +636,28 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             raise ValueError("Invalid data source '{}'; valid sources:"
                              " {}".format(data_src, c1_sources))
         # perform the query, but on a_type-source mismatch, do nothing
-        return {
+        rv = {
             ('C1', 'usgs'): cls.query_c1,
             ('C1S3', 's3'): cls.query_s3,
             ('C1GS', 'gs'): cls.query_gs,
         }.get((asset, data_src), lambda *_: None)(tile, date, pclouds)
+        if rv is not None:
+            rv['a_type'] = asset
+        return rv
 
     @classmethod
-    def fetch(cls, asset, tile, date, **fetch_kwargs):
-        """Fetch the asset given by the given parameters.
-
-        Many arguments are unused, but must be present for compatibility.
-        """
-        qs_rv = cls.query_service(asset, tile, date, **fetch_kwargs)
-        if qs_rv is None:
-            return []
-        basename = qs_rv.pop('basename')
-
-        if asset == 'C1':
-            return cls.fetch_c1(**qs_rv)
-        if asset == 'C1S3':
-            return cls.fetch_s3(basename, **qs_rv)
-        if asset == 'C1GS':
-            return cls.fetch_gs(basename, **qs_rv)
-        raise ValueError('Unfetchable asset type: {}'.format(asset))
+    def download(cls, a_type, download_fp, **kwargs):
+        """Downloads the asset defined by the kwargs to the full path."""
+        methods = {'C1': cls.download_c1,
+                   'C1S3': cls.download_s3,
+                   'C1GS': cls.download_gs,
+                   }
+        if a_type not in methods:
+            raise ValueError('Unfetchable asset type: {}'.format(asset))
+        return methods[a_type](download_fp, **kwargs)
 
     @classmethod
-    def fetch_c1(cls, scene_id, dataset):
+    def download_c1(cls, download_fp, scene_id, dataset, **ignored):
         """Fetches the C1 asset defined by the arguments."""
         stage_dir = cls.Repository.path('stage')
         api_key = cls.ee_login()
@@ -676,14 +670,15 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             if len(granules) == 0:
                 raise Exception("Download didn't seem to"
                                 " produce a file:  {}".format(str(granules)))
-            os.rename(os.path.join(dldir, granules[0]),
-                      os.path.join(stage_dir, granules[0]))
+            os.rename(os.path.join(dldir, granules[0]), download_fp)
+        return True
 
     @classmethod
-    def fetch_s3(cls, basename, _30m_tifs, _15m_tif, qa_tif, mtl_txt):
+    def download_s3(cls, download_fp, _30m_tifs, _15m_tif, qa_tif, mtl_txt,
+                    **ignored):
         """Fetches AWS S3 assets; currently only 'C1S3' assets.
 
-        Doesn't fetch much; instead it constructs a VRT-based tarball.
+        Doesn't fetch much; instead it constructs VRT-based json.
         """
         # construct VSI paths; sample (split into lines):
         # /vsis3_streaming/landsat-pds/c1/L8/013/030
@@ -697,21 +692,24 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             'qa-band': cls.s3_vsi_prefix(qa_tif),
             'mtl': cls._s3_url + mtl_txt,
         }
-        cls.s3_stage_asset_json(asset_content, basename)
+        utils.json_dump(asset_content, download_fp)
+        return True
 
     @classmethod
-    def fetch_gs(cls, basename, keys):
+    def download_gs(cls, download_fp, keys, **ignored):
         """Assembles C1 assets that link into Google Cloud Storage.
 
         Constructs a json file containing /vsicurl_streaming/ paths,
         similarly to S3 assets.
         """
-        cls.gs_stage_asset(basename, {
+        content = {
             'mtl':     cls.gs_object_url_base() + keys['mtl'],
             'qa-band': cls.gs_vsi_prefix() + keys['qa-band'],
             'spectral-bands': [cls.gs_vsi_prefix() + u
                                for u in keys['spectral-bands']],
-        })
+        }
+        utils.json_dump(content, download_fp)
+        return True
 
 
 def unitless_bands(*bands):
@@ -721,6 +719,7 @@ def unitless_bands(*bands):
 class landsatData(gips.data.core.CloudCoverData):
     name = 'Landsat'
     version = '1.0.1'
+    inline_archive = True
 
     Asset = landsatAsset
 
@@ -1183,6 +1182,23 @@ class landsatData(gips.data.core.CloudCoverData):
             with utils.error_handler('Error reading ' + basename(self.assets[asset].filename)):
                 img = self._readraw(asset)
 
+            # This is landsat, so always just one sensor for a given date
+            sensor = self.sensors[asset]
+
+            if asset.startswith('C1'):
+                # BQA in C1 defines value 1 as "designated fill", in addition to any
+                # no data value defined for a band.  As BQA value 0 is
+                # undefined, and has not been seen in any assets thus far -- so
+                # also excluding 0 is OK.
+                # N.B. the label "designated fill" is mutually exclusive with
+                #      all other bqa labels.
+                #      See https://landsat.usgs.gov/collectionqualityband
+                qaimg = self._readqa(asset)
+                img.AddMask(qaimg[0] > 1)
+                qaimg = None
+
+            asset_fn = self.assets[asset].filename
+
             meta = self.assets[asset].meta['bands']
             visbands = self.assets[asset].visbands
             lwbands = self.assets[asset].lwbands
@@ -1219,7 +1235,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         try:
                             # on error, use the unshifted image
                             s2_export = self.sentinel2_coreg_export(tmpdir_fp)
-                            self.run_arop(s2_export)
+                            self.run_arop(s2_export, img['NIR'].Filename())
                         except NoSentinelError:
                             verbose_out(
                                 'No Sentinel found for co-registration', 4)
@@ -1267,11 +1283,6 @@ class landsatData(gips.data.core.CloudCoverData):
                 reflimg[col] = (((img[col].pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
                         ) * meta[col]['K2'] - 273.15
 
-            # This is landsat, so always just one sensor for a given date
-            sensor = self.sensors[asset]
-
-            asset_fn = self.assets[asset].filename
-
             # Process standard products (this is in the 'DN' block)
             for key, val in groups['Standard'].items():
                 p_type = val[0]
@@ -1314,6 +1325,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     elif val[0] == 'cloudmask':
                         qaimg = self._readqa(asset)
                         npqa = qaimg.Read()  # read image file into numpy array
+                        qaimg = None
                         # https://landsat.usgs.gov/collectionqualityband
                         # cloudmaskmask = (cloud and
                         #                  (cc_low or cc_med or cc_high)
@@ -1477,6 +1489,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         imgout[0].SetNoData(0)
                         qaimg = self._readqa(asset)
                         qadata = qaimg.Read()
+                        qaimg = None
                         fill = binmask(qadata, 1)
                         dropped = binmask(qadata, 2)
                         terrain = binmask(qadata, 3)
@@ -1519,8 +1532,7 @@ class landsatData(gips.data.core.CloudCoverData):
                             affine[0] += coreg_xshift
                             affine[3] += coreg_yshift
                             imgout.SetAffine(affine)
-                        imgout.Process()
-
+                    imgout.Process()
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
                     self.AddFile(sensor, key, archive_fp)
@@ -1593,6 +1605,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     verbose_out(' -> {}: processed {} in {}'.format(
                             self.basename, prodout.keys(), endtime - start), 1)
                 ## end ACOLITE
+            reflimg = None
 
     def filter(self, pclouds=100, sensors=None, **kwargs):
         """Check if Data object passes filter.
@@ -1623,7 +1636,7 @@ class landsatData(gips.data.core.CloudCoverData):
         asset_obj = self.assets[asset_type]
         c1_json = asset_obj.load_c1_json()
         if c1_json:
-            r = requests.get(c1_json['mtl'])
+            r = self.Asset.gs_backoff_get(c1_json['mtl'])
             r.raise_for_status()
             text = r.text
             qafn = c1_json['qa-band'].encode('ascii', 'ignore')
@@ -1731,7 +1744,11 @@ class landsatData(gips.data.core.CloudCoverData):
         """
         md = self.meta(asset_type)
         if self.assets[asset_type].in_cloud_storage():
-            return gippy.GeoImage(md['qafilename'])
+            qafilename = self.Asset._cache_if_vsicurl(
+                [md['qafilename']],
+                self._temp_proc_dir
+            )
+            return gippy.GeoImage(qafilename)
         if settings().REPOS[self.Repository.name.lower()]['extract']:
             # Extract files
             qadatafile = self.assets[asset_type].extract([md['qafilename']])
@@ -1867,7 +1884,8 @@ class landsatData(gips.data.core.CloudCoverData):
         delta = timedelta(1)
 
         if self.date < date(2017, 1, 1):
-            date_found = starting_date = date(2017, self.date.month, self.date.day)
+            date_found = starting_date = date(2017, 1, 1) + (
+                self.date - date(self.date.year, 1, 1))
         else:
             date_found = starting_date = self.date
 
@@ -1878,8 +1896,14 @@ class landsatData(gips.data.core.CloudCoverData):
         inventory = DataInventory(sentinel2Data, spatial_extent, temporal_extent, fetch=fetch, pclouds=33)
 
         landsat_footprint = wkt_loads(self.assets[next(iter(self.assets))].get_geometry())
+        geo_images = self._s2_tiles_for_coreg(
+            inventory, starting_date, landsat_footprint
+        )
+        if geo_images:
+            geo_images = self.Asset._cache_if_vsicurl(geo_images, tmpdir)
+            date_found = starting_date
 
-        while True:
+        while not geo_images:
             if delta > timedelta(90):
                 raise NoSentinelError(
                     "didn't find s2 images in this utm zone {}, (pathrow={},date={})"
@@ -1925,7 +1949,7 @@ class landsatData(gips.data.core.CloudCoverData):
         self._time_report("done with s2 export")
         return tmpdir + '/sentinel_mosaic.bin'
 
-    def run_arop(self, base_band_filename):
+    def run_arop(self, base_band_filename, warp_band_filename):
         """
         Runs AROP's `ortho` program.
 
@@ -1941,21 +1965,18 @@ class landsatData(gips.data.core.CloudCoverData):
             nir_band = asset._sensors[asset.sensor]['bands'][
                 asset._sensors[asset.sensor]['colors'].index('NIR')
             ]
-            warp_band_filenames = [
-                f for f in asset.datafiles()
-                        if f.endswith("B{}.TIF".format(nir_band))
-            ]
             if asset_type not in ['C1GS', 'C1S3']:
-                warp_band_filenames = ['/vsitar/' + os.path.join(asset.filename, f) for f in warp_band_filenames]
+                warp_band_filename = '/vsitar/' + os.path.join(asset.filename, warp_band_filename)
 
+            # TODO:  I believe this is a singleton, so it should go away
             warp_bands_bin = []
-            for band in warp_band_filenames:
-                band_bin = basename(band) + '.bin'
-                cmd = ["gdal_translate", "-of", "ENVI",
-                       band,
-                       os.path.join(tmpdir, band_bin)]
-                subprocess.call(args=cmd, cwd=tmpdir)
-                warp_bands_bin.append(band_bin)
+
+            band_bin = basename(warp_band_filename) + '.bin'
+            cmd = ["gdal_translate", "-of", "ENVI",
+                   warp_band_filename,
+                   os.path.join(tmpdir, band_bin)]
+            subprocess.call(args=cmd, cwd=tmpdir)
+            warp_bands_bin.append(band_bin)
 
             # make parameter file
             with open(os.path.join(os.path.dirname(__file__), 'input_file_tmp.inp'), 'r') as input_template:
@@ -2056,7 +2077,7 @@ class landsatData(gips.data.core.CloudCoverData):
             if os.path.exists(asset.filename):
                 c1json_content = asset.load_c1_json()
                 utils.verbose_out('requesting ' + c1json_content['mtl'], 4)
-                text = requests.get(c1json_content['mtl']).text
+                text = self.Asset.gs_backoff_get(c1json_content['mtl']).text
             else:
                 query_results = asset.query_gs(asset.tile, asset.date)
                 if query_results is None:
@@ -2064,7 +2085,7 @@ class landsatData(gips.data.core.CloudCoverData):
                                   ' ({}, {})'.format(self.tile, self.date))
                 url = cls.gs_object_url_base() + query_results['keys']['mtl']
                 utils.verbose_out('requesting ' + url, 4)
-                text = requests.get(url).text
+                text = self.Asset.gs_backoff_get(url).text
         else:
             print('asset is "{}"'.format(asset.asset))
             mtl = asset.extract([f for f in asset.datafiles() if f.endswith("MTL.txt")])[0]

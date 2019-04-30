@@ -27,18 +27,6 @@ def t_daymetAsset_constructor_base_case(fn, expected):
     a = daymet.daymetAsset(fn)
     assert expected == (a.filename, a.asset, a.tile, a.date, a.sensor, a.products)
 
-@pytest.mark.parametrize("fn, message", (
-    ('/repo/daymet/tiles/11935/2015002/11935_2015002_daymet_xxx.tif', 'bad asset/product type'),
-    ('/repo/daymet/tiles/11935/2015002/11935_daymet_tmin.tif', 'missing a token'),
-    ('/repo/daymet/tiles/11935/2015002/11935_2015002_daymet_tmin.tif.index', 'trailing characters'),
-    ('/repo/daymet/tiles/11935/2015002/foo_11935_2015002_daymet_tmin.tif', 'leading characters'),
-    ('/repo/daymet/tiles/11935/2015002/11935_2015002_daymet_tmin_x.tif', 'extra token'),
-))
-def t_daymetAsset_constructor_error_case(fn, message):
-    """Confirm malformed files cause exceptions."""
-    with pytest.raises(ValueError, message=message):
-        a = daymet.daymetAsset(fn)
-
 def t_daymetAsset_fetch_query_service_call(mocker, mpo):
     """Test just enough of daymet's fetch to prove that:
 

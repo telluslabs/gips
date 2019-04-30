@@ -85,7 +85,7 @@ class Inventory(object):
         """ Return color for sensor """
         return self._colors[list(self.sensor_set).index(sensor)]
 
-    def pprint(self, md=False):
+    def pprint(self, md=False, size=False):
         """ Print the inventory """
         if len(self.data) == 0:
             print 'No matching files in inventory'
@@ -103,6 +103,21 @@ class Inventory(object):
             oldyear = date.year
         if self.numfiles != 0:
             VerboseOut("\n\n%s files on %s dates" % (self.numfiles, len(self.dates)), 1)
+        if size:
+            filelist_gen = (
+                tile.filenames.values() + [a.filename for a in tile.assets.values()]
+                for tiles in self.data.values()
+                for tile in tiles.tiles.values()
+            )
+            total_size = sum(
+                sum(os.stat(f).st_size for f in fl)
+                for fl in filelist_gen
+            )
+            sitename = self.spatial.sitename
+            if sitename == 'tiles':
+                sitename += str(self.spatial.tiles)
+            print('{} includes {:.0f} Mebibytes of local gips archive data'
+                  .format(sitename, total_size / 2 ** 20))
 
 
 class ProjectInventory(Inventory):
@@ -212,7 +227,8 @@ class ProjectInventory(Inventory):
 class DataInventory(Inventory):
     """ Manager class for data inventories (collection of Tiles class) """
 
-    def __init__(self, dataclass, spatial, temporal, products=None, fetch=False, update=False, **kwargs):
+    def __init__(self, dataclass, spatial, temporal, products=None,
+                 fetch=False, update=False, **kwargs):
         """ Create a new inventory
         :dataclass: The Data class to use (e.g., LandsatData, ModisData)
         :spatial: The SpatialExtent requested
@@ -236,10 +252,8 @@ class DataInventory(Inventory):
             # conflicts with the explicit tiles argument.
             fetch_kwargs = {k: v for (k, v) in
                 utils.prune_unhashable(kwargs).items() if k != 'tiles'}
-            dataclass.fetch(self.products.base, self.spatial.tiles,
-                            self.temporal, self.update, **fetch_kwargs)
-            archived_assets = dataclass.archive_assets(
-                    Repository.path('stage'), update=self.update)
+            archived_assets = dataclass.fetch(self.products.base,
+                self.spatial.tiles, self.temporal, self.update, **fetch_kwargs)
 
             if orm.use_orm():
                 # save metadata about the fetched assets in the database

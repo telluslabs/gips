@@ -108,11 +108,12 @@ class GoogleStorageMixin(object):
     """
     _gs_query_url_base = 'https://www.googleapis.com/storage/v1/b/{}/o'
     _gs_object_url_base = 'http://storage.googleapis.com/{}/'
+    _gs_backoff_max = int(os.environ.get('MAX_GS_BACKOFF', 245))
 
     @classmethod
     @backoff.on_exception(backoff.expo,
                           requests.exceptions.RequestException,
-                          max_time=120,
+                          max_time=_gs_backoff_max,
                           giveup=_gs_stop_trying)
     def gs_api_search(cls, prefix, delimiter='/'):
         """Convenience wrapper for searching in google cloud storage."""
@@ -136,19 +137,9 @@ class GoogleStorageMixin(object):
         return vsi_magic_string + cls.gs_object_url_base()
 
     @classmethod
-    def gs_stage_asset(cls, basename, urls):
-        """Write the urls as json to the given basename in the stage."""
-        stage_dn = cls.Repository.path('stage')
-        with utils.make_temp_dir(prefix='fetch', dir=stage_dn) as tmp_dir:
-            tmp_fp = tmp_dir + '/' + basename
-            with open(tmp_fp, 'w') as tfo:
-                json.dump(urls, tfo)
-            shutil.copy(tmp_fp, stage_dn)
-
-    @classmethod
     @backoff.on_exception(backoff.expo,
                               requests.exceptions.RequestException,
-                              max_time=120,
+                              max_time=_gs_backoff_max,
                               giveup=_gs_stop_trying)
     def gs_backoff_downloader(cls, src, dst, chunk_size=512 * 1024):
         r = requests.get(src, stream=True)# NOTE the stream=True
@@ -157,6 +148,16 @@ class GoogleStorageMixin(object):
             for chunk in r.iter_content(chunk_size=chunk_size):
                 if chunk: # filter out keep-alive new chunks
                     f.write(chunk)
+
+    @classmethod
+    @backoff.on_exception(backoff.expo,
+                              requests.exceptions.RequestException,
+                              max_time=_gs_backoff_max,
+                              giveup=_gs_stop_trying)
+    def gs_backoff_get(cls, src, stream=False):
+        r = requests.get(src, stream=stream)# NOTE the stream=True
+        r.raise_for_status()
+        return r
 
     @classmethod
     def _cache_if_vsicurl(cls, filelist, tmpdir):
@@ -205,22 +206,9 @@ class S3Mixin(object):
         return keys
 
     @classmethod
-    def s3_stage_asset_json(cls, content, basename):
-        """Saves the given content as a json blob to the stage."""
-        # this may be refactorable with the gs mixin's gs_stage_asset
-        if cls.Repository.in_stage(basename): # skip if there already
-            return
-        stage_dir_fp = cls.Repository.path('stage')
-        with utils.make_temp_dir(prefix='fetch-s3-', dir=stage_dir_fp) as td:
-            tmp_fp = td + '/' + basename
-            with open(tmp_fp, 'w') as tfo:
-                json.dump(content, tfo)
-            shutil.copy(tmp_fp, stage_dir_fp)
-
-    @classmethod
     def s3_vsi_prefix(cls, key):
-        """Add a vsi3_streaming prefix to the given S3 key"""
-        return '/vsis3_streaming/{}/{}'.format(cls._s3_bucket_name, key)
+        """Add a vsi3 prefix to the given S3 key"""
+        return '/vsis3/{}/{}'.format(cls._s3_bucket_name, key)
 
 
 class Repository(object):
@@ -791,7 +779,9 @@ class Asset(object):
 
     @classmethod
     def download(cls, url, download_fp, **kwargs):
-        """Override this method to provide custom download code."""
+        """Override this method to provide custom download code.
+
+        Return True on download success."""
         raise NotImplementedError('download not supported for ' + cls.__name__)
 
     @classmethod
@@ -803,12 +793,18 @@ class Asset(object):
         return stage_full_path
 
     @classmethod
-    def fetch(cls, a_type, tile, date, **fetch_kwargs):
+    def fetch(cls, a_type, tile, date, update=None, archive=False,
+              **fetch_kwargs):
         """Standard fetch method; calls query_service() and download().
 
         Outputs from query_service and fetch_kwargs are passed in to
         download as kwargs, so one can talk to the other in a standard
-        way.
+        way.  It returns a list of file paths even though this is always
+        ignored by callers in gips.
+
+        `archive` controls whether downloaded assets go to the stage or
+        are archived directly.  Once issue 365 is fixed it should be
+        removed.
         """
         qs_rv = cls.query_service(a_type, tile, date, **fetch_kwargs)
         if qs_rv is None:
@@ -820,7 +816,10 @@ class Asset(object):
             qs_rv['download_fp'] = os.path.join(td_fp, qs_rv['basename'])
             fetch_kwargs.update(**qs_rv)
             if cls.download(**fetch_kwargs):
-                return [cls.stage_asset(qs_rv['download_fp'])]
+                if archive:
+                    ao, _, _ = cls._archivefile(qs_rv['download_fp'], update)
+                    return [ao]
+                cls.stage_asset(qs_rv['download_fp'])
         return []
 
     @classmethod
@@ -828,6 +827,7 @@ class Asset(object):
         """Connect to an FTP server and chdir according to the args.
 
         Returns the ftplib connection object."""
+        # TODO chirps is last caller; remove this method once it's gone
         utils.verbose_out('Connecting to {}'.format(cls._host), 5)
         conn = ftplib.FTP(cls._host)
         conn.login('anonymous', settings().EMAIL)
@@ -837,30 +837,8 @@ class Asset(object):
         return conn
 
     @classmethod
-    def fetch_ftp(cls, asset, tile, date):
-        """ Fetch via FTP """
-        url = cls._assets[asset].get('url', '')
-        if url == '':
-            raise Exception("%s: URL not defined for asset %s" % (cls.__name__, asset))
-        VerboseOut('%s: fetch tile %s for %s' % (asset, tile, date), 3)
-        ftpurl = url.split('/')[0]
-        ftpdir = url[len(ftpurl):]
-        with utils.error_handler("Error downloading from {}".format(ftpurl)):
-            ftp = ftplib.FTP(ftpurl)
-            ftp.login('anonymous', settings().EMAIL)
-            pth = os.path.join(ftpdir, date.strftime('%Y'), date.strftime('%j'))
-            ftp.set_pasv(True)
-            ftp.cwd(pth)
-
-            for f in ftp.nlst('*'):
-                VerboseOut("Downloading %s" % f, 2)
-                ftp.retrbinary('RETR %s' % f,
-                               open(os.path.join(cls.Repository.path('stage'), f), "wb").write)
-            ftp.close()
-
-    @classmethod
     def archive(cls, path, recursive=False, keep=False, update=False):
-        """Move asset into the archive.
+        """Move asset files into the archive.
 
         Pass in a path to a file or a directory.  If a directory, its
         contents are scanned for assets and any found are archived; it
@@ -868,7 +846,7 @@ class Asset(object):
         assets are given hard links in the archive.  The original is
         then removed, unless `keep`. If a found asset would replace an
         extant archived asset, replacement is only performed if
-        `update`.  kwargs is unused and likely without purpose.
+        `update`.
 
         Returns a pair of lists:  A list of Asset objects that were archived,
         and a list of asset objects whose files have been overwritten (by the
@@ -1011,6 +989,60 @@ class Asset(object):
         else:
             return (asset, numlinks, overwritten_ao)
         # should return asset instance
+
+
+class FtpAsset(Asset):
+    """Some assets rely on FTP for downloading; they work mostly the same.
+
+    Needed attributes to be an FtpAsset:
+        * cls._host should be set to the ftp server hosting the assets.
+        * Set cls._assets[*]['ftp-basedir'], to which the year is attached;
+        see below.
+    """
+    @classmethod
+    def ftp_connect(cls, working_directory):
+        """Connect to an FTP server and chdir according to the args.
+
+        Returns the ftplib connection object."""
+        utils.verbose_out('Connecting to {}'.format(cls._host), 5)
+        conn = ftplib.FTP(cls._host)
+        conn.login('anonymous', settings().EMAIL)
+        conn.set_pasv(True)
+        utils.verbose_out('Changing to {}'.format(working_directory), 5)
+        conn.cwd(working_directory)
+        return conn
+
+    @classmethod
+    def choose_asset(cls, a_type, tile, date, remote_fn_list):
+        """Of the given filenames, which is the asset of choice?"""
+        raise NotImplementedError()
+
+    @classmethod
+    def local_base_name(cls, a_type, tile, date, remote_bn):
+        """The remote filename may vary from the one we'll use locally."""
+        return remote_bn
+
+    @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
+    def query_service(cls, asset, tile, date):
+        """Search for a matching asset in an ftp store."""
+        if not cls.available(asset, date):
+            return None
+        wd = os.path.join(cls._assets[asset]['ftp-basedir'], str(date.year))
+        conn = cls.ftp_connect(wd)
+        remote_bn = cls.choose_asset(asset, tile, date, conn.nlst())
+        conn.quit()
+        return {'basename': cls.local_base_name(asset, tile, date, remote_bn),
+                'remote_bn': remote_bn, 'wd': wd}
+
+    @classmethod
+    def download(cls, download_fp, remote_bn, wd, **ignored):
+        """Download the asset given by URL, saving it to tmp_fp."""
+        conn = cls.ftp_connect(wd)
+        with open(download_fp, "wb") as temp_fo:
+            conn.retrbinary('RETR ' + remote_bn, temp_fo.write)
+        conn.quit()
+        return True
 
 
 class Data(object):
@@ -1496,16 +1528,24 @@ class Data(object):
         atd_pile = ((a, t, d)
             for a in cls.products2assets(products)
             for t in tiles
-            for d in cls.Asset.dates(a, t, textent.datebounds, textent.daybounds)
-                if cls.need_to_fetch(a, t, d, update, **fetch_kwargs))
+            for d in cls.Asset.dates(
+                a, t, textent.datebounds, textent.daybounds))
         for a, t, d in atd_pile:
             err_msg = 'Problem fetching asset for {}, {}, {}'.format(
                 a, t, d.strftime("%y-%m-%d"))
             with utils.error_handler(err_msg, continuable=True):
-                cls.Asset.fetch(a, t, d, **fetch_kwargs)
-                # fetched may contain both fetched and unfetchable things
-                fetched.append((a, t, d))
-
+                if not cls.need_to_fetch(a, t, d, update, **fetch_kwargs):
+                    continue
+                # check feature toggle to know how to call fetch():
+                if getattr(cls, 'inline_archive', False):
+                    # if fetch promises to archive inline:
+                    fetched += cls.Asset.fetch(a, t, d, update, archive=True,
+                                               **fetch_kwargs)
+                else:
+                    # otherwise, it put assets in stage; do staging here
+                    cls.Asset.fetch(a, t, d, **fetch_kwargs)
+                    fetched += cls.archive_assets(
+                        cls.Asset.Repository.path('stage'), update=update)
         return fetched
 
     @classmethod
