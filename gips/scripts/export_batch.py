@@ -61,8 +61,7 @@ def main(jobid):
 
     args = Args()
     args.command = "hls"
-    # args.products = ['ndvi', 'lswi', 'brgt', 'cmask']
-    args.products = ['ndvi', 'cmask']
+    args.products = ['ndvi', 'lswi', 'brgt', 'cmask']
     args.res = [20., 20.]
     args.stop_on_error = "False"
     args.suffix = ""
