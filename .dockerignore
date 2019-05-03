@@ -1,13 +1,3 @@
-data/
-conf/
-.git
-.github
-.idea
-venv
-travis.yml
-docker-compose.yml
-.bash_history
-.DS_Store
 docker/acolite_py_linux
 gips/data/merra/docs
 junk
