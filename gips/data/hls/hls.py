@@ -219,7 +219,13 @@ class hlsData(gips.data.core.CloudCoverData):
     def process_cmask(self):
         """Produce the cloudmask product."""
         for a_obj in self.assets.values():
-            src_img = gippy.GeoImage(a_obj.filename)
+
+            try:
+                src_img = gippy.GeoImage(a_obj.filename)
+            except:
+                os.remove(a_obj.filename)
+                return
+
             # for both asset types the QA band is the last one
             qa_nparray = src_img[len(src_img) - 1].Read()
             # cirrus, cloud, adjacent cloud, cloud shadow are bits 0 to 3,
