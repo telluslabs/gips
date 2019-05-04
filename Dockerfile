@@ -45,4 +45,23 @@ RUN cd /gips \
 
 COPY docker/pytest-ini /gips/pytest.ini
 
+
+# Sentinel1 stuff
+# download snap installer version 6.0
+# change file execution rights for snap installer
+# install snap with gpt
+# link gpt so it can be used systemwide
+# Update SNAP
+# set gpt max memory to 4GB
+RUN mkdir /snap \
+    && cd /snap \
+    && wget http://step.esa.int/downloads/6.0/installers/esa-snap_sentinel_unix_6_0.sh \
+    && chmod +x esa-snap_sentinel_unix_6_0.sh \
+    && ./esa-snap_sentinel_unix_6_0.sh -q -c \
+    && ln -s /usr/local/snap/bin/gpt /usr/bin/gpt \
+    && snap --nosplash --nogui --modules --update-all \
+    && sed -i -e 's/-Xmx1G/-Xmx4G/g' /usr/local/snap/bin/gpt.vmoptions \
+    && cd .. \
+    && rm -rf /snap
+
 WORKDIR /gips
