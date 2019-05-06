@@ -62,6 +62,8 @@ def main(jobid):
     args = Args()
     args.command = "hls"
     args.products = ['ndvi', 'lswi', 'brgt', 'cmask']
+    #args.command = "modis"
+    #args.products = ['ndvi', 'lswi', 'brgt']
     args.res = [20., 20.]
     args.stop_on_error = "False"
     args.suffix = ""
@@ -115,7 +117,8 @@ def main(jobid):
             print(fid)
 
             args.site = s3shpfile
-            args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}_{}".format(name, name, year, doy, fid)
+            args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}_{}".format(
+                name, name, year, doy, fid)
 
             args.dates = "{}-{}".format(year, str(doy+1).zfill(3))
             args.where = "FID={}".format(fid)
