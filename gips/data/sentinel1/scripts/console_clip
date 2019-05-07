@@ -1,0 +1,10 @@
+#!/bin/bash
+export TAG=${1:-latest}
+docker-compose run \
+    --rm \
+    --entrypoint /bin/bash \
+    -e SENTINEL_REPO \
+    -e SHAPEFILE \
+    -v ${SENTINEL_OUTPUT}:/processed \
+    -v ${CLIPPED_OUTPUT}:/output \
+    downloader \

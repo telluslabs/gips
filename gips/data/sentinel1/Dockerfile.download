@@ -1,0 +1,13 @@
+FROM geographica/gdal2:2.4.1
+
+WORKDIR /sentinel-processing
+COPY . /sentinel-processing
+
+RUN export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update && apt-get install -y \
+        python-geopandas \
+        python-pip \
+        git \
+        vim
+
+RUN pip install -r ./requirements.txt

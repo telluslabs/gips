@@ -1,0 +1,9 @@
+#!/bin/bash
+export TAG=${1:-latest}
+docker-compose run \
+    --rm \
+    -e SENTINEL_REPO \
+    -e SENTINEL_DATA \
+    -e SENTINEL_OUTPUT \
+    -e GRAPH \
+    docker-sentinel-processing

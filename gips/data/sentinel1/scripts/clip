@@ -1,0 +1,10 @@
+#!/bin/bash
+export TAG=${1:-latest}
+docker-compose run \
+    --rm \
+    --entrypoint /usr/bin/python \
+    -e SENTINEL_REPO \
+    -e SHAPEFILE \
+    -v ${SENTINEL_OUTPUT}:/processed \
+    -v ${CLIPPED_OUTPUT}:/output \
+    downloader /sentinel-processing/clip_raster.py \

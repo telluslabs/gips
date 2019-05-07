@@ -1,0 +1,21 @@
+version: '3'
+services:
+  docker-sentinel-processing:
+    build: .
+    image: docker-sentinel-processing:${TAG}
+    volumes:
+      - $SENTINEL_REPO:/sentinel-processing
+      - $SENTINEL_DATA:/data
+      - $SENTINEL_OUTPUT:/output
+    entrypoint: /sentinel-processing/preprocess.bash
+  downloader:
+    build:
+      context: ./
+      dockerfile: Dockerfile.download
+    image: downloader:${TAG}
+    volumes:
+      - $SENTINEL_REPO:/sentinel-processing
+      - $SENTINEL_DATA:/data
+      - $SHP:/shp
+    working_dir: /sentinel-processing
+    command: ["python", "download.py"]

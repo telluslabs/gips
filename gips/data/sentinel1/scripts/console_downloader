@@ -1,0 +1,13 @@
+#!/bin/bash
+export TAG=${1:-latest}
+docker-compose run \
+    --rm \
+    --entrypoint /bin/bash \
+    -e SENTINEL_REPO \
+    -e SENTINEL_DATA \
+    -e USERNAME \
+    -e PASSWORD \
+    -e SHAPEFILE \
+    -e START_DATE \
+    -e END_DATE \
+    downloader \

@@ -1,0 +1,28 @@
+# use debian as base image
+FROM debian:latest
+
+# get list of installable packets and install wget
+RUN export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update && apt-get install -y \
+    wget \
+    awscli
+
+# download snap installer version 6.0
+RUN wget http://step.esa.int/downloads/6.0/installers/esa-snap_sentinel_unix_6_0.sh
+
+#change file execution rights for snap installer
+RUN chmod +x esa-snap_sentinel_unix_6_0.sh
+
+# install snap with gpt
+RUN ./esa-snap_sentinel_unix_6_0.sh -q -c
+
+# link gpt so it can be used systemwide
+RUN ln -s /usr/local/snap/bin/gpt /usr/bin/gpt
+
+# Update SNAP
+RUN snap --nosplash --nogui --modules --update-all
+
+# set gpt max memory to 4GB
+RUN sed -i -e 's/-Xmx1G/-Xmx4G/g' /usr/local/snap/bin/gpt.vmoptions
+
+
