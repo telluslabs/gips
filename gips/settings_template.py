@@ -100,6 +100,9 @@ REPOS = {
     'sar': {
         'repository': '$TLD/sar',
     },
+    'sentinel1': {
+        'repository': '$TLD/sentinel1',
+    },
     #'sarannual': {
     #    'repository': '$TLD/sarannual',
     #},
