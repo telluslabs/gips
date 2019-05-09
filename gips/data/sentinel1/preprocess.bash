@@ -17,7 +17,7 @@ gptPath="/usr/bin/gpt"
 ############################################
 
 # first parameter is a path to the graph xml
-graphXmlPath="/gips/gips/data/sentinel1/BasicPreprocess.xml"
+graphXmlPath="/gips/gips/data/sentinel1/Basic2Preprocess.xml"
 
 # use third parameter for path to source products
 sourceDirectory="/archive/sentinel1/stage"
