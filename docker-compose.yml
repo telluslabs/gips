@@ -8,4 +8,4 @@ services:
   gips:
     build:
       context: .
-    image: ${OWNER}/gips
+    image: telluslabs/gips:${TAG}

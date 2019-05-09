@@ -69,14 +69,14 @@ class cdlAsset(Asset):
             # CDL assets are named just like products: tile_date_sensor_asset-product.tif
             'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdl + '\.tif$',
             'startdate': datetime.date(1997, 1, 1),
-            'latency': 426, # released in february for the previous year
+            'latency': 365, # released in february for the previous year
                             # which we interpret as january that year
         },
         _cdlmkii: {
             'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdlmkii + '\.zip$',
             'description': '',
             'startdate': datetime.date(1997, 1, 1),
-            'latency': 426, # see previous for explanation for this crazy value
+            'latency': 365, # see previous for explanation for this crazy value
         },
     }
 

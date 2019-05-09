@@ -2,7 +2,8 @@ FROM gippy-0.3.x
 
 ARG GIPS_UID
 RUN apt-get update \
-    && apt-get -y install libcurl4-gnutls-dev
+    && apt-get -y install libcurl4-gnutls-dev \
+        python-geopandas awscli
 
 COPY . /gips
 
@@ -35,6 +36,8 @@ RUN cd /gips \
            /gips/gips/settings.py \
     && echo 'GIPS_ORM = False\n' >> /gips/gips/settings.py \
     && tar xfvz gips_init/aod.composites.tgz -C /archive > /dev/null \
+    && pip install --no-cache-dir -U sharedmem \
+    && pip install --no-cache-dir https://github.com/indigo-ag/multitemporal/archive/v1.0.0-tl05.zip \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /gips/gips_init* \
     && apt-get -y autoremove \

@@ -22,13 +22,13 @@ fi
 ./scripts/update "$@"
 
 # TODO: There has got to be a better way to do this
-# Using /export as a way to get two important items out of the container
+# Using /archive as a way to get two important items out of the container
 
-docker run -v ${GIPS_DATA}:/export ${OWNER}/gips cp -r gips.egg-info /export
+docker run -v ${GIPS_DATA}:/archive telluslabs/gips cp -r gips.egg-info /archive
 cp -r ${GIPS_DATA}/gips.egg-info ${GIPS_HOME}/
 rm -rf ${GIPS_DATA}/gips.egg-info
 
-docker run -v ${GIPS_DATA}:/export ${OWNER}/gips cp -r gips/settings.py /export
+docker run -v ${GIPS_DATA}:/archive telluslabs/gips cp -r gips/settings.py /archive
 cp -r ${GIPS_DATA}/settings.py ${GIPS_HOME}/gips/
 rm -rf ${GIPS_DATA}/settings.py
 
