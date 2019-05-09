@@ -1407,7 +1407,7 @@ class Data(object):
         Does not interact with inventory DB as only caller is
         ProjectInventory which needs to read form the filesystem."""
         files = []
-        datedir = cls.Asset.Repository.datedir
+        datedir = cls.Asset.Repository._datedir
         for root, dirs, filenames in os.walk(path):
             for filename in filenames:
                 f = os.path.join(root, filename)
