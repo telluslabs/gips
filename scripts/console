@@ -9,5 +9,6 @@ docker-compose run \
     -v "$HOME/.aws:/root/.aws" \
     -v "$GIPS_DATA:/archive" \
     -v "$GIPS_HOME:/gips" \
+    -v /mnt/storage/gips/SRTM:/root/.snap/auxdata/dem/SRTM\ 1Sec\ HGT/ \
     gips \
     /bin/bash
