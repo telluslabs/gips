@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v0.14.6
+### Fixed
+- fixed less common use-case with NameError
+
 ## v0.14.5
 ### Fixed
 - was passing str, instead of list-of-str, to landsat's `_cache_if_vsicurl`
