@@ -145,10 +145,7 @@ def make_tileimg(outdir, tileid):
     write_raster(outfile, data, proj, geo, meta={}, missing=None)
 
 
-@click.command()
-@click.option('--shpfile', '-s', required=True)
-@click.option('--outfile', '-o', required=True)
-def make_tilegrid(shpfile, outfile):
+def _make_tilegrid(shpfile, outfile):
 
     h_ul, v_ul, h_lr, v_lr, nh, nv = find_rectangular_tiles(shpfile)
     print(h_ul, v_ul, h_lr, v_lr, nh, nv)
@@ -169,6 +166,18 @@ def make_tilegrid(shpfile, outfile):
 
     print('removing', rectfile)
     os.remove(rectfile)
+
+    set_trace()
+
+    # return the tilelist
+
+
+
+@click.command()
+@click.option('--shpfile', '-s', required=True)
+@click.option('--outfile', '-o', required=True)
+def make_tilegrid(shpfile, outfile):
+    _make_tilegrid(shpfile, outfile)
 
 
 @click.command()

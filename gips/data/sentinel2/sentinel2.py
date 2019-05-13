@@ -53,6 +53,8 @@ import gips.data.core
 from gips import utils
 from gips import atmosphere
 
+from pdb import set_trace
+
 
 """Steps for adding a product to this driver:
 
@@ -456,28 +458,46 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
     def query_service(cls, asset, tile, date, pclouds=100, **ignored):
         """as superclass, but bifurcate between google and ESA sources."""
+
+        print('query_service', asset, tile, date)
+
         if not cls.available(asset, date):
             return None
         source = cls.get_setting('source')
+
         if cls._assets[asset]['source'] != source:
             return None
+
         rv = {'esa': cls.query_esa,
               'gs':  cls.query_gs, }[source](tile, date, pclouds)
+
         utils.verbose_out(
             'queried ATD {} {} {}, found '.format(asset, tile, date)
             + ('nothing' if rv is None else rv['basename']), 5)
         if rv is None:
             return None
+
         rv['a_type'] = asset
+
         return rv
+
 
     @classmethod
     def download(cls, a_type, download_fp, **kwargs):
         """Download from the configured source for the asset type."""
+
         methods = {'L1C': cls.download_esa, 'L1CGS': cls.download_gs}
         if a_type not in methods:
             raise ValueError('Unfetchable asset type: {}'.format(asset))
-        return methods[a_type](download_fp, **kwargs)
+
+
+        meth = methods[a_type](download_fp, **kwargs)
+
+        print('download')
+        set_trace()
+
+
+        return meth
 
     @classmethod
     def download_gs(cls, download_fp, keys, **ignored):
