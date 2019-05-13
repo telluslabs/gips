@@ -89,7 +89,9 @@ class sentinel1Repository(Repository):
 
         # tilefile is called /archive/sentinel1/stage/tile_{}_{}.shp
 
-        tileshpfile, tilelist = make_tilegrid(vector.Filename(), cls._tile_attribute)
+        outdir = "/archive/sentinel1/stage"
+
+        tileshpfile, tilelist = make_tilegrid(vector.Filename(), cls._tile_attribute, outdir)
 
         cls._tilefile_name = tileshpfile
 
@@ -141,7 +143,7 @@ class sentinel1Asset(Asset):
 
     # _asset_pat_base = "(?P<sensor>S1[AB])_IW_GRDH_1SDV_(?P<pyear>\d{4})(?P<pmon>\d{2})(?P<pday>\d{2})_(?P<ptile>\w{3}_\w{3]}).tif"
 
-    _asset_pat_base = 'S1_IW_GRDH_(?P<year>\d{4})(?P<mon>\d{2})(?P<day>\d{2})_(?P<tile>\w{3}_\w{3}).tif'
+    _asset_pat_base = 'S1_IW_GRDH_(?P<year>\d{4})(?P<mon>\d{2})(?P<day>\d{2})_(?P<tile>\w{3}_\w{3})\.tif'
 
     _start_date = datetime.date(2015, 1, 1)
 
@@ -164,9 +166,15 @@ class sentinel1Asset(Asset):
         """
         super(sentinel1Asset, self).__init__(filename)
 
+        print('HELLO', filename)
+
         self.basename = os.path.basename(filename)
 
         match = re.match(self._asset_pat_base, self.basename)
+
+
+        print('match', match)
+
 
         self.asset = "L1"
         self.sensor = "S1"
@@ -188,7 +196,7 @@ class sentinel1Asset(Asset):
     def query_esa(cls, tile, date):
         import gips.data.sentinel1.sentinel_api.sentinel_api as api
 
-        print('query', tile)
+        print('******************** query', tile)
 
 
         # use username and password for ESA DATA Hub authentication
@@ -258,57 +266,106 @@ class sentinel1Asset(Asset):
     def download(cls, a_type, download_fp, downloader, **kwargs):
         """Download from the configured source for the asset type."""
 
-        from shapely.wkt import loads
-
-        downloaddir, assetfile = os.path.split(download_fp)
-
-        downloader.set_download_dir(downloaddir)
-
-        print(downloaddir)
-
-        # actually retrieve data
-
-        downloader.download_all()
-
-        # cache the downloaded zip
-
-
-        # geometries are just the boundaries in the shapefile
-        # set_geometries could be used
-        # geoms = [loads(g) for g in downloader.get_geometries()]
-        # gdf = gpd.GeoDataFrame({'geometry':geoms}, geometry='geometry', crs={'epsg:4326'})
-        # gdf.to_file('/archive/sentinel1/stage/scene_boundary.shp')
-
-        # the downloaded data is not the asset file
-
-        graph_xml_path = "/gips/gips/data/sentinel1/Basic2Preprocess.xml"
-
-
-        stagedir = "/archive/sentinel1/stage"
-
-
-        for scene in downloader.get_scenes():
-            name = scene['identifier']
-            sourcefile = os.path.join(stagedir, name + '.zip')
-            targetfile = os.path.join(stagedir, name + '.tif')
-
-            cmd = "/usr/bin/gpt {} -e -SsourceProduct={} -PtargetProduct={} -Dsnap.dataio.bigtiff.compression.type=LZW".format(
-                graph_xml_path, sourcefile, targetfile)
-            print(cmd)
-            args = shlex.split(cmd)
-            p = subprocess.Popen(args)
-            p.communicate()
-            if p.returncode != 0:
-                raise IOError("Expected exit status 0, got {}".format(
-                    p.returncode))
+        import gdal
+        gdal.UseExceptions()
 
         # cache the processed downloaded tif
+        # the downloaded data is not the asset file
 
+        from shapely.wkt import loads
+
+        graph_xml_path = "/gips/gips/data/sentinel1/Basic2Preprocess.xml"
+        stagedir = "/archive/sentinel1/stage"
+
+        # downloaddir is a temp dir created by gips core
+        downloaddir, assetfile = os.path.split(download_fp)
+        downloader.set_download_dir(downloaddir)
+        print(downloaddir)
+
+        # prefix names for all the scenes
+        scenes = [s['identifier'] for s in downloader.get_scenes()]
+
+        # these are the tif files that are staged
+        downloadfiles = [os.path.join(stagedir, s + '.zip') for s in scenes]
+
+
+        # if len(downloadfiles) > 1:
+        #     set_trace()
+
+
+        if not all([os.path.exists(p) for p in downloadfiles]):
+
+            downloader.download_all()
+            # TODO: check they are complete before moving them
+            for scene in scenes:
+                print('downloading', scene)
+                shutil.move(os.path.join(downloaddir, scene + '.zip'),
+                            os.path.join(stagedir, scene + '.zip'))
+
+        # all the downloaded zip scenes are present
+
+        scenefiles = []
+
+        for scene in scenes:
+
+            scenefile = os.path.join(stagedir, scene + '.tif')
+            scenefiles.append(scenefile)
+
+            if not os.path.exists(scenefile):
+
+                sourcefile = os.path.join(stagedir, scene + '.zip')
+                targetfile = os.path.join(downloaddir, scene + '.tif')
+                print('processing', sourcefile, targetfile)
+
+                cmd = "/usr/bin/gpt {} -e -SsourceProduct={} -PtargetProduct={} -Dsnap.dataio.bigtiff.compression.type=LZW".format(
+                    graph_xml_path, sourcefile, targetfile)
+                print(cmd)
+                args = shlex.split(cmd)
+                p = subprocess.Popen(args)
+                p.communicate()
+                if p.returncode != 0:
+                    raise IOError("Expected exit status 0, got {}".format(
+                        p.returncode))
+
+                print('moving', targetfile, scenefile)
+                shutil.move(targetfile, scenefile)
+
+
+        # all the downloaded zips have been processed and are present
+        print('all the downloaded zips have been processed and are present')
+
+        # TODO: why is this the only way I can get the current tile ID?
+        tileid = os.path.splitext(download_fp)[0][-7:]
+        shpfile = os.path.join(stagedir, 'tile_{}.shp'.format(tileid))
+
+
+        for i,scenefile in enumerate(scenefiles):
+            print('warping', scenefile)
+
+            layername = os.path.splitext(os.path.split(shpfile)[1])[0]
+
+            outfile = os.path.splitext(download_fp)[0] + '_{}.tif'.format(i)
+
+            ds = gdal.Warp(outfile, scenefile, format='GTiff', cutlineDSName=shpfile, cutlineLayer=layername,options=['COMPRESS=LZW'], cropToCutline=True, dstAlpha=True, xRes=0.0001, yRes=0.0001)
+
+
+            # GET RID OF THIS
+
+            print('moving', outfile, os.path.join(stagedir, os.path.split(outfile)[1]))
+
+            # shutil.move(outfile, download_fp)
+
+            shutil.move(outfile, os.path.join(stagedir, os.path.split(outfile)[1]))
+
+
+        print('ok')
         set_trace()
 
-        # need the asset file name
 
-        # clip and merge the results and save as an asset
+        # merge the results and save as an asset
+
+        cmd = 'gdal_merge.py -n 0 -a_nodata 0 -init 0 {} {}'.format(download_fp, ' '.join(scenefiles))
+
 
         return True
 

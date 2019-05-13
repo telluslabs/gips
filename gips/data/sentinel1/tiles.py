@@ -1,22 +1,23 @@
 from __future__ import print_function
 
 import sys, os
+from collections import defaultdict
 
 import numpy as np
 import fiona
 from fiona.crs import from_epsg
-from shapely.geometry import mapping, Polygon
+
+from shapely import geometry, speedups
 from shapely.wkt import loads
+
 from osgeo import ogr
 import geopandas as gpd
-
-# from fieldtools.boundaries.utils import read_raster, write_raster
-# from fieldtools.boundaries.geom_intersects import extract
-
-from gips.data.sentinel1.geom_intersects import extract
+from rtree import index
 
 
 from pdb import set_trace
+
+speedups.enable()
 
 
 TEMPDIR = "/archive/vector"
@@ -25,6 +26,131 @@ TEMPDIR = "/archive/vector"
 # Tile dimensions
 DLON = 0.15
 DLAT = 0.15
+
+
+def extract(source, target, output, merge, buffer, buffer_after, filter, same_attrs):
+    """
+    extract features of source vector file that intersect or contain
+    features in target vector file
+    """
+    idx = index.Index()
+    geoms = {}
+
+    print("source:", source)
+    print("target:", target)
+    print("output:", output)
+    print("merge:", merge)
+    print("buffer:", buffer)
+    print("buffer_after:", buffer_after)
+    print("filter:", filter)
+    print("same_attrs:", same_attrs)
+
+    if merge is True and buffer is not None:
+        print('Warning: buffer and merge together might produce unexpected results')
+
+    print('initial pass through source tiles')
+    with fiona.open(source, 'r') as tiles:
+        tiles_crs = tiles.crs
+        print('number of source tiles:', len(tiles))
+        for tile in tiles:
+            fid = int(tile['id'])
+            geoms[fid] = geometry.shape(tile['geometry'])
+            idx.insert(fid, geoms[fid].bounds)
+
+    print('loop through target parcels against rtree boxes')
+    fids = set()
+    target_properties = defaultdict(list)
+    count = defaultdict(int)
+    with fiona.open(target) as parcels:
+        if parcels.crs != tiles_crs:
+            raise Exception(
+                'Input CRS do not match {} {}'.format(parcels.crs, tiles_crs))
+        print('number of target parcels:', len(parcels))
+        target_schema = parcels.schema
+
+        filtercount = 0
+        for parcel in parcels:
+
+            if filter is not None:
+                parts = filter.split()
+                assert len(parts) == 3, "Bad filter specification"
+                attr = parts[0]
+                oper = ' '.join(parts[1:])
+                statement = "parcel['properties'][attr] {}".format(oper)
+                if eval(statement):
+                    filtercount += 1
+                    continue
+            try:
+                geom = geometry.shape(parcel['geometry'])
+            except Exception:
+                print('WARNING: bad geometry', parcel)
+                continue
+
+            for hit in idx.intersection(geom.bounds):
+                if buffer:
+                    geom = geom.buffer(buffer)
+                if geoms[hit].intersects(geom):
+                    fids.add(hit)
+                    target_properties[hit].append(parcel['properties'])
+                    count[hit] += 1
+
+        if filter is not None:
+            print('filtered target features:', filtercount)
+
+    print('selected tiles:', len(fids))
+
+    print('extract and write selected tiles')
+    fp = fiona.open(source, 'r')
+    driver = "ESRI Shapefile"
+
+    schema = fp.schema
+    schema['properties'].update({'count': 'int:9'})
+    if merge is True:
+        schema['properties'].update(target_schema['properties'])
+
+    crs = fp.crs
+    tilelist = []
+    outcount = 0
+    with fp as tiles:
+        with fiona.open(output, 'w', driver, schema, crs) as outtiles:
+            for tile in tiles:
+                fid = int(tile['id'])
+                if fid in fids:
+                    tile['properties'].update({'count': count[fid]})
+                    tilelist.append(tile['properties']['tileid'])
+                    if merge is True:
+                        tprops0 = target_properties[fid][0]
+                        if count[fid] > 1 and same_attrs is not None:
+                            ok = True
+                            for tprops in target_properties[fid][1:]:
+                                for same_attr in same_attrs:
+                                    if tprops[same_attr] != tprops0[same_attr]:
+                                        print('ERROR: same attrs different value')
+                                        ok = False
+                                        break
+
+                            if ok is False:
+                                continue
+
+                        tile['properties'].update(tprops0)
+
+                    if buffer_after is not None:
+                        geom = geometry.shape(tile['geometry'])
+                        geom = geom.buffer(buffer_after)
+                        tile['geometry'] = geometry.mapping(geom)
+                    outtiles.write(tile)
+                    outcount += 1
+
+    if outcount == 0:
+        prefix = os.path.splitext(output)[0]
+        assert(len(prefix) > 0)
+        cmd = "rm {}.*".format(prefix)
+        print('removing empty {}'.format(output))
+        print(cmd)
+        os.system(cmd)
+
+    assert len(tilelist) == len(set(tilelist))
+    return tilelist
 
 
 def segmentize(geom, mindist):
@@ -41,8 +167,7 @@ def segmentize(geom, mindist):
     return geom2
 
 
-
-def make_tilegrid(shpfile, tileid):
+def make_tilegrid(shpfile, tileid, outdir):
 
     gdf = gpd.read_file(shpfile)
     orig_crs = gdf.crs
@@ -67,8 +192,7 @@ def make_tilegrid(shpfile, tileid):
     nygrid = v_lr - v_ul + 1
     nxgrid = h_lr - h_ul + 1
 
-    # outdir = os.path.split(shpfile)[0]
-
+    # TODO: IMPORTANT - SET TILEID
     tileid = "{}_{}".format(h_ul, v_ul)
 
     lon_ul = -180.0 + DLON*h_ul
@@ -95,7 +219,7 @@ def make_tilegrid(shpfile, tileid):
             for j in range(nxgrid):
                 lon0 = lon_ul + j*dlon
                 lon1 = lon0 + dlon
-                poly = Polygon(
+                poly = geometry.Polygon(
                     [(lon0, lat1), (lon1, lat1), (lon1, lat0), (lon0, lat0), (lon0, lat1)])
                 poly = segmentize(poly, dlon/10.)
                 h = j + h_ul
@@ -103,7 +227,7 @@ def make_tilegrid(shpfile, tileid):
                 tileid = "%03d_%03d" % (h, v)
                 bounds = str((lon0, lat0, lon1, lat1))
                 shp.write({
-                    'geometry': mapping(poly),
+                    'geometry': geometry.mapping(poly),
                     'properties': {'tileid': tileid,'bounds': bounds, 'h':int(h), 'v':int(v)},
                 })
 
@@ -115,8 +239,7 @@ def make_tilegrid(shpfile, tileid):
     gdf = gdf.to_crs(orig_crs)
     gdf.to_file(rectfile)
 
-
-    outfile = os.path.join('/archive/vector', 'tiles.shp')
+    outfile = os.path.join(outdir, 'tiles.shp')
 
     print('extracting', rectfile, shpfile, outfile)
     tilelist = extract(rectfile, shpfile, outfile, merge=True, buffer=None, buffer_after=None, filter=None, same_attrs=None)
