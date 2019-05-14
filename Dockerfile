@@ -3,7 +3,7 @@ FROM gippy-0.3.x
 ARG GIPS_UID
 RUN apt-get update \
     && apt-get -y install libcurl4-gnutls-dev \
-        python-geopandas awscli
+        python-geopandas python-rtree awscli
 
 COPY . /gips
 

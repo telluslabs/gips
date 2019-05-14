@@ -445,16 +445,14 @@ class sentinel1Data(Data):
             if val[0] == "sigma0":
                 # this product is just the asset but it has to have the right name
 
-                # SUPER AMNNOYING THAT THIS DOESN"T WORK
-                # command('gdal_translate -of VRT {} {}'.format(assetfname, fname))
 
+                command('gdal_translate -of VRT {} {}'.format(assetfname, fname))
 
-                shutil.copy(assetfname, fname)
+                # shutil.copy(assetfname, fname)
 
-
-                
                 # do this if you want to set metadata later
                 # imgout = gippy.GeoImage(fname)
+
 
             if val[0] == "indices":
                 print('indices not completed yet')
