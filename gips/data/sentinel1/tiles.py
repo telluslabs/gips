@@ -36,15 +36,6 @@ def extract(source, target, output, merge, buffer, buffer_after, filter, same_at
     idx = index.Index()
     geoms = {}
 
-    print("source:", source)
-    print("target:", target)
-    print("output:", output)
-    print("merge:", merge)
-    print("buffer:", buffer)
-    print("buffer_after:", buffer_after)
-    print("filter:", filter)
-    print("same_attrs:", same_attrs)
-
     if merge is True and buffer is not None:
         print('Warning: buffer and merge together might produce unexpected results')
 
@@ -167,7 +158,57 @@ def segmentize(geom, mindist):
     return geom2
 
 
-def make_tilegrid(shpfile, tileid, outdir):
+def make_rectangular_tilegrid(outdir, tileid, nxgrid, nygrid, tileid_attribute, filename=None):
+    """ create a rectangular grid of tiles that can be trimmed down later """
+
+    htile, vtile = [int(t) for t in tileid.split('-')]
+
+    lon_ul = -180.0 + DLON*htile
+    lat_ul = 90.0 - DLAT*vtile
+
+    if filename is None:
+        outfile = os.path.join(outdir, '{}_{}_{}.shp'.format(tileid, nxgrid, nygrid))
+    else:
+        outfile = os.path.join(outdir, filename)
+
+    dlon = DLON
+    dlat = DLAT
+
+    schema = {
+        'geometry': 'Polygon',
+        'properties': {'tileid': 'str', 'h':'int', 'v':'int', 'bounds': 'str'},
+    }
+    print(dlon, dlat)
+    crs = from_epsg(4326)
+
+    # set_trace()
+
+    with fiona.open(outfile, 'w', 'ESRI Shapefile', schema, crs=crs) as shp:
+        # latitude
+        for i in range(nygrid):
+            lat1 = lat_ul - i*dlat
+            lat0 = lat1 - dlat
+            # longitude
+            for j in range(nxgrid):
+                lon0 = lon_ul + j*dlon
+                lon1 = lon0 + dlon
+                poly = geometry.Polygon(
+                    [(lon0, lat1), (lon1, lat1), (lon1, lat0), (lon0, lat0), (lon0, lat1)])
+                poly = segmentize(poly, dlon/10.)
+                h = j + htile
+                v = i + vtile
+                tileid = "%03d-%03d" % (h, v)
+                bounds = str((lon0, lat0, lon1, lat1))
+                shp.write({
+                    'geometry': geometry.mapping(poly),
+                    'properties': {'tileid': tileid,'bounds': bounds, 'h':int(h), 'v':int(v)},
+                })
+
+    print('wrote', outfile)
+    return(outfile)
+
+
+def make_tilegrid(shpfile, outdir, tileid_pattern, tileid_attribute):
 
     gdf = gpd.read_file(shpfile)
     orig_crs = gdf.crs
@@ -192,49 +233,12 @@ def make_tilegrid(shpfile, tileid, outdir):
     nygrid = v_lr - v_ul + 1
     nxgrid = h_lr - h_ul + 1
 
-    # TODO: IMPORTANT - SET TILEID
-    tileid = "{}_{}".format(h_ul, v_ul)
+    # IMPORTANT - SET TILEID
+    tileid = tileid_pattern.format(h_ul, v_ul)
 
-    lon_ul = -180.0 + DLON*h_ul
-    lat_ul = 90.0 - DLAT*v_ul
-
-    # the rectangular grid which might contain some extra tiles
-    rectfile = os.path.join(TEMPDIR, '{}_{}_{}.shp'.format(tileid, nxgrid, nygrid))
-
-    dlon = DLON
-    dlat = DLAT
-
-    schema = {
-        'geometry': 'Polygon',
-        'properties': {'tileid': 'str', 'h':'int', 'v':'int', 'bounds': 'str'},
-    }
-    print(dlon, dlat)
-    crs = from_epsg(4326)
-    with fiona.open(rectfile, 'w', 'ESRI Shapefile', schema, crs=crs) as shp:
-        # latitude
-        for i in range(nygrid):
-            lat1 = lat_ul - i*dlat
-            lat0 = lat1 - dlat
-            # longitude
-            for j in range(nxgrid):
-                lon0 = lon_ul + j*dlon
-                lon1 = lon0 + dlon
-                poly = geometry.Polygon(
-                    [(lon0, lat1), (lon1, lat1), (lon1, lat0), (lon0, lat0), (lon0, lat1)])
-                poly = segmentize(poly, dlon/10.)
-                h = j + h_ul
-                v = i + v_ul
-                tileid = "%03d_%03d" % (h, v)
-                bounds = str((lon0, lat0, lon1, lat1))
-                shp.write({
-                    'geometry': geometry.mapping(poly),
-                    'properties': {'tileid': tileid,'bounds': bounds, 'h':int(h), 'v':int(v)},
-                })
-
-    print('wrote', rectfile)
+    rectfile = make_rectangular_tilegrid(outdir, tileid, nxgrid, nygrid, tileid_attribute)
 
     # change crs of rectfile to match crs of shpfile
-    # gdf = gpd.read_file(shpfile)
     gdf = gpd.read_file(rectfile)
     gdf = gdf.to_crs(orig_crs)
     gdf.to_file(rectfile)

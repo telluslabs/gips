@@ -52,7 +52,7 @@ import gippy.algorithms
 from gips.data.core import Repository, Asset, Data
 import gips.data.core
 from gips import utils
-from gips.data.sentinel1.tiles import make_tilegrid
+from gips.data.sentinel1.tiles import make_tilegrid, make_rectangular_tilegrid
 
 
 
@@ -60,6 +60,16 @@ from pdb import set_trace
 
 
 _asset_types = ('L1',)
+
+
+def command(cmd):
+    # this is dumb but gets reused a lot
+    args = shlex.split(cmd)
+    p = subprocess.Popen(args)
+    p.communicate()
+    if p.returncode != 0:
+        raise IOError("Expected exit status 0, got {}".format(p.returncode))
+
 
 class sentinel1Repository(Repository):
     name = 'Sentinel1'
@@ -74,6 +84,8 @@ class sentinel1Repository(Repository):
 
     # the default tile ID
     _tile_attribute = "tileid"
+    _tilefile_pattern = "tile_{}.shp"
+    _tilefile_name = None
 
     @classmethod
     def validate_setting(cls, key, value):
@@ -81,6 +93,7 @@ class sentinel1Repository(Repository):
             raise ValueError("Sentinel-1's 'source' setting is '{}',"
                     " but valid values are 'esa' or 'gs'".format(value))
         return value
+
 
     @classmethod
     def vector2tiles(cls, vector, *args, **kwargs):
@@ -91,25 +104,15 @@ class sentinel1Repository(Repository):
 
         outdir = "/archive/sentinel1/stage"
 
-        tileshpfile, tilelist = make_tilegrid(vector.Filename(), cls._tile_attribute, outdir)
+        tileid_pattern = "{}-{}"
+
+        tileshpfile, tilelist = make_tilegrid(vector.Filename(), outdir, tileid_pattern, cls._tile_attribute)
 
         cls._tilefile_name = tileshpfile
 
         print('cls._tile_name', tileshpfile)
 
         return {k: (1,1) for k in tilelist}
-
-
-    # @classmethod
-    # def tile_lat_lon(cls, tileid):
-    #     """Returns the coordinates of the given tile ID.
-
-    #     Uses the reference tile vectors provided with the driver.
-    #     Returns (x0, x1, y0, y1), which is
-    #     (west lon, east lon, south lat, north lat) in degrees.
-    #     """
-    #     e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[tileid].Extent()
-    #     return e.x0(), e.x1(), e.y0(), e.y1()
 
 
 
@@ -139,11 +142,11 @@ class sentinel1Asset(Asset):
 
     # S1A_IW_GRDH_1SDV_20180409T002028_20180409T002053_021383_024CFC_A7BE.tif
 
-    _raw_pat_base = "(?P<sensor>S1[AB])_IW_GRDH_1SDV_(?P<pyear>\d{4})(?P<pmon>\d{2})(?P<pday>\d{2})T\w{6}_\w{15}_\w{6}_\w{6}_\w{4}\.tif"
+    # _raw_pat_base = "(?P<sensor>S1[AB])_IW_GRDH_1SDV_(?P<pyear>\d{4})(?P<pmon>\d{2})(?P<pday>\d{2})T\w{6}_\w{15}_\w{6}_\w{6}_\w{4}\.tif"
 
     # _asset_pat_base = "(?P<sensor>S1[AB])_IW_GRDH_1SDV_(?P<pyear>\d{4})(?P<pmon>\d{2})(?P<pday>\d{2})_(?P<ptile>\w{3}_\w{3]}).tif"
 
-    _asset_pat_base = 'S1_IW_GRDH_(?P<year>\d{4})(?P<mon>\d{2})(?P<day>\d{2})_(?P<tile>\w{3}_\w{3})\.tif'
+    _asset_pat_base = 'S1_IW_GRDH_(?P<year>\d{4})(?P<mon>\d{2})(?P<day>\d{2})_(?P<tile>\w{3}-\w{3})\.tif'
 
     _start_date = datetime.date(2015, 1, 1)
 
@@ -166,15 +169,9 @@ class sentinel1Asset(Asset):
         """
         super(sentinel1Asset, self).__init__(filename)
 
-        print('HELLO', filename)
-
         self.basename = os.path.basename(filename)
 
         match = re.match(self._asset_pat_base, self.basename)
-
-
-        print('match', match)
-
 
         self.asset = "L1"
         self.sensor = "S1"
@@ -196,9 +193,6 @@ class sentinel1Asset(Asset):
     def query_esa(cls, tile, date):
         import gips.data.sentinel1.sentinel_api.sentinel_api as api
 
-        print('******************** query', tile)
-
-
         # use username and password for ESA DATA Hub authentication
         username = cls.get_setting('username')
         password = cls.get_setting('password')
@@ -210,17 +204,32 @@ class sentinel1Asset(Asset):
 
         # get the scene name and use it for caching
 
-
         # load geometries from shapefile
-        gdf = gpd.read_file(cls.Repository._tilefile_name)
-        gdf = gdf[gdf['tileid']==tile]
 
-        # IMPORTANT: this is the name of the tile boundaru
-        outfile = os.path.join(cls.Repository.path(), 'stage/tile_{}.shp'.format(tile))
-        gdf.to_file(outfile)
+        # this will be the shapefile containing a single tile boundary
+        outfile = cls.Repository._tilefile_pattern.format(tile)
+        outdir = os.path.join(cls.Repository.path(), 'stage')
+        outpath = os.path.join(outdir, outfile)
+
+        # set_trace()
 
 
-        downloader.load_sites(outfile)
+        if cls.Repository._tilefile_name is not None:
+            # when -s option is used
+            gdf = gpd.read_file(cls.Repository._tilefile_name)
+            gdf = gdf[gdf['tileid'] == tile]
+            # IMPORTANT: outfile is the name of the single tile boundaru
+            gdf.to_file(outpath)
+
+        else:
+            # when -t option is used
+
+            rectfile = make_rectangular_tilegrid(outdir, tile, 1, 1, filename=outfile)
+            assert rectfile == outpath
+
+        print('loading file outpath!', outpath)
+
+        downloader.load_sites(outpath)
 
 
         datestr = date.date().isoformat()
@@ -232,6 +241,10 @@ class sentinel1Asset(Asset):
         # # add another search query (e.g., for Sentinel-1B); both search results will be merged
         downloader.search('S1B*', min_overlap=0.01, start_date=datestr, end_date=datestr,
                   date_type='beginPosition', productType='GRD', sensoroperationalmode='IW')
+
+
+        print('len(downloader.get_scenes())', len(downloader.get_scenes()))
+
 
         if len(downloader.get_scenes()) == 0:
             print('returning None')
@@ -282,6 +295,7 @@ class sentinel1Asset(Asset):
         downloader.set_download_dir(downloaddir)
         print(downloaddir)
 
+
         # prefix names for all the scenes
         scenes = [s['identifier'] for s in downloader.get_scenes()]
 
@@ -289,20 +303,36 @@ class sentinel1Asset(Asset):
         downloadfiles = [os.path.join(stagedir, s + '.zip') for s in scenes]
 
 
-        # if len(downloadfiles) > 1:
-        #     set_trace()
-
-
         if not all([os.path.exists(p) for p in downloadfiles]):
+
+            print('not all paths exist')
+
+            if any([os.path.exists(p) for p in downloadfiles]):
+
+                print('but some paths exist')
+
+                # if the download already exists, then remove it from the request
+
+                downloader._SentinelDownloader__scenes = [
+                    s for s in downloader._SentinelDownloader__scenes \
+                    if not os.path.exists(os.path.join(stagedir, s['identifier'] + '.zip'))
+                ]
+
+                # reset important variables - this is pretty bad, can I just do this one time?
+                scenes = [s['identifier'] for s in downloader.get_scenes()]
+                downloadfiles = [os.path.join(stagedir, s + '.zip') for s in scenes]
+
 
             downloader.download_all()
             # TODO: check they are complete before moving them
             for scene in scenes:
-                print('downloading', scene)
+                print('downloaded', scene)
                 shutil.move(os.path.join(downloaddir, scene + '.zip'),
                             os.path.join(stagedir, scene + '.zip'))
 
+
         # all the downloaded zip scenes are present
+        print('all the downloaded zip scenes are present')
 
         scenefiles = []
 
@@ -320,12 +350,7 @@ class sentinel1Asset(Asset):
                 cmd = "/usr/bin/gpt {} -e -SsourceProduct={} -PtargetProduct={} -Dsnap.dataio.bigtiff.compression.type=LZW".format(
                     graph_xml_path, sourcefile, targetfile)
                 print(cmd)
-                args = shlex.split(cmd)
-                p = subprocess.Popen(args)
-                p.communicate()
-                if p.returncode != 0:
-                    raise IOError("Expected exit status 0, got {}".format(
-                        p.returncode))
+                command(cmd)
 
                 print('moving', targetfile, scenefile)
                 shutil.move(targetfile, scenefile)
@@ -338,7 +363,7 @@ class sentinel1Asset(Asset):
         tileid = os.path.splitext(download_fp)[0][-7:]
         shpfile = os.path.join(stagedir, 'tile_{}.shp'.format(tileid))
 
-
+        outfiles = []
         for i,scenefile in enumerate(scenefiles):
             print('warping', scenefile)
 
@@ -346,26 +371,29 @@ class sentinel1Asset(Asset):
 
             outfile = os.path.splitext(download_fp)[0] + '_{}.tif'.format(i)
 
-            ds = gdal.Warp(outfile, scenefile, format='GTiff', cutlineDSName=shpfile, cutlineLayer=layername,options=['COMPRESS=LZW'], cropToCutline=True, dstAlpha=True, xRes=0.0001, yRes=0.0001)
+            print('gdalwarp', outfile, scenefile)
+
+            ds = gdal.Warp(outfile, scenefile, format='GTiff', cutlineDSName=shpfile, \
+                cutlineLayer=layername,options=['COMPRESS=LZW'], cropToCutline=True, \
+                dstAlpha=False, xRes=0.0001, yRes=0.0001)
+
+            outfiles.append(outfile)
 
 
-            # GET RID OF THIS
+        if len(outfiles) > 1:
+            # merge the results and save as an asset
+            cmd = 'gdal_merge.py -n 0 -a_nodata 0 -init 0 -o {} {}'.format(download_fp, ' '.join(outfiles))
+            args = shlex.split(cmd)
+            p = subprocess.Popen(args)
+            p.communicate()
+            if p.returncode != 0:
+                raise IOError("Expected exit status 0, got {}".format(p.returncode))
+        else:
+            # no need to merge
+            shutil.move(outfiles[0], download_fp)
 
-            print('moving', outfile, os.path.join(stagedir, os.path.split(outfile)[1]))
 
-            # shutil.move(outfile, download_fp)
-
-            shutil.move(outfile, os.path.join(stagedir, os.path.split(outfile)[1]))
-
-
-        print('ok')
-        set_trace()
-
-
-        # merge the results and save as an asset
-
-        cmd = 'gdal_merge.py -n 0 -a_nodata 0 -init 0 {} {}'.format(download_fp, ' '.join(scenefiles))
-
+        # WHY ARE THERE THREE LAYERS
 
         return True
 
@@ -379,22 +407,70 @@ class sentinel1Data(Data):
     # TODO: is this the correct order?
     _productgroups = {'sigma0': ['sigma0']}
 
-
     _products = {
         'sigma0': {
             'description': 'Backscatter',
             'assets': _asset_types,
-            'bands': ['vv', 'vh']
+            'bands': ['vv', 'vh'],
+            'sensor': 'S1'
+        },
+        'indices': {
+            'description': 'Backscatter indices',
+            'assets': _asset_types,
+            'bands': ['mean', 'difference', 'ratio'],
+            'sensor': 'S1'
         },
     }
 
     @Data.proc_temp_dir_manager
-    def process(self, products=None, overwrite=False, **kwargs):
+    def process(self, *args, **kwargs):
         """Produce data products and save them to files."""
+        start = datetime.datetime.now()
+        products = super(sentinel1Data, self).process(*args, **kwargs)
+        if len(products) == 0:
+            return
 
-        pass
+        bname = os.path.join(self.path, self.basename)
+
+        asset =  self.assets.keys()[0]
+        assetfname = self.assets[asset].datafiles()[0]
+
+        # key is only used once far below, and val is only used for val[0].
+        for key, val in products.requested.items():
+
+            prod_type = val[0]
+            sensor = self._products[prod_type]['sensor']
+            fname = self.temp_product_filename(sensor, prod_type)
+
+            if val[0] == "sigma0":
+                # this product is just the asset but it has to have the right name
+
+                # SUPER AMNNOYING THAT THIS DOESN"T WORK
+                # command('gdal_translate -of VRT {} {}'.format(assetfname, fname))
 
 
+                shutil.copy(assetfname, fname)
 
 
+                
+                # do this if you want to set metadata later
+                # imgout = gippy.GeoImage(fname)
 
+            if val[0] == "indices":
+                print('indices not completed yet')
+
+                img = gippy.GeoImage(assetfname)
+                data = img.Read()
+
+                set_trace()
+
+            # set metadata
+            # imgout.SetMeta(self.prep_meta(a_fnames, meta))
+            # del imgout
+
+
+            # add product to inventory
+            archive_fp = self.archive_temp_path(fname)
+            self.AddFile(sensor, key, archive_fp)
+            utils.verbose_out(' -> {}: processed in {}'.format(
+                os.path.basename(fname), datetime.datetime.now() - start), level=1)

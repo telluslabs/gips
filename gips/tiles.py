@@ -113,6 +113,9 @@ class Tiles(object):
                                  if (sensor, product) in self.tiles[t].filenames
                     ]
 
+
+                    # from pdb import set_trace; set_trace()
+
                     images = gippy.GeoImages(filenames)
                     if self.spatial.rastermask is not None:
                         gridded_mosaic(images, tmp_fp,
