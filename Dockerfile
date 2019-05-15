@@ -3,7 +3,7 @@ FROM gippy-0.3.x
 ARG GIPS_UID
 RUN apt-get update \
     && apt-get -y install libcurl4-gnutls-dev \
-        python-geopandas python-rtree awscli
+        python-geopandas awscli
 
 COPY . /gips
 
@@ -40,6 +40,7 @@ RUN cd /gips \
     && pip install --no-cache-dir https://github.com/indigo-ag/multitemporal/archive/v1.0.0-tl05.zip \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /gips/gips_init* \
+    && apt-get -y install python-rtree \
     && apt-get -y autoremove \
     && apt-get -y autoclean
 
