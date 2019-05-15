@@ -224,7 +224,11 @@ class sentinel1Asset(Asset):
         else:
             # when -t option is used
 
-            rectfile = make_rectangular_tilegrid(outdir, tile, 1, 1, filename=outfile)
+            # outdir, tileid, nxgrid, nygrid, tileid_attribute, filename=None
+
+            # set_trace()
+
+            rectfile = make_rectangular_tilegrid(outdir, tile, 1, 1, 'tileid', filename=outfile)
             assert rectfile == outpath
 
         print('loading file outpath!', outpath)
