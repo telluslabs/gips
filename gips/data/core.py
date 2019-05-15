@@ -23,21 +23,15 @@
 
 import os
 import sys
-import errno
-from osgeo import gdal, ogr
 from datetime import datetime, timedelta
 import glob
 import re
 from itertools import groupby
-from shapely.wkt import loads
 import tarfile
 import zipfile
 import json
 import traceback
 import ftplib
-import shutil
-import commands
-from urllib import urlencode
 import urllib2
 from cookielib import CookieJar
 import argparse
@@ -47,11 +41,13 @@ from backports.functools_lru_cache import lru_cache
 import requests
 import backoff
 
+from osgeo import gdal
+from shapely.wkt import loads
+
 import gippy
-from gippy.algorithms import CookieCutter
 from gips import __version__
-from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File, Colors,
-        basename, mkdir, open_vector)
+from gips.utils import (settings, VerboseOut, RemoveFiles, File2List,
+                        List2File, Colors, basename, mkdir, open_vector)
 from gips import utils
 from ..inventory import dbinv, orm
 
@@ -86,9 +82,9 @@ def add_gippy_index_products(p_dict, p_groups, a_types):
         (p, {'description': d,
              'assets': a_types,
              'bands': [{'name': p, 'units': Data._unitless}]}
-         ) for p, d in gippy_index_product_glossary)
+        ) for p, d in gippy_index_product_glossary)
 
-def _gs_stop_trying(e):
+def _gs_stop_trying(exc):
     """Should backoff keep retrying based on this HTTPError?
     
     For searching using backoff per GCP docs:
@@ -96,9 +92,9 @@ def _gs_stop_trying(e):
     to Cloud Storage that return HTTP 5xx and 429 response codes,
     including uploads and downloads of data or metadata.
     """
-    return (e.response is not None
-            and e.response.status_code != 429
-            and not (499 < e.response.status_code < 600))
+    return (exc.response is not None
+            and exc.response.status_code != 429
+            and not (499 < exc.response.status_code < 600))
 
 
 class GoogleStorageMixin(object):
@@ -138,10 +134,11 @@ class GoogleStorageMixin(object):
 
     @classmethod
     @backoff.on_exception(backoff.expo,
-                              requests.exceptions.RequestException,
-                              max_time=_gs_backoff_max,
-                              giveup=_gs_stop_trying)
+                          requests.exceptions.RequestException,
+                          max_time=_gs_backoff_max,
+                          giveup=_gs_stop_trying)
     def gs_backoff_downloader(cls, src, dst, chunk_size=512 * 1024):
+        '''Download following the exponential backoff protocol.'''
         r = requests.get(src, stream=True)# NOTE the stream=True
         r.raise_for_status()
         with open(dst, 'wb') as f:
@@ -151,10 +148,12 @@ class GoogleStorageMixin(object):
 
     @classmethod
     @backoff.on_exception(backoff.expo,
-                              requests.exceptions.RequestException,
-                              max_time=_gs_backoff_max,
-                              giveup=_gs_stop_trying)
+                          requests.exceptions.RequestException,
+                          max_time=_gs_backoff_max,
+                          giveup=_gs_stop_trying)
     def gs_backoff_get(cls, src, stream=False):
+        '''This follows backoff proto until handed func exit.  Still could
+        encounter HTTP503s then.'''
         r = requests.get(src, stream=stream)# NOTE the stream=True
         r.raise_for_status()
         return r
@@ -202,7 +201,7 @@ class S3Mixin(object):
         bucket = s3.Bucket(cls._s3_bucket_name)
         keys = [o.key for o in bucket.objects.filter(Prefix=prefix)]
         utils.verbose_out("Found {} S3 keys while searching for for key fragment"
-                    " '{}'".format(len(keys), prefix), 5)
+                          " '{}'".format(len(keys), prefix), 5)
         return keys
 
     @classmethod
@@ -225,10 +224,10 @@ class Repository(object):
     default_settings = {}
 
     @classmethod
-    def in_stage(cls, basename):
+    def in_stage(cls, base_fn):
         """Tests for the existence of the file in this driver's stage dir."""
-        if os.path.exists(os.path.join(cls.path('stage'), basename)):
-            utils.verbose_out('File `{}` already in stage/'.format(basename), 2)
+        if os.path.exists(os.path.join(cls.path('stage'), base_fn)):
+            utils.verbose_out('File `{}` already in stage/'.format(base_fn), 2)
             return True
         return False
 
@@ -249,6 +248,7 @@ class Repository(object):
         if tile != '':
             path = os.path.join(path, tile)
         if date != '':
+            # TODO: string or date obj...pick one.
             path = os.path.join(path, str(date.strftime(cls._datedir)))
         return path
 
@@ -266,7 +266,10 @@ class Repository(object):
             return dbinv.list_dates(cls.name.lower(), tile)
         tdir = cls.data_path(tile=tile)
         if os.path.exists(tdir):
-            return sorted([datetime.strptime(os.path.basename(d), cls._datedir).date() for d in os.listdir(tdir)])
+            return sorted([
+                datetime.strptime(os.path.basename(d), cls._datedir).date()
+                for d in os.listdir(tdir)
+            ])
         else:
             return []
 
@@ -348,12 +351,12 @@ class Repository(object):
                 request = urllib2.Request(redirect_url)
                 response = urllib2.urlopen(request)
             return response
-        except urllib2.URLError as e:
-            utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
-                              verbosity, sys.stderr)
-            return None
         except urllib2.HTTPError as e:
             utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
+                              verbosity, sys.stderr)
+            return None
+        except urllib2.URLError as e:
+            utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
                               verbosity, sys.stderr)
             return None
 
