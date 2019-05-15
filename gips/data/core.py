@@ -488,12 +488,12 @@ class Asset(object):
         return str(self._version)
 
 
-    def get_geometry(self):
-        """Get the geometry of the asset
+    def get_geofeature(self):
+        """Get the geofeature of the asset
 
         For tiled assets, this will return the geometry of the tile in the
         respective 'tiles.shp' file as WKT. Needs to be extended for
-        untiled assets.
+        untiled assets -- see sentinel2.footprint.
         """
         # If tileID is a number, drop leading 0
         try:
@@ -501,12 +501,20 @@ class Asset(object):
         except:
             tile_num = self.tile
 
-        v = gippy.GeoVector(self.get_setting("tiles"))
-        v.SetPrimaryKey(self.Repository._tile_attribute)
-        # If a GeoVector is indexed with an int, it queries using
-        # FID field.
-        feat = v[str(tile_num)]
-        return feat.WKT()
+        v =  utils.open_vector(
+            self.get_setting("tiles"),
+            key=self.Repository._tile_attribute
+        )
+        return v[str(tile_num)]
+
+    def get_geometry(self):
+        """Get the geometry of the asset
+
+        For tiled assets, this will return the geometry of the tile in the
+        respective 'tiles.shp' file as WKT. Needs to be extended for
+        untiled assets.
+        """
+        return self.get_geofeature().WKT()
 
     ##########################################################################
     # Child classes should not generally have to override anything below here
