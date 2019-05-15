@@ -3,7 +3,7 @@ FROM gippy-0.3.x
 ARG GIPS_UID
 RUN apt-get update \
     && apt-get -y install libcurl4-gnutls-dev \
-        python-geopandas awscli
+        python-geopandas awscli python-rtree
 
 COPY . /gips
 
@@ -40,7 +40,6 @@ RUN cd /gips \
     && pip install --no-cache-dir https://github.com/indigo-ag/multitemporal/archive/v1.0.0-tl05.zip \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /gips/gips_init* \
-    && apt-get -y install python-rtree \
     && apt-get -y autoremove \
     && apt-get -y autoclean
 
@@ -54,15 +53,13 @@ COPY docker/pytest-ini /gips/pytest.ini
 # link gpt so it can be used systemwide
 # Update SNAP
 # set gpt max memory to 4GB
-RUN mkdir /snap \
-    && cd /snap \
-    && wget http://step.esa.int/downloads/6.0/installers/esa-snap_sentinel_unix_6_0.sh \
-    && chmod +x esa-snap_sentinel_unix_6_0.sh \
-    && ./esa-snap_sentinel_unix_6_0.sh -q -c \
-    && ln -s /usr/local/snap/bin/gpt /usr/bin/gpt \
-    && snap --nosplash --nogui --modules --update-all \
-    && sed -i -e 's/-Xmx1G/-Xmx4G/g' /usr/local/snap/bin/gpt.vmoptions \
-    && cd .. \
-    && rm -rf /snap
+RUN mkdir /snap 
+RUN wget -nd -P /snap http://step.esa.int/downloads/6.0/installers/esa-snap_sentinel_unix_6_0.sh 
+RUN chmod +x /snap/esa-snap_sentinel_unix_6_0.sh 
+RUN /snap/esa-snap_sentinel_unix_6_0.sh -q -c 
+RUN ln -s /usr/local/snap/bin/gpt /usr/bin/gpt 
+RUN /usr/local/snap/bin/snap --nosplash --nogui --modules --update-all 
+RUN sed -i -e 's/-Xmx1G/-Xmx16G/g' /usr/local/snap/bin/gpt.vmoptions 
+RUN rm -rf /snap
 
 WORKDIR /gips
