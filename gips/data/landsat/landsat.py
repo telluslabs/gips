@@ -48,7 +48,8 @@ import osr
 import gippy
 from gips import __version__ as __gips_version__
 from gips.core import SpatialExtent, TemporalExtent
-from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
+from gippy.algorithms import (ACCA, Fmask, LinearTransform, Indices,
+                              AddShadowMask, CookieCutter)
 from gips.data.core import Repository, Data
 import gips.data.core
 from gips.atmosphere import SIXS, MODTRAN
@@ -57,6 +58,9 @@ from gips.inventory import DataInventory
 from gips.utils import RemoveFiles, basename, settings, verbose_out
 from gips import utils
 
+import geojson
+import fiona
+from fiona.crs import from_epsg
 from shapely.geometry import Polygon
 from shapely.wkt import loads as wkt_loads
 import requests
@@ -80,7 +84,13 @@ class NoSentinelError(Exception):
     pass
 
 class CantAlignError(Exception):
+    def __init__(self, message, returncode=None):
+        super(CantAlignError, self).__init__(message)
+        self.returncode = returncode
+
+class CoregTimeout(Exception):
     pass
+
 
 class landsatRepository(Repository):
     """ Singleton (all class methods) to be overridden by child data classes """
@@ -206,7 +216,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             'sensors': ['LT5', 'LE7', 'LC8'],
             'enddate': date(2017, 4, 30),
             'pattern': (
-                r'^L(?P<sensor>[A-Z])(?P<satellie>\d)'
+                r'^L(?P<sensor>[A-Z])(?P<satellite>\d)'
                 r'(?P<pathrow>\d{6})(?P<acq_date>\d{7})'
                 r'(?P<gsi>[A-Z]{3})(?P<version>\d{2})\.tar\.gz$'
             ),
@@ -1026,12 +1036,17 @@ class landsatData(gips.data.core.CloudCoverData):
                 insane =  coreg_mag > 75  # TODO: actual fix
 
                 img.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
+                img.SetMeta("COREG_EXCESSIVE_SHIFT", str(insane))
 
-                if not insane:
+                if True: # not insane:
                     affine = img.Affine()
                     affine[0] += xcoreg
                     affine[3] += ycoreg
                     img.SetAffine(affine)
+                else:
+                    # quarantine
+                    pass
+
                 img.Process()
                 img = None
 
@@ -1231,18 +1246,60 @@ class landsatData(gips.data.core.CloudCoverData):
                         utils.mkdir(tmpdir_fp)
                         try:
                             # on error, use the unshifted image
-                            s2_export = self.sentinel2_coreg_export(tmpdir_fp)
-                            self.run_arop(s2_export, img['NIR'].Filename())
+                            mos_source = settings().REPOS['landsat'].get(
+                                'coreg_mos_source', 'sentinel2'
+                            )
+                            base_image = None
+                            if mos_source is 'sentinel2':
+                                base_image = self.sentinel2_coreg_export(tmpdir_fp)
+                            else:
+                                images = gippy.GeoImages([mos_source])
+                                feat = self.assets[asset].get_geofeature()
+                                utm_gjs_feat = geojson.Feature(
+                                    geometry=wkt_loads(
+                                        utils.transform_shape(feat.WKT(),
+                                                              feat.Projection(),
+                                                              img.Projection()),
+                                    ),
+                                    properties={}
+                                )
+                                tmp_feat_fp = os.path.join(tmpdir_fp, 'feat.geojson')
+                                with fiona.open(
+                                        tmp_feat_fp, 'w', 'GeoJSON',
+                                        crs=from_epsg('326{}'.format(self.utm_zone())),
+                                        schema={
+                                            'geometry': 'Polygon',
+                                            'properties': {}
+                                        },
+                                ) as tvec:
+                                    tvec.write(utm_gjs_feat)
+                                cutter = gippy.GeoVector(tmp_feat_fp)
+                                tmp_fp = os.path.join(
+                                    tmpdir_fp, 'custom_mosaic.bin')
+                                base_image = CookieCutter(
+                                    images, cutter[0], tmp_fp, 30., 30.,
+                                )
+                            self.run_arop(base_image.Filename(), img['NIR'].Filename(),
+                                          source='custom_mosaic')
                         except NoSentinelError:
                             verbose_out(
                                 'No Sentinel found for co-registration', 4)
                         except CantAlignError as cae:
                             verbose_out('Co-registration error '
                                         '(FALLBACK): {}'.format(cae), 4)
+                            md['COREG_CANT_ALIGN'] = str(cae)
+                        except CoregTimeout as cte:
+                            verbose_out('Co-registration error '
+                                        '(TIMEOUT): {}'.format(cte), 4)
+                            md['COREG_HIT_TIMEOUT'] = 'TRUE'
 
                 try:
                     coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
-                    md['COREG_STATUS'] = 'AROP'
+                    md['COREG_STATUS'] = (
+                        'AROP'
+                        if (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5 > 0
+                        else 'NO_SHIFT'
+                    )
                 except IOError:
                     coreg_xshift, coreg_yshift = (0.0, 0.0)
                     md['COREG_STATUS'] = 'FALLBACK'
@@ -1522,13 +1579,15 @@ class landsatData(gips.data.core.CloudCoverData):
                         insane =  coreg_mag > 75  # TODO: actual fix
 
                         imgout.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
+                        imgout.SetMeta("COREG_EXCESSIVE_SHIFT", str(insane))
 
-                        if not insane:
+                        if True: #not insane:
                             self._time_report("Setting affine of product")
                             affine = imgout.Affine()
                             affine[0] += coreg_xshift
                             affine[3] += coreg_yshift
                             imgout.SetAffine(affine)
+
                     imgout.Process()
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
@@ -1946,12 +2005,17 @@ class landsatData(gips.data.core.CloudCoverData):
         self._time_report("done with s2 export")
         return tmpdir + '/sentinel_mosaic.bin'
 
-    def run_arop(self, base_band_filename, warp_band_filename):
+    def run_arop(self, base_band_filename, warp_band_filename, source,
+                 source_satellite="Landsat8"):
         """
         Runs AROP's `ortho` program.
 
-        base_band_filename is the filename of the sentinel2 image you want
-        to warp to
+        base_band_filename is the filename of the mosaic image you want
+        to warp to.
+        warp_band_filename is the bands out of self that you want to warp.
+        source is either 'sentinel2' or 'custom_mosaic'
+        source_satellite can be any of 'Landsat{N}' \forall N in [4,5,7,8]
+        or 'Sentinel2', formatted per AROP specs.
         """
         warp_tile = self.id
         warp_date = self.date
@@ -1988,16 +2052,9 @@ class landsatData(gips.data.core.CloudCoverData):
             base_pixel_size = abs(base_band_img.Resolution().x())
             warp_pixel_size = abs(warp_base_band_img.Resolution().x())
             out_pixel_size = max(base_pixel_size, warp_pixel_size)
-            parameters = template.format(
-                base_satellite='Sentinel2',
-                base_band=base_band_filename,
-                base_nsample=base_band_img.XSize(),
-                base_nline=base_band_img.YSize(),
-                base_pixel_size=base_pixel_size,
-                base_upper_left_x=base_band_img.MinXY().x(),
-                base_upper_left_y=base_band_img.MaxXY().y(),
-                base_utm=self.utm_zone(),
-                warp_satellite='Landsat8',
+            lnd_sen_lut = {'LT5': 'Landsat5', 'LE7': 'Landsat7', 'LC8': 'Landsat8'}
+            base_params = dict(
+                warp_satellite=lnd_sen_lut[asset.sensor],
                 warp_nbands=len(warp_bands_bin),
                 warp_bands=' '.join([os.path.join(tmpdir, band) for band in warp_bands_bin]),
                 warp_base_band=os.path.join(tmpdir, warp_base_band_filename),
@@ -2019,7 +2076,21 @@ class landsatData(gips.data.core.CloudCoverData):
                 out_pixel_size=out_pixel_size,
                 tmpdir=tmpdir
             )
-
+            mos_sen_lut = {'sentinel2': 'Sentinel2',
+                           'custom_mosaic': source_satellite}
+            mosaic_params = dict(
+                base_satellite=mos_sen_lut[source],
+                base_band=base_band_filename,
+                base_nsample=base_band_img.XSize(),
+                base_nline=base_band_img.YSize(),
+                base_pixel_size=base_pixel_size,
+                base_upper_left_x=base_band_img.MinXY().x(),
+                base_upper_left_y=base_band_img.MaxXY().y(),
+                base_utm=self.utm_zone(),
+            )
+            all_params = mosaic_params
+            all_params.update(base_params)
+            parameters = template.format(**all_params)
             parameter_file = os.path.join(tmpdir, 'parameter_file.inp')
             with open(parameter_file, 'w') as param_file:
                 param_file.write(parameters)
@@ -2031,17 +2102,24 @@ class landsatData(gips.data.core.CloudCoverData):
 
             try:
                 # subprocess has a timeout option as of python 3.3
-                ORTHO_TIMEOUT = 10 * 60
+                ORTHO_TIMEOUT = 40 * 60
                 cmd = ["timeout", str(ORTHO_TIMEOUT),
                        "ortho", "-r", parameter_file]
                 returnstatus = subprocess.check_call(args=cmd, cwd=tmpdir)
             except subprocess.CalledProcessError as e:
-                raise CantAlignError(repr((warp_tile, warp_date)))
+                if e.returncode == 124:  # 124 is the return code produced by 'timeout'
+                    raise CoregTimeout("Coregistration timed out ({} seconds)"
+                                       .format(ORTHO_TIMEOUT),
+                                       repr((warp_tile, warp_date)))
+                raise CantAlignError(repr((warp_tile, warp_date)), returncode=e.returncode)
 
-            with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
+            with open('{}/coreg_args_file.txt'.format(tmpdir), 'r') as log:
                 xcoef_re = re.compile(r"x' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
                 ycoef_re = re.compile(r"y' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
-                xcoef = ycoef = None
+                cp_info_re = re.compile(r".*Total_Control_Points *= *(?P<total>[0-9]+), *"
+                                        r"Used_Control_Points *= *(?P<used>[0-9]+), *"
+                                        r"RMSE *= *(?P<rmse>[+-]?([0-9]*[.])?[0-9]+).*")
+                xcoef = ycoef = total_cp = used_cp = rmse_cp = None
                 for line in log:
                     x_match = xcoef_re.match(line)
                     if x_match:
@@ -2049,15 +2127,24 @@ class landsatData(gips.data.core.CloudCoverData):
                     y_match = ycoef_re.match(line)
                     if y_match:
                         ycoef = float(y_match.group(1))
+                    cp_match = cp_info_re.match(line)
+                    if cp_match:
+                        total_cp = cp_match.group('total')
+                        used_cp = cp_match.group('used')
+                        rmse_cp = cp_match.group('rmse')
+
                 if xcoef is None:
-                    raise CantAlignError('AROP: no coefs found in cp_log --> '
+                    raise CantAlignError('AROP: no coefs found in coreg_args_file --> '
                                          + repr((warp_tile, warp_date)))
             x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
             y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
 
             with open('{}/{}_{}_coreg_args.txt'.format(self.path, self.id, datetime.strftime(self.date, "%Y%j")), 'w') as coreg_args:
                 coreg_args.write("x: {}\n".format(x_shift))
-                coreg_args.write("y: {}".format(y_shift))
+                coreg_args.write("y: {}\n".format(y_shift))
+                coreg_args.write("total_cp: {}\n".format(total_cp))
+                coreg_args.write("used_cp: {}\n".format(used_cp))
+                coreg_args.write("rmse_cp: {}\n".format(rmse_cp))
 
     def utm_zone(self):
         """
@@ -2102,12 +2189,12 @@ class landsatData(gips.data.core.CloudCoverData):
         file.
         """
         date = datetime.strftime(self.date, "%Y%j")
-        cp_log = "{}/{}_{}_coreg_args.txt".format(self.path, self.id, date)
-        with open(cp_log, 'r') as log:
+        coreg_args_file = "{}/{}_{}_coreg_args.txt".format(self.path, self.id, date)
+        with open(coreg_args_file, 'r') as cra:
             xcoef_re = re.compile(r"x: (-?\d+\.?\d*)")
             ycoef_re = re.compile(r"y: (-?\d+\.?\d*)")
 
-            for line in log:
+            for line in cra:
                 x_match = xcoef_re.match(line)
                 if x_match:
                     xcoef = float(x_match.groups()[0])
