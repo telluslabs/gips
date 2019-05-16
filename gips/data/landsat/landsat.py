@@ -2113,7 +2113,7 @@ class landsatData(gips.data.core.CloudCoverData):
                                        repr((warp_tile, warp_date)))
                 raise CantAlignError(repr((warp_tile, warp_date)), returncode=e.returncode)
 
-            with open('{}/coreg_args_file.txt'.format(tmpdir), 'r') as log:
+            with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
                 xcoef_re = re.compile(r"x' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
                 ycoef_re = re.compile(r"y' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
                 cp_info_re = re.compile(r".*Total_Control_Points *= *(?P<total>[0-9]+), *"
@@ -2134,7 +2134,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         rmse_cp = cp_match.group('rmse')
 
                 if xcoef is None:
-                    raise CantAlignError('AROP: no coefs found in coreg_args_file --> '
+                    raise CantAlignError('AROP: no coefs found in cp_log.txt --> '
                                          + repr((warp_tile, warp_date)))
             x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
             y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
