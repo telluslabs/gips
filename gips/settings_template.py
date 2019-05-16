@@ -102,6 +102,8 @@ REPOS = {
     },
     'sentinel1': {
         'repository': '$TLD/sentinel1',
+        'username': ESA_USER,
+        'password': ESA_PASS
     },
     #'sarannual': {
     #    'repository': '$TLD/sarannual',
