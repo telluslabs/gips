@@ -25,7 +25,6 @@ from __future__ import print_function
 
 import os
 from gips import __version__
-# from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
 from gips.utils import Colors, VerboseOut, import_data_class
 from gips import utils
@@ -60,10 +59,7 @@ def main(jobid):
     print(title)
 
     args = Args()
-    args.command = "hls"
-    args.products = ['ndvi', 'lswi', 'brgt', 'cmask']
-    #args.command = "modis"
-    #args.products = ['ndvi', 'lswi', 'brgt']
+    args.products = ['ndvi', 'lswi', 'brgt']
     args.res = [20., 20.]
     args.stop_on_error = "False"
     args.suffix = ""
@@ -92,13 +88,20 @@ def main(jobid):
 
     with tempfile.TemporaryDirectory() as tmpdir:
 
-        # get name and year
+        # get name, year, and asset
 
         confpath = os.path.join(tmpdir, 'config')
         S3 = boto3.resource('s3')
         S3.Bucket('tl-octopus').download_file('user/gips/config', confpath)
 
         config = eval(open(confpath).read())
+
+        args.command = config['source']
+        if args.command == "hls":
+            args.products.append('cmask')
+        else:
+            args.products.append('clouds')
+
         year = config['year']
         s3shpfile = config['shapefile']
         name = s3shpfile.split('/')[-1].split('.zip')[0]
@@ -117,8 +120,8 @@ def main(jobid):
             print(fid)
 
             args.site = s3shpfile
-            args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}_{}".format(
-                name, name, year, doy, fid)
+            args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}_{}_{}".format(
+                name, name, args.command, year, doy, fid)
 
             args.dates = "{}-{}".format(year, str(doy+1).zfill(3))
             args.where = "FID={}".format(fid)
@@ -132,7 +135,7 @@ def main(jobid):
 
         print('cleaning up')
 
-        items = glob.glob('/archive/hls/tiles/*')
+        items = glob.glob('/archive/{}/tiles/*'.format(args.command))
         for item in items:
             shutil.rmtree(item)
 
