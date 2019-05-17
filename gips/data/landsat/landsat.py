@@ -84,9 +84,10 @@ class NoSentinelError(Exception):
     pass
 
 class CantAlignError(Exception):
-    def __init__(self, message, returncode=None):
+    NO_COEFFS, INSUFFICIENT_CP, EXCESSIVE_SHIFT = range(3)
+    def __init__(self, message, code=None):
         super(CantAlignError, self).__init__(message)
-        self.returncode = returncode
+        self.code = code
 
 class CoregTimeout(Exception):
     pass
@@ -1249,38 +1250,16 @@ class landsatData(gips.data.core.CloudCoverData):
                             mos_source = settings().REPOS['landsat'].get(
                                 'coreg_mos_source', 'sentinel2'
                             )
+                            sat_key = 'custom_mosaic' if mos_source != 'sentinel2' else 'sentinel2'
                             base_image = None
                             if mos_source is 'sentinel2':
-                                base_image = self.sentinel2_coreg_export(tmpdir_fp)
+                                base_image = gippy.GeoImage(
+                                    self.sentinel2_coreg_export(tmpdir_fp))
                             else:
-                                images = gippy.GeoImages([mos_source])
-                                feat = self.assets[asset].get_geofeature()
-                                utm_gjs_feat = geojson.Feature(
-                                    geometry=wkt_loads(
-                                        utils.transform_shape(feat.WKT(),
-                                                              feat.Projection(),
-                                                              img.Projection()),
-                                    ),
-                                    properties={}
-                                )
-                                tmp_feat_fp = os.path.join(tmpdir_fp, 'feat.geojson')
-                                with fiona.open(
-                                        tmp_feat_fp, 'w', 'GeoJSON',
-                                        crs=from_epsg('326{}'.format(self.utm_zone())),
-                                        schema={
-                                            'geometry': 'Polygon',
-                                            'properties': {}
-                                        },
-                                ) as tvec:
-                                    tvec.write(utm_gjs_feat)
-                                cutter = gippy.GeoVector(tmp_feat_fp)
-                                tmp_fp = os.path.join(
-                                    tmpdir_fp, 'custom_mosaic.bin')
-                                base_image = CookieCutter(
-                                    images, cutter[0], tmp_fp, 30., 30.,
-                                )
-                            self.run_arop(base_image.Filename(), img['NIR'].Filename(),
-                                          source='custom_mosaic')
+                                base_image = gippy.GeoImage(
+                                    self.custom_mosaic_coreg_export(
+                                        mos_source, img.Projection(), tmpdir_fp))
+                            self.run_arop(base_image.Filename(), img['NIR'].Filename(), source=sat_key)
                         except NoSentinelError:
                             verbose_out(
                                 'No Sentinel found for co-registration', 4)
@@ -1584,8 +1563,10 @@ class landsatData(gips.data.core.CloudCoverData):
                         if True: #not insane:
                             self._time_report("Setting affine of product")
                             affine = imgout.Affine()
+                            self._time_report("Affine was: {}".format(affine.tolist()))
                             affine[0] += coreg_xshift
                             affine[3] += coreg_yshift
+                            self._time_report("Affine set to: {}".format(affine.tolist()))
                             imgout.SetAffine(affine)
 
                     imgout.Process()
@@ -1920,6 +1901,35 @@ class landsatData(gips.data.core.CloudCoverData):
         verbose_out("S2 assets do not cover enough of Landsat data.", 3)
         return None
 
+    def custom_mosaic_coreg_export(self, mos_source, proj, tmpdir):
+        images = gippy.GeoImages([mos_source])
+        feat = self.assets[asset].get_geofeature()
+        utm_gjs_feat = geojson.Feature(
+            geometry=wkt_loads(
+                utils.transform_shape(feat.WKT(),
+                                      feat.Projection(),
+                                      img.Projection()),
+            ),
+            properties={}
+        )
+        tmp_feat_fp = os.path.join(tmpdir_fp, 'feat.geojson')
+        with fiona.open(
+                tmp_feat_fp, 'w', 'GeoJSON',
+                crs=from_epsg('326{}'.format(self.utm_zone())),
+                schema={
+                    'geometry': 'Polygon',
+                    'properties': {}
+                },
+        ) as tvec:
+            tvec.write(utm_gjs_feat)
+        cutter = gippy.GeoVector(tmp_feat_fp)
+        tmp_fp = os.path.join(
+            tmpdir_fp, 'custom_mosaic.bin')
+        base_image = CookieCutter(
+            images, cutter[0], tmp_fp, 30., 30.,
+        )
+
+
     def sentinel2_coreg_export(self, tmpdir):
         """
         Grabs closest (temporally) sentinel2 tiles and stitches them together
@@ -2022,6 +2032,10 @@ class landsatData(gips.data.core.CloudCoverData):
         asset_type = self.preferred_asset
         asset = self.assets[asset_type]
 
+        ## Selects what order polynomial is used for coregistration...just use
+        ## a shift --> 0th order.
+        out_poly_order = 0
+
         with utils.make_temp_dir() as tmpdir:
             nir_band = asset._sensors[asset.sensor]['bands'][
                 asset._sensors[asset.sensor]['colors'].index('NIR')
@@ -2074,6 +2088,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 out_base_band=os.path.join(
                     tmpdir, basename(warp_base_band_filename)) + '_warped.bin',
                 out_pixel_size=out_pixel_size,
+                out_poly_order=out_poly_order,
                 tmpdir=tmpdir
             )
             mos_sen_lut = {'sentinel2': 'Sentinel2',
@@ -2105,46 +2120,94 @@ class landsatData(gips.data.core.CloudCoverData):
                 ORTHO_TIMEOUT = 40 * 60
                 cmd = ["timeout", str(ORTHO_TIMEOUT),
                        "ortho", "-r", parameter_file]
-                returnstatus = subprocess.check_call(args=cmd, cwd=tmpdir)
+                ortho_out = subprocess.check_output(args=cmd, cwd=tmpdir)
+                with open('{}/{}_{}_coreg_log.txt'.format(self.path, self.id, datetime.strftime(self.date, "%Y%j")), 'w') as coreg_log:
+                    coreg_log.write(ortho_out)
             except subprocess.CalledProcessError as e:
                 if e.returncode == 124:  # 124 is the return code produced by 'timeout'
                     raise CoregTimeout("Coregistration timed out ({} seconds)"
                                        .format(ORTHO_TIMEOUT),
                                        repr((warp_tile, warp_date)))
-                raise CantAlignError(repr((warp_tile, warp_date)), returncode=e.returncode)
+                raise CantAlignError(repr((warp_tile, warp_date)), code=e.returncode)
 
-            with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
-                xcoef_re = re.compile(r"x' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
-                ycoef_re = re.compile(r"y' += +([\d\-\.]+) +\+ +[\d\-\.]+ +\* +x +\+ +[\d\-\.]+ +\* y")
-                cp_info_re = re.compile(r".*Total_Control_Points *= *(?P<total>[0-9]+), *"
-                                        r"Used_Control_Points *= *(?P<used>[0-9]+), *"
-                                        r"RMSE *= *(?P<rmse>[+-]?([0-9]*[.])?[0-9]+).*")
-                xcoef = ycoef = total_cp = used_cp = rmse_cp = None
-                for line in log:
-                    x_match = xcoef_re.match(line)
-                    if x_match:
-                        xcoef = float(x_match.group(1))
-                    y_match = ycoef_re.match(line)
-                    if y_match:
-                        ycoef = float(y_match.group(1))
-                    cp_match = cp_info_re.match(line)
-                    if cp_match:
-                        total_cp = cp_match.group('total')
-                        used_cp = cp_match.group('used')
-                        rmse_cp = cp_match.group('rmse')
+            xcoef = ycoef = total_cp = used_cp = rmse_cp = None
+            if out_poly_order == 1:
+                with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
+                    xcoef_re = re.compile(r"x' += +(?P<const>[\d\-\.]+)( +\+ +(?P<dx>[\d\-\.]+) +\* +x +\+ +(?P<dy>[\d\-\.]+) +\* y)?")
+                    ycoef_re = re.compile(r"y' += +(?P<const>[\d\-\.]+)( +\+ +(?P<dx>[\d\-\.]+) +\* +x +\+ +(?P<dy>[\d\-\.]+) +\* y)?")
+                    cp_info_re = re.compile(r".*Total_Control_Points *= *(?P<total>[0-9]+), *"
+                                            r"Used_Control_Points *= *(?P<used>[0-9]+), *"
+                                            r"RMSE *= *(?P<rmse>[+-]?([0-9]*[.])?[0-9]+).*")
+                    for line in log:
+                        x_match = xcoef_re.match(line)
+                        if x_match:
+                            xcoef = float(x_match.group('const'))
+                        y_match = ycoef_re.match(line)
+                        if y_match:
+                            ycoef = float(y_match.group('const'))
+                        cp_match = cp_info_re.match(line)
+                        if cp_match:
+                            total_cp = cp_match.group('total')
+                            used_cp = cp_match.group('used')
+                            rmse_cp = cp_match.group('rmse')
 
-                if xcoef is None:
-                    raise CantAlignError('AROP: no coefs found in cp_log.txt --> '
-                                         + repr((warp_tile, warp_date)))
-            x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
-            y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
+            elif out_poly_order == 0:
+                orig_coarse_re = re.compile(r".*upper left coordinate has been updated[ \t]*from[ \t]*\((?P<ulx>[0-9\.]+), (?P<uly>[0-9\.]+)\).*")
+                orig_nocoarse_re = re.compile(r".*warp image UL: *\( *(?P<ulx>[0-9\.]+), *(?P<uly>[0-9\.]+)\).*")
+                arop_re = re.compile(r".*warp images may be adjusted with new UL: *\( *(?P<ulx>[0-9\.]+), *(?P<uly>[0-9\.]+)\).*")
+                cp_info_re = re.compile(r".*Num_CP_Candidates:[ \t]*(?P<candidate>[+-]?([0-9]*[.])?[0-9]+)[ \t]*"
+                                        r"Num_CP_Selected:[ \t]*(?P<selected>[+-]?([0-9]*[.])?[0-9]+).*")
+                ortho_out = ortho_out.replace('\n', '\t')
+                origUL = orig_coarse_re.match(ortho_out)
+                if origUL is None:
+                    origUL = orig_nocoarse_re.match(ortho_out)
+                aropUL = arop_re.match(ortho_out)
+                cp_info = cp_info_re.match(ortho_out)
 
+                if origUL and aropUL:
+                    xcoef = float(aropUL.group('ulx')) - float(origUL.group('ulx'))
+                    ycoef = float(aropUL.group('uly')) - float(origUL.group('uly'))
+                if cp_info:
+                    print('cp_info.groupdict()' + repr(cp_info.groupdict()))
+                    used_cp = cp_info.group('selected')
+                    total_cp = cp_info.group('candidate')
+
+                used_cp_thresh = settings().REPOS['landsat'].get(
+                    'coreg_used_cp_thresh', 5)
+            if xcoef is None or ycoef is None:
+                raise CantAlignError(
+                    'AROP: no coefs found in cp_log.txt --> '
+                    + repr((warp_tile, warp_date)), code=CantAlignError.NO_COEFFS)
+            if used_cp is None or used_cp < used_cp_thresh:
+                raise CantAlignError(
+                    ('AROP: need at least {} Control Points, and '
+                     'only found {}').format(used_cp_thresh, used_cp),
+                    code=CantAlignError.INSUFFICIENT_CP)
+            if out_poly_order == 1:
+                x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
+                y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
+            elif out_poly_order == 0:
+                x_shift = xcoef
+                y_shift = ycoef
+            else:
+                raise Exception('unknown hard-coded out_poly_order')
+            shift_mag_thresh = settings().REPOS['landsat'].get(
+                'coreg_shift_thresh', 75)
+            shift_mag = (xcoef ** 2 + ycoef ** 2) ** 0.5
+            xxx = '''
+            if shift_mag > shift_mag_thresh:
+                raise CantAlignError(
+                    ('AROP: shift magnitude of {}, exceeds thresholed of '
+                     '{}').format(shift_mag, shift_mag_thresh),
+                    code=CantAlignError.EXCESSIVE_SHIFT)
+            '''
+                
             with open('{}/{}_{}_coreg_args.txt'.format(self.path, self.id, datetime.strftime(self.date, "%Y%j")), 'w') as coreg_args:
                 coreg_args.write("x: {}\n".format(x_shift))
                 coreg_args.write("y: {}\n".format(y_shift))
                 coreg_args.write("total_cp: {}\n".format(total_cp))
                 coreg_args.write("used_cp: {}\n".format(used_cp))
-                coreg_args.write("rmse_cp: {}\n".format(rmse_cp))
+
 
     def utm_zone(self):
         """
