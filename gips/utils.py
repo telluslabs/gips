@@ -429,7 +429,7 @@ def vectorize(img, vector, oformat=None):
     with make_temp_dir(prefix='vectorize') as td:
         tvec = os.path.join(td, os.path.basename(vector)[:-4] + '.gml')
         polygonize = (
-            'gdal_polygonize.py {CONNECTEDNESS} {IMAGE} {VECTOR}'
+            'gdal_polygonize.py -f GML {CONNECTEDNESS} {IMAGE} {VECTOR}'
             .format(CONNECTEDNESS=conn_opt, IMAGE=img, VECTOR=tvec)
         )
         emsg = 'Error vectorizing raster {} to {}'.format(img, tvec)
