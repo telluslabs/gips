@@ -99,6 +99,8 @@ def main(jobid):
         args.command = config['source']
         if args.command == "hls":
             args.products.append('cmask')
+        else:
+            args.products.append('clouds')
 
         year = config['year']
         s3shpfile = config['shapefile']
