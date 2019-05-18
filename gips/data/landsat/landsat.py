@@ -80,7 +80,7 @@ def binmask(arr, bit):
     return arr & (1 << (bit - 1)) == (1 << (bit - 1))
 
 
-class NoSentinelError(Exception):
+class NoBasemapError(Exception):
     pass
 
 class CantAlignError(Exception):
@@ -1227,6 +1227,8 @@ class landsatData(gips.data.core.CloudCoverData):
                 raise ValueError("Mixing coreg and non-coreg products is not allowed")
 
             if coreg:
+
+                ## TODO: re-read and consider deleting this stale comment
                 # If possible, use AROP 'ortho' command to co-register this landsat scene
                 # against a reference Sentinel2 scene. When AROP is successful it creates
                 # a text file with parameters in it that is needed to apply an offset.
@@ -1239,9 +1241,10 @@ class landsatData(gips.data.core.CloudCoverData):
 
                 # TODO: call fetch on the landsat scene boundary, thus eliminating the
                 # case where S2 exists but is not found by GIPS.
-
-                # TODO: question: why are we using glob here?
-                if not glob.glob(os.path.join(self.path, "*coreg_args.txt")):
+                
+                self.coreg_args_file = self.basename[:-3] + "coreg_args.txt"
+                
+                if not os.path.exists(self.coreg_args_file):
                     with utils.error_handler('Problem with running AROP'):
                         tmpdir_fp = self.generate_temp_path('arop')
                         utils.mkdir(tmpdir_fp)
@@ -1260,28 +1263,24 @@ class landsatData(gips.data.core.CloudCoverData):
                                     self.custom_mosaic_coreg_export(
                                         mos_source, img.Projection(), tmpdir_fp))
                             self.run_arop(base_image.Filename(), img['NIR'].Filename(), source=sat_key)
-                        except NoSentinelError:
-                            verbose_out(
-                                'No Sentinel found for co-registration', 4)
-                        except CantAlignError as cae:
-                            verbose_out('Co-registration error '
-                                        '(FALLBACK): {}'.format(cae), 4)
-                            md['COREG_CANT_ALIGN'] = str(cae)
-                        except CoregTimeout as cte:
-                            verbose_out('Co-registration error '
-                                        '(TIMEOUT): {}'.format(cte), 4)
-                            md['COREG_HIT_TIMEOUT'] = 'TRUE'
+                        except NoBasemapError:
+                            with open(self.coreg_args_file, 'w') as cra:
+                                cra.write("x: {}\n".format(0.))
+                                cra.write("y: {}\n".format(0.))
+                                cra.write("total_cp: {}\n".format(None))
+                                cra.write("used_cp: {}\n".format(None))
+                                cra.write("basemaperror: {}\n".format(
+                                    'No basemap found for co-registration {}'
+                                    .format(mos_source))
+                                )
+                            
+                coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
+                md['COREG_STATUS'] = (
+                    'AROP'
+                    if (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5 > 0
+                    else 'NO_SHIFT_FALLBACK'
+                )
 
-                try:
-                    coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
-                    md['COREG_STATUS'] = (
-                        'AROP'
-                        if (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5 > 0
-                        else 'NO_SHIFT'
-                    )
-                except IOError:
-                    coreg_xshift, coreg_yshift = (0.0, 0.0)
-                    md['COREG_STATUS'] = 'FALLBACK'
 
             # running atmosphere if any products require it
             toa = True
@@ -1895,7 +1894,7 @@ class landsatData(gips.data.core.CloudCoverData):
             return None
 
         percent_cover = (s2_footprint.intersection(landsat_footprint).area) / landsat_footprint.area
-        if percent_cover > .2:
+        if percent_cover > .33:
             return raster_vsi_paths
 
         verbose_out("S2 assets do not cover enough of Landsat data.", 3)
@@ -2121,7 +2120,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 cmd = ["timeout", str(ORTHO_TIMEOUT),
                        "ortho", "-r", parameter_file]
                 ortho_out = subprocess.check_output(args=cmd, cwd=tmpdir)
-                with open('{}/{}_{}_coreg_log.txt'.format(self.path, self.id, datetime.strftime(self.date, "%Y%j")), 'w') as coreg_log:
+                with open(self.basename[:-3] + '_coreg_log.txt', 'w') as coreg_log:
                     coreg_log.write(ortho_out)
             except subprocess.CalledProcessError as e:
                 if e.returncode == 124:  # 124 is the return code produced by 'timeout'
@@ -2130,7 +2129,7 @@ class landsatData(gips.data.core.CloudCoverData):
                                        repr((warp_tile, warp_date)))
                 raise CantAlignError(repr((warp_tile, warp_date)), code=e.returncode)
 
-            xcoef = ycoef = total_cp = used_cp = rmse_cp = None
+            x_shift = y_shift = xcoef = ycoef = total_cp = used_cp = rmse_cp = None
             if out_poly_order == 1:
                 with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
                     xcoef_re = re.compile(r"x' += +(?P<const>[\d\-\.]+)( +\+ +(?P<dx>[\d\-\.]+) +\* +x +\+ +(?P<dy>[\d\-\.]+) +\* y)?")
@@ -2150,7 +2149,10 @@ class landsatData(gips.data.core.CloudCoverData):
                             total_cp = cp_match.group('total')
                             used_cp = cp_match.group('used')
                             rmse_cp = cp_match.group('rmse')
-
+                if xcoef and ycoef:
+                    x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
+                    y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
+                    
             elif out_poly_order == 0:
                 orig_coarse_re = re.compile(r".*upper left coordinate has been updated[ \t]*from[ \t]*\((?P<ulx>[0-9\.]+), (?P<uly>[0-9\.]+)\).*")
                 orig_nocoarse_re = re.compile(r".*warp image UL: *\( *(?P<ulx>[0-9\.]+), *(?P<uly>[0-9\.]+)\).*")
@@ -2165,49 +2167,48 @@ class landsatData(gips.data.core.CloudCoverData):
                 cp_info = cp_info_re.match(ortho_out)
 
                 if origUL and aropUL:
-                    xcoef = float(aropUL.group('ulx')) - float(origUL.group('ulx'))
-                    ycoef = float(aropUL.group('uly')) - float(origUL.group('uly'))
+                    x_shift = float(aropUL.group('ulx')) - float(origUL.group('ulx'))
+                    y_shift = float(aropUL.group('uly')) - float(origUL.group('uly'))
                 if cp_info:
-                    print('cp_info.groupdict()' + repr(cp_info.groupdict()))
                     used_cp = cp_info.group('selected')
                     total_cp = cp_info.group('candidate')
 
                 used_cp_thresh = settings().REPOS['landsat'].get(
                     'coreg_used_cp_thresh', 5)
-            if xcoef is None or ycoef is None:
-                raise CantAlignError(
-                    'AROP: no coefs found in cp_log.txt --> '
-                    + repr((warp_tile, warp_date)), code=CantAlignError.NO_COEFFS)
-            if used_cp is None or used_cp < used_cp_thresh:
-                raise CantAlignError(
-                    ('AROP: need at least {} Control Points, and '
-                     'only found {}').format(used_cp_thresh, used_cp),
-                    code=CantAlignError.INSUFFICIENT_CP)
-            if out_poly_order == 1:
-                x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
-                y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
-            elif out_poly_order == 0:
-                x_shift = xcoef
-                y_shift = ycoef
             else:
                 raise Exception('unknown hard-coded out_poly_order')
             shift_mag_thresh = settings().REPOS['landsat'].get(
                 'coreg_shift_thresh', 75)
-            shift_mag = (xcoef ** 2 + ycoef ** 2) ** 0.5
-            xxx = '''
-            if shift_mag > shift_mag_thresh:
-                raise CantAlignError(
-                    ('AROP: shift magnitude of {}, exceeds thresholed of '
-                     '{}').format(shift_mag, shift_mag_thresh),
-                    code=CantAlignError.EXCESSIVE_SHIFT)
-            '''
-                
-            with open('{}/{}_{}_coreg_args.txt'.format(self.path, self.id, datetime.strftime(self.date, "%Y%j")), 'w') as coreg_args:
-                coreg_args.write("x: {}\n".format(x_shift))
-                coreg_args.write("y: {}\n".format(y_shift))
-                coreg_args.write("total_cp: {}\n".format(total_cp))
-                coreg_args.write("used_cp: {}\n".format(used_cp))
+            
+            shift_mag = exc_msg = code = None
 
+            if x_shift is None:
+                exc_msg = ('AROP: no coefs found in cp_log.txt --> ' +
+                       repr((warp_tile, warp_date)))
+                code = CantAlignError.NO_COEFFS
+                x_shift = y_shift = -1e12
+            else:
+                shift_mag = (x_shift ** 2 + y_shift ** 2) ** 0.5
+            if code is None and (shift_mag > shift_mag_thresh):
+                exc_msg = ('AROP: shift magnitude of {}, exceeds thresholed of '
+                     '{}').format(shift_mag, shift_mag_thresh),
+                code = CantAlignError.EXCESSIVE_SHIFT
+            if code is None and (used_cp is None or used_cp < used_cp_thresh):
+                exc_msg = ('AROP: need at least {} Control Points, and '
+                       'only found {}').format(used_cp_thresh, used_cp),
+                code = CantAlignError.INSUFFICIENT_CP
+                
+                
+            #     raise CantAlignError(exc_msg, code=code)
+            with open(self.coreg_args_file, 'w') as cra:
+                cra.write("x: {}\n".format(x_shift))
+                cra.write("y: {}\n".format(y_shift))
+                cra.write("total_cp: {}\n".format(total_cp))
+                cra.write("used_cp: {}\n".format(used_cp))
+                if code is not None:
+                    cra.write("banned: {} (CantAlignError.code = {})\n"
+                              .format(exc_msg, code))
+                        
 
     def utm_zone(self):
         """
@@ -2252,17 +2253,25 @@ class landsatData(gips.data.core.CloudCoverData):
         file.
         """
         date = datetime.strftime(self.date, "%Y%j")
-        coreg_args_file = "{}/{}_{}_coreg_args.txt".format(self.path, self.id, date)
-        with open(coreg_args_file, 'r') as cra:
+        with open(self.coreg_args_file, 'r') as cra:
             xcoef_re = re.compile(r"x: (-?\d+\.?\d*)")
             ycoef_re = re.compile(r"y: (-?\d+\.?\d*)")
+            banned_re = re.compile(r"banned: (?P<reason>.*)")
+            basemap_re = re.compile(r"basemaperror: (?P<reason>.*)")
 
             for line in cra:
                 x_match = xcoef_re.match(line)
                 if x_match:
-                    xcoef = float(x_match.groups()[0])
+                    xcoef = float(x_match.group(1))
                 y_match = ycoef_re.match(line)
                 if y_match:
-                    ycoef = float(y_match.groups()[0])
+                    ycoef = float(y_match.group(1))
+                banned = banned_re.match(line)
+                if banned:
+                    raise Exception('coreg ' + line)
+                basemap = basemap_re.match(line)
+                if basemap:
+                    verbose_out(line)
+                
 
         return xcoef, ycoef
