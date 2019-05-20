@@ -41,6 +41,7 @@ import requests
 
 import gippy
 from gippy import GeoVector
+from .exceptions import GipsException
 
 
 class Colors():
@@ -599,13 +600,20 @@ def lib_error_handler(msg_prefix='Error', continuable=False):
 error_handler = lib_error_handler # set this so gips code can use the right error handler
 
 
+def errors_exit_status(errors):
+    """Determine an apropos exit status given the set of errors."""
+    statii = set([e.exc_code if isinstance(e, GipsException) else 1
+                  for e in errors])
+    return 2 if len(statii) > 1 else list(statii)[0]
+
+
 def gips_exit():
     """Deliver an error report if needed, then exit."""
     if len(_accumulated_errors) == 0:
         sys.exit(0)
     verbose_out("Fatal: {} error(s) occurred:".format(len(_accumulated_errors)), 1, sys.stderr)
     [report_error(error, error.msg_prefix) for error in _accumulated_errors]
-    sys.exit(1)
+    sys.exit(errors_exit_status(_accumulated_errors))
 
 
 @contextmanager
