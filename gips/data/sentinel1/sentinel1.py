@@ -55,10 +55,6 @@ from gips import utils
 from gips.data.sentinel1.tiles import make_tilegrid, make_rectangular_tilegrid
 
 
-
-from pdb import set_trace
-
-
 _asset_types = ('L1',)
 
 
@@ -97,54 +93,35 @@ class sentinel1Repository(Repository):
 
     @classmethod
     def vector2tiles(cls, vector, *args, **kwargs):
-
-        # make a tilegrid on the fly and get the list of tiles
-
-        # tilefile is called /archive/sentinel1/stage/tile_{}_{}.shp
+        """
+        make a tilegrid on the fly and get the list of tiles
+        tilefile is called /archive/sentinel1/stage/tile_{}_{}.shp
+        """
 
         outdir = "/archive/sentinel1/stage"
-
         tileid_pattern = "{}-{}"
-
         tileshpfile, tilelist = make_tilegrid(vector.Filename(), outdir, tileid_pattern, cls._tile_attribute)
-
         cls._tilefile_name = tileshpfile
-
         print('cls._tile_name', tileshpfile)
-
         return {k: (1,1) for k in tilelist}
-
 
 
 class sentinel1Asset(Asset):
     Repository = sentinel1Repository
-
     _sensors = {
         'S1': {
             'description': 'Sentinel-1, Satellite',
-
             'band-strings':
                 ['01', '02'],
-
             'polarization':
                 ('VV',  'VH'),
-
             # band location in GHz
             'bandlocs':
                 ['5.405', '5.405'],
-
             'spatial-resolutions':
                 [20, 20],
         },
     }
-
-    # _asset_fn_pat_base = '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*'
-
-    # S1A_IW_GRDH_1SDV_20180409T002028_20180409T002053_021383_024CFC_A7BE.tif
-
-    # _raw_pat_base = "(?P<sensor>S1[AB])_IW_GRDH_1SDV_(?P<pyear>\d{4})(?P<pmon>\d{2})(?P<pday>\d{2})T\w{6}_\w{15}_\w{6}_\w{6}_\w{4}\.tif"
-
-    # _asset_pat_base = "(?P<sensor>S1[AB])_IW_GRDH_1SDV_(?P<pyear>\d{4})(?P<pmon>\d{2})(?P<pday>\d{2})_(?P<ptile>\w{3}_\w{3]}).tif"
 
     _asset_pat_base = 'S1_IW_GRDH_(?P<year>\d{4})(?P<mon>\d{2})(?P<day>\d{2})_(?P<tile>\w{3}-\w{3})\.tif'
 
@@ -160,9 +137,7 @@ class sentinel1Asset(Asset):
         },
     }
 
-
-    # # default resultant resolution for resampling during to Data().copy()
-    # _defaultresolution = (10, 10)
+    # default resultant resolution for resampling during to Data().copy()
 
     def __init__(self, filename):
         """Inspect a single file and set some metadata.
@@ -201,18 +176,13 @@ class sentinel1Asset(Asset):
         downloader = api.SentinelDownloader(username, password,
             api_url='https://scihub.copernicus.eu/apihub/')
 
-
         # get the scene name and use it for caching
-
         # load geometries from shapefile
 
         # this will be the shapefile containing a single tile boundary
         outfile = cls.Repository._tilefile_pattern.format(tile)
         outdir = os.path.join(cls.Repository.path(), 'stage')
         outpath = os.path.join(outdir, outfile)
-
-        # set_trace()
-
 
         if cls.Repository._tilefile_name is not None:
             # when -s option is used
@@ -222,20 +192,12 @@ class sentinel1Asset(Asset):
             gdf.to_file(outpath)
 
         else:
-            # when -t option is used
-
-            # outdir, tileid, nxgrid, nygrid, tileid_attribute, filename=None
-
-            # set_trace()
-
             rectfile = make_rectangular_tilegrid(outdir, tile, 1, 1, 'tileid', filename=outfile)
             assert rectfile == outpath
 
         print('loading file outpath!', outpath)
 
         downloader.load_sites(outpath)
-
-
         datestr = date.date().isoformat()
 
         # search for scenes with some restrictions (e.g., minimum overlap 1%)
@@ -246,9 +208,7 @@ class sentinel1Asset(Asset):
         downloader.search('S1B*', min_overlap=0.01, start_date=datestr, end_date=datestr,
                   date_type='beginPosition', productType='GRD', sensoroperationalmode='IW')
 
-
         print('len(downloader.get_scenes())', len(downloader.get_scenes()))
-
 
         if len(downloader.get_scenes()) == 0:
             print('returning None')
@@ -257,7 +217,6 @@ class sentinel1Asset(Asset):
             basename = 'S1_IW_GRDH_{}_{}.tif'.format(date.date().strftime('%Y%m%d'), tile)
             print('returning', basename)
             return {'basename': basename, 'downloader': downloader, 'url': ''}
-
 
     @classmethod
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
@@ -282,7 +241,6 @@ class sentinel1Asset(Asset):
     @classmethod
     def download(cls, a_type, download_fp, downloader, **kwargs):
         """Download from the configured source for the asset type."""
-
         import gdal
         gdal.UseExceptions()
 
@@ -299,20 +257,15 @@ class sentinel1Asset(Asset):
         downloader.set_download_dir(downloaddir)
         print(downloaddir)
 
-
         # prefix names for all the scenes
         scenes = [s['identifier'] for s in downloader.get_scenes()]
 
         # these are the tif files that are staged
         downloadfiles = [os.path.join(stagedir, s + '.zip') for s in scenes]
 
-
         if not all([os.path.exists(p) for p in downloadfiles]):
-
             print('not all paths exist')
-
             if any([os.path.exists(p) for p in downloadfiles]):
-
                 print('but some paths exist')
 
                 # if the download already exists, then remove it from the request
@@ -326,7 +279,6 @@ class sentinel1Asset(Asset):
                 scenes = [s['identifier'] for s in downloader.get_scenes()]
                 downloadfiles = [os.path.join(stagedir, s + '.zip') for s in scenes]
 
-
             downloader.download_all()
             # TODO: check they are complete before moving them
             for scene in scenes:
@@ -334,12 +286,10 @@ class sentinel1Asset(Asset):
                 shutil.move(os.path.join(downloaddir, scene + '.zip'),
                             os.path.join(stagedir, scene + '.zip'))
 
-
         # all the downloaded zip scenes are present
         print('all the downloaded zip scenes are present')
 
         scenefiles = []
-
         for scene in scenes:
 
             scenefile = os.path.join(stagedir, scene + '.tif')
@@ -358,7 +308,6 @@ class sentinel1Asset(Asset):
 
                 print('moving', targetfile, scenefile)
                 shutil.move(targetfile, scenefile)
-
 
         # all the downloaded zips have been processed and are present
         print('all the downloaded zips have been processed and are present')
@@ -383,7 +332,6 @@ class sentinel1Asset(Asset):
 
             outfiles.append(outfile)
 
-
         if len(outfiles) > 1:
             # merge the results and save as an asset
             cmd = 'gdal_merge.py -n 0 -a_nodata 0 -init 0 -o {} {}'.format(download_fp, ' '.join(outfiles))
@@ -395,9 +343,6 @@ class sentinel1Asset(Asset):
         else:
             # no need to merge
             shutil.move(outfiles[0], download_fp)
-
-
-        # WHY ARE THERE THREE LAYERS
 
         return True
 
@@ -448,28 +393,13 @@ class sentinel1Data(Data):
 
             if val[0] == "sigma0":
                 # this product is just the asset but it has to have the right name
-
-
                 command('gdal_translate -of VRT {} {}'.format(assetfname, fname))
 
-                # shutil.copy(assetfname, fname)
-
-                # do this if you want to set metadata later
-                # imgout = gippy.GeoImage(fname)
-
-
             if val[0] == "indices":
-                print('indices not completed yet')
-
                 img = gippy.GeoImage(assetfname)
                 data = img.Read()
 
-                set_trace()
-
-            # set metadata
-            # imgout.SetMeta(self.prep_meta(a_fnames, meta))
-            # del imgout
-
+                raise Exception('indices not supported yet')
 
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
