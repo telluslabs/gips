@@ -1914,12 +1914,15 @@ class landsatData(gips.data.core.CloudCoverData):
             verbose_out("No S2 assets found in UTM zone {}".format(self.utm_zone()), 3)
             return None
 
-        percent_cover = (s2_footprint.intersection(landsat_footprint).area) / landsat_footprint.area
-        if percent_cover > .33:
-            return raster_vsi_paths
-
-        verbose_out("S2 assets do not cover enough of Landsat data.", 3)
-        return None
+        percent_cover = (
+            s2_footprint.intersection(landsat_footprint).area
+        ) / landsat_footprint.area * 100
+        sufficient_coverage = percent_cover > 20
+        verbose_out("S2 assets {}cover enough of Landsat data ({}%)."
+                    .format('do not ' if not sufficient_coverage else '',
+                            percent_cover),
+                    3)
+        return raster_vsi_paths if sufficient_coverage else None 
 
     def custom_mosaic_coreg_export(self, mos_source, proj, tmpdir):
         images = gippy.GeoImages([mos_source])
@@ -1991,7 +1994,7 @@ class landsatData(gips.data.core.CloudCoverData):
 
         while not geo_images:
             if delta > timedelta(90):
-                raise NoSentinelError(
+                raise NoBasemapError(
                     "didn't find s2 images in this utm zone {}, (pathrow={},date={})"
                     .format(self.utm_zone(), self.id, self.date)
                 )
