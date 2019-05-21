@@ -2318,7 +2318,6 @@ class landsatData(gips.data.core.CloudCoverData):
                         message=banned.group('reason'),
                         exc_code=int(banned.group('exc_code'))
                     )
-                    cae
                 basemap = basemap_re.match(line)
                 if basemap:
                     verbose_out(line)
