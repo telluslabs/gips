@@ -185,8 +185,11 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
                 except Exception as e:
                     ### This whole block is ugly, but somehow the directory is
                     ### not emptying out immediately, but it is emptying out eventually.
-                    if tries == rm_num_tries:
-                        raise
+                    if tries > rm_num_tries:
+                        print('Open files: ')
+                        os.system('/bin/ls -l /proc/{}/fd'.format(os.getpid()))
+                        print('^^^^^^^^^^^^^^^^^^^^^^^^^')
+                        raise e
                     # it can occur that it has now been deleted, so break
                     if not os.path.exists(absolute_pathname):
                         verbose_out('tempdir: infintesimal delay on deletion', 4)
