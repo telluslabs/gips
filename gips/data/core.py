@@ -1708,10 +1708,14 @@ class CloudCoverAsset(Asset):
             return True
         cc = self.cloud_cover()
         asset_passes_filter = cc <= pclouds
-        msg = ('Asset cloud cover is {}%, meets pclouds threshold of {}%'
-               if asset_passes_filter else
-               'Asset cloud cover is {}%, fails to meet pclouds threshold of {}%')
-        utils.verbose_out(msg.format(cc, pclouds), 3)
+        msg = '{}Asset {} cloud cover is {}%, {} pclouds threshold of {}%'
+
+        utils.verbose_out(msg.format(
+                self.Repository.name.lower(), 
+                self.tile, cc,
+                'meets' if asset_passes_filter else 'fails to meet',
+                pclouds),
+            3)
         return asset_passes_filter
 
 

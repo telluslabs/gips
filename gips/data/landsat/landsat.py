@@ -1294,7 +1294,7 @@ class landsatData(gips.data.core.CloudCoverData):
                                     'No basemap found for co-registration {}'
                                     .format(mos_source))
                                 )
-
+                import pdb; pdb.set_trace()
                 coreg_xshift, coreg_yshift = self.parse_coreg_coefficients()
                 md['COREG_STATUS'] = (
                     'AROP'
@@ -1908,6 +1908,8 @@ class landsatData(gips.data.core.CloudCoverData):
             vsi_str = (band_8 if s2ao.asset == 'L1CGS' else
                        '/vsizip/' + os.path.join(s2ao.filename, band_8))
             raster_vsi_paths.append(vsi_str)
+            verbose_out(':::_s2_tiles_for_coreg: using {}                <<<<<<'
+                        .format(tile))
             s2_footprint = s2_footprint.union(wkt_loads(s2ao.footprint()))
 
         if len(raster_vsi_paths) == 0:
@@ -2140,6 +2142,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 os.path.join(tmpdir, 'lndortho.cps_par.ini')
             )
             base_band_img = warp_base_band_img = None
+            x_shift = y_shift = xcoef = ycoef = total_cp = used_cp = rmse_cp = None
             shift_mag = exc_msg = exc_code = None
             try:
                 # subprocess has a timeout option as of python 3.3
@@ -2149,7 +2152,21 @@ class landsatData(gips.data.core.CloudCoverData):
                 ortho_out = subprocess.check_output(args=cmd, cwd=tmpdir)
                 with open(self.basename[:-3] + '_coreg_log.txt', 'w') as coreg_log:
                     coreg_log.write(ortho_out)
-                x_shift = y_shift = xcoef = ycoef = total_cp = used_cp = rmse_cp = None
+            except subprocess.CalledProcessError as e:
+                exc_msg = 'ortho exit code {} for {} {}'.format(
+                    e.returncode, warp_tile, warp_date
+                )
+                if e.returncode == 124:  # 124 is the return code produced by 'timeout'
+                    exc_msg  = (
+                        "Coregistration timed out -- {} seconds for {} {} "
+                        .format(ORTHO_TIMEOUT, warp_tile, warp_date))
+                verbose_out('LOOK HERE: ' + exc_msg)
+                exc_code = e.returncode
+            except Exception as e:
+                verbose_out('LOOK HERE: ' + str(e))
+                exc_code = 111
+                exc_msg = str(e)
+            finally:
                 if out_poly_order == 1:
                     with open('{}/cp_log.txt'.format(tmpdir), 'r') as log:
                         xcoef_re = re.compile(r"x' += +(?P<const>[\d\-\.]+)( +\+ +(?P<dx>[\d\-\.]+) +\* +x +\+ +(?P<dy>[\d\-\.]+) +\* y)?")
@@ -2196,17 +2213,6 @@ class landsatData(gips.data.core.CloudCoverData):
                         'coreg_used_cp_thresh', 5)
                 else:
                     raise Exception('unknown hard-coded out_poly_order')
-            except subprocess.CalledProcessError as e:
-                exc_msg = 'ortho exit code {} for {} {}'.format(
-                    e.returncode, warp_tile, warp_date
-                )
-                if e.returncode == 124:  # 124 is the return code produced by 'timeout'
-                    exc_msg  = (
-                        "Coregistration timed out -- {} seconds for {} {} "
-                        .format(ORTHO_TIMEOUT, warp_tile, warp_date))
-
-                exc_code = e.returncode
-            finally:
                 shift_mag_thresh = settings().REPOS['landsat'].get(
                     'coreg_shift_thresh', _default_coreg_mag_thresh)
 
