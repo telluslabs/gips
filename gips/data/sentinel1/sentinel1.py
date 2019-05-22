@@ -114,7 +114,7 @@ class sentinel1Asset(Asset):
             'band-strings':
                 ['01', '02'],
             'polarization':
-                ('VV',  'VH'),
+                ('VV', 'VH'),
             # band location in GHz
             'bandlocs':
                 ['5.405', '5.405'],
@@ -393,12 +393,17 @@ class sentinel1Data(Data):
 
             if val[0] == "sigma0":
                 # this product is just the asset but it has to have the right name
-                command('gdal_translate -of VRT {} {}'.format(assetfname, fname))
+
+                os.link(assetfname, fname)
+
+                vrtname = os.path.splitext(fname)[0] + ".vrt"
+                cmd = 'gdal_translate -of VRT {} {}'.format(assetfname, vrtname)
+                print(cmd)
+                command(cmd)
 
             if val[0] == "indices":
                 img = gippy.GeoImage(assetfname)
                 data = img.Read()
-
                 raise Exception('indices not supported yet')
 
             # add product to inventory
