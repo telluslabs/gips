@@ -91,10 +91,10 @@ class CantAlignError(GipsException):
     # types, there should be a base GipsException class which handles
     # registration of exception types, to prevent conflicts.  For now, this is
     # the only class providing this feature.
-    NO_COEFFS, INSUFFICIENT_CP, EXCESSIVE_SHIFT = range(13,16)
+    COREG_FAIL, INSUFFICIENT_CP, EXCESSIVE_SHIFT = range(13,16)
     code_map = dict(zip(
         range(13,16),
-        ['NO_COEFFS', 'INSUFFICIENT_CP', 'EXCESSIVE_SHIFT']
+        ['COREG_FAIL', 'INSUFFICIENT_CP', 'EXCESSIVE_SHIFT']
     ))
     def __init__(self, message, exc_code=None):
         super(CantAlignError, self).__init__(message, exc_code)
@@ -2171,7 +2171,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     exc_msg  = (
                         "Coregistration timed out -- {} seconds for {} {} "
                         .format(ORTHO_TIMEOUT, warp_tile, warp_date))
-                exc_code = e.returncode
+                exc_code = 13
             except Exception as e:
                 exc_code = 111
                 exc_msg = str(e)
@@ -2230,7 +2230,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 if exc_code is None and x_shift is None:
                     exc_msg = ('AROP: no coefs found in cp_log.txt --> ' +
                            repr((warp_tile, warp_date)))
-                    exc_code = CantAlignError.NO_COEFFS
+                    exc_code = CantAlignError.COREG_FAIL
                     x_shift = y_shift = -1e12
                 elif exc_code is None:
                     shift_mag = (x_shift ** 2 + y_shift ** 2) ** 0.5
