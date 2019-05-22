@@ -100,7 +100,7 @@ def main(jobid):
         if args.command == "hls":
             args.products.append('cmask')
         else:
-            args.products.append('clouds')
+            args.products.append('quality')
 
         year = config['year']
         s3shpfile = config['shapefile']
