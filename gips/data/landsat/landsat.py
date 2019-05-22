@@ -2228,8 +2228,8 @@ class landsatData(gips.data.core.CloudCoverData):
                     'coreg_shift_thresh', _default_coreg_mag_thresh)
 
                 if exc_code is None and x_shift is None:
-                    exc_msg = ('AROP: no coefs found in cp_log.txt --> ' +
-                           repr((warp_tile, warp_date)))
+                    exc_msg = ('AROP: no coefs found in cp_log.txt --> {},{}'
+                               .format(warp_tile, warp_date))
                     exc_code = CantAlignError.COREG_FAIL
                     x_shift = y_shift = -1e12
                 elif exc_code is None:
