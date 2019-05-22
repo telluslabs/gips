@@ -2173,7 +2173,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         .format(ORTHO_TIMEOUT, warp_tile, warp_date))
                 exc_code = 13
             except Exception as e:
-                exc_code = 111
+                exc_code = 13
                 exc_msg = str(e)
             finally:
                 if out_poly_order == 1:
