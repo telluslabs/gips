@@ -78,6 +78,7 @@ def run_export(args):
                 s3_key = "/".join(s3path.split('/')[1:])
                 s3outdir = args.outdir
                 args.outdir = os.path.join(tmpdir, dirname)
+                print('temp outdir', args.outdir)
             else:
                 s3outdir = None
 
@@ -118,7 +119,6 @@ def run_export(args):
                         .format(str(t_extent), str(t_extent)),
                         2,
                     )
-
 
             if s3outdir is not None and os.path.exists(args.outdir):
                 outpath = args.outdir

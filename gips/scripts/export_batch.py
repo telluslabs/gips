@@ -43,10 +43,6 @@ import boto3
 import zipfile
 
 
-from pdb import set_trace
-
-
-
 class Args(object):
     pass
 
@@ -74,7 +70,7 @@ def main(jobid):
     args.notld = True
     args.fetch = True
     args.crop = False
-    args.overwrite = False
+    args.overwrite = True
     args.alltouch = True
     args.tree = False
     args.size = False
@@ -126,6 +122,7 @@ def main(jobid):
             args.dates = "{}-{}".format(year, str(doy+1).zfill(3))
             args.where = "FID={}".format(fid)
 
+            print('outdir', args.outdir)
             print(args.dates)
             print(args.where)
 
