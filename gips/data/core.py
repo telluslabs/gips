@@ -383,6 +383,7 @@ class Repository(object):
         ogrgeom.Transform(trans)
         # convert to shapely
         geom = loads(ogrgeom.ExportToWkt())
+        geom = geom if geom.is_valid else geom.buffer(0)  # bugfix: attempt to fix topology errors
 
         # find overlapping tiles
         tiles = {}
