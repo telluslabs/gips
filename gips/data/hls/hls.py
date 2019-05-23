@@ -35,6 +35,10 @@ from gips.utils import verbose_out
 from gips.data.sentinel2 import sentinel2
 from gips.data.landsat import landsat
 
+
+from pdb import set_trace
+
+
 # User guide & other docs here:  https://hls.gsfc.nasa.gov/documents/
 
 _hls_version = '1.4'
@@ -184,6 +188,13 @@ class hlsData(gips.data.core.CloudCoverData):
                             ' cloud shadow bits from the QA band)'),
             'latency': 1,
             'bands': [{'name': 'cmask', 'units': Data._unitless}]},
+        'ref': {
+            'assets': list(_ordered_asset_types),
+            'description': ('surface reflectance'),
+            'latency': 1,
+            'bands': [{'name': band_name, 'units': 'W/m^2/um'}
+                      for band_name in ['RED', 'NIR']]
+        }
     }
     gips.data.core.add_gippy_index_products(
         _products, _productgroups, _ordered_asset_types)
@@ -215,6 +226,8 @@ class hlsData(gips.data.core.CloudCoverData):
         for temp_fp in prodout.values():
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, tempfps_to_ptypes[temp_fp], archived_fp)
+
+
 
     def process_cmask(self):
         """Produce the cloudmask product."""
@@ -262,9 +275,46 @@ class hlsData(gips.data.core.CloudCoverData):
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, 'cloudmask', archived_fp)
 
+    def process_ref(self):
+        """Produce reflectance"""
+
+        for a_obj in self.assets.values():
+
+            src_img = gippy.GeoImage(a_obj.filename)
+
+            temp_fp = self.temp_product_filename(a_obj.sensor, 'ref')
+
+            imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Int16, 5)
+
+            green = src_img['Green'].Read()
+            red = src_img['Red'].Read()
+
+            if 'NIR' in src_img.BandNames():
+                nir = src_img['NIR'].Read()
+            else:
+                nir = src_img['NIR_Narrow'].Read()
+            swir1 = src_img['SWIR1'].Read()
+            swir2 = src_img['SWIR2'].Read()
+
+            missing = -1000.0
+            imgout.SetNoData(missing)
+            imgout.SetOffset(0.0)
+            imgout.SetGain(0.0001)
+
+            imgout[0].Write(green)
+            imgout[1].Write(red)
+            imgout[2].Write(nir)
+            imgout[3].Write(swir1)
+            imgout[4].Write(swir2)
+
+            archived_fp = self.archive_temp_path(temp_fp)
+            self.AddFile(a_obj.sensor, 'ref', archived_fp)
+
+
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False):
         """Generate hls products."""
+
         products = self.needed_products(products, overwrite)
         if len(products) == 0:
             verbose_out('No new processing required.', 5)
@@ -277,3 +327,5 @@ class hlsData(gips.data.core.CloudCoverData):
         indices = products.groups()['Index']
         if indices:
             [self.process_indices(ao, indices) for ao in self.assets.values()]
+
+
