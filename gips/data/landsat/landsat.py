@@ -2299,11 +2299,11 @@ class landsatData(gips.data.core.CloudCoverData):
         date = datetime.strftime(self.date, "%Y%j")
         verbose_out('Parsing {}'.format(self.coreg_args_file))
         with open(self.coreg_args_file, 'r') as cra:
-            xcoef_re = re.compile(r"x: (-?\d+\.?\d*)")
-            ycoef_re = re.compile(r"y: (-?\d+\.?\d*)")
-            banned_re = re.compile(r"banned: (?P<reason>[^\(]*)\((?P<exc_code>[^\)]+)\)")
+            xcoef_re = re.compile(r"^x: (-?\d+\.?\d*)")
+            ycoef_re = re.compile(r"^y: (-?\d+\.?\d*)")
+            banned_re = re.compile(r"^banned: (?P<reason>[^\(]*)\((?P<exc_code>[^\)]+)\)$")
             # TODO: only for now is basemaperror not a fatal one
-            basemap_re = re.compile(r"basemaperror: (?P<reason>.*)")
+            basemap_re = re.compile(r"^basemaperror: (?P<reason>.*)$")
 
             for line in cra:
                 x_match = xcoef_re.match(line)
