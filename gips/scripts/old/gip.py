@@ -24,7 +24,7 @@
 import os
 import sys
 import argparse
-import commands
+import subprocess
 import datetime
 import shutil
 import tempfile
@@ -110,7 +110,7 @@ if __name__ == "__main__":
                 cmd = cmd + ' -overwrite'
             if args.alpha:
                 cmd = cmd + ' -dstalpha'
-            out = commands.getstatusoutput(cmd)
+            out = subprocess.getstatusoutput(cmd)
             print '%s -> %s: %s' % (os.path.basename(f), os.path.basename(fout), datetime.datetime.now()-start)
 
 """
@@ -140,7 +140,7 @@ create polygon code
         cmd = 'ogr2ogr %s PG:"%s" -sql "%s"' % (args.output,dbstr,sql)
         if args.overwrite: cmd = cmd + ' -overwrite'
         print cmd
-        out = commands.getstatusoutput(cmd)
+        out = subprocess.getstatusoutput(cmd)
         #print out
         print '%s: %s' % (args.output,datetime.datetime.now()-start)
 """

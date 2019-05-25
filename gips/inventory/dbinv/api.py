@@ -38,10 +38,10 @@ def _chunky_transaction(iterable, function, chunk_sz=1000, item_desc="items"):
                 function(item)
         # after each chunk report stats
         new_chunk_start_time = time.time()
-        print "{} {} scanned; chunk time {:0.2f}s, total time {:0.2f}s".format(
+        print("{} {} scanned; chunk time {:0.2f}s, total time {:0.2f}s".format(
                 iter_cnt, item_desc,
                 new_chunk_start_time - chunk_start_time,
-                new_chunk_start_time - start_time)
+                new_chunk_start_time - start_time))
         chunk_start_time = new_chunk_start_time
 
 
@@ -75,7 +75,7 @@ def rectify_assets(asset_class):
 
     start_time = time.time()
     for (ak, av) in asset_class._assets.items():
-        print "Starting on {} assets at {:0.2f}s".format(ak, time.time() - start_time)
+        print("Starting on {} assets at {:0.2f}s".format(ak, time.time() - start_time))
         counts = {'add': 0, 'update': 0} # A flaw in python scoping makes this necessary
         touched_rows = set() # for removing entries that don't match the filesystem
         # little optimization to make deleting stale records go faster:
@@ -87,16 +87,16 @@ def rectify_assets(asset_class):
         _chunky_transaction(imatches, rectify_asset)
 
         # Remove things from DB that are NOT in FS:
-        print "Deleting stale asset records . . . "
+        print("Deleting stale asset records . . . ")
         delete_start_time = time.time()
         deletia_keys = starting_keys - touched_rows
         _chunky_transaction(deletia_keys, lambda key: mao.get(pk=key).delete())
         delete_time = time.time() - delete_start_time
 
         del_cnt = len(deletia_keys)
-        print "Deleted {} stale asset records in {:0.2f}s.".format(del_cnt, delete_time)
+        print("Deleted {} stale asset records in {:0.2f}s.".format(del_cnt, delete_time))
         msg = "{} complete, inventory records changed:  {} added, {} updated, {} deleted"
-        print msg.format(ak, counts['add'], counts['update'], del_cnt) # no -v for this important data
+        print(msg.format(ak, counts['add'], counts['update'], del_cnt)) # no -v for this important data
 
 
 def _match_failure_report(f_name, reason):
@@ -163,16 +163,16 @@ def rectify_products(data_class):
     _chunky_transaction(glob.iglob(search_glob), rectify_product)
 
     # Remove things from DB that are NOT in FS; do it in a loop to avoid an explosion.
-    print "Deleting stale product records . . . "
+    print("Deleting stale product records . . . ")
     delete_start_time = time.time()
     deletia_keys = starting_keys - touched_rows
     _chunky_transaction(deletia_keys, lambda key: mpo.get(pk=key).delete())
     delete_time = time.time() - delete_start_time
 
     del_cnt = len(deletia_keys)
-    print "Deleted {} stale product records in {:0.2f}s.".format(del_cnt, delete_time)
+    print("Deleted {} stale product records in {:0.2f}s.".format(del_cnt, delete_time))
     msg = "{} complete, inventory records changed:  {} added, {} updated, {} deleted"
-    print msg.format(driver, counts['add'], counts['update'], del_cnt)
+    print(msg.format(driver, counts['add'], counts['update'], del_cnt))
 
 
 def list_tiles(driver):

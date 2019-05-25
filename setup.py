@@ -43,7 +43,7 @@ for f in glob.glob('gips/scripts/*.py'):
             script = 'gips_%s = gips.scripts.%s:main' % (name, name.lower())
             console_scripts.append(script)
     except:
-        print traceback.format_exc()
+        print(traceback.format_exc())
 
 
 setup(

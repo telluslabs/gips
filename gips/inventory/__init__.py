@@ -88,7 +88,7 @@ class Inventory(object):
     def pprint(self, md=False, size=False):
         """ Print the inventory """
         if len(self.data) == 0:
-            print 'No matching files in inventory'
+            print('No matching files in inventory')
             return
         self.data[self.data.keys()[0]].pprint_asset_header()
         dformat = '%m-%d' if md else '%j'
@@ -156,7 +156,7 @@ class ProjectInventory(Inventory):
                 products[date] = set(self.data[date].products).intersection(set(self.requested_products))
             return products
 
-    def new_image(self, filename, dtype=gippy.GDT_Byte, numbands=1, nodata=None):
+    def new_image(self, filename, dtype='uint8', numbands=1, nodata=None):
         """ Create new image with the same template as the files in project """
         img = gippy.GeoImage(self.data[self.dates[0]].open(self.requested_products[0]))
         imgout = gippy.GeoImage(filename, img, dtype, numbands)
@@ -370,21 +370,21 @@ class DataInventory(Inventory):
 
     def pprint(self, **kwargs):
         """ Print inventory """
-        print
+        print('')
         if self.spatial.site is not None:
-            print Colors.BOLD + 'Asset Coverage for site %s' % (self.spatial.sitename) + Colors.OFF
+            print(Colors.BOLD + 'Asset Coverage for site %s' % (self.spatial.sitename) + Colors.OFF)
             self.spatial.print_tile_coverage()
-            print
+            print('')
         else:
             # constructor makes it safe to assume there is only one tile when
             # self.spatial.site is None, but raise an error anyway just in case
             if len(self.spatial.tiles) > 1:
                 raise RuntimeError('Expected 1 tile but got ' + repr(self.spatial.tiles))
-            print Colors.BOLD + 'Asset Holdings for tile ' + self.spatial.tiles[0] + Colors.OFF
+            print(Colors.BOLD + 'Asset Holdings for tile ' + self.spatial.tiles[0] + Colors.OFF)
 
         super(DataInventory, self).pprint(**kwargs)
 
-        print Colors.BOLD + '\nSENSORS' + Colors.OFF
+        print(Colors.BOLD + '\nSENSORS' + Colors.OFF)
         _sensors = self.dataclass.Asset._sensors
         for key in sorted(self.sensor_set):
             if key in _sensors:
@@ -393,4 +393,4 @@ class DataInventory(Inventory):
             else:
                 desc = ''
                 scode = key
-            print self.color(key) + '%s%s' % (scode, desc) + Colors.OFF
+            print(self.color(key) + '%s%s' % (scode, desc) + Colors.OFF)

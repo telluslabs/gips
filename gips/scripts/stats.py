@@ -41,7 +41,7 @@ def main():
     args = parser0.parse_args()
 
     utils.gips_script_setup(stop_on_error=args.stop_on_error)
-    print title
+    print(title)
 
     # TODO - check that at least 1 of filemask or pmask is supplied
     header = ['date', 'band', 'min', 'max', 'mean', 'sd', 'skew', 'count']

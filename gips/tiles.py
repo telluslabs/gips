@@ -28,7 +28,7 @@ import traceback
 import collections
 
 import gippy
-from gippy.algorithms import CookieCutter
+from gippy.algorithms import cookie_cutter
 from gips.utils import VerboseOut, Colors, mosaic, gridded_mosaic, mkdir
 from gips import utils
 
@@ -118,9 +118,9 @@ class Tiles(object):
                         gridded_mosaic(images, tmp_fp,
                                        self.spatial.rastermask, interpolation)
                     elif self.spatial.site is not None and res is not None:
-                        CookieCutter(
-                            images, self.spatial.site, tmp_fp, res[0], res[1],
-                            crop, interpolation, {}, alltouch,
+                        cookie_cutter(
+                            images, tmp_fp, self.spatial.site, crop,
+                            "", res[0], res[1], interpolation,
                         )
                     else:
                         mosaic(images, tmp_fp, self.spatial.site)

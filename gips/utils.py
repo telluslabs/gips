@@ -29,7 +29,7 @@ import re
 import errno
 from contextlib import contextmanager
 import tempfile
-import commands
+import subprocess
 import shutil
 import traceback
 import datetime
@@ -308,7 +308,15 @@ def import_data_module(clsname):
 def import_repository_class(clsname):
     """ Get clsnameRepository class object """
     mod = import_data_module(clsname)
-    exec('repo = mod.%sRepository' % clsname)
+
+    print(clsname)
+
+    # exec('repo = mod.%sRepository' % clsname)
+
+    repo = eval('mod.%sRepository' % clsname)
+
+    # from pdb import set_trace; set_trace()
+
     return repo
 
 
@@ -373,7 +381,7 @@ def transform(filename, srs):
     f.write(srs)
     f.close()
     cmd = 'ogr2ogr %s %s -t_srs %s' % (fout, filename, prjfile)
-    result = commands.getstatusoutput(cmd)
+    result = subprocess.getstatusoutput(cmd)
     return fout
 
 
@@ -388,7 +396,7 @@ def crop2vector(img, vector):
     maskname = mask.Filename()
     mask = None
     cmd = 'gdal_rasterize -at -burn 1 -l %s %s %s' % (warped_vec.LayerName(), vecname, maskname)
-    result = commands.getstatusoutput(cmd)
+    result = subprocess.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
     mask = gippy.GeoImage(maskname)
     img.AddMask(mask[0]).Process().ClearMasks()
@@ -414,7 +422,7 @@ def vectorize(img, vector, oformat=None):
         '''simple shell command wrapper'''
         with error_handler(emsg):
             verbose_out('Running: {}'.format(cmd), 4)
-            status, output = commands.getstatusoutput(cmd)
+            status, output = subprocess.getstatusoutput(cmd)
             if status != 0:
                 verbose_out(
                     '++\n Ran command:\n {}\n\n++++\n Console output:\n {}\n++\n'
@@ -476,7 +484,7 @@ def mosaic(images, outfile, vector):
     # run merge command
     nodatastr = '-n %s -a_nodata %s -init %s' % (nd, nd, nd)
     cmd = 'gdal_merge.py -o %s -ul_lr %s %s %s' % (outfile, ullr, nodatastr, " ".join(filenames))
-    result = commands.getstatusoutput(cmd)
+    result = subprocess.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
     imgout = gippy.GeoImage(outfile, True)
     imgout.SetMeta(
@@ -517,7 +525,7 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
         " ".join(filenames),
         outfile
     )
-    status, output = commands.getstatusoutput(cmd)
+    status, output = subprocess.getstatusoutput(cmd)
     verbose_out(' COMMAND: {}\n exit_status: {}\n output: {}'
                 .format(cmd, status, output ), 4)
 
@@ -531,7 +539,7 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     imgout.AddMask(mask_img[0])
     imgout.Process()
 
-    
+
 def julian_date(date_and_time, variant=None):
     """Returns the julian date for the given datetime object.
 

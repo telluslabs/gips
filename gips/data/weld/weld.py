@@ -218,13 +218,13 @@ class weldData(Data):
                 ndsi = missing + np.zeros_like(grnimg)
                 wg = np.where((grnimg != missing) & (swrimg != missing) & (grnimg + swrimg != 0.0) & (cldimg == 0))
                 ng = len(wg[0])
-                print "ng", ng
+                print("ng", ng)
                 if ng == 0:
                     continue
                 ndsi[wg] = (grnimg[wg] - swrimg[wg]) / (grnimg[wg] + swrimg[wg])
-                print ndsi.min(), ndsi.max()
-                print ndsi[wg].min(), ndsi[wg].max()
-                print "writing", fname
+                print(ndsi.min(), ndsi.max())
+                print(ndsi[wg].min(), ndsi[wg].max())
+                print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Float32, 1)
                 imgout.SetNoData(float(missing))
                 imgout.SetOffset(0.0)
@@ -253,7 +253,7 @@ class weldData(Data):
                 ndsi = missing + np.zeros_like(grnimg)
                 wg = np.where((grnimg != missing) & (swrimg != missing) & (grnimg + swrimg != 0.0) & (cldimg == 0))
                 ng = len(wg[0])
-                print "ng", ng
+                print("ng", ng)
                 if ng == 0:
                     continue
                 ndsi[wg] = (grnimg[wg] - swrimg[wg]) / (grnimg[wg] + swrimg[wg])
@@ -261,12 +261,12 @@ class weldData(Data):
                 wc = np.where((ndsi != missing) & (ndsi > 0.4) & (nirimg <= 0.11) & (swrimg <= 0.1))
                 ns = len(ws[0])
                 nc = len(wc[0])
-                print ng, ns, nc
+                print(ng, ns, nc)
                 if (ns > 0):
                     snow[ws] = 1
                 if (nc > 0):
                     snow[wc] = 0
-                print "writing", fname
+                print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Byte, 1)
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.)
@@ -291,13 +291,13 @@ class weldData(Data):
                 ndvi = missing + np.zeros_like(redimg)
                 wg = np.where((redimg != missing) & (nirimg != missing) & (redimg + nirimg != 0.0) & (cldimg == 0))
                 ng = len(wg[0])
-                print "ng", ng
+                print("ng", ng)
                 if ng == 0:
                     continue
                 ndvi[wg] = (nirimg[wg] - redimg[wg]) / (nirimg[wg] + redimg[wg])
-                print ndvi.min(), ndvi.max()
-                print ndvi[wg].min(), ndvi[wg].max()
-                print "writing", fname
+                print(ndvi.min(), ndvi.max())
+                print(ndvi[wg].min(), ndvi[wg].max())
+                print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Float32, 1)
                 imgout.SetNoData(float(missing))
                 imgout.SetOffset(0.0)
@@ -324,13 +324,13 @@ class weldData(Data):
                 brgt = missing + np.zeros_like(redimg)
                 wg = np.where((grnimg != missing) & (redimg != missing) & (nirimg != missing) & (cldimg == 0))
                 ng = len(wg[0])
-                print "ng", ng
+                print("ng", ng)
                 if ng == 0:
                     continue
                 brgt[wg] = (grnimg[wg] + redimg[wg] + nirimg[wg])/3.
-                print brgt.min(), brgt.max()
-                print brgt[wg].min(), brgt[wg].max()
-                print "writing", fname
+                print(brgt.min(), brgt.max())
+                print(brgt[wg].min(), brgt[wg].max())
+                print("writing", fname)
                 imgout = gippy.GeoImage(fname, refl, gippy.GDT_Float32, 1)
                 imgout.SetNoData(float(missing))
                 imgout.SetOffset(0.0)

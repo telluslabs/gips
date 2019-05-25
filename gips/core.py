@@ -160,10 +160,10 @@ class SpatialExtent(object):
     def print_tile_coverage(self):
         """ Print tile coverage info """
         if self.site is not None:
-            print Colors.BOLD + '\nTile Coverage'
-            print Colors.UNDER + '{:^8}{:>14}{:>14}'.format('Tile', '% Coverage', '% Tile Used') + Colors.OFF
+            print(Colors.BOLD + '\nTile Coverage')
+            print(Colors.UNDER + '{:^8}{:>14}{:>14}'.format('Tile', '% Coverage', '% Tile Used') + Colors.OFF)
             for t in sorted(self.coverage):
-                print "{:>8}{:>11.1f}%{:>11.1f}%".format(t, self.coverage[t][0] * 100, self.coverage[t][1] * 100)
+                print("{:>8}{:>11.1f}%{:>11.1f}%".format(t, self.coverage[t][0] * 100, self.coverage[t][1] * 100))
 
     def __str__(self):
         """ String representation of spatial extent """

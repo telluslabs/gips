@@ -34,7 +34,7 @@ from __future__ import print_function
 import os
 import sys
 import datetime
-import commands
+import subprocess
 import tempfile
 import shutil
 import tarfile
@@ -225,7 +225,7 @@ class MODTRAN():
 
         try:
             # run output and get results
-            modout = commands.getstatusoutput('modtran')
+            modout = subprocess.getstatusoutput('modtran')
             #VerboseOut("MODTRAN Output:", 4)
             #[VerboseOut(m, 4) for m in modout]
             self.output = self.readoutput(bandnum)
@@ -674,7 +674,7 @@ def process_acolite(asset, aco_proc_dir, products, meta, model_image,
             extracted_asset_fp, settings_path)
     verbose_out('acolite processing:  starting acolite: `{}`'.format(cmd), 2)
 
-    status, output = commands.getstatusoutput(cmd)
+    status, output = subprocess.getstatusoutput(cmd)
 
     verbose_out('acolite processing:  ====== begin acolite output ======', 4)
     verbose_out(output, 4)

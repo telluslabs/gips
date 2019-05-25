@@ -32,7 +32,6 @@ import shutil
 import glob
 import traceback
 from copy import deepcopy
-import commands # TODO unused?
 import subprocess
 import tempfile
 import tarfile

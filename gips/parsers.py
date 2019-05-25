@@ -190,7 +190,7 @@ class GIPSParser(argparse.ArgumentParser):
 def set_gippy_options(args):
     """ Set gippy options from parsed command line arguments """
     if 'verbose' in args:
-        gippy.Options.SetVerbose(args.verbose)
+        gippy.Options.set_verbose(args.verbose)
     if 'format' in args:
         gippy.Options.SetDefaultFormat(args.format)
     if 'chunksize' in args:

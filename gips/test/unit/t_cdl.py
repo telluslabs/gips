@@ -57,7 +57,7 @@ def t_cdlAsset_query_service_success_case(mocker):
     m_root.find.return_value.text = expected_url
 
     actual = cdl.cdlAsset.query_service('cdl', fake_tile,
-                                        datetime.date(2015, 01, 01))
+                                        datetime.date(2015, 1, 1))
     assert {'basename': 'fake-tile_2015_cdl_cdl.tif',
             'url': expected_url} == actual
 

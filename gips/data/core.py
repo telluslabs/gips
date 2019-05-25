@@ -36,10 +36,9 @@ import json
 import traceback
 import ftplib
 import shutil
-import commands
-from urllib import urlencode
-import urllib2
-from cookielib import CookieJar
+import subprocess
+import urllib
+from http.cookiejar import CookieJar
 import argparse
 
 # from functools import lru_cache <-- python 3.2+ can do this instead
@@ -48,7 +47,6 @@ import requests
 import backoff
 
 import gippy
-from gippy.algorithms import CookieCutter
 from gips import __version__
 from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File, Colors,
         basename, mkdir, open_vector)
@@ -320,39 +318,39 @@ class Repository(object):
 
         Uses auth settings and cls._manager_url, and also follows custom
         weird redirects (specific to Earthdata servers seemingly).
-        Returns urllib2.urlopen(...), or None if errors are encountered.
+        Returns urllib.urlopen(...), or None if errors are encountered.
         debuglevel is ultimately passed in to httplib; if >0, http info,
         such as headers, will be printed on standard out.
         """
         username = cls.get_setting('username')
         password = cls.get_setting('password')
         manager_url = cls._manager_url
-        password_manager = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        password_manager = urllib.HTTPPasswordMgrWithDefaultRealm()
         password_manager.add_password(
             None, manager_url, username, password)
         cookie_jar = CookieJar()
-        opener = urllib2.build_opener(
-            urllib2.HTTPBasicAuthHandler(password_manager),
-            urllib2.HTTPHandler(debuglevel=debuglevel),
-            urllib2.HTTPSHandler(debuglevel=debuglevel),
-            urllib2.HTTPCookieProcessor(cookie_jar))
-        urllib2.install_opener(opener)
+        opener = urllib.build_opener(
+            urllib.HTTPBasicAuthHandler(password_manager),
+            urllib.HTTPHandler(debuglevel=debuglevel),
+            urllib.HTTPSHandler(debuglevel=debuglevel),
+            urllib.HTTPCookieProcessor(cookie_jar))
+        urllib.install_opener(opener)
         try: # try instead of error handler because the exceptions have funny values to unpack
-            request = urllib2.Request(url)
-            response = urllib2.urlopen(request)
+            request = urllib.Request(url)
+            response = urllib.urlopen(request)
             redirect_url = response.geturl()
             # some data centers do it differently
             if "redirect" in redirect_url: # TODO is this the right way to detect redirects?
                 utils.verbose_out('Redirected to ' + redirect_url, 3)
                 redirect_url += "&app_type=401"
-                request = urllib2.Request(redirect_url)
-                response = urllib2.urlopen(request)
+                request = urllib.Request(redirect_url)
+                response = urllib.urlopen(request)
             return response
-        except urllib2.URLError as e:
+        except urllib.URLError as e:
             utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
                               verbosity, sys.stderr)
             return None
-        except urllib2.HTTPError as e:
+        except urllib.HTTPError as e:
             utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
                               verbosity, sys.stderr)
             return None
@@ -620,7 +618,7 @@ class Asset(object):
                 tmp_fname = os.path.join(tmp_dn, f)
                 # this ensures we have permissions on extracted files
                 if not os.path.isdir(tmp_fname):
-                    os.chmod(tmp_fname, 0664)
+                    os.chmod(tmp_fname, 0o664)
                 extracted_fnames.append((tmp_fname, final_fname))
             if extracted_fnames:
                 utils.verbose_out("Moving files from {} to {}".format(tmp_dn, path), 3)
@@ -908,7 +906,7 @@ class Asset(object):
         overwritten_ao = None
         try:
             asset = cls(filename)
-        except Exception, e:
+        except Exception(e):
             cls._quarantine_file(filename, e)
             return (None, 0, None)
 
@@ -1123,8 +1121,9 @@ class Data(object):
                         resampler = ['near', 'bilinear', 'cubic']
                         cmd = 'gdalwarp %s %s -t_srs "%s" -tr %s %s -r %s' % \
                                (fin, fout, site.Projection(), res[0], res[1], resampler[interpolation])
-                        print cmd
-                        #result = commands.getstatusoutput(cmd)
+                        print(cmd)
+                        # TODO: what is this?
+                        #result = subprocess.getstatusoutput(cmd)
                     else:
                         gippy.GeoImage(fin).Process(fout)
                         #shutil.copyfile(fin, fout)
@@ -1401,7 +1400,7 @@ class Data(object):
         for a in sorted(cls.Asset._assets.keys()):
             header = header + ('{:^10}'.format(a if a != '' else 'Coverage'))
         header = header + '{:^10}'.format('Product') + Colors.OFF
-        print header
+        print(header)
 
     def pprint(self, dformat='%j', colors=None):
         """ Print product inventory for this date """
@@ -1579,7 +1578,7 @@ class Data(object):
 
     @classmethod
     def print_products(cls):
-        print Colors.BOLD + "\n%s Products v%s" % (cls.name, cls.version) + Colors.OFF
+        print(Colors.BOLD + "\n%s Products v%s" % (cls.name, cls.version) + Colors.OFF)
         groups = cls.product_groups()
         opts = False
         txt = ""
@@ -1595,8 +1594,8 @@ class Data(object):
                     for a in args:
                         txt = txt + '{:>12}     {:<40}\n'.format(a[0], a[1])
         if opts:
-            print "  Optional qualifiers listed below each product."
-            print "  Specify by appending '-option' to product (e.g., ref-toa)"
+            print("  Optional qualifiers listed below each product.")
+            print("  Specify by appending '-option' to product (e.g., ref-toa)")
         sys.stdout.write(txt)
 
     def make_temp_proc_dir(self):

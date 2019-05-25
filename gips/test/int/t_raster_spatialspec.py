@@ -1,20 +1,20 @@
 import pytest
 import os
-import commands
+import subprocess
 from gips import utils
 from gips.core import SpatialExtent
 from ..sys.util import *
-    
+
 def t_raster_spatialspec():
     """Test that shapefile and rastermask return the same tile list"""
     with utils.make_temp_dir(prefix='t_gridded_inventory') as td:
         rastermask = os.path.join(td, 'nhseacost_mask.tif')
-        
+
         rasterize = (
             'gdal_rasterize -burn 1 -ot Byte -tr 30 30 {} {}'
             .format(NH_SHP_PATH, rastermask)
         )
-        status, output = commands.getstatusoutput(rasterize)
+        status, output = subprocess.getstatusoutput(rasterize)
         assert status == 0
 
         cls = utils.import_data_class('modis')

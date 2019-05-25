@@ -49,7 +49,7 @@ def main():
     utils.gips_script_setup(None, args.stop_on_error)
 
     with utils.error_handler('Data archive error'):
-        print title
+        print(title)
         cls = import_data_class(args.command)
         orm.setup() # set up DB orm in case it's needed for Asset.archive()
         archived_assets = cls.archive_assets(
