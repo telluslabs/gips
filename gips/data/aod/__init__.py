@@ -1,1 +1,1 @@
-from aod import aodRepository, aodAsset, aodData
+from .aod import aodRepository, aodAsset, aodData

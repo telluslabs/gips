@@ -14,14 +14,12 @@ import re
 import datetime
 
 import urllib
-import urllib2
 
 import math
 import numpy as np
 import requests
 import ftplib
 import gippy
-from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut, settings
 from gips import utils

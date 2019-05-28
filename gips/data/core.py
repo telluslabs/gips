@@ -88,7 +88,7 @@ def add_gippy_index_products(p_dict, p_groups, a_types):
 
 def _gs_stop_trying(e):
     """Should backoff keep retrying based on this HTTPError?
-    
+
     For searching using backoff per GCP docs:
     Clients should use truncated exponential backoff for all requests
     to Cloud Storage that return HTTP 5xx and 429 response codes,
@@ -295,6 +295,8 @@ class Repository(object):
         cls.default_settings, a dict of such things.  If still not found,
         resorts to magic for 'driver' and 'tiles', ValueError otherwise.
         """
+        import importlib
+
         dataclass = cls.__name__[:-10] # name of a class, not the class object
         r = settings().REPOS[dataclass]
         if key in r:
@@ -303,7 +305,7 @@ class Repository(object):
             return cls.default_settings[key]
 
         # not in settings file nor default, so resort to magic
-        exec('import gips.data.%s as clsname' % dataclass)
+        clsname = importlib.import_module('gips.data.%s' % dataclass)
         driverpath = os.path.dirname(clsname.__file__)
         if key == 'driver':
             return driverpath
@@ -325,19 +327,19 @@ class Repository(object):
         username = cls.get_setting('username')
         password = cls.get_setting('password')
         manager_url = cls._manager_url
-        password_manager = urllib.HTTPPasswordMgrWithDefaultRealm()
+        password_manager = urllib.request.HTTPPasswordMgrWithDefaultRealm()
         password_manager.add_password(
             None, manager_url, username, password)
         cookie_jar = CookieJar()
-        opener = urllib.build_opener(
-            urllib.HTTPBasicAuthHandler(password_manager),
-            urllib.HTTPHandler(debuglevel=debuglevel),
-            urllib.HTTPSHandler(debuglevel=debuglevel),
-            urllib.HTTPCookieProcessor(cookie_jar))
-        urllib.install_opener(opener)
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPBasicAuthHandler(password_manager),
+            urllib.request.HTTPHandler(debuglevel=debuglevel),
+            urllib.request.HTTPSHandler(debuglevel=debuglevel),
+            urllib.request.HTTPCookieProcessor(cookie_jar))
+        urllib.request.install_opener(opener)
         try: # try instead of error handler because the exceptions have funny values to unpack
-            request = urllib.Request(url)
-            response = urllib.urlopen(request)
+            request = urllib.request.Request(url)
+            response = urllib.request.urlopen(request)
             redirect_url = response.geturl()
             # some data centers do it differently
             if "redirect" in redirect_url: # TODO is this the right way to detect redirects?
@@ -368,15 +370,15 @@ class Repository(object):
 
         # open tiles vector
         v = open_vector(cls.get_setting('tiles'))
-        shp = ogr.Open(v.Filename())
-        if v.LayerName() == '':
+        shp = ogr.Open(v.filename())
+        if v.layer_name() == '':
             layer = shp.GetLayer(0)
         else:
-            layer = shp.GetLayer(v.LayerName())
+            layer = shp.GetLayer(v.layer_name())
 
         # create and warp site geometry
-        ogrgeom = ogr.CreateGeometryFromWkt(vector.WKT())
-        srs = osr.SpatialReference(vector.Projection())
+        ogrgeom = ogr.CreateGeometryFromWkt(vector.wkt_geometry())
+        srs = osr.SpatialReference(vector.srs())
         trans = osr.CoordinateTransformation(srs, layer.GetSpatialRef())
         ogrgeom.Transform(trans)
         # convert to shapely
@@ -1168,9 +1170,10 @@ class Data(object):
         defaulted to None, self.assets' filenames is used instead.
         """
         sa = src_afns
+
         if src_afns is None:
             sa = [ao.filename for ao in self.assets.values()]
-        elif isinstance(src_afns, basestring):
+        elif isinstance(src_afns, str):
             sa = [src_afns]
         md = {
             'GIPS_Version': __version__,
@@ -1197,7 +1200,11 @@ class Data(object):
         assetnames = [a.filename for a in self.assets.values()]
         badexts = ['.index', '.xml']
         test = lambda x: x not in assetnames and os.path.splitext(f)[1] not in badexts
-        filenames[:] = [f for f in filenames if test(f)]
+        # list comprehensions aren't all that
+        filenames = []
+        for f in filenames:
+            if test(f):
+                filenames.append(f)
         return filenames
 
 

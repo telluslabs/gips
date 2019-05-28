@@ -33,9 +33,9 @@ import tempfile
 import zipfile
 import copy
 import glob
-from itertools import izip_longest
+from itertools import zip_longest
 from xml.etree import ElementTree
-import StringIO
+from io import StringIO
 
 from backports.functools_lru_cache import lru_cache
 
@@ -794,7 +794,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
 
         # format as valid WKT
         points = values_tags.text.strip().split(" ")
-        zipped_points = izip_longest(*[iter(points)]*2)  # fancy way to group list into pairs
+        zipped_points = zip_longest(*[iter(points)]*2)  # fancy way to group list into pairs
         wkt_points = ", ".join([y + " " + x for x, y in list(zipped_points)])
         footprint_wkt = "POLYGON (({}))".format(wkt_points)
 

@@ -29,7 +29,6 @@ import re
 import datetime
 
 import urllib
-import urllib2
 import math
 
 import numpy as np
@@ -37,7 +36,7 @@ import requests
 from backports.functools_lru_cache import lru_cache
 
 import gippy
-from gippy.algorithms import Indices
+from gippy import algorithms
 from gips.data.core import Repository, Asset, Data
 import gips.data.core
 from gips.utils import VerboseOut, settings
@@ -240,6 +239,7 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
             # effectively random).
+            item = item.decode('utf-8')
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
@@ -474,6 +474,28 @@ class modisData(Data):
     }
 
     _products.update(_index_product_entries)
+
+
+    # TODO: use this for consistency with Landsat and consider pulling it into
+    # utils
+    def _process_indices(self, image, metadata, sensor, indices):
+        """Process the given indices and add their files to the inventory.
+        Image is a GeoImage suitable for generating the indices.
+        Metadata is passed in to the gippy indices() call.  Sensor is
+        used to generate index filenames and saving info about the
+        product to self. Indices is a dict of desired keys; keys and
+        values are the same as requested products in process().
+        """
+        verbose_out("Starting on {} indices: {}".format(len(indices), indices.keys()), 2)
+        for prod_and_args, split_p_and_a in indices.items():
+            verbose_out("Starting on {}".format(prod_and_args), 3)
+            temp_fp = self.temp_product_filename(sensor, prod_and_args)
+            # indices() assumes many indices per file; we just want one
+            imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
+            imgout.add_meta(metadata)
+            archived_fp = self.archive_temp_path(temp_fp)
+            self.AddFile(sensor, prod_and_args, archived_fp)
+
 
     def asset_check(self, prod_type):
         """Is an asset available for the current scene and product?
@@ -1034,9 +1056,9 @@ class modisData(Data):
                 os.path.basename(fname), datetime.datetime.now() - start), level=1)
 
         # process some index products (not all, see above)
-        requested_ipt = products.groups()['Index'].keys()
+        requested_ipt = list(products.groups()['Index'].keys())
         if requested_ipt:
-            model_pt = requested_ipt[0] # all should be similar
+            model_pt = list(requested_ipt)[0] # all should be similar
             availassets, _, version, allsds = self.asset_check(model_pt)
             asset = availassets[0]
             if asset is None:
@@ -1062,7 +1084,7 @@ class modisData(Data):
             6   7   2105 - 2155 SWIR2
             """
             # SetBandName goes by band number, not index
-            [img.SetBandName(name, i) for (name, i) in [
+            [img.set_bandname(name, i) for (name, i) in [
                 ('RED',   1), ('NIR',   2), ('BLUE',  3),
                 ('GREEN', 4), ('SWIR1', 6), ('SWIR2', 7)]]
 
@@ -1071,7 +1093,12 @@ class modisData(Data):
                          for pt in requested_ipt}
             prepped_md = self.prep_meta([self.assets[asset].filename],
                                         {'VERSION': '1.0'})
-            pt_to_temp_fps = Indices(img, prod_spec, prepped_md)
-            for pt, temp_fp in pt_to_temp_fps.items():
+            indices = products.groups()['Index']
+            for prod_and_args, split_p_and_a in indices.items():
+                print(prod_and_args, split_p_and_a)
+                temp_fp = self.temp_product_filename(sensor, prod_and_args)
+                print(temp_fp)
+                imgout = algorithms.indices(img, [split_p_and_a[0]], temp_fp)
+                imgout.add_meta(prepped_md)
                 archived_fp = self.archive_temp_path(temp_fp)
-                self.AddFile(sensor, pt, archived_fp)
+                self.AddFile(sensor, prod_and_args, archived_fp)

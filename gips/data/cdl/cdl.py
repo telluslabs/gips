@@ -26,7 +26,6 @@ import re
 import datetime
 from csv import DictReader
 import glob
-from itertools import ifilter
 import shutil
 from xml.etree import ElementTree
 from zipfile import ZipFile
@@ -40,7 +39,7 @@ import gips
 from gips.data.core import Repository, Asset, Data
 from gips import utils
 from gips.utils import verbose_out
-from gippy import GeoImage, GeoImages
+from gippy import GeoImage
 from osgeo import gdal
 
 import imghdr

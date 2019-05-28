@@ -23,9 +23,8 @@ RUN mkdir /tmp/sixs \
 
 RUN pip3 install gippy \
     && pip3 install https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3 \
-    && pip3 install https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.5.0.zip#egg=python-fmask-0.5.0
-
-#&& python3 setup.py install
+    && pip3 install https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.5.0.zip#egg=python-fmask-0.5.0 \
+    && python3 setup.py develop
 
 RUN apt-get -y autoremove \
     && apt-get -y autoclean

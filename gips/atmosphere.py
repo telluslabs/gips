@@ -368,32 +368,6 @@ class MODTRAN():
         c = ('{IRPT:>5}')
         return c.format(IRPT=0)
 
-    """ old plotting code
-    if plot:
-        #fig = plt.figure()
-        #plt.title('Atmospheric Transmittance vs Wavelength (um)')
-
-        results = table.Table()
-        results.read_csv('tape7.scn',skip=11, delim=' ', ignorebad=True, hasheader=False)
-        #pdb.set_trace()
-
-        wvlens = results.as_numpy_col(0)
-        T = results.as_numpy_col(1)
-        rad = results.as_numpy_col(2)
-        fout.write('{:5d}{:20.10f}{:20.10f}\n'.format(bandnum,np.mean(T),np.mean(rad)))
-
-        if plot:
-            fig.add_subplot(4,2,bandnum)
-            plt.title("Band %s" % bandnum)
-            plt.plot(wvlens,T)
-            plt.ylim([0.0,1.0])
-
-        bandnum = bandnum+1
-    if plot:
-        plt.tight_layout()
-        plt.show()
-    fout.close()
-    """
 
 _s2_ls_aco_prod_templs = {
     'rhow': { # product passed in eg process_acolite(products={'rhow':...}...)
@@ -548,9 +522,9 @@ def add_acolite_product_dicts(_products, *assets, **kwargs):
 _acolite_ndv = 1.875 * 2 ** 122 # acolite's no-data value
 
 _aco_img_params = {
-    'float32': (gippy.GDT_Float32, -32768.0),
-    'int16': (gippy.GDT_Int16, -32768),
-    'uint8': (gippy.GDT_Byte, 1),
+    'float32': ('float32', -32768.0),
+    'int16': ('int16', -32768),
+    'uint8': ('uint8', 1),
 }
 
 def acolite_nc_to_prods(products, nc_file, meta, model_image):

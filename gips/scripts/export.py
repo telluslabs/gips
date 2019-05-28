@@ -32,7 +32,8 @@ from gips import utils
 from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import orm
 
-from backports import tempfile
+# from backports import tempfile
+import tempfile
 import boto3
 import zipfile
 import shutil
@@ -103,7 +104,7 @@ def run_export(args):
             for extent in extents:
                 t_extent = TemporalExtent(args.dates, args.days)
                 inv = DataInventory(cls, extent, t_extent, **vars(args))
-                datadir = os.path.join(tld, extent.site.Value())
+                datadir = os.path.join(tld, extent.site.value())
                 if inv.numfiles > 0:
                     inv.mosaic(
                         datadir=datadir, tree=args.tree, overwrite=args.overwrite,

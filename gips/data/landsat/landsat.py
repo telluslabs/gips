@@ -47,7 +47,7 @@ import osr
 import gippy
 from gips import __version__ as __gips_version__
 from gips.core import SpatialExtent, TemporalExtent
-from gippy.algorithms import ACCA, Fmask, LinearTransform, Indices, AddShadowMask
+from gippy.algorithms import acca, fmask, linear_transform, indices
 from gips.data.core import Repository, Data
 import gips.data.core
 from gips.atmosphere import SIXS, MODTRAN
@@ -240,11 +240,14 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
     _ee_datasets = None
 
     # Set the startdate to the min date of the asset's sensors
-    for asset, asset_info in _assets.iteritems():
-        asset_info['startdate'] = min(
-            [_sensors[sensor]['startdate']
-                for sensor in asset_info['sensors']]
-        )
+    for asset, asset_info in _assets.items():
+
+        # TODO: there was some weird scope thing going on in the
+        # list comprehension that was here
+        startdates = []
+        for sensor in asset_info['sensors']:
+            startdates.append(_sensors[sensor]['startdate'])
+        asset_info['startdate'] = min(startdates)
 
     _defaultresolution = [30.0, 30.0]
 
@@ -979,7 +982,7 @@ class landsatData(gips.data.core.CloudCoverData):
         if 'C1' in pdict['assets']:
             pdict['assets'] += ['C1S3', 'C1GS']
 
-    for product, product_info in _products.iteritems():
+    for product, product_info in _products.items():
         product_info['startdate'] = min(
             [landsatAsset._assets[asset]['startdate']
                 for asset in product_info['assets']]
@@ -1015,7 +1018,7 @@ class landsatData(gips.data.core.CloudCoverData):
         self._time_report("Finshed running Indices")
 
         if coreg_shift:
-            for key, val in prodout.iteritems():
+            for key, val in prodout.items():
                 self._time_report("coregistering index")
                 xcoreg = coreg_shift.get('x', 0.0)
                 ycoreg = coreg_shift.get('y', 0.0)
@@ -1314,12 +1317,12 @@ class landsatData(gips.data.core.CloudCoverData):
                                 'ACCA requires all bands to have the same '
                                 'spatial resolution.  Found:\n\t' + str(resset)
                             )
-                        imgout = ACCA(reflimg, fname, s_elev, s_azim, erosion, dilation, cloudheight)
+                        imgout = acca(reflimg, fname, s_elev, s_azim, erosion, dilation, cloudheight)
                     elif val[0] == 'fmask':
                         tolerance, dilation = 3, 5
                         if len(val) >= 3:
                             tolerance, dilation = [int(v) for v in val[1:3]]
-                        imgout = Fmask(reflimg, fname, tolerance, dilation)
+                        imgout = fmask(reflimg, fname, tolerance, dilation)
 
                     elif val[0] == 'cloudmask':
                         qaimg = self._readqa(asset)
@@ -1481,40 +1484,40 @@ class landsatData(gips.data.core.CloudCoverData):
                                     ) * meta[col]['K2'] - 273.15
                             band.Process(imgout[col])
 
-                    elif val[0] == 'bqashadow':
-                        if 'LC8' not in self.sensor_set:
-                            continue
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_UInt16, 1)
-                        imgout[0].SetNoData(0)
-                        qaimg = self._readqa(asset)
-                        qadata = qaimg.Read()
-                        qaimg = None
-                        fill = binmask(qadata, 1)
-                        dropped = binmask(qadata, 2)
-                        terrain = binmask(qadata, 3)
-                        cirrus = binmask(qadata, 14)
-                        othercloud = binmask(qadata, 16)
-                        cloud = (cirrus + othercloud) + 2 * (fill + dropped + terrain)
-                        abfn = fname + '-intermediate'
-                        abimg = gippy.GeoImage(abfn, img, gippy.GDT_UInt16, 1)
-                        abimg[0].SetNoData(2)
-                        abimg[0].Write(cloud.astype(numpy.uint16))
-                        abimg.Process()
-                        abimg = None
-                        abimg = gippy.GeoImage(abfn + '.tif')
+                    # elif val[0] == 'bqashadow':
+                    #     if 'LC8' not in self.sensor_set:
+                    #         continue
+                    #     imgout = gippy.GeoImage(fname, img, gippy.GDT_UInt16, 1)
+                    #     imgout[0].SetNoData(0)
+                    #     qaimg = self._readqa(asset)
+                    #     qadata = qaimg.Read()
+                    #     qaimg = None
+                    #     fill = binmask(qadata, 1)
+                    #     dropped = binmask(qadata, 2)
+                    #     terrain = binmask(qadata, 3)
+                    #     cirrus = binmask(qadata, 14)
+                    #     othercloud = binmask(qadata, 16)
+                    #     cloud = (cirrus + othercloud) + 2 * (fill + dropped + terrain)
+                    #     abfn = fname + '-intermediate'
+                    #     abimg = gippy.GeoImage(abfn, img, gippy.GDT_UInt16, 1)
+                    #     abimg[0].SetNoData(2)
+                    #     abimg[0].Write(cloud.astype(numpy.uint16))
+                    #     abimg.Process()
+                    #     abimg = None
+                    #     abimg = gippy.GeoImage(abfn + '.tif')
 
-                        s_azim = self.metadata['geometry']['solarazimuth']
-                        s_elev = 90 - self.metadata['geometry']['solarzenith']
-                        erosion, dilation, cloudheight = 5, 10, 4000
-                        if len(val) >= 4:
-                            erosion, dilation, cloudheight = [int(v) for v in val[1:4]]
-                        imgout = AddShadowMask(
-                            abimg, imgout, 0, s_elev, s_azim, erosion,
-                            dilation, cloudheight, {'notes': 'dev-version'}
-                        )
-                        imgout.Process()
-                        abimg = None
-                        os.remove(abfn + '.tif')
+                    #     s_azim = self.metadata['geometry']['solarazimuth']
+                    #     s_elev = 90 - self.metadata['geometry']['solarzenith']
+                    #     erosion, dilation, cloudheight = 5, 10, 4000
+                    #     if len(val) >= 4:
+                    #         erosion, dilation, cloudheight = [int(v) for v in val[1:4]]
+                    #     imgout = AddShadowMask(
+                    #         abimg, imgout, 0, s_elev, s_azim, erosion,
+                    #         dilation, cloudheight, {'notes': 'dev-version'}
+                    #     )
+                    #     imgout.Process()
+                    #     abimg = None
+                    #     os.remove(abfn + '.tif')
 
                     fname = imgout.Filename()
                     imgout.SetMeta(self.prep_meta(asset_fn, md))
@@ -1790,7 +1793,7 @@ class landsatData(gips.data.core.CloudCoverData):
         image.SetNoData(0)
 
         # TODO - set appropriate metadata
-        #for key,val in meta.iteritems():
+        #for key,val in meta.items():
         #    image.SetMeta(key,str(val))
 
         # Geometry used for calculating incident irradiance

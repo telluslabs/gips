@@ -90,7 +90,7 @@ class Inventory(object):
         if len(self.data) == 0:
             print('No matching files in inventory')
             return
-        self.data[self.data.keys()[0]].pprint_asset_header()
+        self.data[list(self.data.keys())[0]].pprint_asset_header()
         dformat = '%m-%d' if md else '%j'
         oldyear = 0
         formatstr = '{:<12}\n'

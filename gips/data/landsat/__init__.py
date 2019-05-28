@@ -1,1 +1,1 @@
-from landsat import landsatRepository, landsatAsset, landsatData
+from .landsat import landsatRepository, landsatAsset, landsatData

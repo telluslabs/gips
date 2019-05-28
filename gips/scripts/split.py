@@ -12,8 +12,6 @@ from gips.inventory import ProjectInventory
 from gips.utils import Colors, VerboseOut, basename
 from gips import utils
 
-from pdb import set_trace
-
 
 def read_raster(infile):
     fp = gdal.Open(infile)

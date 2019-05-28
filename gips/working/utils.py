@@ -7,8 +7,6 @@ import numpy as np
 import geopandas as gpd
 from osgeo import gdal, ogr, osr
 
-from pdb import set_trace
-
 
 def read_raster(infile, meta=False):
     fp = gdal.Open(infile)

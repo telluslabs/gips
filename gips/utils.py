@@ -72,21 +72,29 @@ class Colors():
 
 def verbose_out(obj, level=1, stream=sys.stdout):
     """print(obj) but only if the user's chosen verbosity level warrants it.
-
     Print to stdout by default, but select any stream the user wishes.  Finally
     if the obj is a list or tuple, print each contained object consecutively on
-    separate lines.
+    separate lines.  The stream may be specified by passing in the stream object or
+    by the special strings, 'stderr' and 'stdout'.
     """
     #TODO: Add real documentation of rules regarding levels used within
     #      GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
     #      "let me see everything" level.
-    if gippy.Options.Verbose() >= level:
+    streams = {'stdout': sys.stdout, 'stderr': sys.stderr}
+    if verbosity() >= level:
         if not isinstance(obj, (list, tuple)):
             obj = [obj]
         for o in obj:
-            print(o, file=stream)
+            print(o, file=streams.get(stream, stream))
 
 VerboseOut = verbose_out # VerboseOut name is deprecated
+
+def verbosity(new=None):
+    """Returns after optionally setting the gips verbosity level.
+    Currently slaved to gippy's verbosity level."""
+    if new is not None:
+        gippy.Options.set_verbose(new)
+    return gippy.Options.verbose()
 
 ##############################################################################
 # Filesystem functions
@@ -308,22 +316,14 @@ def import_data_module(clsname):
 def import_repository_class(clsname):
     """ Get clsnameRepository class object """
     mod = import_data_module(clsname)
-
-    print(clsname)
-
-    # exec('repo = mod.%sRepository' % clsname)
-
     repo = eval('mod.%sRepository' % clsname)
-
-    # from pdb import set_trace; set_trace()
-
     return repo
 
 
 def import_data_class(clsname):
     """ Get clsnameData class object """
     mod = import_data_module(clsname)
-    exec('repo = mod.%sData' % clsname)
+    repo = eval('mod.%sData' % clsname)
     # prevent use of database inventory for certain incompatible drivers
     from gips.inventory import orm
     orm.driver_for_dbinv_feature_toggle = repo.name.lower()
@@ -339,7 +339,7 @@ def open_vector(fname, key="", where=''):
     parts = fname.split(':')
     if len(parts) == 1:
         vector = GeoVector(fname)
-        vector.SetPrimaryKey(key)
+        vector.set_primary_key(key)
     else:
         # or it is a database
         if parts[0] not in settings().DATABASES.keys():
@@ -670,7 +670,7 @@ def prune_unhashable(d):
 def stringify_meta_dict(md):
     """Mostly return {str(k): str(v)...}, except for non-dict iterables."""
     def stringify(o):
-        if isinstance(o, (basestring, dict)):
+        if isinstance(o, (str, dict)):
             return str(o)
         try:
             return ','.join(str(i) for i in o)
