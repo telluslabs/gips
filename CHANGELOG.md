@@ -7,6 +7,10 @@ and this project adheres to
 ## [UNRELEASED]
 
 
+## v0.14.6
+### Fixed
+- fixed less common use-case with NameError
+
 ## v0.14.5
 ### Fixed
 - was passing str, instead of list-of-str, to landsat's `_cache_if_vsicurl`
