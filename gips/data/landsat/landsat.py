@@ -40,14 +40,15 @@ from xml.etree import ElementTree
 
 from backports.functools_lru_cache import lru_cache
 import numpy
-# once gippy==1.0, switch to GeoRaster.erode
+# TODO: now that gippy==1.0, switch to GeoRaster.erode
 from scipy.ndimage import binary_dilation
 
 import osr
 import gippy
+from gippy import algorithms
+from gippy.algorithms import acca, fmask, linear_transform
 from gips import __version__ as __gips_version__
 from gips.core import SpatialExtent, TemporalExtent
-from gippy.algorithms import acca, fmask, linear_transform, indices
 from gips.data.core import Repository, Data
 import gips.data.core
 from gips.atmosphere import SIXS, MODTRAN
@@ -1005,44 +1006,36 @@ class landsatData(gips.data.core.CloudCoverData):
         is a dict with keys `x` and `y` used to make affine
         transformation for `-coreg` products.
         """
-        gippy_input = {} # map prod types to temp output filenames for feeding to gippy
-        tempfps_to_ptypes = {} # map temp output filenames to prod types, for AddFile
-        for prod_type, pt_split in indices.items():
-            temp_fp = self.temp_product_filename(sensor, prod_type)
-            gippy_input[pt_split[0]] = temp_fp
-            tempfps_to_ptypes[temp_fp] = prod_type
-
-        self._time_report("Running Indices")
-        prodout = Indices(image, gippy_input,
-                          self.prep_meta(asset_fn, metadata))
-        self._time_report("Finshed running Indices")
-
-        if coreg_shift:
-            for key, val in prodout.items():
+        verbose_out("Starting on {} indices: {}".format(len(indices), indices.keys()), 2)
+        for prod_and_args, split_p_and_a in indices.items():
+            verbose_out("Starting on {}".format(prod_and_args), 3)
+            temp_fp = self.temp_product_filename(sensor, prod_and_args)
+            # indices() assumes many indices per file; we just want one
+            imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
+            imgout.add_meta(metadata)
+            if coreg_shift:
                 self._time_report("coregistering index")
                 xcoreg = coreg_shift.get('x', 0.0)
                 ycoreg = coreg_shift.get('y', 0.0)
 
                 self._time_report("coreg (x, y) = ({:.3f}, {:.3f})"
                                   .format(xcoreg, ycoreg))
-                img = gippy.GeoImage(val, True)
 
                 coreg_mag = (xcoreg ** 2 + ycoreg ** 2) ** 0.5
                 insane =  coreg_mag > 75  # TODO: actual fix
 
-                img.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
+                imgout.add_meta("COREG_MAGNITUDE", str(coreg_mag))
 
                 if not insane:
                     affine = img.Affine()
                     affine[0] += xcoreg
                     affine[3] += ycoreg
-                    img.SetAffine(affine)
-                img.Process()
-                img = None
+                    imgout.set_affine(affine)
+                imgout.Process()
+                imgout = None
 
-        for temp_fp in prodout.values():
             archived_fp = self.archive_temp_path(temp_fp)
-            self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
+            self.AddFile(sensor, prod_and_args, archived_fp)
 
     def _download_gcs_bands(self, output_dir):
         if 'C1GS' not in self.assets:
@@ -1068,7 +1061,7 @@ class landsatData(gips.data.core.CloudCoverData):
             return self._preferred_asset
 
         # figure out which asset should be used for processing
-        self._preferred_asset = self.assets.keys()[0] # really an asset type string, eg 'SR'
+        self._preferred_asset = list(self.assets.keys())[0] # really an asset type string, eg 'SR'
         if len(self.assets) > 1:
             # if there's more than one, have to choose:
             # prefer local over fetching from the cloud, and prefer C1 over DN
@@ -1196,7 +1189,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 #      all other bqa labels.
                 #      See https://landsat.usgs.gov/collectionqualityband
                 qaimg = self._readqa(asset)
-                img.AddMask(qaimg[0] > 1)
+                img.add_mask(qaimg[0] > 1)
                 qaimg = None
 
             asset_fn = self.assets[asset].filename
@@ -1265,8 +1258,8 @@ class landsatData(gips.data.core.CloudCoverData):
                 with utils.error_handler('Problem running 6S atmospheric model'):
                     wvlens = [(meta[b]['wvlen1'], meta[b]['wvlen2']) for b in visbands]
                     geo = self.metadata['geometry']
-                    atm6s = SIXS(visbands, wvlens, geo, self.metadata['datetime'],
-                                 sensor=self.sensor_set[0])
+                    atm6s = SIXS(visbands, wvlens, geo, self.metadata['datetime'], sensor=self.sensor_set[0])
+
                     md["AOD Source"] = str(atm6s.aod[0])
                     md["AOD Value"] = str(atm6s.aod[1])
 
@@ -1568,12 +1561,15 @@ class landsatData(gips.data.core.CloudCoverData):
                 # Run atmospherically corrected
                 if len(indices) > 0:
                     for col in visbands:
-                        img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
-                                ) * (1.0 / atm6s.results[col][2])
+
+                        img[col] = (img[col] -  atm6s.results[col][1]) * (1.0 / atm6s.results[col][0]) * (1.0 / atm6s.results[col][2])
+
                     self._process_indices(img, asset_fn, md, sensor, indices,
                                           coreg_shift)
+
                 verbose_out(' -> %s: processed %s in %s' % (
                         self.basename, indices0.keys(), datetime.now() - start), 1)
+
             img = None
             # cleanup scene directory by removing (most) extracted files
             with utils.error_handler('Error removing extracted files', continuable=True):
@@ -1790,7 +1786,7 @@ class landsatData(gips.data.core.CloudCoverData):
                          for f in md['filenames']]
         self._time_report("reading bands")
         image = gippy.GeoImage(paths)
-        image.SetNoData(0)
+        image.set_nodata(0)
 
         # TODO - set appropriate metadata
         #for key,val in meta.items():
@@ -1803,12 +1799,12 @@ class landsatData(gips.data.core.CloudCoverData):
         colors = asset_obj._sensors[sensor]['colors']
 
         for bi in range(0, len(md['filenames'])):
-            image.SetBandName(colors[bi], bi + 1)
+            image.set_bandname(colors[bi], bi + 1)
             # need to do this or can we index correctly?
             band = image[bi]
             gain = md['gain'][bi]
-            band.SetGain(gain)
-            band.SetOffset(md['offset'][bi])
+            band.set_gain(gain)
+            band.set_offset(md['offset'][bi])
             dynrange = md['dynrange'][bi]
             # #band.SetDynamicRange(dynrange[0], dynrange[1])
             # dynrange[0] was used internally to for conversion to radiance
@@ -1832,7 +1828,7 @@ class landsatData(gips.data.core.CloudCoverData):
             #     Out[20]: -64.927711800095906
 
         self._time_report("done reading bands")
-        verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
+        verbose_out('%s: read in %s' % (image.basename(), datetime.now() - start), 2)
         return image
 
     def _s2_tiles_for_coreg(self, inventory, date_found, landsat_footprint):

@@ -380,7 +380,7 @@ class DataInventory(Inventory):
             # self.spatial.site is None, but raise an error anyway just in case
             if len(self.spatial.tiles) > 1:
                 raise RuntimeError('Expected 1 tile but got ' + repr(self.spatial.tiles))
-            print(Colors.BOLD + 'Asset Holdings for tile ' + self.spatial.tiles[0] + Colors.OFF)
+            print(Colors.BOLD + 'Asset Holdings for tile ' + list(self.spatial.tiles)[0] + Colors.OFF)
 
         super(DataInventory, self).pprint(**kwargs)
 
