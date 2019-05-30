@@ -476,25 +476,25 @@ class modisData(Data):
     _products.update(_index_product_entries)
 
 
-    # TODO: use this for consistency with Landsat and consider pulling it into
-    # utils
-    def _process_indices(self, image, metadata, sensor, indices):
-        """Process the given indices and add their files to the inventory.
-        Image is a GeoImage suitable for generating the indices.
-        Metadata is passed in to the gippy indices() call.  Sensor is
-        used to generate index filenames and saving info about the
-        product to self. Indices is a dict of desired keys; keys and
-        values are the same as requested products in process().
-        """
-        verbose_out("Starting on {} indices: {}".format(len(indices), indices.keys()), 2)
-        for prod_and_args, split_p_and_a in indices.items():
-            verbose_out("Starting on {}".format(prod_and_args), 3)
-            temp_fp = self.temp_product_filename(sensor, prod_and_args)
-            # indices() assumes many indices per file; we just want one
-            imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
-            imgout.add_meta(metadata)
-            archived_fp = self.archive_temp_path(temp_fp)
-            self.AddFile(sensor, prod_and_args, archived_fp)
+    # TODO: use this for consistency with Landsat
+    # NOT USED
+    # def _process_indices(self, image, metadata, sensor, indices):
+    #     """Process the given indices and add their files to the inventory.
+    #     Image is a GeoImage suitable for generating the indices.
+    #     Metadata is passed in to the gippy indices() call.  Sensor is
+    #     used to generate index filenames and saving info about the
+    #     product to self. Indices is a dict of desired keys; keys and
+    #     values are the same as requested products in process().
+    #     """
+    #     verbose_out("Starting on {} indices: {}".format(len(indices), indices.keys()), 2)
+    #     for prod_and_args, split_p_and_a in indices.items():
+    #         verbose_out("Starting on {}".format(prod_and_args), 3)
+    #         temp_fp = self.temp_product_filename(sensor, prod_and_args)
+    #         # indices() assumes many indices per file; we just want one
+    #         imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
+    #         imgout.add_meta(metadata)
+    #         archived_fp = self.archive_temp_path(temp_fp)
+    #         self.AddFile(sensor, prod_and_args, archived_fp)
 
 
     def asset_check(self, prod_type):
