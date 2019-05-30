@@ -470,6 +470,14 @@ class modisData(Data):
             'bands': ['cloud-cover'],
             'startdate': datetime.date(2000, 2, 24),
             'latency': 3
+        },
+        'ref': {
+            'description': 'Surface reflectance',
+            'assets': [MCD43A4],
+            'sensor': 'MCD',
+            'bands': ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'],
+            'startdate': datetime.date(2000, 2, 18),
+            'latency': 15,
         }
     }
 
@@ -552,6 +560,37 @@ class modisData(Data):
                     raise Exception('product version not supported')
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
+
+
+            if val[0] == "ref":
+                img = gippy.GeoImage(allsds)
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
+
+                red = img[7].Read()
+                nir = img[8].Read()
+                blu = img[9].Read()
+                grn = img[10].Read()
+                sw1 = img[11].Read()
+                sw2 = img[12].Read()
+                del img
+
+                imgout.SetNoData(32767)
+                imgout.SetOffset(0.0)
+                imgout.SetGain(0.0001)
+
+                imgout.SetBandName('BLUE', 1)
+                imgout.SetBandName('GREEN', 2)
+                imgout.SetBandName('RED', 3)
+                imgout.SetBandName('NIR', 4)
+                imgout.SetBandName('SWIR1', 5)
+                imgout.SetBandName('SWIR2', 6)
+
+                imgout[0].Write(blu)
+                imgout[1].Write(grn)
+                imgout[2].Write(red)
+                imgout[3].Write(nir)
+                imgout[4].Write(sw1)
+                imgout[5].Write(sw2)
 
             # LAND VEGETATION INDICES PRODUCT
             # now with QC layer!
