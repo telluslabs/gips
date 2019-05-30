@@ -26,6 +26,7 @@ from backports.functools_lru_cache import lru_cache
 import requests
 import numpy
 import gippy
+from gippy import algorithms
 
 from gips.data.core import Repository, Data
 import gips.data.core
@@ -162,7 +163,7 @@ class hlsAsset(gips.data.core.CloudCoverAsset):
         subdatasets = self.datafiles()
         image = gippy.GeoImage(subdatasets)
         colors = self.sensor_spec('colors')
-        [image.SetBandName(name, i) for (i, name) in enumerate(colors, 1)]
+        [image.set_bandname(name, i) for (i, name) in enumerate(colors, 1)]
         return image
 
 
@@ -201,30 +202,21 @@ class hlsData(gips.data.core.CloudCoverData):
         return sentinel2.sentinel2Data.normalize_tile_string(tile_string)
 
     def process_indices(self, a_obj, indices):
-        """Make the given indices from the given asset.
-
-        indices' values are the keys, split by hyphen, eg {ndvi-toa':
-        ['ndvi', 'toa']} (technically it's useless here, as no argumentated
-        products are supported; doing it for consistency).
+        """Process the given indices and add their files to the inventory.
         """
-        # TODO another place that can be DRY'd out; several drivers process similarly
-        verbose_out('Starting processing on {} for {}'.format(
-            a_obj.atd_str(), indices.keys()), 4)
-        gippy_input = {} # gippy wants p-types mapped to output filenames
-        tempfps_to_ptypes = {} # AddFile needs a map of p-types to filenames
-        for prod_type, pt_split in indices.items():
-            temp_fp = self.temp_product_filename(a_obj.sensor, prod_type)
-            gippy_input[pt_split[0]] = temp_fp
-            tempfps_to_ptypes[temp_fp] = prod_type
-
-        prodout = gippy.algorithms.Indices(
-            a_obj.load_image(), gippy_input, self.prep_meta(a_obj.filename))
-
-        for temp_fp in prodout.values():
+        asset_fn = a_obj.filename
+        metadata = {}
+        sensor = a_obj.sensor
+        image = a_obj.load_image()
+        verbose_out("Starting on {} indices: {}".format(len(indices), indices.keys()), 2)
+        for prod_and_args, split_p_and_a in indices.items():
+            verbose_out("Starting on {}".format(prod_and_args), 3)
+            temp_fp = self.temp_product_filename(sensor, prod_and_args)
+            # indices() assumes many indices per file; we just want one
+            imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
+            imgout.add_meta(metadata)
             archived_fp = self.archive_temp_path(temp_fp)
-            self.AddFile(a_obj.sensor, tempfps_to_ptypes[temp_fp], archived_fp)
-
-
+            self.AddFile(sensor, prod_and_args, archived_fp)
 
     def process_cmask(self):
         """Produce the cloudmask product."""
