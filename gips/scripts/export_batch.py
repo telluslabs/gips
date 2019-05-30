@@ -55,7 +55,7 @@ def main(jobid):
     print(title)
 
     args = Args()
-    args.products = ['ndvi', 'lswi', 'brgt']
+    args.products = ['ref', 'ndvi', 'lswi', 'brgt']
     args.res = [20., 20.]
     args.stop_on_error = "False"
     args.suffix = ""
