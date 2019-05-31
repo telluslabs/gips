@@ -270,14 +270,11 @@ class hlsData(gips.data.core.CloudCoverData):
         for a_obj in self.assets.values():
 
             src_img = gippy.GeoImage(a_obj.filename)
-
             temp_fp = self.temp_product_filename(a_obj.sensor, 'ref')
-
             imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Int16, 5)
 
             green = src_img['Green'].Read()
             red = src_img['Red'].Read()
-
             if 'NIR' in src_img.BandNames():
                 nir = src_img['NIR'].Read()
             else:

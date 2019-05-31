@@ -1027,7 +1027,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 imgout.add_meta("COREG_MAGNITUDE", str(coreg_mag))
 
                 if not insane:
-                    affine = img.Affine()
+                    affine = img.affine()
                     affine[0] += xcoreg
                     affine[3] += ycoreg
                     imgout.set_affine(affine)
@@ -1523,10 +1523,10 @@ class landsatData(gips.data.core.CloudCoverData):
 
                         if not insane:
                             self._time_report("Setting affine of product")
-                            affine = imgout.Affine()
+                            affine = imgout.affine()
                             affine[0] += coreg_xshift
                             affine[3] += coreg_yshift
-                            imgout.SetAffine(affine)
+                            imgout.set_affine(affine)
                     imgout.Process()
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
@@ -1561,8 +1561,9 @@ class landsatData(gips.data.core.CloudCoverData):
                 # Run atmospherically corrected
                 if len(indices) > 0:
                     for col in visbands:
-
-                        img[col] = (img[col] -  atm6s.results[col][1]) * (1.0 / atm6s.results[col][0]) * (1.0 / atm6s.results[col][2])
+                        img[col] = (img[col] -  atm6s.results[col][1]) \
+                        * (1.0 / atm6s.results[col][0]) \
+                        * (1.0 / atm6s.results[col][2])
 
                     self._process_indices(img, asset_fn, md, sensor, indices,
                                           coreg_shift)
