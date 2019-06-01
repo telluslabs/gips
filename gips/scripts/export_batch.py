@@ -55,8 +55,10 @@ def main(jobid):
     print(title)
 
     args = Args()
-    args.products = ['ref', 'ndvi', 'lswi', 'brgt']
-    args.res = [20., 20.]
+    #args.products = ['ref', 'ndvi', 'lswi', 'brgt']
+    args.products = ['ndvi', 'lswi', 'brgt']
+    args.res = [500, 500]
+    #args.res = [20., 20.]
     args.stop_on_error = "False"
     args.suffix = ""
     args.format = "GTiff"
@@ -132,11 +134,11 @@ def main(jobid):
 
         print('cleaning up')
 
-        items = glob.glob('/archive/{}/tiles/*'.format(args.command))
-        for item in items:
-            shutil.rmtree(item)
+        # items = glob.glob('/archive/{}/tiles/*'.format(args.command))
+        # for item in items:
+        #     shutil.rmtree(item)
 
-        utils.gips_exit()
+        # utils.gips_exit()
 
 
 if __name__ == "__main__":
