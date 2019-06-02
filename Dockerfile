@@ -37,7 +37,7 @@ RUN cd /gips \
     && echo 'GIPS_ORM = False\n' >> /gips/gips/settings.py \
     && tar xfvz gips_init/aod.composites.tgz -C /archive > /dev/null \
     && pip install --no-cache-dir -U sharedmem \
-    && pip install --no-cache-dir https://github.com/indigo-ag/multitemporal/archive/v1.0.0-tl05.zip \
+    && pip install --no-cache-dir https://github.com/indigo-ag/multitemporal/archive/v1.0.0-in01.zip \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /gips/gips_init* \
     && apt-get -y autoremove \
