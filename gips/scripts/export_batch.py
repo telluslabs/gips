@@ -132,11 +132,11 @@ def main(jobid):
 
         print('cleaning up')
 
-        # items = glob.glob('/archive/{}/tiles/*'.format(args.command))
-        # for item in items:
-        #     shutil.rmtree(item)
+        items = glob.glob('/archive/{}/tiles/*'.format(args.command))
+        for item in items:
+            shutil.rmtree(item)
 
-        # utils.gips_exit()
+        utils.gips_exit()
 
 
 if __name__ == "__main__":
