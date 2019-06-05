@@ -393,13 +393,7 @@ class sentinel1Data(Data):
 
             if val[0] == "sigma0":
                 # this product is just the asset but it has to have the right name
-
                 os.link(assetfname, fname)
-
-                vrtname = os.path.splitext(fname)[0] + ".vrt"
-                cmd = 'gdal_translate -of VRT {} {}'.format(assetfname, vrtname)
-                print(cmd)
-                command(cmd)
 
             if val[0] == "indices":
                 img = gippy.GeoImage(assetfname)
