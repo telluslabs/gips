@@ -236,7 +236,6 @@ class MODTRAN():
         # Change back to original directory
         os.chdir(pwd)
 
-        #print 'MODTRAN dir: ', tmpdir
         # Remove directory
         shutil.rmtree(tmpdir)
 

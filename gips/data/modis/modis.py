@@ -933,17 +933,14 @@ class modisData(Data):
 
                     metaname = "NUMBAD_%s_%s" % (dayornight, platform)
                     metaname = metaname.upper()
-                    # print "metaname", metaname
                     meta[metaname] = str(numbad)
 
                     metaname = "NUMGOOD_%s_%s" % (dayornight, platform)
                     metaname = metaname.upper()
-                    # print "metaname", metaname
                     meta[metaname] = str(numgood)
 
                     metaname = "NUMBEST_%s_%s" % (dayornight, platform)
                     metaname = metaname.upper()
-                    # print "metaname", metaname
                     meta[metaname] = str(numbest)
 
                     # overpass time

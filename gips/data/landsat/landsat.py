@@ -1110,8 +1110,6 @@ class landsatData(gips.data.core.CloudCoverData):
 
                 imgpaths[key] = path
 
-            # print imgpaths
-
             sensor = 'LC8SR'
 
             for key, val in products.requested.items():

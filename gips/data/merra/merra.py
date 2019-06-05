@@ -574,6 +574,8 @@ class merraData(Data):
                 imgout.SetAffine(np.array(self._geotransform))
                 imgout.SetMeta(self.prep_meta(assetfile, meta))
 
+            # TODO: revive this?
+            # create a temperature product aligned with MODIS overpass times
             """
             if val[0] == "temp_modis":
                 img = gippy.GeoImage(assets[0])
@@ -584,9 +586,9 @@ class merraData(Data):
                 hroffset = self.gmtoffset()
                 # TODO: loop across the scene in latitude
                 # calculate local time for each latitude column
-                print 'localtimes', localtimes
+                print('localtimes', localtimes)
                 for itime, localtime in enumerate(localtimes):
-                    print itime
+                    print(itime)
                     picktime = localtime - hroffset
                     pickhour = int(picktime)
                     if pickhour < 0:
@@ -599,11 +601,11 @@ class merraData(Data):
                         # same day local time
                         pickday = 0
                     pickidx = pickhour % 24
-                    print "localtime", localtime
-                    print "picktime", picktime
-                    print "pickhour", pickhour
-                    print "pickday", pickday
-                    print "pickidx", pickidx
+                    print("localtime", localtime)
+                    print("picktime", picktime)
+                    print("pickhour", pickhour)
+                    print("pickday", pickday)
+                    print("pickidx", pickidx)
                     img[pickidx].Process(imgout[itime])
                     obsdate = self.date + datetime.timedelta(pickday)
                     descr = " ".join([strtimes[itime], obsdate.isoformat()])
