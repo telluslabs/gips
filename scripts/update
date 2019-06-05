@@ -1,8 +1,0 @@
-#!/bin/bash
-
-set -e
-
-export TAG=${1:-latest}
-
-echo "Building gips with tag ${TAG}"
-docker-compose build --no-cache
