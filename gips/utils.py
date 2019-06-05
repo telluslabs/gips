@@ -20,7 +20,6 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
-from __future__ import print_function
 
 import imp
 import sys
@@ -89,12 +88,18 @@ def verbose_out(obj, level=1, stream=sys.stdout):
 
 VerboseOut = verbose_out # VerboseOut name is deprecated
 
+
+
 def verbosity(new=None):
     """Returns after optionally setting the gips verbosity level.
     Currently slaved to gippy's verbosity level."""
     if new is not None:
         gippy.Options.set_verbose(new)
     return gippy.Options.verbose()
+
+
+
+
 
 ##############################################################################
 # Filesystem functions

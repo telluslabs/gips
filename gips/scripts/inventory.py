@@ -36,8 +36,6 @@ desired, eg:
     gips_inventory prism --rectify
 """
 
-from __future__ import print_function
-
 from gips import __version__ as gipsversion
 from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent

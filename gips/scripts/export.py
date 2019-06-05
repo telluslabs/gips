@@ -21,8 +21,6 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
-from __future__ import print_function
-
 import os
 from gips import __version__
 from gips.parsers import GIPSParser
@@ -32,7 +30,6 @@ from gips import utils
 from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import orm
 
-# from backports import tempfile
 import tempfile
 import boto3
 import zipfile

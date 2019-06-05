@@ -1,4 +1,3 @@
-#from __future__ import print_function
 
 ### WHERE I LEFT THIS:
 # working on optional test teardown (removal of created files) on test failure/error

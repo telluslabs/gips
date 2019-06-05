@@ -29,7 +29,6 @@ date/time, and location).
 
 Any info passed in beyond this should be via keywords
 """
-from __future__ import print_function
 
 import os
 import sys
