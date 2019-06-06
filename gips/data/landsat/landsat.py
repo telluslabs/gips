@@ -1140,10 +1140,10 @@ class landsatData(gips.data.core.CloudCoverData):
 
                     verbose_out("writing " + fname, 2)
                     imgout = gippy.GeoImage.create_from(img, fname, 1, 'float32')
-                    imgout.SetNoData(-9999.)
-                    imgout.SetOffset(0.0)
-                    imgout.SetGain(1.0)
-                    imgout.SetBandName('NDVI', 1)
+                    imgout.set_nodata(-9999.)
+                    imgout.set_offset(0.0)
+                    imgout.set_gain(1.0)
+                    imgout.set_bandname('NDVI', 1)
                     imgout[0].write(ndvi)
 
                 if val[0] == "landmask":
@@ -1159,7 +1159,7 @@ class landsatData(gips.data.core.CloudCoverData):
 
                     verbose_out("writing " + fname, 2)
                     imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
-                    imgout.SetBandName('Land mask', 1)
+                    imgout.set_bandname('Land mask', 1)
                     imgout[0].write(cfmask)
 
                 archive_fp = self.archive_temp_path(fname)
@@ -1356,7 +1356,7 @@ class landsatData(gips.data.core.CloudCoverData):
 
                         imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
                         verbose_out("writing " + fname, 2)
-                        imgout.SetBandName(
+                        imgout.set_bandname(
                             self._products[val[0]]['bands'][0]['name'], 1
                         )
                         md.update(
@@ -1376,14 +1376,14 @@ class landsatData(gips.data.core.CloudCoverData):
                         )
                         imgout = None
                         imgout = gippy.GeoImage(fname, True)
-                        imgout[0].SetNoData(0.)
+                        imgout[0].set_nodata(0.)
                         ####################
                     elif val[0] == 'rad':
                         imgout = gippy.GeoImage.create_from(img, fname, len(visbands), 'int16')
                         for i in range(0, imgout.NumBands()):
-                            imgout.SetBandName(visbands[i], i + 1)
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.1)
+                            imgout.set_bandname(visbands[i], i + 1)
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.1)
                         if toa:
                             for col in visbands:
                                 img[col].Process(imgout[col])
@@ -1396,9 +1396,9 @@ class landsatData(gips.data.core.CloudCoverData):
                     elif val[0] == 'ref':
                         imgout = gippy.GeoImage.create_from(img, fname, len(visbands), 'int16')
                         for i in range(0, imgout.NumBands()):
-                            imgout.SetBandName(visbands[i], i + 1)
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.0001)
+                            imgout.set_bandname(visbands[i], i + 1)
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.0001)
                         if toa:
                             for c in visbands:
                                 reflimg[c].Process(imgout[c])
@@ -1416,27 +1416,27 @@ class landsatData(gips.data.core.CloudCoverData):
                         imgout.add_meta('AREA_OR_POINT', 'Point')
                         outbands = ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6']
                         for i in range(0, imgout.NumBands()):
-                            imgout.SetBandName(outbands[i], i + 1)
+                            imgout.set_bandname(outbands[i], i + 1)
                     elif val[0] == 'temp':
                         imgout = gippy.GeoImage.create_from(img, fname, len(lwbands), 'int16')
                         for i in range(0, imgout.NumBands()):
-                            imgout.SetBandName(lwbands[i], i + 1)
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.1)
+                            imgout.set_bandname(lwbands[i], i + 1)
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.1)
                         [reflimg[col].Process(imgout[col]) for col in lwbands]
                     elif val[0] == 'dn':
                         rawimg = self._readraw(asset)
-                        rawimg.SetGain(1.0)
-                        rawimg.SetOffset(0.0)
+                        rawimg.set_gain(1.0)
+                        rawimg.set_offset(0.0)
                         imgout = rawimg.Process(fname)
                         rawimg = None
                     elif val[0] == 'volref':
                         bands = deepcopy(visbands)
                         bands.remove("SWIR1")
                         imgout = gippy.GeoImage.create_from(reflimg, fname, len(bands), 'int16')
-                        [imgout.SetBandName(band, i + 1) for i, band in enumerate(bands)]
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.0001)
+                        [imgout.set_bandname(band, i + 1) for i, band in enumerate(bands)]
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.0001)
                         r = 0.54    # Water-air reflection
                         p = 0.03    # Internal Fresnel reflectance
                         pp = 0.54   # Water-air Fresnel reflectance
@@ -1455,9 +1455,9 @@ class landsatData(gips.data.core.CloudCoverData):
                     elif val[0] == 'wtemp':
                         raise NotImplementedError('See https://gitlab.com/appliedgeosolutions/gips/issues/155')
                         imgout = gippy.GeoImage.create_from(img, fname, len(lwbands), 'int16')
-                        [imgout.SetBandName(lwbands[i], i + 1) for i in range(0, imgout.NumBands())]
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.1)
+                        [imgout.set_bandname(lwbands[i], i + 1) for i in range(0, imgout.NumBands())]
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.1)
                         tmpimg = gippy.GeoImage(img)
                         for col in lwbands:
                             band = tmpimg[col]

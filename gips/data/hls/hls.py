@@ -237,7 +237,8 @@ class hlsData(gips.data.core.CloudCoverData):
             temp_fp = self.temp_product_filename(a_obj.sensor, 'cmask')
             imgout = gippy.GeoImage.create_from(src_img, temp_fp, 1, 'uint8')
             imgout[0].write(mask.astype(numpy.uint8))
-            #imgout.SetNoData(0) # needed due to particulars of gdal_merge
+            # TODO: remove?
+            #imgout.set_nodata(0) # needed due to particulars of gdal_merge
             imgout.add_meta(self.prep_meta(
                 a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
             # imgout.Process() # TODO needed?
@@ -257,7 +258,7 @@ class hlsData(gips.data.core.CloudCoverData):
             temp_fp = self.temp_product_filename(a_obj.sensor, 'cloudmask')
             imgout = gippy.GeoImage.create_from(src_img, temp_fp, 1, 'uint8')
             imgout[0].write(mask.astype(numpy.uint8))
-            imgout.SetNoData(0) # needed due to particulars of gdal_merge
+            imgout.set_nodata(0) # needed due to particulars of gdal_merge
             imgout.add_meta(self.prep_meta(
                 a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
             # imgout.Process() # TODO needed?
@@ -283,9 +284,9 @@ class hlsData(gips.data.core.CloudCoverData):
             swir2 = src_img['SWIR2'].read()
 
             missing = -1000.0
-            imgout.SetNoData(missing)
-            imgout.SetOffset(0.0)
-            imgout.SetGain(0.0001)
+            imgout.set_nodata(missing)
+            imgout.set_offset(0.0)
+            imgout.set_gain(0.0001)
 
             imgout[0].write(green)
             imgout[1].write(red)

@@ -225,12 +225,12 @@ class weldData(Data):
                 print(ndsi[wg].min(), ndsi[wg].max())
                 print("writing", fname)
                 imgout = gippy.GeoImage.create_from(refl, fname, 1, 'float32')
-                imgout.SetNoData(float(missing))
-                imgout.SetOffset(0.0)
-                imgout.SetGain(1.0)
-                imgout.SetProjection(PROJ)
+                imgout.set_nodata(float(missing))
+                imgout.set_offset(0.0)
+                imgout.set_gain(1.0)
+                imgout.set_projection(PROJ)
                 imgout[0].write(ndsi)
-                imgout.SetBandName('NDSI', 1)
+                imgout.set_bandname('NDSI', 1)
 
             # SNOW ICE COVER PRODUCT
             if val[0] == "snow":
@@ -267,12 +267,12 @@ class weldData(Data):
                     snow[wc] = 0
                 print("writing", fname)
                 imgout = gippy.GeoImage.create_from(refl, fname, 1, 'uint8')
-                imgout.SetNoData(127)
-                imgout.SetOffset(0.)
-                imgout.SetGain(1.)
-                imgout.SetProjection(PROJ)
+                imgout.set_nodata(127)
+                imgout.set_offset(0.)
+                imgout.set_gain(1.)
+                imgout.set_projection(PROJ)
                 imgout[0].write(snow)
-                imgout.SetBandName('SNOW', 1)
+                imgout.set_bandname('SNOW', 1)
 
             # VEGETATION INDEX PRODUCT
             if val[0] == "ndvi":
@@ -298,12 +298,12 @@ class weldData(Data):
                 print(ndvi[wg].min(), ndvi[wg].max())
                 print("writing", fname)
                 imgout = gippy.GeoImage.create_from(refl, fname, 1, 'float32')
-                imgout.SetNoData(float(missing))
-                imgout.SetOffset(0.0)
-                imgout.SetGain(1.0)
-                imgout.SetProjection(PROJ)
+                imgout.set_nodata(float(missing))
+                imgout.set_offset(0.0)
+                imgout.set_gain(1.0)
+                imgout.set_projection(PROJ)
                 imgout[0].write(ndvi)
-                imgout.SetBandName('NDVI', 1)
+                imgout.set_bandname('NDVI', 1)
 
             # BRIGHTNESS PRODUCT
             if val[0] == "brgt":
@@ -331,12 +331,12 @@ class weldData(Data):
                 print(brgt[wg].min(), brgt[wg].max())
                 print("writing", fname)
                 imgout = gippy.GeoImage.create_from(refl, fname, 1, 'float32')
-                imgout.SetNoData(float(missing))
-                imgout.SetOffset(0.0)
-                imgout.SetGain(1.0)
-                imgout.SetProjection(PROJ)
+                imgout.set_nodata(float(missing))
+                imgout.set_offset(0.0)
+                imgout.set_gain(1.0)
+                imgout.set_projection(PROJ)
                 imgout[0].write(brgt)
-                imgout.SetBandName('BRGT', 1)
+                imgout.set_bandname('BRGT', 1)
 
             # set metadata
             meta = {k: str(v) for k, v in meta.iteritems()}

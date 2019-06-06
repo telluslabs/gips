@@ -316,12 +316,12 @@ class gpmData(Data):
             imgdata = img.read()
             imgout = gippy.GeoImage.create(fname, img.XSize(), img.YSize(), 1, 'float32')
             del img
-            imgout.SetNoData(29999.0)
-            imgout.SetOffset(0.0)
-            imgout.SetGain(0.1)
-            imgout.SetBandName('PrecipitationRate', 1)
-            imgout.SetProjection(self._projection)
-            imgout.SetAffine(np.array(self._products[prod_type]['_geotransform']))
+            imgout.set_nodata(29999.0)
+            imgout.set_offset(0.0)
+            imgout.set_gain(0.1)
+            imgout.set_bandName('PrecipitationRate', 1)
+            imgout.set_projection(self._projection)
+            imgout.set_affine(np.array(self._products[prod_type]['_geotransform']))
             imgout[0].write(imgdata)
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)

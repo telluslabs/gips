@@ -685,10 +685,10 @@ class modisData(Data):
                 imgout = gippy.GeoImage.create_from(refl, fname, 7, 'int16')
                 del refl
 
-                imgout.SetNoData(missing)
+                imgout.set_nodata(missing)
                 imgout.SetOffset(0.0)
-                imgout.SetGain(0.0001)
-                imgout[6].SetGain(1.0)
+                imgout.set_gain(0.0001)
+                imgout[6].set_gain(1.0)
 
                 imgout[0].write(ndvi)
                 imgout[1].write(lswi)
@@ -698,13 +698,13 @@ class modisData(Data):
                 imgout[5].write(evi)
                 imgout[6].write(qc)
 
-                imgout.SetBandName('NDVI', 1)
-                imgout.SetBandName('LSWI', 2)
-                imgout.SetBandName('VARI', 3)
-                imgout.SetBandName('BRGT', 4)
-                imgout.SetBandName('SATVI', 5)
-                imgout.SetBandName('EVI', 6)
-                imgout.SetBandName('QC', 7)
+                imgout.set_bandname('NDVI', 1)
+                imgout.set_bandname('LSWI', 2)
+                imgout.set_bandname('VARI', 3)
+                imgout.set_bandname('BRGT', 4)
+                imgout.set_bandname('SATVI', 5)
+                imgout.set_bandname('EVI', 6)
+                imgout.set_bandname('QC', 7)
 
             if val[0] == "clouds":
                 # cloud mask product
@@ -727,10 +727,10 @@ class modisData(Data):
                 # create output gippy image
                 imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
                 del img
-                imgout.SetNoData(nodata)
+                imgout.set_nodata(nodata)
                 imgout.SetOffset(0.0)
-                imgout.SetGain(1.0)
-                imgout.SetBandName('Cloud Cover', 1)
+                imgout.set_gain(1.0)
+                imgout.set_bandname('Cloud Cover', 1)
                 imgout[0].write(clouds)
 
             if val[0] in ('snow', 'fsnow'):
@@ -852,11 +852,11 @@ class modisData(Data):
                 # create output gippy image
                 imgout = gippy.GeoImage.create_from(img, fname, 2, 'uint8')
                 del img
-                imgout.SetNoData(127)
+                imgout.set_nodata(127)
                 imgout.SetOffset(0.0)
-                imgout.SetGain(1.0)
-                imgout.SetBandName('Snow Cover', 1)
-                imgout.SetBandName('Fractional Snow Cover', 2)
+                imgout.set_gain(1.0)
+                imgout.set_bandname('Snow Cover', 1)
+                imgout.set_bandname('Fractional Snow Cover', 2)
 
                 imgout[0].write(coverout)
                 imgout[1].write(fracout)
@@ -891,8 +891,8 @@ class modisData(Data):
                 hourbands = gippy.GeoImage(hoursds)
 
                 imgout = gippy.GeoImage.create_from(tempbands, fname, 5, 'uint16')
-                imgout.SetNoData(65535)
-                imgout.SetGain(0.02)
+                imgout.set_nodata(65535)
+                imgout.set_gain(0.02)
 
                 # there are four temperature bands
                 for iband, band in enumerate(availbands):
@@ -991,8 +991,8 @@ class modisData(Data):
                 hourbands = gippy.GeoImage(hoursds)
 
                 imgout = gippy.GeoImage.create_from(hourbands, fname, 4, 'uint8')
-                imgout.SetNoData(0)
-                imgout.SetGain(0.1)
+                imgout.set_nodata(0)
+                imgout.set_gain(0.1)
 
                 # there are four temperature bands
                 for iband, band in enumerate(availbands):
@@ -1009,10 +1009,10 @@ class modisData(Data):
 
                     hourbands[iband].Process(imgout[band])
 
-                imgout.SetBandName('Observation Time Daytime Terra', 1)
-                imgout.SetBandName('Observation Time Nighttime Terra', 2)
-                imgout.SetBandName('Observation Time Daytime Aqua', 3)
-                imgout.SetBandName('Observation Time Nighttime Aqua', 4)
+                imgout.set_bandname('Observation Time Daytime Terra', 1)
+                imgout.set_bandname('Observation Time Nighttime Terra', 2)
+                imgout.set_bandname('Observation Time Daytime Aqua', 3)
+                imgout.set_bandname('Observation Time Nighttime Aqua', 4)
                 del hourbands
 
             ###################################################################
@@ -1022,9 +1022,9 @@ class modisData(Data):
                 meta['VERSION'] = VERSION
 
                 refl = gippy.GeoImage(allsds)
-                refl.SetBandName("RED", 1)
-                refl.SetBandName("NIR", 2)
-                refl.SetNoData(-28762)
+                refl.set_bandname("RED", 1)
+                refl.set_bandname("NIR", 2)
+                refl.set_nodata(-28762)
 
                 fouts = dict(Indices(refl, {'ndvi': fname}, meta))
                 imgout = gippy.GeoImage(fouts['ndvi'])
@@ -1078,7 +1078,7 @@ class modisData(Data):
             5   6   1628 - 1652 SWIR1
             6   7   2105 - 2155 SWIR2
             """
-            # SetBandName goes by band number, not index
+            # set_bandname goes by band number, not index
             [img.set_bandname(name, i) for (name, i) in [
                 ('RED',   1), ('NIR',   2), ('BLUE',  3),
                 ('GREEN', 4), ('SWIR1', 6), ('SWIR2', 7)]]
