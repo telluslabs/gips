@@ -283,7 +283,7 @@ class aodData(Data):
         if len(filenames) > 0:
             img = gippy.GeoImage(filenames)
             imgout = gippy.GeoImage.create_from(img, fout, 2, 'float32')
-            imgout.SetNoData(-32768)
+            imgout.set_nodata(-32768)
             img.Mean(imgout[0])
             meanimg = imgout[0].read()
             for band in range(0, img.NumBands()):

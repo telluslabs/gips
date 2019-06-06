@@ -290,7 +290,7 @@ class sarAsset(Asset):
         self._meta_dict = meta
 
         dateimg = self._jaxa_opener(datefile)
-        dateimg.SetNoData(0)
+        dateimg.set_nodata(0)
         datevals = numpy.unique(dateimg.read())
         dateimg = None
         RemoveFiles((datefile,), ['.hdr', '.aux.xml'])
@@ -400,7 +400,7 @@ class sarData(Data):
             if val[0] == 'mask':
                 mask = jo(datafiles['mask'])
                 imgout = mask.Process(fname)
-                imgout[0].SetNoData(0)
+                imgout[0].set_nodata(0)
                 imgout.Process()
                 # Sometimes the I/O seems to be put off until garbage
                 # collection time, so trick gippy into getting on with it:
@@ -412,7 +412,7 @@ class sarData(Data):
                 #          if any((b.endswith(sl) for sl in ["sl_HH", "sl_HV"]))
                 # ]
                 img = jo(bands)
-                img.SetNoData(0)
+                img.set_nodata(0)
                 mask = jo(datafiles['mask'])
                 mask[0] = mask[0].BXOR(150.) > 0
                 img.AddMask(mask[0])
@@ -421,11 +421,11 @@ class sarData(Data):
                 dateday = (
                     self.date -
                     self.assets[asset]._sensors[sensor]['startdate']).days
-                img.AddMask(dateimg[0] == dateday)
+                img.add_mask(dateimg[0] == dateday)
                 imgout = gippy.GeoImage.create_from(img, fname, 1, 'float32')
-                imgout.SetNoData(-32768)
+                imgout.set_nodata(-32768)
                 for b in range(0, imgout.NumBands()):
-                    imgout.SetBandName(img[b].Description(), b + 1)
+                    imgout.set_bandname(img[b].Description(), b + 1)
                     (
                         img[b].pow(2).log10() * 10 +
                         self.assets[asset].get_meta_dict()['CF']

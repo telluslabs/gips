@@ -85,7 +85,7 @@ def main():
                     for mask in available_masks:
                         mask_img = inv[date].open(mask)[0]
                         if mask in args.invert:
-                            mask_img.SetNoData(utils.np.nan)
+                            mask_img.set_nodata(utils.np.nan)
                             mask_img = mask_img.BXOR(1)
                             meta += 'inverted-'
                         img.AddMask(mask_img)

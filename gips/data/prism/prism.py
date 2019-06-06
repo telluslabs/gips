@@ -270,8 +270,8 @@ class prismData(Data):
                 with self.make_temp_proc_dir() as tmp_dir:
                     tmp_fp = os.path.join(tmp_dir, prod_fn)
                     oimg = GeoImage(tmp_fp, imgs[0])
-                    oimg.SetNoData(-9999)
-                    oimg.SetBandName(
+                    oimg.set_nodata(-9999)
+                    oimg.set_bandname(
                         description + '({} day window)'.format(lag), 1
                     )
                     oimg.add_meta(self.prep_meta(sorted(asset_fns)))

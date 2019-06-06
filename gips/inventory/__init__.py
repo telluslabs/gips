@@ -162,7 +162,7 @@ class ProjectInventory(Inventory):
         imgout = gippy.GeoImage.create_from(img, filename, numbands, dtype)
         img = None
         if nodata is not None:
-            imgout.SetNoData(nodata)
+            imgout.set_nodata(nodata)
         return imgout
 
     def data_size(self):

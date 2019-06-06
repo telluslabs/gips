@@ -132,7 +132,7 @@ class cdlAsset(Asset):
             with open(tmp_fname, 'w') as asset:
                 asset.write(file_response.content)
             imgout = GeoImage(tmp_fname, True)
-            imgout.SetNoData(0)
+            imgout.set_nodata(0)
             imgout.add_meta('GIPS_Version', gips.__version__)
             imgout = None
             shutil.copy(tmp_fname, cls.Repository.path('stage'))
@@ -169,7 +169,7 @@ class cdlData(Data):
                     os.rename(extracted, fname_without_ext + '.' + member_ext)
 
             image = GeoImage(fname, True)
-            image[0].SetNoData(0)
+            image[0].set_nodata(0)
             image = None
 
             image = gdal.Open(fname, gdal.GA_Update)
