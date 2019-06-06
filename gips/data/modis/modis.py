@@ -107,25 +107,25 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
             'pattern': '^MCD43A4' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15, # this may need to be revised; see S3 version
+            'latency': 5, # this may need to be revised; see S3 version
         },
         MCD43A4S3: {
             'pattern': '^MCD43A4' + _asset_re_common + r'_S3\.json$',
             # this date appears wrong but no better value is documented
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 10,
+            'latency': 5,
         },
         'MCD43A2': {
             'pattern': '^MCD43A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15,
+            'latency': 5,
         },
         'MOD09Q1': {
             'pattern': '^MOD09Q1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 7,
+            'latency': 5,
         },
         'MOD10A1': {
             'pattern': '^MOD10A1' + _asset_re_tail,
@@ -155,7 +155,7 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
             'pattern': '^MOD11A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.006',
             'startdate': datetime.date(2000, 3, 5),
-            'latency': 7,
+            'latency': 5,
         },
         'MYD11A2': {
             'pattern': '^MYD11A2' + _asset_re_tail,
