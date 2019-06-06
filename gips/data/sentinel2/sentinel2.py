@@ -1239,11 +1239,11 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         # cloudmask.tif is taken by cfmask
         cloudmask_filename = "%s/cloudmask2.tif" % self._temp_proc_dir
-        cloudmask_img = gippy.GeoImage(
-            cloudmask_filename,
+        cloudmask_img = gippy.GeoImage.create_from(
             fmask_image,
-            gippy.GDT_Byte,
-            1
+            cloudmask_filename,
+            1,
+            'uint8'
         )
         cloudmask_img[0].Write(np_cloudmask)
         self._product_images['cloudmask'] = cloudmask_img
@@ -1273,7 +1273,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         mtci = mtci.astype('int16')
 
         mtci_filename = "%s/mtci.tif" % self._temp_proc_dir
-        mtci_img = gippy.GeoImage(mtci_filename, ref_img, gippy.GDT_Int16, 1)
+        mtci_img = gippy.GeoImage.create_from(ref_img, mtci_filename, 1, 'int16')
 
         mtci_img[0].Write(mtci)
         mtci_img[0].SetGain(gain)
@@ -1307,7 +1307,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         s2rep = s2rep.astype('int16')
 
         s2rep_filename = "%s/s2rep.tif" % self._temp_proc_dir
-        s2rep_img = gippy.GeoImage(s2rep_filename, ref_img, gippy.GDT_Int16, 1)
+        s2rep_img = gippy.GeoImage.create_from(ref_img, s2rep_filename, 1, 'int16')
 
         s2rep_img[0].Write(s2rep)
         s2rep_img[0].SetGain(gain)

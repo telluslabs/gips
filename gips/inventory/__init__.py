@@ -159,7 +159,7 @@ class ProjectInventory(Inventory):
     def new_image(self, filename, dtype='uint8', numbands=1, nodata=None):
         """ Create new image with the same template as the files in project """
         img = gippy.GeoImage(self.data[self.dates[0]].open(self.requested_products[0]))
-        imgout = gippy.GeoImage(filename, img, dtype, numbands)
+        imgout = gippy.GeoImage.create_from(img, filename, numbands, dtype)
         img = None
         if nodata is not None:
             imgout.SetNoData(nodata)

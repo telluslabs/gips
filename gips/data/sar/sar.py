@@ -422,7 +422,7 @@ class sarData(Data):
                     self.date -
                     self.assets[asset]._sensors[sensor]['startdate']).days
                 img.AddMask(dateimg[0] == dateday)
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32)
+                imgout = gippy.GeoImage.create_from(img, fname, 1, 'float32')
                 imgout.SetNoData(-32768)
                 for b in range(0, imgout.NumBands()):
                     imgout.SetBandName(img[b].Description(), b + 1)

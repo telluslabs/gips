@@ -282,7 +282,7 @@ class aodData(Data):
         start = datetime.datetime.now()
         if len(filenames) > 0:
             img = gippy.GeoImage(filenames)
-            imgout = gippy.GeoImage(fout, img, gippy.GDT_Float32, 2)
+            imgout = gippy.GeoImage.create_from(img, fout, 2, 'float32')
             imgout.SetNoData(-32768)
             img.Mean(imgout[0])
             meanimg = imgout[0].Read()

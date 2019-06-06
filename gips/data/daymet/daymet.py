@@ -207,7 +207,7 @@ class daymetAsset(Asset):
         with utils.make_temp_dir(prefix='fetch', dir=stage_dir) as temp_dir:
             temp_fp = os.path.join(temp_dir, asset_bn)
             stage_fp = os.path.join(stage_dir, asset_bn)
-            imgout = gippy.GeoImage(temp_fp, xsz, ysz, 1, dtype)
+            imgout = gippy.GeoImage.create(temp_fp, xsz, ysz, 1, str(data.dtype))
             imgout.SetBandName(asset, 1)
             imgout.SetNoData(-9999.)
             imgout.SetProjection(PROJ)

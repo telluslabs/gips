@@ -1139,7 +1139,7 @@ class landsatData(gips.data.core.CloudCoverData):
                                     (nir[wvalid] + red[wvalid]))
 
                     verbose_out("writing " + fname, 2)
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
+                    imgout = gippy.GeoImage.create_from(img, fname, 1, 'float32')
                     imgout.SetNoData(-9999.)
                     imgout.SetOffset(0.0)
                     imgout.SetGain(1.0)
@@ -1158,7 +1158,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     cfmask[cfmask == 2] = 0
 
                     verbose_out("writing " + fname, 2)
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                    imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
                     imgout.SetBandName('Land mask', 1)
                     imgout[0].Write(cfmask)
 
@@ -1354,7 +1354,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         np_cloudmask_dilated *= (npqa != 1)
                         #
 
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                        imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
                         verbose_out("writing " + fname, 2)
                         imgout.SetBandName(
                             self._products[val[0]]['bands'][0]['name'], 1
@@ -1379,7 +1379,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         imgout[0].SetNoData(0.)
                         ####################
                     elif val[0] == 'rad':
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
+                        imgout = gippy.GeoImage.create_from(img, fname, len(visbands), 'int16')
                         for i in range(0, imgout.NumBands()):
                             imgout.SetBandName(visbands[i], i + 1)
                         imgout.SetNoData(-32768)
@@ -1394,7 +1394,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         # Mask out any pixel for which any band is nodata
                         #imgout.ApplyMask(img.DataMask())
                     elif val[0] == 'ref':
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
+                        imgout = gippy.GeoImage.create_from(img, fname, len(visbands), 'int16')
                         for i in range(0, imgout.NumBands()):
                             imgout.SetBandName(visbands[i], i + 1)
                         imgout.SetNoData(-32768)
@@ -1418,7 +1418,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         for i in range(0, imgout.NumBands()):
                             imgout.SetBandName(outbands[i], i + 1)
                     elif val[0] == 'temp':
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
+                        imgout = gippy.GeoImage.create_from(img, fname, len(lwbands), 'int16')
                         for i in range(0, imgout.NumBands()):
                             imgout.SetBandName(lwbands[i], i + 1)
                         imgout.SetNoData(-32768)
@@ -1433,7 +1433,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     elif val[0] == 'volref':
                         bands = deepcopy(visbands)
                         bands.remove("SWIR1")
-                        imgout = gippy.GeoImage(fname, reflimg, gippy.GDT_Int16, len(bands))
+                        imgout = gippy.GeoImage.create_from(reflimg, fname, len(bands), 'int16')
                         [imgout.SetBandName(band, i + 1) for i, band in enumerate(bands)]
                         imgout.SetNoData(-32768)
                         imgout.SetGain(0.0001)
@@ -1454,7 +1454,7 @@ class landsatData(gips.data.core.CloudCoverData):
                             imgout[band].Write(diffimg)
                     elif val[0] == 'wtemp':
                         raise NotImplementedError('See https://gitlab.com/appliedgeosolutions/gips/issues/155')
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
+                        imgout = gippy.GeoImage.create_from(img, fname, len(lwbands), 'int16')
                         [imgout.SetBandName(lwbands[i], i + 1) for i in range(0, imgout.NumBands())]
                         imgout.SetNoData(-32768)
                         imgout.SetGain(0.1)
@@ -1472,41 +1472,6 @@ class landsatData(gips.data.core.CloudCoverData):
                             band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
                                     ) * meta[col]['K2'] - 273.15
                             band.Process(imgout[col])
-
-                    # elif val[0] == 'bqashadow':
-                    #     if 'LC8' not in self.sensor_set:
-                    #         continue
-                    #     imgout = gippy.GeoImage(fname, img, gippy.GDT_UInt16, 1)
-                    #     imgout[0].SetNoData(0)
-                    #     qaimg = self._readqa(asset)
-                    #     qadata = qaimg.Read()
-                    #     qaimg = None
-                    #     fill = binmask(qadata, 1)
-                    #     dropped = binmask(qadata, 2)
-                    #     terrain = binmask(qadata, 3)
-                    #     cirrus = binmask(qadata, 14)
-                    #     othercloud = binmask(qadata, 16)
-                    #     cloud = (cirrus + othercloud) + 2 * (fill + dropped + terrain)
-                    #     abfn = fname + '-intermediate'
-                    #     abimg = gippy.GeoImage(abfn, img, gippy.GDT_UInt16, 1)
-                    #     abimg[0].SetNoData(2)
-                    #     abimg[0].Write(cloud.astype(numpy.uint16))
-                    #     abimg.Process()
-                    #     abimg = None
-                    #     abimg = gippy.GeoImage(abfn + '.tif')
-
-                    #     s_azim = self.metadata['geometry']['solarazimuth']
-                    #     s_elev = 90 - self.metadata['geometry']['solarzenith']
-                    #     erosion, dilation, cloudheight = 5, 10, 4000
-                    #     if len(val) >= 4:
-                    #         erosion, dilation, cloudheight = [int(v) for v in val[1:4]]
-                    #     imgout = AddShadowMask(
-                    #         abimg, imgout, 0, s_elev, s_azim, erosion,
-                    #         dilation, cloudheight, {'notes': 'dev-version'}
-                    #     )
-                    #     imgout.Process()
-                    #     abimg = None
-                    #     os.remove(abfn + '.tif')
 
                     fname = imgout.Filename()
                     imgout.SetMeta(self.prep_meta(asset_fn, md))

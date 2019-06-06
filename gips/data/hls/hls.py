@@ -235,7 +235,7 @@ class hlsData(gips.data.core.CloudCoverData):
             mask = 1 - ((qa_nparray & 0b00001111) > 0) # on edit update Mask_params
             # build the product file
             temp_fp = self.temp_product_filename(a_obj.sensor, 'cmask')
-            imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Byte, 1)
+            imgout = gippy.GeoImage.create_from(src_img, temp_fp, 1, 'uint8')
             imgout[0].Write(mask.astype(numpy.uint8))
             #imgout.SetNoData(0) # needed due to particulars of gdal_merge
             imgout.SetMeta(self.prep_meta(
@@ -255,7 +255,7 @@ class hlsData(gips.data.core.CloudCoverData):
             mask = (qa_nparray & 0b00001111) > 0 # on edit update Mask_params
             # build the product file
             temp_fp = self.temp_product_filename(a_obj.sensor, 'cloudmask')
-            imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Byte, 1)
+            imgout = gippy.GeoImage.create_from(src_img, temp_fp, 1, 'uint8')
             imgout[0].Write(mask.astype(numpy.uint8))
             imgout.SetNoData(0) # needed due to particulars of gdal_merge
             imgout.SetMeta(self.prep_meta(
@@ -271,7 +271,7 @@ class hlsData(gips.data.core.CloudCoverData):
 
             src_img = gippy.GeoImage(a_obj.filename)
             temp_fp = self.temp_product_filename(a_obj.sensor, 'ref')
-            imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Int16, 5)
+            imgout = gippy.GeoImage.create_from(src_img, temp_fp, 5, 'int16')
 
             green = src_img['Green'].Read()
             red = src_img['Red'].Read()

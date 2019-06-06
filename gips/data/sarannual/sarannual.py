@@ -156,7 +156,7 @@ class sarannualData(Data):
                     img.SetNoData(0)
                     mask = gippy.GeoImage(datafiles['mask'], False)
                     img.AddMask(mask[0] == 255)
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32)
+                    imgout = gippy.GeoImage.create_from(img, fname, 'float32')
                     imgout.SetNoData(-32768)
                     for b in range(0, imgout.NumBands()):
                         imgout.SetBandName(img[b].Description(), b + 1)

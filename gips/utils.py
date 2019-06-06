@@ -397,7 +397,7 @@ def crop2vector(img, vector):
     warped_vec = open_vector(vecname)
     # rasterize the vector
     td = tempfile.mkdtemp()
-    mask = gippy.GeoImage(os.path.join(td, vector.LayerName()), img, gippy.GDT_Byte, 1)
+    mask = gippy.GeoImage.create_from(img, os.path.join(td, vector.LayerName()), 1, 'uint8')
     maskname = mask.Filename()
     mask = None
     cmd = 'gdal_rasterize -at -burn 1 -l %s %s %s' % (warped_vec.LayerName(), vecname, maskname)
@@ -511,12 +511,11 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     for f in range(1, images.NumImages()):
         filenames.append(images[f].Filename())
 
-    imgout = gippy.GeoImage(outfile, mask_img,
-                            images[0].DataType(), images[0].NumBands())
+    imgout = gippy.GeoImage.create_from(mask_img, outfile,
+                                        len(images[0]), images[0].DataType())
 
-    imgout.SetNoData(nd)
-    #imgout.ColorTable(images[0])
-    nddata = np.empty((images[0].NumBands(),
+    imgout.set_nodata(nd)
+    nddata = np.empty((len(images[0]),
                        mask_img.YSize(), mask_img.XSize()))
     nddata[:] = nd
     imgout.Write(nddata)
