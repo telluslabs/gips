@@ -448,7 +448,7 @@ def vectorize(img, vector, oformat=None):
         emsg = 'Error vectorizing raster {} to {}'.format(img, tvec)
         gso_run(polygonize, emsg)
 
-        if gippy.GeoVector(tvec).NumFeatures() != 1:
+        if gippy.GeoVector(tvec).num_features() != 1:
             ivec = tvec
             tvec = tvec[:-4] + '_dissolve.gml'
             dissolve = (

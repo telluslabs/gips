@@ -845,7 +845,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
     gips.data.core.add_gippy_index_products(
         _products, _productgroups, _asset_types)
 
-    # indices not processed by gippy.Indices(); L1CGS not supported:
+    # indices not processed by gippy.indices(); L1CGS not supported:
     _products.update(
         (p, {'description': d, 'assets': ('L1C',),
              'bands': [{'name': p, 'units': Data._unitless}]}

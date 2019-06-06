@@ -33,7 +33,7 @@ import requests
 
 import gippy
 # TODO: Use this:
-# from gippy.algorithms import Indices
+# from gippy.algorithms import indices
 from gips.data.core import Repository, Asset, Data
 from gips.utils import VerboseOut
 from gips import utils
