@@ -1225,7 +1225,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
     def cloudmask_geoimage(self):
         fmask_image = self.load_image('cfmask')
-        npfm = fmask_image.Read()
+        npfm = fmask_image.read()
         # cfmask values:
         # 0 = NoData
         # 1 = Land
@@ -1245,7 +1245,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             1,
             'uint8'
         )
-        cloudmask_img[0].Write(np_cloudmask)
+        cloudmask_img[0].write(np_cloudmask)
         self._product_images['cloudmask'] = cloudmask_img
 
 
@@ -1258,9 +1258,9 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         # change this to 'ref'
         ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
 
-        b4 = ref_img['RED'].Read()
-        b5 = ref_img['REDEDGE1'].Read()
-        b6 = ref_img['REDEDGE2'].Read()
+        b4 = ref_img['RED'].read()
+        b5 = ref_img['REDEDGE1'].read()
+        b6 = ref_img['REDEDGE2'].read()
 
         gain = 0.0002
         missing = -32768
@@ -1275,7 +1275,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         mtci_filename = "%s/mtci.tif" % self._temp_proc_dir
         mtci_img = gippy.GeoImage.create_from(ref_img, mtci_filename, 1, 'int16')
 
-        mtci_img[0].Write(mtci)
+        mtci_img[0].write(mtci)
         mtci_img[0].SetGain(gain)
         mtci_img[0].SetNoData(missing)
 
@@ -1289,10 +1289,10 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         # change this to 'ref'
         ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
 
-        b4 = ref_img['RED'].Read()
-        b5 = ref_img['REDEDGE1'].Read()
-        b6 = ref_img['REDEDGE2'].Read()
-        b7 = ref_img['REDEDGE3'].Read()
+        b4 = ref_img['RED'].read()
+        b5 = ref_img['REDEDGE1'].read()
+        b6 = ref_img['REDEDGE2'].read()
+        b7 = ref_img['REDEDGE3'].read()
 
         gain = 0.04
         offset = 400.
@@ -1309,7 +1309,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         s2rep_filename = "%s/s2rep.tif" % self._temp_proc_dir
         s2rep_img = gippy.GeoImage.create_from(ref_img, s2rep_filename, 1, 'int16')
 
-        s2rep_img[0].Write(s2rep)
+        s2rep_img[0].write(s2rep)
         s2rep_img[0].SetGain(gain)
         s2rep_img[0].SetOffset(offset)
         s2rep_img[0].SetNoData(missing)

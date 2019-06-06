@@ -291,7 +291,7 @@ class sarAsset(Asset):
 
         dateimg = self._jaxa_opener(datefile)
         dateimg.SetNoData(0)
-        datevals = numpy.unique(dateimg.Read())
+        datevals = numpy.unique(dateimg.read())
         dateimg = None
         RemoveFiles((datefile,), ['.hdr', '.aux.xml'])
         dates = [

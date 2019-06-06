@@ -229,14 +229,14 @@ class hlsData(gips.data.core.CloudCoverData):
                 return
 
             # for both asset types the QA band is the last one
-            qa_nparray = src_img[len(src_img) - 1].Read()
+            qa_nparray = src_img[len(src_img) - 1].read()
             # cirrus, cloud, adjacent cloud, cloud shadow are bits 0 to 3,
             # where bit 0 is LSB; value of 1 means that thing is present there.
             mask = 1 - ((qa_nparray & 0b00001111) > 0) # on edit update Mask_params
             # build the product file
             temp_fp = self.temp_product_filename(a_obj.sensor, 'cmask')
             imgout = gippy.GeoImage.create_from(src_img, temp_fp, 1, 'uint8')
-            imgout[0].Write(mask.astype(numpy.uint8))
+            imgout[0].write(mask.astype(numpy.uint8))
             #imgout.SetNoData(0) # needed due to particulars of gdal_merge
             imgout.SetMeta(self.prep_meta(
                 a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
@@ -249,14 +249,14 @@ class hlsData(gips.data.core.CloudCoverData):
         for a_obj in self.assets.values():
             src_img = gippy.GeoImage(a_obj.filename)
             # for both asset types the QA band is the last one
-            qa_nparray = src_img[len(src_img) - 1].Read()
+            qa_nparray = src_img[len(src_img) - 1].read()
             # cirrus, cloud, adjacent cloud, cloud shadow are bits 0 to 3,
             # where bit 0 is LSB; value of 1 means that thing is present there.
             mask = (qa_nparray & 0b00001111) > 0 # on edit update Mask_params
             # build the product file
             temp_fp = self.temp_product_filename(a_obj.sensor, 'cloudmask')
             imgout = gippy.GeoImage.create_from(src_img, temp_fp, 1, 'uint8')
-            imgout[0].Write(mask.astype(numpy.uint8))
+            imgout[0].write(mask.astype(numpy.uint8))
             imgout.SetNoData(0) # needed due to particulars of gdal_merge
             imgout.SetMeta(self.prep_meta(
                 a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
@@ -273,25 +273,25 @@ class hlsData(gips.data.core.CloudCoverData):
             temp_fp = self.temp_product_filename(a_obj.sensor, 'ref')
             imgout = gippy.GeoImage.create_from(src_img, temp_fp, 5, 'int16')
 
-            green = src_img['Green'].Read()
-            red = src_img['Red'].Read()
+            green = src_img['Green'].read()
+            red = src_img['Red'].read()
             if 'NIR' in src_img.BandNames():
-                nir = src_img['NIR'].Read()
+                nir = src_img['NIR'].read()
             else:
-                nir = src_img['NIR_Narrow'].Read()
-            swir1 = src_img['SWIR1'].Read()
-            swir2 = src_img['SWIR2'].Read()
+                nir = src_img['NIR_Narrow'].read()
+            swir1 = src_img['SWIR1'].read()
+            swir2 = src_img['SWIR2'].read()
 
             missing = -1000.0
             imgout.SetNoData(missing)
             imgout.SetOffset(0.0)
             imgout.SetGain(0.0001)
 
-            imgout[0].Write(green)
-            imgout[1].Write(red)
-            imgout[2].Write(nir)
-            imgout[3].Write(swir1)
-            imgout[4].Write(swir2)
+            imgout[0].write(green)
+            imgout[1].write(red)
+            imgout[2].write(nir)
+            imgout[3].write(swir1)
+            imgout[4].write(swir2)
 
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, 'ref', archived_fp)

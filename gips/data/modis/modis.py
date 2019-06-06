@@ -585,18 +585,18 @@ class modisData(Data):
                 missing = 32767
 
                 if version == 6:
-                    redimg = refl[7].Read()
-                    nirimg = refl[8].Read()
-                    bluimg = refl[9].Read()
-                    grnimg = refl[10].Read()
-                    mirimg = refl[11].Read()
-                    swrimg = refl[12].Read()  # swir1, formerly swir2
-                    redqcimg = refl[0].Read()
-                    nirqcimg = refl[1].Read()
-                    bluqcimg = refl[2].Read()
-                    grnqcimg = refl[3].Read()
-                    mirqcimg = refl[4].Read()
-                    swrqcimg = refl[5].Read()
+                    redimg = refl[7].read()
+                    nirimg = refl[8].read()
+                    bluimg = refl[9].read()
+                    grnimg = refl[10].read()
+                    mirimg = refl[11].read()
+                    swrimg = refl[12].read()  # swir1, formerly swir2
+                    redqcimg = refl[0].read()
+                    nirqcimg = refl[1].read()
+                    bluqcimg = refl[2].read()
+                    grnqcimg = refl[3].read()
+                    mirqcimg = refl[4].read()
+                    swrqcimg = refl[5].read()
                 else:
                     raise Exception('product version not supported')
 
@@ -690,13 +690,13 @@ class modisData(Data):
                 imgout.SetGain(0.0001)
                 imgout[6].SetGain(1.0)
 
-                imgout[0].Write(ndvi)
-                imgout[1].Write(lswi)
-                imgout[2].Write(vari)
-                imgout[3].Write(brgt)
-                imgout[4].Write(satvi)
-                imgout[5].Write(evi)
-                imgout[6].Write(qc)
+                imgout[0].write(ndvi)
+                imgout[1].write(lswi)
+                imgout[2].write(vari)
+                imgout[3].write(brgt)
+                imgout[4].write(satvi)
+                imgout[5].write(evi)
+                imgout[6].write(qc)
 
                 imgout.SetBandName('NDVI', 1)
                 imgout.SetBandName('LSWI', 2)
@@ -711,7 +711,7 @@ class modisData(Data):
                 meta['VERSION'] = '1.0'
                 img = gippy.GeoImage(allsds)
 
-                data = img[0].Read()
+                data = img[0].read()
                 clouds = np.zeros_like(data)
 
                 # See table 3 in the user guide:
@@ -731,7 +731,7 @@ class modisData(Data):
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
                 imgout.SetBandName('Cloud Cover', 1)
-                imgout[0].Write(clouds)
+                imgout[0].write(clouds)
 
             if val[0] in ('snow', 'fsnow'):
                 # (fsnow was removed entirely due to being a big copypasta
@@ -761,8 +761,8 @@ class modisData(Data):
 
                     # get the data values for both bands
                     # for both MOD10A1 and MYD10A1, bands 0 & 3 are --v
-                    cover = img[2 * iband].Read()       # Snow_Cover_Daily_Tile
-                    frac = img[2 * iband + 1].Read()    # Fractional_Snow_Cover
+                    cover = img[2 * iband].read()       # Snow_Cover_Daily_Tile
+                    frac = img[2 * iband + 1].read()    # Fractional_Snow_Cover
 
                     # check out frac
                     # meanings of special values, see C5 user guide, table 4:
@@ -858,8 +858,8 @@ class modisData(Data):
                 imgout.SetBandName('Snow Cover', 1)
                 imgout.SetBandName('Fractional Snow Cover', 2)
 
-                imgout[0].Write(coverout)
-                imgout[1].Write(fracout)
+                imgout[0].write(coverout)
+                imgout[1].write(fracout)
 
             ###################################################################
             # TEMPERATURE PRODUCT (DAILY)
@@ -907,7 +907,7 @@ class modisData(Data):
                     else:
                         raise Exception('%s appears to be an invalid MODIS temperature project' % basename)
 
-                    qc = qcbands[iband].Read()
+                    qc = qcbands[iband].read()
 
                     # first two bits are 10 or 11
                     newmaskbad = binmask(qc, 2)
@@ -945,7 +945,7 @@ class modisData(Data):
 
                     # overpass time
                     hournodatavalue = hourbands[iband].NoDataValue()
-                    hour = hourbands[iband].Read()
+                    hour = hourbands[iband].read()
                     hour = hour[hour != hournodatavalue]
                     hourmean = 0
                     with utils.error_handler("Couldn't compute hour mean for " + fname,
@@ -958,13 +958,13 @@ class modisData(Data):
 
                     tempbands[iband].Process(imgout[band])
 
-                imgout[4].SetGain(1.0)
-                imgout[4].Write(bestmask)
-                imgout.SetBandName('Temperature Daytime Terra', 1)
-                imgout.SetBandName('Temperature Nighttime Terra', 2)
-                imgout.SetBandName('Temperature Daytime Aqua', 3)
-                imgout.SetBandName('Temperature Nighttime Aqua', 4)
-                imgout.SetBandName('Temperature Best Quality', 5)
+                imgout[4].set_gain(1.0)
+                imgout[4].write(bestmask)
+                imgout.set_bandname('Temperature Daytime Terra', 1)
+                imgout.set_bandname('Temperature Nighttime Terra', 2)
+                imgout.set_bandname('Temperature Daytime Aqua', 3)
+                imgout.set_bandname('Temperature Nighttime Aqua', 4)
+                imgout.set_bandname('Temperature Best Quality', 5)
                 del tempbands
                 del qcbands
                 del hourbands

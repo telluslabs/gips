@@ -205,16 +205,15 @@ class weldData(Data):
                 meta['VERSION'] = VERSION
                 refl = gippy.GeoImage(allsds)
                 # band 2
-                grnimg = refl[1].Read()
+                grnimg = refl[1].read()
                 missing = refl[1].NoDataValue()
                 # band 4
-                nirimg = refl[3].Read()
+                nirimg = refl[3].read()
                 assert refl[3].NoDataValue() == missing
                 # band 5
-                swrimg = refl[4].Read()
+                swrimg = refl[4].read()
                 assert refl[4].NoDataValue() == missing
-                cldimg = refl[11].Read()
-                # accaimg = refl[13].Read()
+                cldimg = refl[11].read()
                 ndsi = missing + np.zeros_like(grnimg)
                 wg = np.where((grnimg != missing) & (swrimg != missing) & (grnimg + swrimg != 0.0) & (cldimg == 0))
                 ng = len(wg[0])
@@ -230,7 +229,7 @@ class weldData(Data):
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
                 imgout.SetProjection(PROJ)
-                imgout[0].Write(ndsi)
+                imgout[0].write(ndsi)
                 imgout.SetBandName('NDSI', 1)
 
             # SNOW ICE COVER PRODUCT
@@ -239,16 +238,16 @@ class weldData(Data):
                 meta['VERSION'] = VERSION
                 refl = gippy.GeoImage(allsds)
                 # band 2
-                grnimg = refl[1].Read()
+                grnimg = refl[1].read()
                 missing = refl[1].NoDataValue()
                 # band 4
-                nirimg = refl[3].Read()
+                nirimg = refl[3].read()
                 assert refl[3].NoDataValue() == missing
                 # band 5
-                swrimg = refl[4].Read()
+                swrimg = refl[4].read()
                 assert refl[4].NoDataValue() == missing
-                cldimg = refl[11].Read()
-                accaimg = refl[13].Read()
+                cldimg = refl[11].read()
+                accaimg = refl[13].read()
                 snow = 127 + np.zeros_like(grnimg)
                 ndsi = missing + np.zeros_like(grnimg)
                 wg = np.where((grnimg != missing) & (swrimg != missing) & (grnimg + swrimg != 0.0) & (cldimg == 0))
@@ -272,7 +271,7 @@ class weldData(Data):
                 imgout.SetOffset(0.)
                 imgout.SetGain(1.)
                 imgout.SetProjection(PROJ)
-                imgout[0].Write(snow)
+                imgout[0].write(snow)
                 imgout.SetBandName('SNOW', 1)
 
             # VEGETATION INDEX PRODUCT
@@ -281,13 +280,13 @@ class weldData(Data):
                 meta['VERSION'] = VERSION
                 refl = gippy.GeoImage(allsds)
                 # band 3
-                redimg = refl[2].Read()
+                redimg = refl[2].read()
                 missing = refl[2].NoDataValue()
                 # band 4
-                nirimg = refl[3].Read()
+                nirimg = refl[3].read()
                 assert refl[3].NoDataValue() == missing
-                cldimg = refl[11].Read()
-                accaimg = refl[13].Read()
+                cldimg = refl[11].read()
+                accaimg = refl[13].read()
                 ndvi = missing + np.zeros_like(redimg)
                 wg = np.where((redimg != missing) & (nirimg != missing) & (redimg + nirimg != 0.0) & (cldimg == 0))
                 ng = len(wg[0])
@@ -303,7 +302,7 @@ class weldData(Data):
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
                 imgout.SetProjection(PROJ)
-                imgout[0].Write(ndvi)
+                imgout[0].write(ndvi)
                 imgout.SetBandName('NDVI', 1)
 
             # BRIGHTNESS PRODUCT
@@ -312,15 +311,15 @@ class weldData(Data):
                 meta['VERSION'] = VERSION
                 refl = gippy.GeoImage(allsds)
                 # band 2
-                grnimg = refl[1].Read()
+                grnimg = refl[1].read()
                 missing = refl[1].NoDataValue()
                 # band 3
-                redimg = refl[2].Read()
+                redimg = refl[2].read()
                 assert refl[2].NoDataValue() == missing
                 # band 4
-                nirimg = refl[3].Read()
+                nirimg = refl[3].read()
                 assert refl[3].NoDataValue() == missing
-                cldimg = refl[11].Read()
+                cldimg = refl[11].read()
                 brgt = missing + np.zeros_like(redimg)
                 wg = np.where((grnimg != missing) & (redimg != missing) & (nirimg != missing) & (cldimg == 0))
                 ng = len(wg[0])
@@ -336,7 +335,7 @@ class weldData(Data):
                 imgout.SetOffset(0.0)
                 imgout.SetGain(1.0)
                 imgout.SetProjection(PROJ)
-                imgout[0].Write(brgt)
+                imgout[0].write(brgt)
                 imgout.SetBandName('BRGT', 1)
 
             # set metadata

@@ -518,7 +518,7 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     nddata = np.empty((len(images[0]),
                        mask_img.YSize(), mask_img.XSize()))
     nddata[:] = nd
-    imgout.Write(nddata)
+    imgout.write(nddata)
     imgout = None
 
     # run warp command

@@ -437,7 +437,7 @@ class merraData(Data):
         daily[daily.mask] = missing
         utils.verbose_out('writing %s' % fout, 4)
         imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
-        imgout[0].Write(np.array(np.flipud(daily)).astype('float32'))
+        imgout[0].write(np.array(np.flipud(daily)).astype('float32'))
         imgout.SetBandName(prod, 1)
         imgout.SetUnits(units)
         imgout.SetNoData(missing)
@@ -536,7 +536,7 @@ class merraData(Data):
                 rhday[rhday.mask] = missing
                 utils.verbose_out('writing %s' % fout, 4)
                 imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
-                imgout[0].Write(np.array(np.flipud(rhday)).astype('float32'))
+                imgout[0].write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.SetBandName(val[0], 1)
                 imgout.SetUnits('%')
                 imgout.SetNoData(missing)
@@ -566,7 +566,7 @@ class merraData(Data):
                     frland[frland.mask] = missing
                 utils.verbose_out('writing %s' % fout, 4)
                 imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
-                imgout[0].Write(np.array(np.flipud(frland)).astype('float32'))
+                imgout[0].write(np.array(np.flipud(frland)).astype('float32'))
                 imgout.SetBandName(prod, 1)
                 imgout.SetUnits('fraction')
                 imgout.SetNoData(missing)

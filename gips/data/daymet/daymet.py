@@ -212,7 +212,7 @@ class daymetAsset(Asset):
             imgout.SetNoData(-9999.)
             imgout.SetProjection(PROJ)
             imgout.SetAffine(geo)
-            imgout[0].Write(data)
+            imgout[0].write(data)
             imgout.SetMeta(cls.generate_metadata(asset, tile, date, url))
             os.rename(temp_fp, stage_fp)
             return [stage_fp]

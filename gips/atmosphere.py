@@ -556,7 +556,7 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
             arr[mask] = ((arr[mask] - offset) / gain)
             verbose_out('acolite processing:  writing band {} of {}'.format(
                 i, p_fp), 2)
-            imgout[i].Write(arr.astype(npdtype))
+            imgout[i].write(arr.astype(npdtype))
 
         prodout[p_type] = imgout.Filename()
         imgout = None

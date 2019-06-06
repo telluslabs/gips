@@ -285,9 +285,9 @@ class aodData(Data):
             imgout = gippy.GeoImage.create_from(img, fout, 2, 'float32')
             imgout.SetNoData(-32768)
             img.Mean(imgout[0])
-            meanimg = imgout[0].Read()
+            meanimg = imgout[0].read()
             for band in range(0, img.NumBands()):
-                data = img[band].Read()
+                data = img[band].read()
                 mask = img[band].DataMask()
                 var = numpy.multiply(numpy.power(data - meanimg, 2), mask)
                 if band == 0:
@@ -300,7 +300,7 @@ class aodData(Data):
             totalvar[inds] = -32768
             inds = numpy.where(counts != 0)
             totalvar[inds] = numpy.divide(totalvar[inds], counts[inds])
-            imgout[1].Write(totalvar)
+            imgout[1].write(totalvar)
             t = datetime.datetime.now() - start
             utils.verbose_out(
                 '%s: mean/var for %s files processed in %s' %

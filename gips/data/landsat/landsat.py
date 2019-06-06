@@ -1120,8 +1120,8 @@ class landsatData(gips.data.core.CloudCoverData):
 
                     missing = float(img[0].NoDataValue())
 
-                    red = img[0].Read().astype('float32')
-                    nir = img[1].Read().astype('float32')
+                    red = img[0].read().astype('float32')
+                    nir = img[1].read().astype('float32')
 
                     wvalid = numpy.where((red != missing) & (nir != missing) & (red + nir != 0.0))
 
@@ -1144,12 +1144,12 @@ class landsatData(gips.data.core.CloudCoverData):
                     imgout.SetOffset(0.0)
                     imgout.SetGain(1.0)
                     imgout.SetBandName('NDVI', 1)
-                    imgout[0].Write(ndvi)
+                    imgout[0].write(ndvi)
 
                 if val[0] == "landmask":
                     img = gippy.GeoImage([imgpaths['cfmask'], imgpaths['cfmask_conf']])
 
-                    cfmask = img[0].Read()
+                    cfmask = img[0].read()
                     # array([  0,   1,   2,   3,   4, 255], dtype=uint8)
                     # 0 means clear! but I want 1 to mean clear
 
@@ -1160,7 +1160,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     verbose_out("writing " + fname, 2)
                     imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
                     imgout.SetBandName('Land mask', 1)
-                    imgout[0].Write(cfmask)
+                    imgout[0].write(cfmask)
 
                 archive_fp = self.archive_temp_path(fname)
                 self.AddFile(sensor, key, archive_fp)
@@ -1315,7 +1315,7 @@ class landsatData(gips.data.core.CloudCoverData):
 
                     elif val[0] == 'cloudmask':
                         qaimg = self._readqa(asset)
-                        npqa = qaimg.Read()  # read image file into numpy array
+                        npqa = qaimg.read()  # read image file into numpy array
                         qaimg = None
                         # https://landsat.usgs.gov/collectionqualityband
                         # cloudmaskmask = (cloud and
@@ -1371,7 +1371,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         # GIPPY1.0 note: replace this block with
                         # imgout[0].set_nodata(0.)
                         # imout[0].write_raw(np_cloudmask_dilated)
-                        imgout[0].Write(
+                        imgout[0].write(
                             np_cloudmask_dilated
                         )
                         imgout = None
@@ -1443,15 +1443,15 @@ class landsatData(gips.data.core.CloudCoverData):
                         n = 1.34    # Refractive index of water
                         Q = 1.0     # Downwelled irradiance / upwelled radiance
                         A = ((1 - p) * (1 - pp)) / (n * n)
-                        srband = reflimg['SWIR1'].Read()
+                        srband = reflimg['SWIR1'].read()
                         nodatainds = srband == reflimg['SWIR1'].NoDataValue()
                         for band in bands:
-                            bimg = reflimg[band].Read()
+                            bimg = reflimg[band].read()
                             diffimg = bimg - srband
                             diffimg = diffimg / (A + r * Q * diffimg)
                             diffimg[bimg == reflimg[band].NoDataValue()] = imgout[band].NoDataValue()
                             diffimg[nodatainds] = imgout[band].NoDataValue()
-                            imgout[band].Write(diffimg)
+                            imgout[band].write(diffimg)
                     elif val[0] == 'wtemp':
                         raise NotImplementedError('See https://gitlab.com/appliedgeosolutions/gips/issues/155')
                         imgout = gippy.GeoImage.create_from(img, fname, len(lwbands), 'int16')

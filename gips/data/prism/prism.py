@@ -276,10 +276,10 @@ class prismData(Data):
                     )
                     oimg.SetMeta(self.prep_meta(sorted(asset_fns)))
                     for chunk in oimg.Chunks():
-                        oarr = oimg[0].Read(chunk) * 0.0 # wat
+                        oarr = oimg[0].read(chunk) * 0.0 # wat
                         for img in imgs:
-                            oarr += img[0].Read(chunk)
-                        oimg[0].Write(oarr, chunk)
+                            oarr += img[0].read(chunk)
+                        oimg[0].write(oarr, chunk)
                     oimg.Process()
                     os.rename(tmp_fp, archived_fp)
                 oimg = None  # help swig+gdal with GC
