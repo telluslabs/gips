@@ -436,7 +436,7 @@ class merraData(Data):
         daily = fun(hourly)
         daily[daily.mask] = missing
         utils.verbose_out('writing %s' % fout, 4)
-        imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
+        imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
         imgout[0].Write(np.array(np.flipud(daily)).astype('float32'))
         imgout.SetBandName(prod, 1)
         imgout.SetUnits(units)
@@ -535,7 +535,7 @@ class merraData(Data):
                 rhday = rh.mean(axis=0)
                 rhday[rhday.mask] = missing
                 utils.verbose_out('writing %s' % fout, 4)
-                imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
+                imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
                 imgout[0].Write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.SetBandName(val[0], 1)
                 imgout.SetUnits('%')
@@ -565,7 +565,7 @@ class merraData(Data):
                 if frland.mask.sum() > 0:
                     frland[frland.mask] = missing
                 utils.verbose_out('writing %s' % fout, 4)
-                imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
+                imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
                 imgout[0].Write(np.array(np.flipud(frland)).astype('float32'))
                 imgout.SetBandName(prod, 1)
                 imgout.SetUnits('fraction')
@@ -579,7 +579,7 @@ class merraData(Data):
             """
             if val[0] == "temp_modis":
                 img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 4)
+                imgout = gippy.GeoImage.create_from(img, fout, 4, img.DataType())
                 # Aqua AM, Terra AM, Aqua PM, Terra PM
                 localtimes = [1.5, 10.5, 13.5, 22.5]
                 strtimes = ['0130LT', '1030LT', '1330LT', '2230LT']

@@ -542,7 +542,7 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
         dtype, missing = _aco_img_params[npdtype]
         gain = p_spec.get('gain', 1.0)
         offset = p_spec.get('offset', 0.0)
-        imgout = gippy.GeoImage(p_fp, model_image, dtype, len(bands))
+        imgout = gippy.GeoImage.create_from(model_image, p_fp, len(bands), dtype)
         pmeta = {'description': p_spec['description']}
         pmeta.update(meta)
         imgout.SetMeta(pmeta)

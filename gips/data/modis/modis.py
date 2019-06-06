@@ -682,7 +682,7 @@ class modisData(Data):
 
                 # create output gippy image
                 print("writing", fname)
-                imgout = gippy.GeoImage(fname, refl, gippy.GDT_Int16, 7)
+                imgout = gippy.GeoImage.create_from(refl, fname, 7, 'int16')
                 del refl
 
                 imgout.SetNoData(missing)
@@ -725,7 +725,7 @@ class modisData(Data):
                 clouds[data == 250] = 1
 
                 # create output gippy image
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
                 del img
                 imgout.SetNoData(nodata)
                 imgout.SetOffset(0.0)
@@ -850,7 +850,7 @@ class modisData(Data):
                 meta['NUMVALIDCOVER'] = numvalidcover
 
                 # create output gippy image
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 2)
+                imgout = gippy.GeoImage.create_from(img, fname, 2, 'uint8')
                 del img
                 imgout.SetNoData(127)
                 imgout.SetOffset(0.0)
@@ -890,7 +890,7 @@ class modisData(Data):
                 qcbands = gippy.GeoImage(qcsds)
                 hourbands = gippy.GeoImage(hoursds)
 
-                imgout = gippy.GeoImage(fname, tempbands, gippy.GDT_UInt16, 5)
+                imgout = gippy.GeoImage.create_from(tempbands, fname, 5, 'uint16')
                 imgout.SetNoData(65535)
                 imgout.SetGain(0.02)
 
@@ -990,7 +990,7 @@ class modisData(Data):
 
                 hourbands = gippy.GeoImage(hoursds)
 
-                imgout = gippy.GeoImage(fname, hourbands, gippy.GDT_Byte, 4)
+                imgout = gippy.GeoImage.create_from(hourbands, fname, 4, 'uint8')
                 imgout.SetNoData(0)
                 imgout.SetGain(0.1)
 
