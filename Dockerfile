@@ -7,6 +7,7 @@ RUN apt-get -y update \
     && apt-get install -y \
        python3-pip \
        curl \
+       wget \
        gfortran \
        libgnutls28-dev \
        emacs-nox

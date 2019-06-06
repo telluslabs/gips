@@ -438,12 +438,12 @@ class merraData(Data):
         utils.verbose_out('writing %s' % fout, 4)
         imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
         imgout[0].write(np.array(np.flipud(daily)).astype('float32'))
-        imgout.SetBandName(prod, 1)
-        imgout.SetUnits(units)
-        imgout.SetNoData(missing)
-        imgout.SetProjection(self._projection)
-        imgout.SetAffine(np.array(self._geotransform))
-        imgout.SetMeta(self.prep_meta(assetfile, meta))
+        imgout.set_bandname(prod, 1)
+        imgout.set_units(units)
+        imgout.set_nodata(missing)
+        imgout.set_projection(self._projection)
+        imgout.set_affine(np.array(self._geotransform))
+        imgout.add_meta(self.prep_meta(assetfile, meta))
 
 
     @Data.proc_temp_dir_manager
@@ -537,12 +537,12 @@ class merraData(Data):
                 utils.verbose_out('writing %s' % fout, 4)
                 imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
                 imgout[0].write(np.array(np.flipud(rhday)).astype('float32'))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('%')
-                imgout.SetNoData(missing)
-                imgout.SetProjection(self._projection)
-                imgout.SetAffine(np.array(self._geotransform))
-                imgout.SetMeta(self.prep_meta(assetfile, meta))
+                imgout.set_bandname(val[0], 1)
+                imgout.set_units('%')
+                imgout.set_nodata(missing)
+                imgout.set_projection(self._projection)
+                imgout.set_affine(np.array(self._geotransform))
+                imgout.add_meta(self.prep_meta(assetfile, meta))
 
             elif val[0] == "frland":
                 startdate = merraAsset._assets[self._products[val[0]]['assets'][0]]['startdate']
@@ -567,12 +567,12 @@ class merraData(Data):
                 utils.verbose_out('writing %s' % fout, 4)
                 imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
                 imgout[0].write(np.array(np.flipud(frland)).astype('float32'))
-                imgout.SetBandName(prod, 1)
-                imgout.SetUnits('fraction')
-                imgout.SetNoData(missing)
-                imgout.SetProjection(self._projection)
-                imgout.SetAffine(np.array(self._geotransform))
-                imgout.SetMeta(self.prep_meta(assetfile, meta))
+                imgout.set_bandname(prod, 1)
+                imgout.set_units('fraction')
+                imgout.set_nodata(missing)
+                imgout.set_projection(self._projection)
+                imgout.set_affine(np.array(self._geotransform))
+                imgout.add_meta(self.prep_meta(assetfile, meta))
 
             # TODO: revive this?
             # create a temperature product aligned with MODIS overpass times
@@ -609,7 +609,7 @@ class merraData(Data):
                     img[pickidx].Process(imgout[itime])
                     obsdate = self.date + datetime.timedelta(pickday)
                     descr = " ".join([strtimes[itime], obsdate.isoformat()])
-                    imgout.SetBandName(descr, itime + 1)
+                    imgout.set_bandname(descr, itime + 1)
 
             elif val[0] == 'profile':
                 pass

@@ -492,7 +492,7 @@ def mosaic(images, outfile, vector):
     result = subprocess.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
     imgout = gippy.GeoImage(outfile, True)
-    imgout.SetMeta(
+    imgout.add_meta(
         'GIPS_MOSAIC_SOURCES',
         ';'.join([os.path.basename(f) for f in filenames])
     )
@@ -534,7 +534,7 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
                 .format(cmd, status, output ), 4)
 
     imgout = gippy.GeoImage(outfile, True)
-    imgout.SetMeta(
+    imgout.add_meta(
         'GIPS_GRIDDED_MOSAIC_SOURCES',
         ';'.join([os.path.basename(f) for f in filenames])
     )
@@ -587,7 +587,7 @@ def report_error(error, msg_prefix, show_tb=True):
 
     Caller can suppress the traceback with show_tb.  The user can suppress
     it via the GIPS global verbosity setting."""
-    if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
+    if show_tb and gippy.Options.verbose() >= _traceback_verbosity:
         verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
         error_text = getattr(error, 'tb_text', 'Error text not found.')
         verbose_out(error_text, 1, stream=sys.stderr)

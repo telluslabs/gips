@@ -133,7 +133,7 @@ class cdlAsset(Asset):
                 asset.write(file_response.content)
             imgout = GeoImage(tmp_fname, True)
             imgout.SetNoData(0)
-            imgout.SetMeta('GIPS_Version', gips.__version__)
+            imgout.add_meta('GIPS_Version', gips.__version__)
             imgout = None
             shutil.copy(tmp_fname, cls.Repository.path('stage'))
 
@@ -175,7 +175,7 @@ class cdlData(Data):
             image = gdal.Open(fname, gdal.GA_Update)
             dbf = DBF(fname + '.vat.dbf')
             for i, record in enumerate(dbf):
-                image.SetMetadataItem(str("CLASS_NAME_%s" % record['CLASS_NAME']), str(i))
+                image.add_meta(str("CLASS_NAME_%s" % record['CLASS_NAME']), str(i))
             image = None
 
             archive_fp = self.archive_temp_path(fname)

@@ -1187,7 +1187,7 @@ class Data(object):
         return md
 
     def prep_meta(self, src_afns, additional=None):
-        """Prepare product metadata for consumption by GeoImage.SetMeta()."""
+        """Prepare product metadata for consumption by GeoImage.add_meta()."""
         return utils.stringify_meta_dict(self.meta_dict(src_afns, additional))
 
     def find_files(self):

@@ -545,10 +545,10 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
         imgout = gippy.GeoImage.create_from(model_image, p_fp, len(bands), dtype)
         pmeta = {'description': p_spec['description']}
         pmeta.update(meta)
-        imgout.SetMeta(pmeta)
+        imgout.add_meta(pmeta)
 
         for i, b in enumerate(bands):
-            imgout.SetBandName(str(b), i + 1)
+            imgout.set_bandname(str(b), i + 1)
             arr = numpy.array(dsroot.variables[b][:])
             fill = getattr(dsroot.variables[b], '_FillValue', _acolite_ndv)
             mask = arr != fill
@@ -561,9 +561,9 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
         prodout[p_type] = imgout.Filename()
         imgout = None
         imgout = gippy.GeoImage(p_fp, True)
-        imgout.SetGain(gain)
-        imgout.SetOffset(offset)
-        imgout.SetNoData(missing)
+        imgout.set_gain(gain)
+        imgout.set_offset(offset)
+        imgout.set_nodata(missing)
     return prodout
 
 def process_acolite(asset, aco_proc_dir, products, meta, model_image,

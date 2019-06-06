@@ -158,7 +158,7 @@ class daymetAsset(Asset):
 
     @classmethod
     def generate_metadata(cls, asset, tile, date, url):
-        """Returns a dict suitable to pass to GeoImage.SetMeta()."""
+        """Returns a dict suitable to pass to GeoImage.add_meta()."""
         return {
             'GIPS_Version': gips.__version__,
             'GIPS_Daymet_Version': _daymet_driver_version,
@@ -213,7 +213,7 @@ class daymetAsset(Asset):
             imgout.SetProjection(PROJ)
             imgout.SetAffine(geo)
             imgout[0].write(data)
-            imgout.SetMeta(cls.generate_metadata(asset, tile, date, url))
+            imgout.add_meta(cls.generate_metadata(asset, tile, date, url))
             os.rename(temp_fp, stage_fp)
             return [stage_fp]
 

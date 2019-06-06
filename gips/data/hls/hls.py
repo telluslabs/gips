@@ -238,7 +238,7 @@ class hlsData(gips.data.core.CloudCoverData):
             imgout = gippy.GeoImage.create_from(src_img, temp_fp, 1, 'uint8')
             imgout[0].write(mask.astype(numpy.uint8))
             #imgout.SetNoData(0) # needed due to particulars of gdal_merge
-            imgout.SetMeta(self.prep_meta(
+            imgout.add_meta(self.prep_meta(
                 a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
             # imgout.Process() # TODO needed?
             archived_fp = self.archive_temp_path(temp_fp)
@@ -258,7 +258,7 @@ class hlsData(gips.data.core.CloudCoverData):
             imgout = gippy.GeoImage.create_from(src_img, temp_fp, 1, 'uint8')
             imgout[0].write(mask.astype(numpy.uint8))
             imgout.SetNoData(0) # needed due to particulars of gdal_merge
-            imgout.SetMeta(self.prep_meta(
+            imgout.add_meta(self.prep_meta(
                 a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
             # imgout.Process() # TODO needed?
             archived_fp = self.archive_temp_path(temp_fp)

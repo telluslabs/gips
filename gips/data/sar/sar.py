@@ -442,9 +442,9 @@ class sarData(Data):
                 img.Process(fname)
             else:
                 raise Exception('Unrecognized product: ' + key)
-            # True = r/w mode, otherwise SetMeta silently does nothing
+            # True = r/w mode, otherwise add_meta silently does nothing
             smi = gippy.GeoImage(fname, True)
-            smi.SetMeta(self.prep_meta(self.assets[asset].filename))
+            smi.add_meta(self.prep_meta(self.assets[asset].filename))
             archive_fp = self.archive_temp_path(fname)
             self.AddFile(sensor, key, archive_fp)
         # Remove unused files

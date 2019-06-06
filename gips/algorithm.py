@@ -26,7 +26,7 @@ import traceback
 
 import gippy
 import gips
-from gips.utils import VerboseOut, Colors, verbosity
+from gips.utils import VerboseOut, Colors
 from gips import utils
 from gips.inventory import ProjectInventory
 
@@ -94,16 +94,8 @@ class Algorithm(object):
 
         args = parser.parse_args()
 
-
-
-        from pdb import set_trace; set_trace()
-
-        verbosity(args.verbose)
-
-        # gippy.Options.SetVerbose(args.verbose)
+        gippy.Options.set_verbose(args.verbose)
         VerboseOut(cls.info())
-
-
         utils.gips_script_setup(driver_string=None, setup_orm=False)
 
         with utils.error_handler('Error in {}'.format(cls.name)):

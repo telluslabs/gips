@@ -340,7 +340,7 @@ class weldData(Data):
 
             # set metadata
             meta = {k: str(v) for k, v in meta.iteritems()}
-            imgout.SetMeta(meta)
+            imgout.add_meta(meta)
 
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)

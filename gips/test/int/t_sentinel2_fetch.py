@@ -317,7 +317,7 @@ def t_archive_old_asset(archive_setup, mocker):
 
     m_cloud_cover = mocker.patch.object(
             sentinel2.sentinel2Asset, 'cloud_cover')
-    gippy.Options.SetVerbose(4) # to get tracebacks
+    gippy.Options.set_verbose(4) # to get tracebacks
     # touches db if use_orm(), hence django_db
     sentinel2.sentinel2Asset.archive(stage_path)
 

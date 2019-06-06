@@ -274,7 +274,7 @@ class prismData(Data):
                     oimg.SetBandName(
                         description + '({} day window)'.format(lag), 1
                     )
-                    oimg.SetMeta(self.prep_meta(sorted(asset_fns)))
+                    oimg.add_meta(self.prep_meta(sorted(asset_fns)))
                     for chunk in oimg.Chunks():
                         oarr = oimg[0].read(chunk) * 0.0 # wat
                         for img in imgs:

@@ -1041,7 +1041,7 @@ class modisData(Data):
                 imgout = gippy.GeoImage(fname)
 
             # set metadata
-            imgout.SetMeta(self.prep_meta(a_fnames, meta))
+            imgout.add_meta(self.prep_meta(a_fnames, meta))
 
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)

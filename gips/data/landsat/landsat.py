@@ -1413,7 +1413,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         tmpimg.PruneBands(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'])
                         arr = numpy.array(self.Asset._sensors[self.sensor_set[0]]['tcap']).astype('float32')
                         imgout = LinearTransform(tmpimg, fname, arr)
-                        imgout.SetMeta('AREA_OR_POINT', 'Point')
+                        imgout.add_meta('AREA_OR_POINT', 'Point')
                         outbands = ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6']
                         for i in range(0, imgout.NumBands()):
                             imgout.SetBandName(outbands[i], i + 1)
@@ -1474,13 +1474,13 @@ class landsatData(gips.data.core.CloudCoverData):
                             band.Process(imgout[col])
 
                     fname = imgout.Filename()
-                    imgout.SetMeta(self.prep_meta(asset_fn, md))
+                    imgout.add_meta(self.prep_meta(asset_fn, md))
 
                     if coreg:
                         coreg_mag = (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5
                         insane =  coreg_mag > 75  # TODO: actual fix
 
-                        imgout.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
+                        imgout.add_meta("COREG_MAGNITUDE", str(coreg_mag))
 
                         if not insane:
                             self._time_report("Setting affine of product")
@@ -1752,7 +1752,7 @@ class landsatData(gips.data.core.CloudCoverData):
 
         # TODO - set appropriate metadata
         #for key,val in meta.items():
-        #    image.SetMeta(key,str(val))
+        #    image.add_meta(key,str(val))
 
         # Geometry used for calculating incident irradiance
         # colors = self.assets['DN']._sensors[self.sensor_set[0]]['colors']
