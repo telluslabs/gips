@@ -200,6 +200,7 @@ class smapData(Data):
             elif val[0] == 'smpe':
                 img = gippy.GeoImage(allsds[13])
 
+            # TODO: This is broken - GeoImage.create() apparently doesn't support datatypes
             imgdata = img.read()
             imgout = gippy.GeoImage.create(fname, img.xsize(), img.ysize(), 1, 'float32')
             del img
