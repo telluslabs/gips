@@ -206,7 +206,7 @@ class smapData(Data):
             imgout.set_offset(0.0)
             imgout.set_gain(1.0)
             imgout.set_bandname('Soil Moisture', 1)
-            imgout.set_projection(self._projection)
+            imgout.set_srs(self._projection)
             imgout.set_affine(np.array(self._products[prod_type]['_geotransform']))
             imgout[0].write(imgdata)
             # add product to inventory

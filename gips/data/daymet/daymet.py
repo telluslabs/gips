@@ -201,7 +201,7 @@ class daymetAsset(Asset):
             imgout = gippy.GeoImage.create(temp_fp, xsz, ysz, 1, str(data.dtype))
             imgout.set_bandname(asset, 1)
             imgout.set_nodata(-9999.)
-            imgout.set_projection(PROJ)
+            imgout.set_srs(PROJ)
             imgout.set_affine(geo)
             imgout[0].write(data)
             imgout.add_meta(cls.generate_metadata(asset, tile, date, url))

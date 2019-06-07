@@ -441,7 +441,7 @@ class merraData(Data):
         imgout.set_bandname(prod, 1)
         imgout.set_units(units)
         imgout.set_nodata(missing)
-        imgout.set_projection(self._projection)
+        imgout.set_srs(self._projection)
         imgout.set_affine(np.array(self._geotransform))
         imgout.add_meta(self.prep_meta(assetfile, meta))
 
@@ -540,7 +540,7 @@ class merraData(Data):
                 imgout.set_bandname(val[0], 1)
                 imgout.set_units('%')
                 imgout.set_nodata(missing)
-                imgout.set_projection(self._projection)
+                imgout.set_srs(self._projection)
                 imgout.set_affine(np.array(self._geotransform))
                 imgout.add_meta(self.prep_meta(assetfile, meta))
 
@@ -570,7 +570,7 @@ class merraData(Data):
                 imgout.set_bandname(prod, 1)
                 imgout.set_units('fraction')
                 imgout.set_nodata(missing)
-                imgout.set_projection(self._projection)
+                imgout.set_srs(self._projection)
                 imgout.set_affine(np.array(self._geotransform))
                 imgout.add_meta(self.prep_meta(assetfile, meta))
 

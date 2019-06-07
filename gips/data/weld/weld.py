@@ -228,7 +228,7 @@ class weldData(Data):
                 imgout.set_nodata(float(missing))
                 imgout.set_offset(0.0)
                 imgout.set_gain(1.0)
-                imgout.set_projection(PROJ)
+                imgout.set_srs(PROJ)
                 imgout[0].write(ndsi)
                 imgout.set_bandname('NDSI', 1)
 
@@ -270,7 +270,7 @@ class weldData(Data):
                 imgout.set_nodata(127)
                 imgout.set_offset(0.)
                 imgout.set_gain(1.)
-                imgout.set_projection(PROJ)
+                imgout.set_srs(PROJ)
                 imgout[0].write(snow)
                 imgout.set_bandname('SNOW', 1)
 
@@ -301,7 +301,7 @@ class weldData(Data):
                 imgout.set_nodata(float(missing))
                 imgout.set_offset(0.0)
                 imgout.set_gain(1.0)
-                imgout.set_projection(PROJ)
+                imgout.set_srs(PROJ)
                 imgout[0].write(ndvi)
                 imgout.set_bandname('NDVI', 1)
 
@@ -334,7 +334,7 @@ class weldData(Data):
                 imgout.set_nodata(float(missing))
                 imgout.set_offset(0.0)
                 imgout.set_gain(1.0)
-                imgout.set_projection(PROJ)
+                imgout.set_srs(PROJ)
                 imgout[0].write(brgt)
                 imgout.set_bandname('BRGT', 1)
 
