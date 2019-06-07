@@ -503,7 +503,7 @@ class Asset(object):
             tile_num = self.tile
 
         v = gippy.GeoVector(self.get_setting("tiles"))
-        v.SetPrimaryKey(self.Repository._tile_attribute)
+        v.set_primary_key(self.Repository._tile_attribute)
         # If a GeoVector is indexed with an int, it queries using
         # FID field.
         feat = v[str(tile_num)]

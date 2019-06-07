@@ -1392,7 +1392,8 @@ class landsatData(gips.data.core.CloudCoverData):
                                 ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
                                         ).save(imgout[col])
                         # Mask out any pixel for which any band is nodata
-                        #imgout.ApplyMask(img.DataMask())
+                        # TODO: why is this commented out?
+                        # imgout.apply_mask(img.data_mask())
                     elif val[0] == 'ref':
                         imgout = gippy.GeoImage.create_from(img, fname, len(visbands), 'int16')
                         for i in range(0, imgout.NumBands()):
@@ -1407,7 +1408,8 @@ class landsatData(gips.data.core.CloudCoverData):
                                 (((img[c] - atm6s.results[c][1]) / atm6s.results[c][0])
                                         * (1.0 / atm6s.results[c][2])).save(imgout[c])
                         # Mask out any pixel for which any band is nodata
-                        #imgout.ApplyMask(img.DataMask())
+                        # TODO: why is this commented out?
+                        #imgout.apply_mask(img.DataMask())
                     elif val[0] == 'tcap':
                         tmpimg = gippy.GeoImage(reflimg)
                         tmpimg.PruneBands(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'])
