@@ -44,7 +44,7 @@ from requests.auth import HTTPBasicAuth
 from shapely.wkt import loads as wkt_loads
 
 import gippy
-import gippy.algorithms
+from gippy import algorithms
 
 from gips.data.core import Repository, Asset, Data
 import gips.data.core
@@ -99,7 +99,7 @@ class sentinel2Repository(Repository):
         Returns (x0, x1, y0, y1), which is
         (west lon, east lon, south lat, north lat) in degrees.
         """
-        e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[tileid].Extent()
+        e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[tileid].extent()
         return e.x0(), e.x1(), e.y0(), e.y1()
 
 
@@ -1082,26 +1082,22 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         if mode != 'toa':
             image = self.load_image('ref')
             # this faff is needed because gippy shares metadata across images behind your back
-            metadata['AOD Source'] = getattr(image, '_aod_source', image.Meta('AOD Source'))
-            metadata['AOD Value']  = getattr(image, '_aod_value',  image.Meta('AOD Value'))
+            metadata['AOD Source'] = getattr(image, '_aod_source', image.meta('AOD Source'))
+            metadata['AOD Value']  = getattr(image, '_aod_value',  image.meta('AOD Value'))
         else:
             image = self.load_image('ref-toa')
 
         # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
-        gippy_input = {} # map prod types to temp output filenames for feeding to gippy
-        tempfps_to_ptypes = {} # map temp output filenames to prod types, needed for AddFile
-        for prod_type, pt_split in indices.items():
-            temp_fp = self.temp_product_filename(sensor, prod_type)
-            gippy_input[pt_split[0]] = temp_fp
-            tempfps_to_ptypes[temp_fp] = prod_type
 
-        prodout = gippy.algorithms.Indices(image, gippy_input, metadata)
-
-        for temp_fp in prodout.values():
+        for prod_and_args, split_p_and_a in indices.items():
+            print(prod_and_args, split_p_and_a)
+            temp_fp = self.temp_product_filename(sensor, prod_and_args)
+            print(temp_fp)
+            imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
+            imgout.add_meta(metadata)
             archived_fp = self.archive_temp_path(temp_fp)
-            self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
+            self.AddFile(sensor, prod_and_args, archived_fp)
 
-        self._time_report(' -> %s: processed %s' % (self.basename, indices))
 
     # this function creates a geolocation error
     #def shrunk_bbox(self, tile):
@@ -1161,7 +1157,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             (T, Lu, Ld) = atm6s.results[c]
             lu = 0.0001 * Lu # see rad_geoimage for reason for this
             TLdS = T * Ld * scaling_factor
-            sr_image[c] = (rad_toa_image[c] - lu) / TLdS
+            sr_image[c] = (rad_toa_image[c] - lu) * (1.0 / TLdS)
         self._product_images['ref'] = sr_image
 
     def fmask_geoimage(self):

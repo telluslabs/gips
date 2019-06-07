@@ -76,7 +76,7 @@ class merraRepository(Repository):
         features = vector.where('tileid', tile)
         if len(features) != 1:
             raise Exception('there should be a single tile with id %s' % tile)
-        extent = features[0].Extent()
+        extent = features[0].extent()
         return [extent.x0(), extent.y0(), extent.x1(), extent.y1()]
 
 
