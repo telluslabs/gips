@@ -230,7 +230,7 @@ class merraAsset(Asset):
         stage_dir = cls.Repository.path('stage')
         with utils.make_temp_dir(prefix='fetch', dir=stage_dir) as tmp_dn:
             tmp_outpath = os.path.join(tmp_dn, basename)
-            with open(tmp_outpath, 'w') as fd:
+            with open(tmp_outpath, 'wb') as fd:
                 fd.write(response.read())
             # verify that it is a netcdf file
             try:
@@ -440,7 +440,7 @@ class merraData(Data):
         imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
         imgout[0].write(np.array(np.flipud(daily)).astype('float32'))
         imgout.set_bandname(prod, 1)
-        imgout.set_units(units)
+        imgout.add_meta({'units': units})
         imgout.set_nodata(missing)
         imgout.set_srs(self._projection)
         imgout.set_affine(np.array(self._geotransform))
@@ -539,7 +539,7 @@ class merraData(Data):
                 imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
                 imgout[0].write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.set_bandname(val[0], 1)
-                imgout.set_units('%')
+                imgout.add_meta({'units': '%'})
                 imgout.set_nodata(missing)
                 imgout.set_srs(self._projection)
                 imgout.set_affine(np.array(self._geotransform))
@@ -569,7 +569,7 @@ class merraData(Data):
                 imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
                 imgout[0].write(np.array(np.flipud(frland)).astype('float32'))
                 imgout.set_bandname(prod, 1)
-                imgout.set_units('fraction')
+                imgout.add_meta({'units': 'fraction'})
                 imgout.set_nodata(missing)
                 imgout.set_srs(self._projection)
                 imgout.set_affine(np.array(self._geotransform))
