@@ -393,7 +393,7 @@ def transform(filename, srs):
 def crop2vector(img, vector):
     """ Crop a GeoImage down to a vector - only used by mosaic """
     # transform vector to srs of image
-    vecname = transform(vector.Filename(), img.Projection())
+    vecname = transform(vector.Filename(), img.srs())
     warped_vec = open_vector(vecname)
     # rasterize the vector
     td = tempfile.mkdtemp()
@@ -437,7 +437,7 @@ def vectorize(img, vector, oformat=None):
                 raise RuntimeError(emsg)
 
     # Grab projection because gml doesn't carry it around by default
-    wkt = gippy.GeoImage(img).Projection()
+    wkt = gippy.GeoImage(img).srs()
     # rasterize the vector
     with make_temp_dir(prefix='vectorize') as td:
         tvec = os.path.join(td, os.path.basename(vector)[:-4] + '.gml')
@@ -472,16 +472,16 @@ def vectorize(img, vector, oformat=None):
 
 def mosaic(images, outfile, vector):
     """ Mosaic multiple files together, but do not warp """
-    nd = images[0][0].NoDataValue()
-    srs = images[0].Projection()
+    nd = images[0][0].nodata()
+    srs = images[0].srs()
     # check they all have same projection
     filenames = [images[0].Filename()]
     for f in range(1, images.NumImages()):
-        if images[f].Projection() != srs:
+        if images[f].srs() != srs:
             raise Exception("Input files have non-matching projections and must be warped")
         filenames.append(images[f].Filename())
     # transform vector to image projection
-    geom = wktloads(transform_shape(vector.WKT(), vector.Projection(), srs))
+    geom = wktloads(transform_shape(vector.WKT(), vector.srs(), srs))
 
     extent = geom.bounds
     ullr = "%f %f %f %f" % (extent[0], extent[3], extent[2], extent[1])
@@ -504,9 +504,9 @@ def mosaic(images, outfile, vector):
 
 def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     """ Mosaic multiple files to grid and mask specified in rastermask """
-    nd = images[0][0].NoDataValue()
+    nd = images[0][0].nodata()
     mask_img = gippy.GeoImage(rastermask)
-    srs = mask_img.Projection()
+    srs = mask_img.srs()
     filenames = [images[0].Filename()]
     for f in range(1, images.NumImages()):
         filenames.append(images[f].Filename())

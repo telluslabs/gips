@@ -1122,7 +1122,7 @@ class Data(object):
                         # warp just this tile
                         resampler = ['near', 'bilinear', 'cubic']
                         cmd = 'gdalwarp %s %s -t_srs "%s" -tr %s %s -r %s' % \
-                               (fin, fout, site.Projection(), res[0], res[1], resampler[interpolation])
+                               (fin, fout, site.srs(), res[0], res[1], resampler[interpolation])
                         print(cmd)
                         # TODO: what is this?
                         #result = subprocess.getstatusoutput(cmd)

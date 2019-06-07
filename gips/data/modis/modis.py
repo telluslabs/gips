@@ -944,7 +944,7 @@ class modisData(Data):
                     meta[metaname] = str(numbest)
 
                     # overpass time
-                    hournodatavalue = hourbands[iband].NoDataValue()
+                    hournodatavalue = hourbands[iband].nodata()
                     hour = hourbands[iband].read()
                     hour = hour[hour != hournodatavalue]
                     hourmean = 0

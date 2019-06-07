@@ -1118,7 +1118,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 if val[0] == "ndvi8sr":
                     img = gippy.GeoImage([imgpaths['sr_band4'], imgpaths['sr_band5']])
 
-                    missing = float(img[0].NoDataValue())
+                    missing = float(img[0].nodata())
 
                     red = img[0].read().astype('float32')
                     nir = img[1].read().astype('float32')
@@ -1446,13 +1446,13 @@ class landsatData(gips.data.core.CloudCoverData):
                         Q = 1.0     # Downwelled irradiance / upwelled radiance
                         A = ((1 - p) * (1 - pp)) / (n * n)
                         srband = reflimg['SWIR1'].read()
-                        nodatainds = srband == reflimg['SWIR1'].NoDataValue()
+                        nodatainds = srband == reflimg['SWIR1'].nodata()
                         for band in bands:
                             bimg = reflimg[band].read()
                             diffimg = bimg - srband
                             diffimg = diffimg / (A + r * Q * diffimg)
-                            diffimg[bimg == reflimg[band].NoDataValue()] = imgout[band].NoDataValue()
-                            diffimg[nodatainds] = imgout[band].NoDataValue()
+                            diffimg[bimg == reflimg[band].nodata()] = imgout[band].nodata()
+                            diffimg[nodatainds] = imgout[band].nodata()
                             imgout[band].write(diffimg)
                     elif val[0] == 'wtemp':
                         raise NotImplementedError('See https://gitlab.com/appliedgeosolutions/gips/issues/155')

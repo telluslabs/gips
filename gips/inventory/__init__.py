@@ -188,7 +188,7 @@ class ProjectInventory(Inventory):
             # TODO - move numpy.squeeze into swig interface file?
             ch = gippy.Recti(chunk[0], chunk[1], chunk[2], chunk[3])
             arr = numpy.squeeze(gimg.TimeSeries(days.astype('float64'), ch))
-            arr[arr == gimg[0].NoDataValue()] = numpy.nan
+            arr[arr == gimg[0].nodata()] = numpy.nan
             if len(days) == 1:
                 dims = arr.shape
                 arr = arr.reshape(1, dims[0], dims[1])
