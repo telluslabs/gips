@@ -713,7 +713,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
         sil_elem = self.xml_subtree('datastrip', 'Solar_Irradiance_List')
         values_tags = sil_elem.findall('SOLAR_IRRADIANCE')
         # sanity check that the bands are in the right order
-        assert range(13) == [int(vt.attrib['bandId']) for vt in values_tags]
+        assert [r for r in range(13)] == [int(vt.attrib['bandId']) for vt in values_tags]
         return [float(vt.text) for vt in values_tags]
 
     #def gridded_zenith_angle(self):
@@ -1014,7 +1014,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         vrt_img.set_gain(0.0001) # 16-bit storage values / 10^4 = refl values
         # eg:   1        '02', which yields color_name 'BLUE'
         for band_num, band_string in enumerate(indices_bands, 1): # starts at 0
-            vrt_img.SetBandName(colors[b_strings.index(band_string)], band_num)
+            vrt_img.set_bandname(colors[b_strings.index(band_string)], band_num)
         self._product_images['ref-toa'] = vrt_img
         self._time_report('Finished VRT for ref-toa image')
 
@@ -1032,7 +1032,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         rad_image = gippy.GeoImage(reftoa_img)
 
         for i in range(len(rad_image)):
-            color = rad_image[i].Description()
+            color = rad_image[i].description()
             rf = radiance_factors[colors.index(color)]
             self._time_report(
                 'TOA radiance reversion factor for {} (band {}): {}'.format(color, i + 1, rf))
@@ -1401,7 +1401,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                     output_image.set_offset(400.0)
                     output_image.set_nodata(-32768)
                 for b_num, b_name in enumerate(source_image.BandNames(), 1):
-                    output_image.SetBandName(b_name, b_num)
+                    output_image.set_bandname(b_name, b_num)
                 # process bandwise because gippy had an error doing it all at once
                 for i in range(len(source_image)):
                     source_image[i].Process(output_image[i])

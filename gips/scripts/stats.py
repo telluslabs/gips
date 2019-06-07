@@ -73,7 +73,7 @@ def main():
                         for b in img:
                             stats = [str(s) for s in b.Stats()]
                             writer.writerow(
-                                    [date_str, b.Description()] + stats)
+                                    [date_str, b.description()] + stats)
                         img = None
 
     utils.gips_exit() # produce a summary error report then quit with a proper exit status

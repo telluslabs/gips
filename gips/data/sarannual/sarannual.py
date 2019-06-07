@@ -159,7 +159,7 @@ class sarannualData(Data):
                     imgout = gippy.GeoImage.create_from(img, fname, 'float32')
                     imgout.set_nodata(-32768)
                     for b in range(0, imgout.NumBands()):
-                        imgout.set_bandname(img[b].Description(), b + 1)
+                        imgout.set_bandname(img[b].description(), b + 1)
                         (img[b].pow(2).log10() * 10 - 83.0).Process(imgout[b])
                     fname = imgout.Filename()
                     img = None

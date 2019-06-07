@@ -425,7 +425,7 @@ class sarData(Data):
                 imgout = gippy.GeoImage.create_from(img, fname, 1, 'float32')
                 imgout.set_nodata(-32768)
                 for b in range(0, imgout.NumBands()):
-                    imgout.set_bandname(img[b].Description(), b + 1)
+                    imgout.set_bandname(img[b].description(), b + 1)
                     (
                         img[b].pow(2).log10() * 10 +
                         self.assets[asset].get_meta_dict()['CF']
