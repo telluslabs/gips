@@ -117,7 +117,7 @@ class prismAsset(gips.data.core.FtpAsset):
 
     def datafiles(self):
         datafiles = super(prismAsset, self).datafiles()
-        datafiles = filter(lambda x: x.lower().endswith('.bil'), datafiles)
+        datafiles = [d for d in datafiles if d.lower().endswith('.bil')]
         if len(datafiles) > 0:
             indexfile = self.filename + '.index'
             utils.verbose_out('indexfile: {}'.format(indexfile), 3)
@@ -188,7 +188,7 @@ class prismData(Data):
         # TODO: overwrite doesn't play well with pptsum -- wonder if it would
         #       if it was made into a composite product (which it is)
         assert len(prismAsset._sensors) == 1  # sanity check to force this code to stay current
-        sensor = prismAsset._sensors.keys()[0]
+        sensor = list(prismAsset._sensors.keys())[0]
 
         def get_bil_vsifile(d, a):
             with utils.error_handler('Error accessing asset {}'
