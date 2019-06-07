@@ -956,7 +956,7 @@ class modisData(Data):
                     metaname = metaname.upper()
                     meta[metaname] = str(hourmean)
 
-                    tempbands[iband].Process(imgout[band])
+                    tempbands[iband].save(imgout[band])
 
                 imgout[4].set_gain(1.0)
                 imgout[4].write(bestmask)
@@ -1007,7 +1007,7 @@ class modisData(Data):
                     else:
                         raise Exception('%s appears to be an invalid MODIS temperature project' % basename)
 
-                    hourbands[iband].Process(imgout[band])
+                    hourbands[iband].save(imgout[band])
 
                 imgout.set_bandname('Observation Time Daytime Terra', 1)
                 imgout.set_bandname('Observation Time Nighttime Terra', 2)

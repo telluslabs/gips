@@ -239,7 +239,7 @@ class aodData(Data):
             return
         a = inv[inv.dates[0]].tiles[cls.Asset.Repository._the_tile].open('aod')
         a[0] = a[0] * 0 + a[0].NoDataValue()
-        a.Process(ltatif)
+        a.save(ltatif)
 
 
     @classmethod

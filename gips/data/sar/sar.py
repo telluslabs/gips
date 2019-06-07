@@ -399,9 +399,9 @@ class sarData(Data):
 
             if val[0] == 'mask':
                 mask = jo(datafiles['mask'])
-                imgout = mask.Process(fname)
+                imgout = mask.save(fname)
                 imgout[0].set_nodata(0)
-                imgout.Process()
+                imgout.save()
                 # Sometimes the I/O seems to be put off until garbage
                 # collection time, so trick gippy into getting on with it:
                 del imgout
@@ -429,17 +429,17 @@ class sarData(Data):
                     (
                         img[b].pow(2).log10() * 10 +
                         self.assets[asset].get_meta_dict()['CF']
-                    ).Process(imgout[b])
+                    ).save(imgout[b])
                 fname = imgout.Filename()
                 del imgout
             elif val[0] == 'linci':
                 # Note the linci product DOES NOT mask by date
                 img = gippy.GeoImage(datafiles['linci'])
-                img.Process(fname)
+                img.save(fname)
             elif val[0] == 'date':
                 # Note the date product DOES NOT mask by date
                 img = gippy.GeoImage(datafiles['date'])
-                img.Process(fname)
+                img.save(fname)
             else:
                 raise Exception('Unrecognized product: ' + key)
             # True = r/w mode, otherwise add_meta silently does nothing

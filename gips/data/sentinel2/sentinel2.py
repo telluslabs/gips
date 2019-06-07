@@ -1372,9 +1372,9 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                 self._time_report('Starting {} processing'.format(prod_type))
                 temp_fp = self.temp_product_filename(sensor, prod_type)
                 # have to reproduce the whole object because gippy refuses to write metadata when
-                # you do image.Process(filename).
+                # you do image.save(filename).
                 source_image = self._product_images[prod_type]
-                output_image = gippy.GeoImage(temp_fp, source_image)
+                output_image = gippy.GeoImage.create_from(source_image, temp_fp)
                 output_image.set_nodata(0)
                 output_image.add_meta(self.prep_meta())
                 if prod_type in ('ref', 'rad'): # atmo-correction metadata
@@ -1396,11 +1396,11 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                     output_image.set_gain(0.04)
                     output_image.set_offset(400.0)
                     output_image.set_nodata(-32768)
-                for b_num, b_name in enumerate(source_image.BandNames(), 1):
+                for b_num, b_name in enumerate(source_image.bandnames(), 1):
                     output_image.set_bandname(b_name, b_num)
                 # process bandwise because gippy had an error doing it all at once
                 for i in range(len(source_image)):
-                    source_image[i].Process(output_image[i])
+                    source_image[i].save(output_image[i])
                 archive_fp = self.archive_temp_path(temp_fp)
                 self.AddFile(sensor, prod_type, archive_fp)
 

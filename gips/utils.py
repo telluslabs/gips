@@ -404,7 +404,7 @@ def crop2vector(img, vector):
     result = subprocess.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
     mask = gippy.GeoImage(maskname)
-    img.AddMask(mask[0]).Process().ClearMasks()
+    img.add_mask(mask[0]).save(img.filename()).clear_masks()
     mask = None
     shutil.rmtree(os.path.dirname(maskname))
     shutil.rmtree(os.path.dirname(vecname))
@@ -541,7 +541,7 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     for b in range(0, images[0].NumBands()):
         imgout[b].CopyMeta(images[0][b])
     imgout.AddMask(mask_img[0])
-    imgout.Process()
+    imgout.save()
 
 
 def julian_date(date_and_time, variant=None):

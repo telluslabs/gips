@@ -241,7 +241,6 @@ class hlsData(gips.data.core.CloudCoverData):
             #imgout.set_nodata(0) # needed due to particulars of gdal_merge
             imgout.add_meta(self.prep_meta(
                 a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
-            # imgout.Process() # TODO needed?
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, 'cmask', archived_fp)
 
@@ -261,7 +260,6 @@ class hlsData(gips.data.core.CloudCoverData):
             imgout.set_nodata(0) # needed due to particulars of gdal_merge
             imgout.add_meta(self.prep_meta(
                 a_obj.filename, {'Mask_params': 'union of bits 0 to 3'}))
-            # imgout.Process() # TODO needed?
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, 'cloudmask', archived_fp)
 

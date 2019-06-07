@@ -93,13 +93,13 @@ def main():
                     if meta != '':
                         if args.original:
                             VerboseOut('  %s' % (img.Basename()), 2)
-                            img.Process()
+                            img.save()
                             img.add_meta('MASKS', meta)
                         else:
                             fout = os.path.splitext(img.Filename())[0] + args.suffix + '.tif'
                             if not os.path.exists(fout) or args.overwrite:
-                                VerboseOut('  %s -> %s' % (img.Basename(), basename(fout)), 2)
-                                imgout = img.Process(fout)
+                                VerboseOut('  %s -> %s' % (img.basename(), basename(fout)), 2)
+                                imgout = img.save(fout)
                                 imgout.add_meta('MASKS', meta)
                                 imgout = None
                     img = None

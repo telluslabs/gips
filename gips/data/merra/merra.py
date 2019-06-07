@@ -606,7 +606,7 @@ class merraData(Data):
                     print("pickhour", pickhour)
                     print("pickday", pickday)
                     print("pickidx", pickidx)
-                    img[pickidx].Process(imgout[itime])
+                    img[pickidx].save(imgout[itime])
                     obsdate = self.date + datetime.timedelta(pickday)
                     descr = " ".join([strtimes[itime], obsdate.isoformat()])
                     imgout.set_bandname(descr, itime + 1)

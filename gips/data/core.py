@@ -1127,7 +1127,7 @@ class Data(object):
                         # TODO: what is this?
                         #result = subprocess.getstatusoutput(cmd)
                     else:
-                        gippy.GeoImage(fin).Process(fout)
+                        gippy.GeoImage(fin).save(fout)
                         #shutil.copyfile(fin, fout)
         procstr = 'copied' if site is None else 'warped'
         VerboseOut('%s tile %s: %s files %s' % (self.date, self.id, len(products.requested), procstr))

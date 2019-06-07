@@ -280,7 +280,7 @@ class prismData(Data):
                         for img in imgs:
                             oarr += img[0].read(chunk)
                         oimg[0].write(oarr, chunk)
-                    oimg.Process()
+                    oimg.save()
                     os.rename(tmp_fp, archived_fp)
                 oimg = None  # help swig+gdal with GC
                 products.requested.pop(key)

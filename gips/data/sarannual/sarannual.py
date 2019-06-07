@@ -160,7 +160,7 @@ class sarannualData(Data):
                     imgout.set_nodata(-32768)
                     for b in range(0, imgout.NumBands()):
                         imgout.set_bandname(img[b].description(), b + 1)
-                        (img[b].pow(2).log10() * 10 - 83.0).Process(imgout[b])
+                        (img[b].pow(2).log10() * 10 - 83.0).save(imgout[b])
                     fname = imgout.Filename()
                     img = None
                     imgout = None

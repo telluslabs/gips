@@ -1029,7 +1029,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     affine[0] += xcoreg
                     affine[3] += ycoreg
                     imgout.set_affine(affine)
-                imgout.Process()
+                imgout.save()
                 imgout = None
 
             archived_fp = self.archive_temp_path(temp_fp)
@@ -1386,11 +1386,11 @@ class landsatData(gips.data.core.CloudCoverData):
                         imgout.set_gain(0.1)
                         if toa:
                             for col in visbands:
-                                img[col].Process(imgout[col])
+                                img[col].save(imgout[col])
                         else:
                             for col in visbands:
                                 ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
-                                        ).Process(imgout[col])
+                                        ).save(imgout[col])
                         # Mask out any pixel for which any band is nodata
                         #imgout.ApplyMask(img.DataMask())
                     elif val[0] == 'ref':
@@ -1401,11 +1401,11 @@ class landsatData(gips.data.core.CloudCoverData):
                         imgout.set_gain(0.0001)
                         if toa:
                             for c in visbands:
-                                reflimg[c].Process(imgout[c])
+                                reflimg[c].save(imgout[c])
                         else:
                             for c in visbands:
                                 (((img[c] - atm6s.results[c][1]) / atm6s.results[c][0])
-                                        * (1.0 / atm6s.results[c][2])).Process(imgout[c])
+                                        * (1.0 / atm6s.results[c][2])).save(imgout[c])
                         # Mask out any pixel for which any band is nodata
                         #imgout.ApplyMask(img.DataMask())
                     elif val[0] == 'tcap':
@@ -1423,12 +1423,12 @@ class landsatData(gips.data.core.CloudCoverData):
                             imgout.set_bandname(lwbands[i], i + 1)
                         imgout.set_nodata(-32768)
                         imgout.set_gain(0.1)
-                        [reflimg[col].Process(imgout[col]) for col in lwbands]
+                        [reflimg[col].save(imgout[col]) for col in lwbands]
                     elif val[0] == 'dn':
                         rawimg = self._readraw(asset)
                         rawimg.set_gain(1.0)
                         rawimg.set_offset(0.0)
-                        imgout = rawimg.Process(fname)
+                        imgout = rawimg.save(fname)
                         rawimg = None
                     elif val[0] == 'volref':
                         bands = deepcopy(visbands)
@@ -1471,7 +1471,7 @@ class landsatData(gips.data.core.CloudCoverData):
                                     ) / (atmos.output[0] * e)
                             band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
                                     ) * meta[col]['K2'] - 273.15
-                            band.Process(imgout[col])
+                            band.save(imgout[col])
 
                     fname = imgout.Filename()
                     imgout.add_meta(self.prep_meta(asset_fn, md))
@@ -1488,7 +1488,7 @@ class landsatData(gips.data.core.CloudCoverData):
                             affine[0] += coreg_xshift
                             affine[3] += coreg_yshift
                             imgout.set_affine(affine)
-                    imgout.Process()
+                    imgout.save()
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
                     self.AddFile(sensor, key, archive_fp)
