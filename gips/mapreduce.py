@@ -100,7 +100,6 @@ class MapReduce(object):
         chunks = []
         for ichunk in range(nchunks):
             # This is being inverted because gippy is X x Y, whereas numpy is Y x X
-            #chunks.append(gippy.Recti(0, sum(chszs[:ichunk]), datasz[2], chszs[ichunk]))
             chunks.append([0, sum(chszs[:ichunk]), shape[2], chszs[ichunk]])
         return chunks
 

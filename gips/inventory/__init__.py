@@ -186,7 +186,8 @@ class ProjectInventory(Inventory):
         for p in products:
             gimg = self.get_timeseries(p, dates=dates)
             # TODO - move numpy.squeeze into swig interface file?
-            ch = gippy.Recti(chunk[0], chunk[1], chunk[2], chunk[3])
+            gippy.gippy = sys.modules['gippy.gippy']
+            ch = gippy.gippy.Chunk(chunk[0], chunk[1], chunk[2], chunk[3])
             arr = numpy.squeeze(gimg.TimeSeries(days.astype('float64'), ch))
             arr[arr == gimg[0].nodata()] = numpy.nan
             if len(days) == 1:
