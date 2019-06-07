@@ -314,7 +314,7 @@ class gpmData(Data):
             img = gippy.GeoImage(allsds)
 
             imgdata = img.read()
-            imgout = gippy.GeoImage.create(fname, img.XSize(), img.YSize(), 1, 'float32')
+            imgout = gippy.GeoImage.create(fname, img.xsize(), img.ysize(), 1, 'float32')
             del img
             imgout.set_nodata(29999.0)
             imgout.set_offset(0.0)

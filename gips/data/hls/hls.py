@@ -124,7 +124,7 @@ class hlsAsset(gips.data.core.CloudCoverAsset):
 
     def cloud_cover(self):
         try:
-            return float(gippy.GeoImage(self.filename).Meta('cloud_coverage'))
+            return float(gippy.GeoImage(self.filename).meta('cloud_coverage'))
         except RuntimeError as rte:
             rte.args = 'Error reading cloud cover:  ' + rte.args[0],
             raise

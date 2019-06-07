@@ -201,7 +201,7 @@ class smapData(Data):
                 img = gippy.GeoImage(allsds[13])
 
             imgdata = img.read()
-            imgout = gippy.GeoImage.create(fname, img.XSize(), img.YSize(), 1, 'float32')
+            imgout = gippy.GeoImage.create(fname, img.xsize(), img.ysize(), 1, 'float32')
             del img
             imgout.set_nodata(-9999.0)
             imgout.set_offset(0.0)

@@ -518,7 +518,7 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
 
     imgout.set_nodata(nd)
     nddata = np.empty((len(images[0]),
-                       mask_img.YSize(), mask_img.XSize()))
+                       mask_img.ysize(), mask_img.xsize()))
     nddata[:] = nd
     imgout.write(nddata)
     imgout = None

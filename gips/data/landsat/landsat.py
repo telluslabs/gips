@@ -1956,11 +1956,11 @@ class landsatData(gips.data.core.CloudCoverData):
             parameters = template.format(
                 base_satellite='Sentinel2',
                 base_band=base_band_filename,
-                base_nsample=base_band_img.XSize(),
-                base_nline=base_band_img.YSize(),
+                base_nsample=base_band_img.xsize(),
+                base_nline=base_band_img.ysize(),
                 base_pixel_size=base_pixel_size,
-                base_upper_left_x=base_band_img.MinXY().x(),
-                base_upper_left_y=base_band_img.MaxXY().y(),
+                base_upper_left_x=base_band_img.minxy().x(),
+                base_upper_left_y=base_band_img.maxxy().y(),
                 base_utm=self.utm_zone(),
                 warp_satellite='Landsat8',
                 warp_nbands=len(warp_bands_bin),
@@ -1969,11 +1969,11 @@ class landsatData(gips.data.core.CloudCoverData):
                 warp_data_type=' '.join(([
                     str(warp_base_band_img.DataType())
                 ] * len(warp_bands_bin))),
-                warp_nsample=warp_base_band_img.XSize(),
-                warp_nline=warp_base_band_img.YSize(),
+                warp_nsample=warp_base_band_img.xsize(),
+                warp_nline=warp_base_band_img.ysize(),
                 warp_pixel_size=warp_pixel_size,
-                warp_upper_left_x=warp_base_band_img.MinXY().x(),
-                warp_upper_left_y=warp_base_band_img.MaxXY().y(),
+                warp_upper_left_x=warp_base_band_img.minxy().x(),
+                warp_upper_left_y=warp_base_band_img.maxxy().y(),
                 warp_utm=self.utm_zone(),
                 out_bands=' '.join(
                     [os.path.join(tmpdir, basename(band) + '_warped.bin')
@@ -2017,8 +2017,8 @@ class landsatData(gips.data.core.CloudCoverData):
                 if xcoef is None:
                     raise CantAlignError('AROP: no coefs found in cp_log --> '
                                          + repr((warp_tile, warp_date)))
-            x_shift = ((base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()) / out_pixel_size - xcoef) * out_pixel_size
-            y_shift = ((base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()) / out_pixel_size + ycoef) * out_pixel_size
+            x_shift = ((base_band_img.minxy().x() - warp_base_band_img.minxy().x()) / out_pixel_size - xcoef) * out_pixel_size
+            y_shift = ((base_band_img.minxy().y() - warp_base_band_img.maxxy().y()) / out_pixel_size + ycoef) * out_pixel_size
 
             with open('{}/{}_{}_coreg_args.txt'.format(self.path, self.id, datetime.strftime(self.date, "%Y%j")), 'w') as coreg_args:
                 coreg_args.write("x: {}\n".format(x_shift))

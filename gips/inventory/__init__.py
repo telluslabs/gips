@@ -168,7 +168,7 @@ class ProjectInventory(Inventory):
     def data_size(self):
         """ Get 'shape' of inventory: #products x rows x columns """
         img = gippy.GeoImage(self.data[self.dates[0]].open(self.requested_products[0]))
-        sz = (len(self.requested_products), img.YSize(), img.XSize())
+        sz = (len(self.requested_products), img.ysize(), img.xsize())
         return sz
 
     def get_data(self, dates=None, products=None, chunk=None):
