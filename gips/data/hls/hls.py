@@ -188,6 +188,11 @@ class hlsData(gips.data.core.CloudCoverData):
                             ' cloud shadow bits from the QA band)'),
             'latency': 1,
             'bands': [{'name': 'cmask', 'units': Data._unitless}]},
+        'qa': {
+            'assets': list(_ordered_asset_types),
+            'description': ('QA band including cirrus, cloud, adjacent cloud, and cloud shadow bits.'),
+            'latency': 1,
+            'bands': [{'name': 'qa', 'units': Data._unitless}]},
         'ref': {
             'assets': list(_ordered_asset_types),
             'description': ('surface reflectance'),
@@ -254,6 +259,26 @@ class hlsData(gips.data.core.CloudCoverData):
             # imgout.Process() # TODO needed?
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, 'cmask', archived_fp)
+
+    def process_qa(self):
+        """Produce the cloudmask product."""
+        for a_obj in self.assets.values():
+
+            try:
+                src_img = gippy.GeoImage(a_obj.filename)
+            except:
+                os.remove(a_obj.filename)
+                return
+
+            # for both asset types the QA band is the last one
+            qa_nparray = src_img[len(src_img) - 1].Read()
+            temp_fp = self.temp_product_filename(a_obj.sensor, 'qa')
+            imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Byte, 1)
+            imgout[0].Write(qa_nparray.astype(numpy.uint8))
+            imgout.SetMeta(self.prep_meta(
+                a_obj.filename, {'Mask_params': 'QA band'}))
+            archived_fp = self.archive_temp_path(temp_fp)
+            self.AddFile(a_obj.sensor, 'qa', archived_fp)
 
     def process_cloudmask(self):
         """Produce the cloudmask product."""
