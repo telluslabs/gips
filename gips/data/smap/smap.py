@@ -84,6 +84,7 @@ class smapAsset(Asset):
             # screen-scrape the content of the page and extract the full name of the needed file
             # (this step is needed because part of the filename, the creation timestamp, is
             # effectively random).
+            item = item.decode('utf-8')
             if cpattern.search(item):
                 if 'xml' in item:
                     continue

@@ -198,6 +198,7 @@ class merraAsset(Asset):
                 return None, None
         for item in response.readlines():
             # inspect the page and extract the full name of the needed file
+            item = item.decode('utf-8')
             if cpattern.search(item):
                 if 'xml' in item:
                     continue

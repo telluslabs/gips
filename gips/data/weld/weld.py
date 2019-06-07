@@ -114,7 +114,7 @@ class weldAsset(Asset):
                    'auth': (cls.Repository.get_setting('username'),
                             cls.Repository.get_setting('password'))}
         for item in response.readlines():
-
+            item = item.decode('utf-8')
             if cpattern.search(item):
                 if 'xml' in item:
                     continue
