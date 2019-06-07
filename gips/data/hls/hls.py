@@ -36,9 +36,6 @@ from gips.data.sentinel2 import sentinel2
 from gips.data.landsat import landsat
 
 
-from pdb import set_trace
-
-
 # User guide & other docs here:  https://hls.gsfc.nasa.gov/documents/
 
 _hls_version = '1.4'
@@ -238,9 +235,10 @@ class hlsData(gips.data.core.CloudCoverData):
         """Produce the cloudmask product."""
         for a_obj in self.assets.values():
 
+            # TODO: what is going on here?
             try:
                 src_img = gippy.GeoImage(a_obj.filename)
-            except:
+            except Exception:
                 os.remove(a_obj.filename)
                 return
 
