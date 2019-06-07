@@ -393,14 +393,14 @@ def transform(filename, srs):
 def crop2vector(img, vector):
     """ Crop a GeoImage down to a vector - only used by mosaic """
     # transform vector to srs of image
-    vecname = transform(vector.Filename(), img.srs())
+    vecname = transform(vector.filename(), img.srs())
     warped_vec = open_vector(vecname)
     # rasterize the vector
     td = tempfile.mkdtemp()
-    mask = gippy.GeoImage.create_from(img, os.path.join(td, vector.LayerName()), 1, 'uint8')
-    maskname = mask.Filename()
+    mask = gippy.GeoImage.create_from(img, os.path.join(td, vector.layer_name()), 1, 'uint8')
+    maskname = mask.filename()
     mask = None
-    cmd = 'gdal_rasterize -at -burn 1 -l %s %s %s' % (warped_vec.LayerName(), vecname, maskname)
+    cmd = 'gdal_rasterize -at -burn 1 -l %s %s %s' % (warped_vec.layer_name(), vecname, maskname)
     result = subprocess.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
     mask = gippy.GeoImage(maskname)
@@ -475,11 +475,11 @@ def mosaic(images, outfile, vector):
     nd = images[0][0].nodata()
     srs = images[0].srs()
     # check they all have same projection
-    filenames = [images[0].Filename()]
+    filenames = [images[0].filename()]
     for f in range(1, images.NumImages()):
         if images[f].srs() != srs:
             raise Exception("Input files have non-matching projections and must be warped")
-        filenames.append(images[f].Filename())
+        filenames.append(images[f].filename())
     # transform vector to image projection
     geom = wktloads(transform_shape(vector.WKT(), vector.srs(), srs))
 
@@ -496,9 +496,11 @@ def mosaic(images, outfile, vector):
         'GIPS_MOSAIC_SOURCES',
         ';'.join([os.path.basename(f) for f in filenames])
     )
-    for b in range(0, images[0].NumBands()):
-        imgout[b].CopyMeta(images[0][b])
-    imgout.CopyColorTable(images[0])
+    for b in range(0, images[0].nbands()):
+        imgout[b].add_meta(images[0][b].meta())
+
+    #NOTE: CopyColorTable is not supported
+    #imgout.CopyColorTable(images[0])
     return crop2vector(imgout, vector)
 
 
@@ -507,9 +509,9 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     nd = images[0][0].nodata()
     mask_img = gippy.GeoImage(rastermask)
     srs = mask_img.srs()
-    filenames = [images[0].Filename()]
+    filenames = [images[0].filename()]
     for f in range(1, images.NumImages()):
-        filenames.append(images[f].Filename())
+        filenames.append(images[f].filename())
 
     imgout = gippy.GeoImage.create_from(mask_img, outfile,
                                         len(images[0]), images[0].DataType())
@@ -538,8 +540,8 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
         'GIPS_GRIDDED_MOSAIC_SOURCES',
         ';'.join([os.path.basename(f) for f in filenames])
     )
-    for b in range(0, images[0].NumBands()):
-        imgout[b].CopyMeta(images[0][b])
+    for b in range(0, images[0].nbands()):
+        imgout[b].add_meta(images[0][b].meta())
     imgout.AddMask(mask_img[0])
     imgout.save()
 

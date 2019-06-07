@@ -93,7 +93,7 @@ def run_export(args):
                 suffix = '' if args.suffix == '' else '_' + args.suffix
                 res = '' if args.res is None else '_%sx%s' % (args.res[0], args.res[1])
                 bname = (
-                    extents[0].site.LayerName() +
+                    extents[0].site.layer_name() +
                     key + res + '_' + args.command + suffix
                 )
                 tld = os.path.join(args.outdir, bname)

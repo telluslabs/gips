@@ -158,10 +158,10 @@ class sarannualData(Data):
                     img.AddMask(mask[0] == 255)
                     imgout = gippy.GeoImage.create_from(img, fname, 'float32')
                     imgout.set_nodata(-32768)
-                    for b in range(0, imgout.NumBands()):
+                    for b in range(0, len(imgout)):
                         imgout.set_bandname(img[b].description(), b + 1)
                         (img[b].pow(2).log10() * 10 - 83.0).save(imgout[b])
-                    fname = imgout.Filename()
+                    fname = imgout.filename()
                     img = None
                     imgout = None
                     [RemoveFiles([f], ['.hdr', '.aux.xml']) for k, f in datafiles.items() if k != 'hdr']

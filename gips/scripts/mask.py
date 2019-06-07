@@ -73,7 +73,7 @@ def main():
                     meta = ''
                     update = True if args.original else False
                     img = inv[date].open(p, update=update)
-                    fname = img.Filename()
+                    fname = img.filename()
 
                     # TODO: this is a little hacky
                     if "mask" in fname:
@@ -92,11 +92,11 @@ def main():
                         meta = meta + basename(inv[date][mask]) + ' '
                     if meta != '':
                         if args.original:
-                            VerboseOut('  %s' % (img.Basename()), 2)
+                            VerboseOut('  %s' % (img.basename()), 2)
                             img.save()
                             img.add_meta('MASKS', meta)
                         else:
-                            fout = os.path.splitext(img.Filename())[0] + args.suffix + '.tif'
+                            fout = os.path.splitext(img.filename())[0] + args.suffix + '.tif'
                             if not os.path.exists(fout) or args.overwrite:
                                 VerboseOut('  %s -> %s' % (img.basename(), basename(fout)), 2)
                                 imgout = img.save(fout)

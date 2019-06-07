@@ -558,7 +558,7 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
                 i, p_fp), 2)
             imgout[i].write(arr.astype(npdtype))
 
-        prodout[p_type] = imgout.Filename()
+        prodout[p_type] = imgout.filename()
         imgout = None
         imgout = gippy.GeoImage(p_fp, True)
         imgout.set_gain(gain)

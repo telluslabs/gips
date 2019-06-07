@@ -424,13 +424,13 @@ class sarData(Data):
                 img.add_mask(dateimg[0] == dateday)
                 imgout = gippy.GeoImage.create_from(img, fname, 1, 'float32')
                 imgout.set_nodata(-32768)
-                for b in range(0, imgout.NumBands()):
+                for b in range(0, len(imgout)):
                     imgout.set_bandname(img[b].description(), b + 1)
                     (
                         img[b].pow(2).log10() * 10 +
                         self.assets[asset].get_meta_dict()['CF']
                     ).save(imgout[b])
-                fname = imgout.Filename()
+                fname = imgout.filename()
                 del imgout
             elif val[0] == 'linci':
                 # Note the linci product DOES NOT mask by date

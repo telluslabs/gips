@@ -1226,7 +1226,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         try:
                             # on error, use the unshifted image
                             s2_export = self.sentinel2_coreg_export(tmpdir_fp)
-                            self.run_arop(s2_export, img['NIR'].Filename())
+                            self.run_arop(s2_export, img['NIR'].filename())
                         except NoSentinelError:
                             verbose_out(
                                 'No Sentinel found for co-registration', 4)
@@ -1380,7 +1380,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         ####################
                     elif val[0] == 'rad':
                         imgout = gippy.GeoImage.create_from(img, fname, len(visbands), 'int16')
-                        for i in range(0, imgout.NumBands()):
+                        for i in range(0, len(imgout)):
                             imgout.set_bandname(visbands[i], i + 1)
                         imgout.set_nodata(-32768)
                         imgout.set_gain(0.1)
@@ -1396,7 +1396,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         # imgout.apply_mask(img.data_mask())
                     elif val[0] == 'ref':
                         imgout = gippy.GeoImage.create_from(img, fname, len(visbands), 'int16')
-                        for i in range(0, imgout.NumBands()):
+                        for i in range(0, len(imgout)):
                             imgout.set_bandname(visbands[i], i + 1)
                         imgout.set_nodata(-32768)
                         imgout.set_gain(0.0001)
@@ -1412,16 +1412,16 @@ class landsatData(gips.data.core.CloudCoverData):
                         #imgout.apply_mask(img.DataMask())
                     elif val[0] == 'tcap':
                         tmpimg = gippy.GeoImage(reflimg)
-                        tmpimg.PruneBands(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'])
+                        tmpimg.select(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'])
                         arr = numpy.array(self.Asset._sensors[self.sensor_set[0]]['tcap']).astype('float32')
                         imgout = LinearTransform(tmpimg, fname, arr)
                         imgout.add_meta('AREA_OR_POINT', 'Point')
                         outbands = ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6']
-                        for i in range(0, imgout.NumBands()):
+                        for i in range(0, len(imgout)):
                             imgout.set_bandname(outbands[i], i + 1)
                     elif val[0] == 'temp':
                         imgout = gippy.GeoImage.create_from(img, fname, len(lwbands), 'int16')
-                        for i in range(0, imgout.NumBands()):
+                        for i in range(0, len(imgout)):
                             imgout.set_bandname(lwbands[i], i + 1)
                         imgout.set_nodata(-32768)
                         imgout.set_gain(0.1)
@@ -1457,7 +1457,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     elif val[0] == 'wtemp':
                         raise NotImplementedError('See https://gitlab.com/appliedgeosolutions/gips/issues/155')
                         imgout = gippy.GeoImage.create_from(img, fname, len(lwbands), 'int16')
-                        [imgout.set_bandname(lwbands[i], i + 1) for i in range(0, imgout.NumBands())]
+                        [imgout.set_bandname(lwbands[i], i + 1) for i in range(0, len(imgout))]
                         imgout.set_nodata(-32768)
                         imgout.set_gain(0.1)
                         tmpimg = gippy.GeoImage(img)
@@ -1475,7 +1475,7 @@ class landsatData(gips.data.core.CloudCoverData):
                                     ) * meta[col]['K2'] - 273.15
                             band.save(imgout[col])
 
-                    fname = imgout.Filename()
+                    fname = imgout.filename()
                     imgout.add_meta(self.prep_meta(asset_fn, md))
 
                     if coreg:
@@ -1772,7 +1772,7 @@ class landsatData(gips.data.core.CloudCoverData):
             dynrange = md['dynrange'][bi]
             # #band.SetDynamicRange(dynrange[0], dynrange[1])
             # dynrange[0] was used internally to for conversion to radiance
-            # from DN in GeoRaster.Read:
+            # from DN in GeoRaster.read:
             #   img = Gain() * (img-_minDC) + Offset();  # (1)
             # and with the removal of _minDC and _maxDC it is now:
             #   img = Gain() * img + Offset();           # (2)

@@ -686,7 +686,7 @@ class modisData(Data):
                 del refl
 
                 imgout.set_nodata(missing)
-                imgout.SetOffset(0.0)
+                imgout.set_offset(0.0)
                 imgout.set_gain(0.0001)
                 imgout[6].set_gain(1.0)
 
@@ -728,7 +728,7 @@ class modisData(Data):
                 imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
                 del img
                 imgout.set_nodata(nodata)
-                imgout.SetOffset(0.0)
+                imgout.set_offset(0.0)
                 imgout.set_gain(1.0)
                 imgout.set_bandname('Cloud Cover', 1)
                 imgout[0].write(clouds)
@@ -853,7 +853,7 @@ class modisData(Data):
                 imgout = gippy.GeoImage.create_from(img, fname, 2, 'uint8')
                 del img
                 imgout.set_nodata(127)
-                imgout.SetOffset(0.0)
+                imgout.set_offset(0.0)
                 imgout.set_gain(1.0)
                 imgout.set_bandname('Snow Cover', 1)
                 imgout.set_bandname('Fractional Snow Cover', 2)
@@ -897,7 +897,7 @@ class modisData(Data):
                 # there are four temperature bands
                 for iband, band in enumerate(availbands):
                     # get meta name template info
-                    basename = tempbands[iband].Basename()
+                    basename = tempbands[iband].basename()
                     platform = self.Asset._sensors[basename[:3]]['description']
 
                     if basename.find('daytime'):
@@ -997,7 +997,7 @@ class modisData(Data):
                 # there are four temperature bands
                 for iband, band in enumerate(availbands):
                     # get meta name template info
-                    basename = hourbands[iband].Basename()
+                    basename = hourbands[iband].basename()
                     platform = self.Asset._sensors[basename[:3]]['description']
 
                     if basename.find('daytime'):

@@ -284,9 +284,9 @@ class aodData(Data):
             img = gippy.GeoImage(filenames)
             imgout = gippy.GeoImage.create_from(img, fout, 2, 'float32')
             imgout.set_nodata(-32768)
-            img.Mean(imgout[0])
+            img.mean(imgout[0])
             meanimg = imgout[0].read()
-            for band in range(0, img.NumBands()):
+            for band in range(0, len(img)):
                 data = img[band].read()
                 mask = img[band].DataMask()
                 var = numpy.multiply(numpy.power(data - meanimg, 2), mask)
