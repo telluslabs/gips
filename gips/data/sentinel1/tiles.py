@@ -1,6 +1,8 @@
 from __future__ import print_function
 
-import sys, os
+import os
+import sys
+import glob
 from collections import defaultdict
 
 import numpy as np
@@ -26,6 +28,17 @@ TEMPDIR = "/archive/vector"
 # Tile dimensions
 DLON = 0.15
 DLAT = 0.15
+
+
+def write_feature(vector, outfile):
+    """ make a shapefile out of a feature """
+
+    wkt = vector.WKT()
+    proj = vector.Projection()
+    gdf = gpd.GeoDataFrame([{'geometry':loads(wkt)}], geometry='geometry', crs=proj)
+    print('writing', outfile)
+    gdf.to_file(outfile)
+
 
 
 def extract(source, target, output, merge, buffer, buffer_after, filter, same_attrs):
@@ -208,7 +221,7 @@ def make_rectangular_tilegrid(outdir, tileid, nxgrid, nygrid, tileid_attribute, 
     return(outfile)
 
 
-def make_tilegrid(shpfile, outdir, tileid_pattern, tileid_attribute):
+def make_tilegrid(shpfile, outdir, outname, tileid_pattern, tileid_attribute):
 
     gdf = gpd.read_file(shpfile)
     orig_crs = gdf.crs
@@ -243,14 +256,16 @@ def make_tilegrid(shpfile, outdir, tileid_pattern, tileid_attribute):
     gdf = gdf.to_crs(orig_crs)
     gdf.to_file(rectfile)
 
-    outfile = os.path.join(outdir, 'tiles.shp')
+    outfile = os.path.join(outdir, outname)
 
     print('extracting', rectfile, shpfile, outfile)
     tilelist = extract(rectfile, shpfile, outfile, merge=True, buffer=None, buffer_after=None, filter=None, same_attrs=None)
 
     print('removing', rectfile)
-    os.remove(rectfile)
+    # TODO: use temp file
+    for file in glob.glob(os.path.splitext(rectfile)[0] + '.*'):
+        os.remove(file)
 
     # return the tilelist
-    return outfile, tilelist
+    return tilelist
 

@@ -52,7 +52,10 @@ import gippy.algorithms
 from gips.data.core import Repository, Asset, Data
 import gips.data.core
 from gips import utils
-from gips.data.sentinel1.tiles import make_tilegrid, make_rectangular_tilegrid
+from gips.data.sentinel1.tiles import write_feature, make_tilegrid, make_rectangular_tilegrid
+
+
+from pdb import set_trace
 
 
 _asset_types = ('L1',)
@@ -97,12 +100,19 @@ class sentinel1Repository(Repository):
         make a tilegrid on the fly and get the list of tiles
         tilefile is called /archive/sentinel1/stage/tile_{}_{}.shp
         """
-
         outdir = "/archive/sentinel1/stage"
         tileid_pattern = "{}-{}"
-        tileshpfile, tilelist = make_tilegrid(vector.Filename(), outdir, tileid_pattern, cls._tile_attribute)
-        cls._tilefile_name = tileshpfile
-        print('cls._tile_name', tileshpfile)
+        outname = "tiles.shp"
+        featurepath = os.path.join(outdir, 'feature.shp')
+        write_feature(vector, featurepath)
+        tilelist = make_tilegrid(featurepath, outdir, outname, tileid_pattern, cls._tile_attribute)
+
+        # TODO: use temp file
+        for file in glob.glob(os.path.splitext(featurepath)[0] + '.*'):
+            os.remove(file)
+
+        cls._tilefile_name = os.path.join(outdir, outname)
+        print('cls._tilefile_name', cls._tilefile_name)
         return {k: (1,1) for k in tilelist}
 
 
@@ -145,7 +155,6 @@ class sentinel1Asset(Asset):
         super(sentinel1Asset, self).__init__(filename)
 
         self.basename = os.path.basename(filename)
-
         match = re.match(self._asset_pat_base, self.basename)
 
         self.asset = "L1"
@@ -209,6 +218,10 @@ class sentinel1Asset(Asset):
                   date_type='beginPosition', productType='GRD', sensoroperationalmode='IW')
 
         print('len(downloader.get_scenes())', len(downloader.get_scenes()))
+
+        # TODO: use temp file
+        for file in glob.glob(os.path.splitext(rectfile)[0] + '.*'):
+            os.remove(file)
 
         if len(downloader.get_scenes()) == 0:
             print('returning None')
