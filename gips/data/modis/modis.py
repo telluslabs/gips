@@ -555,6 +555,7 @@ class modisData(Data):
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
+            # TODO: get other bands or at least get quality < 3
             if val[0] == "quality":
                 if version != 6:
                     raise Exception('product version not supported')

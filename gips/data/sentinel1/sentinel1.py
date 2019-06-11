@@ -199,7 +199,6 @@ class sentinel1Asset(Asset):
             gdf = gdf[gdf['tileid'] == tile]
             # IMPORTANT: outfile is the name of the single tile boundaru
             gdf.to_file(outpath)
-
         else:
             rectfile = make_rectangular_tilegrid(outdir, tile, 1, 1, 'tileid', filename=outfile)
             assert rectfile == outpath
@@ -220,8 +219,8 @@ class sentinel1Asset(Asset):
         print('len(downloader.get_scenes())', len(downloader.get_scenes()))
 
         # TODO: use temp file
-        #for file in glob.glob(os.path.splitext(outpath)[0] + '.*'):
-        #    os.remove(file)
+        for file in glob.glob(os.path.splitext(outpath)[0] + '.*'):
+           os.remove(file)
 
         if len(downloader.get_scenes()) == 0:
             print('returning None')
