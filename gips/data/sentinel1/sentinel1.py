@@ -220,8 +220,8 @@ class sentinel1Asset(Asset):
         print('len(downloader.get_scenes())', len(downloader.get_scenes()))
 
         # TODO: use temp file
-        for file in glob.glob(os.path.splitext(outpath)[0] + '.*'):
-            os.remove(file)
+        #for file in glob.glob(os.path.splitext(outpath)[0] + '.*'):
+        #    os.remove(file)
 
         if len(downloader.get_scenes()) == 0:
             print('returning None')
