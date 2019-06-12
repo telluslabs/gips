@@ -55,9 +55,6 @@ from gips import utils
 from gips.data.sentinel1.tiles import write_feature, make_tilegrid, make_rectangular_tilegrid
 
 
-from pdb import set_trace
-
-
 _asset_types = ('L1',)
 
 
