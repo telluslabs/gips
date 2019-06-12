@@ -555,23 +555,47 @@ class modisData(Data):
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
-
             if val[0] == "quality":
                 if version != 6:
                     raise Exception('product version not supported')
-                img = gippy.GeoImage(allsds[11:18])
-                imgout = gippy.GeoImage(fname, img)
+                img = gippy.GeoImage(allsds[11:17])
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 6)
+
+                red = img[0].Read()
+                nir = img[1].Read()
+                blu = img[2].Read()
+                grn = img[3].Read()
+                sw1 = img[4].Read()
+                sw2 = img[5].Read()
+                del img
+
+                imgout.SetBandName('QC BLUE', 1)
+                imgout.SetBandName('QC GREEN', 2)
+                imgout.SetBandName('QC RED', 3)
+                imgout.SetBandName('QC NIR', 4)
+                imgout.SetBandName('QC SWIR1', 5)
+                imgout.SetBandName('QC SWIR2', 6)
+
+                imgout[0].Write(blu)
+                imgout[1].Write(grn)
+                imgout[2].Write(red)
+                imgout[3].Write(nir)
+                imgout[4].Write(sw1)
+                imgout[5].Write(sw2)
 
             if val[0] == "ref":
-                img = gippy.GeoImage(allsds)
+                if version != 6:
+                    raise Exception('product version not supported')
+
+                img = gippy.GeoImage(allsds[7:13])
                 imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
 
-                red = img[7].Read()
-                nir = img[8].Read()
-                blu = img[9].Read()
-                grn = img[10].Read()
-                sw1 = img[11].Read()
-                sw2 = img[12].Read()
+                red = img[0].Read()
+                nir = img[1].Read()
+                blu = img[2].Read()
+                grn = img[3].Read()
+                sw1 = img[4].Read()
+                sw2 = img[5].Read()
                 del img
 
                 imgout.SetNoData(32767)
