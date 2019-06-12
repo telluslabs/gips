@@ -43,10 +43,6 @@ import boto3
 import zipfile
 
 
-from pdb import set_trace
-
-
-
 class Args(object):
     pass
 
@@ -60,7 +56,6 @@ def main(jobid):
 
     args = Args()
     args.products = ['ndvi', 'lswi', 'brgt']
-    args.res = [20., 20.]
     args.stop_on_error = "False"
     args.suffix = ""
     args.format = "GTiff"
@@ -74,7 +69,7 @@ def main(jobid):
     args.notld = True
     args.fetch = True
     args.crop = False
-    args.overwrite = False
+    args.overwrite = True
     args.alltouch = True
     args.tree = False
     args.size = False
@@ -100,8 +95,10 @@ def main(jobid):
         if args.command == "hls":
             args.products.append('cmask')
         else:
-            args.products.append('clouds')
+            args.products.append('ndsi')
+            args.products.append('quality')
 
+        args.res = [config['res', config['res']]
         year = config['year']
         s3shpfile = config['shapefile']
         name = s3shpfile.split('/')[-1].split('.zip')[0]
@@ -125,16 +122,14 @@ def main(jobid):
 
             args.dates = "{}-{}".format(year, str(doy+1).zfill(3))
             args.where = "FID={}".format(fid)
-
+            print('outdir', args.outdir)
             print(args.dates)
             print(args.where)
 
             run_export(args)
-
             print('done export')
 
         print('cleaning up')
-
         items = glob.glob('/archive/{}/tiles/*'.format(args.command))
         for item in items:
             shutil.rmtree(item)

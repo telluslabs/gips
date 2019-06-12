@@ -107,25 +107,25 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
             'pattern': '^MCD43A4' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A4.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15, # this may need to be revised; see S3 version
+            'latency': 5, # this may need to be revised; see S3 version
         },
         MCD43A4S3: {
             'pattern': '^MCD43A4' + _asset_re_common + r'_S3\.json$',
             # this date appears wrong but no better value is documented
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 10,
+            'latency': 5,
         },
         'MCD43A2': {
             'pattern': '^MCD43A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOTA/MCD43A2.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15,
+            'latency': 5,
         },
         'MOD09Q1': {
             'pattern': '^MOD09Q1' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD09Q1.006',
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 7,
+            'latency': 5,
         },
         'MOD10A1': {
             'pattern': '^MOD10A1' + _asset_re_tail,
@@ -470,6 +470,14 @@ class modisData(Data):
             'bands': ['cloud-cover'],
             'startdate': datetime.date(2000, 2, 24),
             'latency': 3
+        },
+        'ref': {
+            'description': 'Surface reflectance',
+            'assets': [MCD43A4],
+            'sensor': 'MCD',
+            'bands': ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'],
+            'startdate': datetime.date(2000, 2, 18),
+            'latency': 15,
         }
     }
 
@@ -550,8 +558,63 @@ class modisData(Data):
             if val[0] == "quality":
                 if version != 6:
                     raise Exception('product version not supported')
-                os.symlink(allsds[0], fname)
-                imgout = gippy.GeoImage(fname)
+                img = gippy.GeoImage(allsds[11:17])
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 6)
+
+                red = img[0].Read()
+                nir = img[1].Read()
+                blu = img[2].Read()
+                grn = img[3].Read()
+                sw1 = img[4].Read()
+                sw2 = img[5].Read()
+                del img
+
+                imgout.SetBandName('QC BLUE', 1)
+                imgout.SetBandName('QC GREEN', 2)
+                imgout.SetBandName('QC RED', 3)
+                imgout.SetBandName('QC NIR', 4)
+                imgout.SetBandName('QC SWIR1', 5)
+                imgout.SetBandName('QC SWIR2', 6)
+
+                imgout[0].Write(blu)
+                imgout[1].Write(grn)
+                imgout[2].Write(red)
+                imgout[3].Write(nir)
+                imgout[4].Write(sw1)
+                imgout[5].Write(sw2)
+
+            if val[0] == "ref":
+                if version != 6:
+                    raise Exception('product version not supported')
+
+                img = gippy.GeoImage(allsds[7:13])
+                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
+
+                red = img[0].Read()
+                nir = img[1].Read()
+                blu = img[2].Read()
+                grn = img[3].Read()
+                sw1 = img[4].Read()
+                sw2 = img[5].Read()
+                del img
+
+                imgout.SetNoData(32767)
+                imgout.SetOffset(0.0)
+                imgout.SetGain(0.0001)
+
+                imgout.SetBandName('BLUE', 1)
+                imgout.SetBandName('GREEN', 2)
+                imgout.SetBandName('RED', 3)
+                imgout.SetBandName('NIR', 4)
+                imgout.SetBandName('SWIR1', 5)
+                imgout.SetBandName('SWIR2', 6)
+
+                imgout[0].Write(blu)
+                imgout[1].Write(grn)
+                imgout[2].Write(red)
+                imgout[3].Write(nir)
+                imgout[4].Write(sw1)
+                imgout[5].Write(sw2)
 
             # LAND VEGETATION INDICES PRODUCT
             # now with QC layer!
