@@ -55,10 +55,7 @@ def main(jobid):
     print(title)
 
     args = Args()
-    #args.products = ['ref', 'ndvi', 'lswi', 'brgt']
     args.products = ['ndvi', 'lswi', 'brgt']
-    args.res = [500, 500]
-    #args.res = [20., 20.]
     args.stop_on_error = "False"
     args.suffix = ""
     args.format = "GTiff"
@@ -99,7 +96,9 @@ def main(jobid):
             args.products.append('cmask')
         else:
             args.products.append('ndsi')
+            args.products.append('quality')
 
+        args.res = [config['res', config['res']]
         year = config['year']
         s3shpfile = config['shapefile']
         name = s3shpfile.split('/')[-1].split('.zip')[0]
