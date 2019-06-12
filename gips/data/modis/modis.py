@@ -477,7 +477,7 @@ class modisData(Data):
             'sensor': 'MCD',
             'bands': ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'],
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15,
+            'latency': 5,
         }
     }
 
