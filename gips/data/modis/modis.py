@@ -555,12 +555,12 @@ class modisData(Data):
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
+
             if val[0] == "quality":
                 if version != 6:
                     raise Exception('product version not supported')
-                os.symlink(allsds[0], fname)
-                imgout = gippy.GeoImage(fname)
-
+                img = gippy.GeoImage(allsds[11:18])
+                imgout = gippy.GeoImage(fname, img)
 
             if val[0] == "ref":
                 img = gippy.GeoImage(allsds)
