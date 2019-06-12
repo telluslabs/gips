@@ -256,16 +256,16 @@ class hlsData(gips.data.core.CloudCoverData):
 
             try:
                 src_img = gippy.GeoImage(a_obj.filename)
-            except:
+            except Exception:
                 os.remove(a_obj.filename)
                 return
 
             # for both asset types the QA band is the last one
-            qa_nparray = src_img[len(src_img) - 1].Read()
+            qa_nparray = src_img[len(src_img) - 1].read()
             temp_fp = self.temp_product_filename(a_obj.sensor, 'qa')
-            imgout = gippy.GeoImage(temp_fp, src_img, gippy.GDT_Byte, 1)
-            imgout[0].Write(qa_nparray.astype(numpy.uint8))
-            imgout.SetMeta(self.prep_meta(
+            imgout = gippy.GeoImage.create_from(src_img, temp_fp, 1, 'uint8')
+            imgout[0].write(qa_nparray.astype(numpy.uint8))
+            imgout.add_meta(self.prep_meta(
                 a_obj.filename, {'Mask_params': 'QA band'}))
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(a_obj.sensor, 'qa', archived_fp)

@@ -475,7 +475,7 @@ class modisData(Data):
             'sensor': 'MCD',
             'bands': ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'],
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15,
+            'latency': 5,
         }
     }
 
@@ -579,62 +579,62 @@ class modisData(Data):
                 if version != 6:
                     raise Exception('product version not supported')
                 img = gippy.GeoImage(allsds[11:17])
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 6)
+                imgout = gippy.GeoImage.create_from(img, fname, 6, 'uint8')
 
-                red = img[0].Read()
-                nir = img[1].Read()
-                blu = img[2].Read()
-                grn = img[3].Read()
-                sw1 = img[4].Read()
-                sw2 = img[5].Read()
+                red = img[0].read()
+                nir = img[1].read()
+                blu = img[2].read()
+                grn = img[3].read()
+                sw1 = img[4].read()
+                sw2 = img[5].read()
                 del img
 
-                imgout.SetBandName('QC BLUE', 1)
-                imgout.SetBandName('QC GREEN', 2)
-                imgout.SetBandName('QC RED', 3)
-                imgout.SetBandName('QC NIR', 4)
-                imgout.SetBandName('QC SWIR1', 5)
-                imgout.SetBandName('QC SWIR2', 6)
+                imgout.set_bandname('QC BLUE', 1)
+                imgout.set_bandname('QC GREEN', 2)
+                imgout.set_bandname('QC RED', 3)
+                imgout.set_bandname('QC NIR', 4)
+                imgout.set_bandname('QC SWIR1', 5)
+                imgout.set_bandname('QC SWIR2', 6)
 
-                imgout[0].Write(blu)
-                imgout[1].Write(grn)
-                imgout[2].Write(red)
-                imgout[3].Write(nir)
-                imgout[4].Write(sw1)
-                imgout[5].Write(sw2)
+                imgout[0].write(blu)
+                imgout[1].write(grn)
+                imgout[2].write(red)
+                imgout[3].write(nir)
+                imgout[4].write(sw1)
+                imgout[5].write(sw2)
 
             if val[0] == "ref":
                 if version != 6:
                     raise Exception('product version not supported')
 
                 img = gippy.GeoImage(allsds[7:13])
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, 6)
+                imgout = gippy.GeoImage.create_from(img, fname, 6, 'int16')
 
-                red = img[0].Read()
-                nir = img[1].Read()
-                blu = img[2].Read()
-                grn = img[3].Read()
-                sw1 = img[4].Read()
-                sw2 = img[5].Read()
+                red = img[0].read()
+                nir = img[1].read()
+                blu = img[2].read()
+                grn = img[3].read()
+                sw1 = img[4].read()
+                sw2 = img[5].read()
                 del img
 
-                imgout.SetNoData(32767)
-                imgout.SetOffset(0.0)
-                imgout.SetGain(0.0001)
+                imgout.set_nodata(32767)
+                imgout.set_offset(0.0)
+                imgout.set_gain(0.0001)
 
-                imgout.SetBandName('BLUE', 1)
-                imgout.SetBandName('GREEN', 2)
-                imgout.SetBandName('RED', 3)
-                imgout.SetBandName('NIR', 4)
-                imgout.SetBandName('SWIR1', 5)
-                imgout.SetBandName('SWIR2', 6)
+                imgout.set_bandname('BLUE', 1)
+                imgout.set_bandname('GREEN', 2)
+                imgout.set_bandname('RED', 3)
+                imgout.set_bandname('NIR', 4)
+                imgout.set_bandname('SWIR1', 5)
+                imgout.set_bandname('SWIR2', 6)
 
-                imgout[0].Write(blu)
-                imgout[1].Write(grn)
-                imgout[2].Write(red)
-                imgout[3].Write(nir)
-                imgout[4].Write(sw1)
-                imgout[5].Write(sw2)
+                imgout[0].write(blu)
+                imgout[1].write(grn)
+                imgout[2].write(red)
+                imgout[3].write(nir)
+                imgout[4].write(sw1)
+                imgout[5].write(sw2)
 
             # LAND VEGETATION INDICES PRODUCT
             # now with QC layer!
