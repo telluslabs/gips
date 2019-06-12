@@ -123,22 +123,19 @@ def main(jobid):
 
             args.dates = "{}-{}".format(year, str(doy+1).zfill(3))
             args.where = "FID={}".format(fid)
-
             print('outdir', args.outdir)
             print(args.dates)
             print(args.where)
 
             run_export(args)
-
             print('done export')
 
         print('cleaning up')
+        items = glob.glob('/archive/{}/tiles/*'.format(args.command))
+        for item in items:
+            shutil.rmtree(item)
 
-        # items = glob.glob('/archive/{}/tiles/*'.format(args.command))
-        # for item in items:
-        #     shutil.rmtree(item)
-
-        # utils.gips_exit()
+        utils.gips_exit()
 
 
 if __name__ == "__main__":
