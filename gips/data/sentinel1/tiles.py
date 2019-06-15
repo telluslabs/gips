@@ -17,8 +17,6 @@ import geopandas as gpd
 from rtree import index
 
 
-from pdb import set_trace
-
 speedups.enable()
 
 
@@ -221,12 +219,18 @@ def make_rectangular_tilegrid(outdir, tileid, nxgrid, nygrid, tileid_attribute, 
     return(outfile)
 
 
-def make_tilegrid(shpfile, outdir, outname, tileid_pattern, tileid_attribute):
+def make_tilegrid(shpfile, outdir, outname, tileid_pattern, tileid_attribute, append=False):
 
     gdf = gpd.read_file(shpfile)
     orig_crs = gdf.crs
     gdf = gdf.to_crs(epsg=4326)
     bounds = gdf.bounds
+
+    outfile = os.path.join(outdir, outname)
+
+    if append is True:
+        # deal with the case of multiple features
+        existing_tiles = gpd.read_file(outfile)
 
     # UL
     minx = bounds['minx'].min()
@@ -256,10 +260,17 @@ def make_tilegrid(shpfile, outdir, outname, tileid_pattern, tileid_attribute):
     gdf = gdf.to_crs(orig_crs)
     gdf.to_file(rectfile)
 
-    outfile = os.path.join(outdir, outname)
-
     print('extracting', rectfile, shpfile, outfile)
-    tilelist = extract(rectfile, shpfile, outfile, merge=True, buffer=None, buffer_after=None, filter=None, same_attrs=None)
+    tilelist = extract(rectfile, shpfile, outfile,
+               merge=True, buffer=None, buffer_after=None, filter=None, same_attrs=None)
+
+    if append is True:
+        # deal with the case of multiple features open and rewrite tiles.shp
+        new_tiles = gpd.read_file(outfile)
+        new_tiles = new_tiles.append(existing_tiles, ignore_index=True)
+        new_tiles = gpd.GeoDataFrame(new_tiles, crs=existing_tiles.crs, geometry='geometry')
+        new_tiles = new_tiles.loc[~new_tiles.tileid.duplicated(keep='first')]
+        new_tiles.to_file(outfile)
 
     print('removing', rectfile)
     # TODO: use temp file

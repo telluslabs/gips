@@ -102,7 +102,12 @@ class sentinel1Repository(Repository):
         outname = "tiles.shp"
         featurepath = os.path.join(outdir, 'feature.shp')
         write_feature(vector, featurepath)
-        tilelist = make_tilegrid(featurepath, outdir, outname, tileid_pattern, cls._tile_attribute)
+
+        if cls._tilefile_name is not None:
+            tilelist = make_tilegrid(featurepath, outdir, outname, tileid_pattern, cls._tile_attribute,
+                                     append=True)
+        else:
+            tilelist = make_tilegrid(featurepath, outdir, outname, tileid_pattern, cls._tile_attribute)
 
         # TODO: use temp file
         for file in glob.glob(os.path.splitext(featurepath)[0] + '.*'):
