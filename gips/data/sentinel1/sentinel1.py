@@ -68,6 +68,9 @@ def command(cmd):
 
 
 class sentinel1Repository(Repository):
+    if not os.path.exists('/usr/bin/gpt'):
+        raise Exception('SNAP GPT not installed')
+
     name = 'Sentinel1'
     description = 'Data from the Sentinel 1 satellite(s) from the ESA'
 
@@ -294,7 +297,12 @@ class sentinel1Asset(Asset):
                 scenes = [s['identifier'] for s in downloader.get_scenes()]
                 downloadfiles = [os.path.join(stagedir, s + '.zip') for s in scenes]
 
-            downloader.download_all()
+            print('about to download', downloadfiles)
+            result = downloader.download_all()
+            print(result)
+            if not len(result['success']) == len(scenes):
+                raise Exception('Not all files were successfully downloaded')
+
             # TODO: check they are complete before moving them
             for scene in scenes:
                 print('downloaded', scene)
