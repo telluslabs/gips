@@ -223,6 +223,10 @@ class sentinel1Asset(Asset):
 
         print('len(downloader.get_scenes())', len(downloader.get_scenes()))
 
+        # TODO: use temp file
+        for file in glob.glob(os.path.splitext(outpath)[0] + '.*'):
+           os.remove(file)
+
         if len(downloader.get_scenes()) == 0:
             print('returning None')
             return None
@@ -230,10 +234,6 @@ class sentinel1Asset(Asset):
             basename = 'S1_IW_GRDH_{}_{}.tif'.format(date.date().strftime('%Y%m%d'), tile)
             print('returning', basename)
             return {'basename': basename, 'downloader': downloader, 'url': ''}
-
-        # TODO: use temp file
-        for file in glob.glob(os.path.splitext(outpath)[0] + '.*'):
-           os.remove(file)
 
 
     @classmethod
