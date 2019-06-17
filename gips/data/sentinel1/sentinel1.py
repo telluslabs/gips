@@ -223,10 +223,6 @@ class sentinel1Asset(Asset):
 
         print('len(downloader.get_scenes())', len(downloader.get_scenes()))
 
-        # TODO: use temp file
-        for file in glob.glob(os.path.splitext(outpath)[0] + '.*'):
-           os.remove(file)
-
         if len(downloader.get_scenes()) == 0:
             print('returning None')
             return None
@@ -367,7 +363,19 @@ class sentinel1Asset(Asset):
             # no need to merge
             shutil.move(outfiles[0], download_fp)
 
+        # TODO: use temp file
+        for file in glob.glob(os.path.splitext(shpfile)[0] + '.*'):
+           os.remove(file)
+
         return True
+
+    @classmethod
+    def fetch(cls, *args, **kwargs):
+        super(sentinel1Asset, cls).fetch(*args, **kwargs)
+        from pdb import set_trace; set_trace()
+        # clear out the staging area
+        # TODO: just use temp files everywhere
+        # or more ideally, provide an option for the user to keep the raw files
 
 
 class sentinel1Data(Data):
