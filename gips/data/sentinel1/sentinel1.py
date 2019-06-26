@@ -372,7 +372,6 @@ class sentinel1Asset(Asset):
     @classmethod
     def fetch(cls, *args, **kwargs):
         fetched = super(sentinel1Asset, cls).fetch(*args, **kwargs)
-        #from pdb import set_trace; set_trace()
         # clear out the staging area
         # TODO: just use temp files everywhere
         # or more ideally, provide an option for the user to keep the raw files
