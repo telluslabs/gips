@@ -194,10 +194,14 @@ class S3Mixin(object):
     """
     @classmethod
     @lru_cache(maxsize=1)
-    def s3_prefix_search(cls, prefix):
-        validate_s3_env_vars()
+    def s3_prefix_search(cls, prefix, profile=None):
         # find the layer and metadata files matching the current scene
         import boto3 # import here so it only breaks if it's actually needed
+        if profile is None:
+            validate_s3_env_vars()
+        else:
+            # the user has a [profile] set up in $HOME/.aws/credentials
+            boto3.setup_default_session(profile_name=profile)
         s3 = boto3.resource('s3')
         bucket = s3.Bucket(cls._s3_bucket_name)
         keys = [o.key for o in bucket.objects.filter(Prefix=prefix)]

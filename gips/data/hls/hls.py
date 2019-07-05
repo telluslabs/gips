@@ -55,7 +55,9 @@ class hlsRepository(Repository):
         return super(hlsRepository, cls).get_setting(key)
 
 
-class hlsAsset(gips.data.core.CloudCoverAsset):
+class hlsAsset(gips.data.core.CloudCoverAsset,
+               gips.data.core.S3Mixin):
+
     Repository = hlsRepository
 
     _sensors = {
@@ -141,7 +143,18 @@ class hlsAsset(gips.data.core.CloudCoverAsset):
                     _url_base, r.status_code))
 
     @classmethod
-    def query_provider(cls, asset, tile, date, **ignored):
+    def data_src(cls):
+        try:
+            src = cls.get_setting('source')
+        except ValueError:
+            src = 'http'
+        finally:
+            assert src in ('s3', 'http')
+        return src
+
+    @classmethod
+    def query_http(cls, asset, tile, date, **ignored):
+        print(asset, tile, date)
         cls.check_hls_version()
         # build the full URL & basename of the file
         basename = 'HLS.{}.T{}.{}.v{}.hdf'.format(
@@ -152,10 +165,85 @@ class hlsAsset(gips.data.core.CloudCoverAsset):
             return basename, url
         return None, None
 
+    _s3_bucket_name = "hlsp1"
+    _s3_base_key = "HLS_LOCAL_IO.v1.4"
+
+    @classmethod
+    def query_s3(cls, asset, tile, date, **ignored):
+        cls.check_hls_version()
+        # build the full URL & basename of the file
+        basename = 'HLS.{}.T{}.{}.v{}.hdf'.format(
+            asset, tile, date.strftime('%Y%j'), _hls_version)
+
+        s30_key = '{base}/S30/{year}/{tile1}/{tile2}/{tile3}/{tile4}/'\
+                  'HLS.S30.T{tile}.{datestr}.v{version}.hdf'\
+                  .format(base=cls._s3_base_key, year=date.year, tile1=tile[0:2],
+                          tile2=tile[2], tile3=tile[3], tile4=tile[4],
+                          tile=tile, datestr=date.strftime('%Y%j'),
+                          version='1.4')
+
+        l30_key = '{base}/L30/{year}/{tile1}/{tile2}/{tile3}/{tile4}/'\
+                  'HLS.S30.T{tile}.{datestr}.v{version}.hdf'\
+                  .format(base=cls._s3_base_key, year=date.year, tile1=tile[0:2],
+                          tile2=tile[2], tile3=tile[3], tile4=tile[4],
+                          tile=tile, datestr=date.strftime('%Y%j'),
+                          version='1.4')
+
+        # the user must have a [nasa] profile in their $HOME/.aws/credentials
+        s30keys = cls.s3_prefix_search(s30_key, profile='nasa')
+        l30keys = cls.s3_prefix_search(l30_key, profile='nasa')
+
+        if len(s30keys) > 0:
+            key = [k for k in s30keys if '.hdf' in k][0]
+        elif len(l30keys > 0):
+            key = [k for k in l30keys if '.hdf' in k][0]
+        else:
+            return None
+
+        url = 's3://{bucket}/{key}'.format(bucket=cls._s3_bucket_name, key=key)
+        return basename, url
+
+    @classmethod
+    @lru_cache(maxsize=100) # cache size chosen arbitrarily
+    def query_service(cls, asset, tile, date, **ignored):
+        # start with pre-query checks
+        if not cls.available(asset, date):
+            return None
+        if cls.data_src() == 'http':
+            bn, url = cls.query_http(asset, tile, date)
+        else:
+            bn, url = cls.query_s3(asset, tile, date)
+        return {'basename': bn, 'url': url}
+
+    @classmethod
+    def download_http(cls, url, download_fp, pclouds=100.0):
+        utils.http_download(url, download_fp)
+        print(url, download_fp)
+        return cls(download_fp).filter(pclouds)
+
+    @classmethod
+    def download_s3(cls, url, download_fp, pclouds=100.0):
+        import boto3
+        boto3.setup_default_session(profile_name='nasa')
+        s3_client = boto3.client('s3')
+        extra_args = {'RequestPayer': 'requester'}
+        bucket = url.lstrip('s3://').split('/')[0]
+        key = '/'.join(url.lstrip('s3://').split('/')[1:])
+        head = s3_client.head_object(Bucket=bucket, Key=key)
+        metadata = head['Metadata']
+        with open(download_fp, 'wb') as data:
+            s3_client.download_fileobj(Bucket=cls._s3_bucket_name,
+                                       Key=key,
+                                       Fileobj=data,
+                                       ExtraArgs=extra_args)
+        return cls(download_fp).filter(pclouds)
+
     @classmethod
     def download(cls, url, download_fp, pclouds=100.0, **ignored):
-        utils.http_download(url, download_fp)
-        return cls(download_fp).filter(pclouds)
+        if cls.data_src() == 'http':
+            return cls.download_http(url, download_fp, pclouds)
+        else:
+            return cls.download_s3(url, download_fp, pclouds)
 
     def load_image(self):
         """Load this asset into a GeoImage and return it."""
