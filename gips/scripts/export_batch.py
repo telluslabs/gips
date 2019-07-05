@@ -98,7 +98,7 @@ def main(jobid):
             args.products.append('ndsi')
             args.products.append('quality')
 
-        args.res = [config['res', config['res']]
+        args.res = [config['res'], config['res']]
         year = config['year']
         s3shpfile = config['shapefile']
         name = s3shpfile.split('/')[-1].split('.zip')[0]

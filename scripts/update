@@ -5,4 +5,4 @@ set -e
 export TAG=${1:-latest}
 
 echo "Building gips with tag ${TAG}"
-docker-compose build --no-cache
+docker-compose build --no-cache --build-arg SENTINEL1=$SENTINEL1

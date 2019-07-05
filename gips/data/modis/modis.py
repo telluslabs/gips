@@ -155,7 +155,7 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
             'pattern': '^MOD11A2' + _asset_re_tail,
             'url': 'https://e4ftl01.cr.usgs.gov/MOLT/MOD11A2.006',
             'startdate': datetime.date(2000, 3, 5),
-            'latency': 7,
+            'latency': 5,
         },
         'MYD11A2': {
             'pattern': '^MYD11A2' + _asset_re_tail,
@@ -477,7 +477,7 @@ class modisData(Data):
             'sensor': 'MCD',
             'bands': ['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'],
             'startdate': datetime.date(2000, 2, 18),
-            'latency': 15,
+            'latency': 5,
         }
     }
 
@@ -555,6 +555,7 @@ class modisData(Data):
                 os.symlink(allsds[0], fname)
                 imgout = gippy.GeoImage(fname)
 
+            # TODO: get other bands or at least get quality < 3
             if val[0] == "quality":
                 if version != 6:
                     raise Exception('product version not supported')
