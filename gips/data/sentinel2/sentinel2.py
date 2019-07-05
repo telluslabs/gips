@@ -456,7 +456,6 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
     def query_service(cls, asset, tile, date, pclouds=100, **ignored):
         """as superclass, but bifurcate between google and ESA sources."""
-        print('query_service', asset, tile, date)
         if not cls.available(asset, date):
             return None
         source = cls.get_setting('source')
@@ -478,8 +477,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
         methods = {'L1C': cls.download_esa, 'L1CGS': cls.download_gs}
         if a_type not in methods:
             raise ValueError('Unfetchable asset type: {}'.format(asset))
-        meth = methods[a_type](download_fp, **kwargs)
-        return meth
+        return methods[a_type](download_fp, **kwargs)
 
     @classmethod
     def download_gs(cls, download_fp, keys, **ignored):
