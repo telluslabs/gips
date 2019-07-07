@@ -118,6 +118,7 @@ REPOS = {
     },
     'hls': {
         'repository': '$TLD/hls',
+        'source': 's3'
     },
     'chirps': {
         'repository': '$TLD/chirps',
