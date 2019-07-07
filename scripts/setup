@@ -22,11 +22,7 @@ fi
 ./scripts/update "$@"
 
 # TODO: There has got to be a better way to do this
-# Using /archive as a way to get two important items out of the container
-
-docker run -v ${GIPS_DATA}:/archive telluslabs/gips cp -r gips.egg-info /archive
-cp -r ${GIPS_DATA}/gips.egg-info ${GIPS_HOME}/
-rm -rf ${GIPS_DATA}/gips.egg-info
+# Using /archive as a way to get settings out of the container
 
 docker run -v ${GIPS_DATA}:/archive telluslabs/gips cp -r gips/settings.py /archive
 cp -r ${GIPS_DATA}/settings.py ${GIPS_HOME}/gips/

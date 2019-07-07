@@ -118,6 +118,7 @@ REPOS = {
     },
     'hls': {
         'repository': '$TLD/hls',
+        'source': 's3'
     },
     'chirps': {
         'repository': '$TLD/chirps',
@@ -138,3 +139,4 @@ REPOS = {
         #'tiles': '~/randomdir/dataname_tiles.shp'      # file format
     }
 """
+GIPS_ORM = False
