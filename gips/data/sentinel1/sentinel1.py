@@ -180,7 +180,7 @@ class sentinel1Asset(Asset):
 
     @classmethod
     def query_esa(cls, tile, date):
-        import gips.data.sentinel1.sentinel_api.sentinel_api as api
+        import gips.data.sentinel1.sentinel_api as api
 
         # use username and password for ESA DATA Hub authentication
         username = cls.get_setting('username')
