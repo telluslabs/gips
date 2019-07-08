@@ -3,7 +3,7 @@ FROM gippy-0.3.x
 ARG GIPS_UID
 RUN apt-get update \
     && apt-get -y install libcurl4-gnutls-dev \
-        python-geopandas awscli
+        python-geopandas awscli python-rtree
 
 COPY . /gips
 
@@ -37,12 +37,32 @@ RUN cd /gips \
     && echo 'GIPS_ORM = False\n' >> /gips/gips/settings.py \
     && tar xfvz gips_init/aod.composites.tgz -C /archive > /dev/null \
     && pip install --no-cache-dir -U sharedmem \
-    && pip install --no-cache-dir https://github.com/indigo-ag/multitemporal/archive/v1.0.0-in01.zip \
+    && pip install --no-cache-dir https://github.com/indigo-ag/multitemporal/archive/v1.0.0-in02.zip \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /gips/gips_init* \
     && apt-get -y autoremove \
     && apt-get -y autoclean
 
 COPY docker/pytest-ini /gips/pytest.ini
+
+# Sentinel1 stuff
+# download snap installer version 6.0
+# change file execution rights for snap installer
+# install snap with gpt
+# link gpt so it can be used systemwide
+# Update SNAP
+# set gpt max memory to 4GB
+
+ARG SENTINEL1
+
+RUN if [ "$SENTINEL1" = "YES" ] ; then echo 'BUILDING SENTINEL1' \
+    && mkdir /snap \
+    && wget -nd -P /snap http://step.esa.int/downloads/6.0/installers/esa-snap_sentinel_unix_6_0.sh \
+    && chmod +x /snap/esa-snap_sentinel_unix_6_0.sh \
+    && /snap/esa-snap_sentinel_unix_6_0.sh -q -c \
+    && ln -s /usr/local/snap/bin/gpt /usr/bin/gpt \
+    && /usr/local/snap/bin/snap --nosplash --nogui --modules --update-all \
+    && sed -i -e 's/-Xmx1G/-Xmx16G/g' /usr/local/snap/bin/gpt.vmoptions \
+    && rm -rf /snap ; fi
 
 WORKDIR /gips

@@ -7,3 +7,6 @@ envoy # deprecated
 sh
 fiona
 backports.tempfile
+click
+progressbar
+shapely

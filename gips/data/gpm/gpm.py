@@ -40,7 +40,7 @@ class gpmAsset(Asset):
     _assets = {
         'IMERG-DAY-FINAL': {
                         'host': "arthurhou.pps.eosdis.nasa.gov",
-            'pattern': r'3B-DAY-GIS\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.tif',
+            'pattern': r'^3B-DAY-GIS\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.tif$',
             'description': 'Daily Precipitation Rate (mm/hr) at 0.1 degrees - Research Run using the IMERG Algorithm'
                            'developed for the GPM constellation',
             'path': '/gpmdata/',
@@ -49,7 +49,7 @@ class gpmAsset(Asset):
         },
         'IMERG-DAY-LATE': {
             'host': "jsimpson.pps.eosdis.nasa.gov",
-            'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif',
+            'pattern': r'^3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif$',
             'description': 'Daily Accumulated Precipitation (in mm) at 23:59 UTC at 0.1 degrees - Production Run '
                            'using the IMERG Algorithm developed for the GPM constellation',
             'path': '/NRTPUB/imerg/gis/',
@@ -58,7 +58,7 @@ class gpmAsset(Asset):
         },
         'IMERG-DAY-EARLY': {
             'host': "jsimpson.pps.eosdis.nasa.gov",
-            'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif',
+            'pattern': r'^3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif$',
             'description': 'Daily Accumulated Precipitation (in mm) at 06:59 UTC 0.1 degrees - Production Run '
                            'using the IMERG Algorithm developed for the GPM constellation',
             'path': '/NRTPUB/imerg/gis/',
@@ -67,7 +67,7 @@ class gpmAsset(Asset):
         },
         'IMERG-DAY-MID': {
             'host': "jsimpson.pps.eosdis.nasa.gov",
-            'pattern': r'3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif',
+            'pattern': r'^3B-HHR-L\.MS\.MRG\.3IMERG\..{8}-S.{6}-E.{6}\..{4}\..{4}\.1day.tif$',
             'description': 'Daily Accumulated Precipitation (in mm) at 14:59 0.1 degrees - Production Run '
                            'using the IMERG Algorithm developed for the GPM constellation',
             'path': '/NRTPUB/imerg/gis/',
@@ -76,7 +76,7 @@ class gpmAsset(Asset):
         },
         '3B42-DAY-LATE': {
             'host': "trmmopen.pps.eosdis.nasa.gov",
-            'pattern': r'3B42RT\..{10}[\.7]*\.1day.tif',
+            'pattern': r'^3B42RT\..{10}[\.7]*\.1day.tif$',
             'description': 'Daily Accumulated Precipitation (in mm) at 0.25 degrees - Production Run using the '
                            '3B42 Algorithm developed for the TRMM constellation',
             'path': '/pub/gis/',

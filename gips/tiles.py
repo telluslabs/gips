@@ -108,7 +108,7 @@ class Tiles(object):
                     #    print "skipping: ", self.date, datadir, sensor, product
                     #    continue
 
-                    filenames = [self.tiles[t].filenames[(sensor, product)]
+                    filenames = [str(self.tiles[t].filenames[(sensor, product)])
                                  for t in self.tiles
                                  if (sensor, product) in self.tiles[t].filenames
                     ]
