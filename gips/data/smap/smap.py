@@ -218,7 +218,7 @@ class smapData(Data):
         ycount = img.YSize()
         xres = (-1*x2-x2)/xcount
         yres = (-1*y2-y2)/ycount
-        
+
         return np.array([x2, xres, 0, y2, 0, yres])
 
     @Data.proc_temp_dir_manager
