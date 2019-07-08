@@ -350,7 +350,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
                 if query_results is None:
                     raise IOError('Could not locate metadata for'
                                   ' ({}, {})'.format(self.tile, self.date))
-                url = cls.gs_object_url_base() + query_results['keys']['mtl']
+                url = self.gs_object_url_base() + query_results['keys']['mtl']
                 utils.verbose_out('requesting ' + url, 4)
                 text = self.gs_backoff_get(url).text
         elif os.path.exists(self.filename):

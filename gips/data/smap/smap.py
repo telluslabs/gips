@@ -20,6 +20,8 @@ import math
 import numpy as np
 import requests
 
+import ogr, osr
+
 import gippy
 from gippy.algorithms import Indices
 from gips.data.core import Repository, Asset, Data
@@ -37,18 +39,19 @@ class smapRepository(Repository):
 
 class smapAsset(Asset):
     Repository = smapRepository
-    _sensors = {'RAD': {'description': 'Soil Moisture Active Passive Radiometer'}}
+    _sensors = {'RAD': {'description':
+                            'Soil Moisture Active Passive Radiometer'}}
     _assets = {
         'SM_P_E': {
             'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP_E.002',
-            'pattern': r'^SMAP\_.{2}\_SM\_P\_E\_.{8}\_.{6}\_.{3}\.h5$',
+            'pattern': r'SMAP\_.{2}\_SM\_P\_E\_.{8}\_.{6}\_.{3}\.h5$',
             'description': 'Passive Enhanced Radiometer Based SM at 9KM',
             'startdate': datetime.date(2015, 3, 31),
             'latency': 1,
         },
         'SM_P': {
             'url': 'https://n5eil01u.ecs.nsidc.org/SMAP/SPL3SMP.005',
-            'pattern': r'^SMAP\_.{2}\_SM\_P\_.{8}\_.{6}\_.{3}\.h5$',
+            'pattern': r'SMAP\_.{2}\_SM\_P\_.{8}\_.{6}\_.{3}\.h5$',
             'description': 'Passive Original Radiometer Based SM at 36KM',
             'startdate': datetime.date(2015, 3, 31),
             'latency': 1,
@@ -60,7 +63,8 @@ class smapAsset(Asset):
         super(smapAsset, self).__init__(filename)
 
         bname = os.path.basename(filename)
-        self.asset = (re.search('(?<=SMAP_L3_)\w*(?=_[0-9]{8})', bname)).group(0)
+        self.asset = (re.search('(?<=SMAP_L3_)\w*(?=_[0-9]{8})',
+                                bname)).group(0)
         date_here = (re.search('[0-9]{8}', bname)).group(0)
         self.date = datetime.datetime.strptime(date_here, "%Y%m%d").date()
         self._version = (re.search('R[0-9]*', bname)).group(0)
@@ -74,9 +78,11 @@ class smapAsset(Asset):
         returns a tuple:  base-filename, url
         """
 
-        mainurl = "%s/%s" % (cls._assets[asset]['url'], str(date.strftime('%Y.%m.%d')))
+        mainurl = "%s/%s" % (cls._assets[asset]['url'],
+                             str(date.strftime('%Y.%m.%d')))
 
-        pattern = r'SMAP\_.{2}\_%s\_%s\_.{6}\_.{3}\.h5' % (asset, str(date.strftime('%Y%m%d')))
+        pattern = r'SMAP\_.{2}\_%s\_%s\_.{6}\_.{3}\.h5' \
+                  % (asset, str(date.strftime('%Y%m%d')))
         cpattern = re.compile(pattern)
         err_msg = "Error downloading: " + mainurl
         with utils.error_handler(err_msg):
@@ -85,8 +91,10 @@ class smapAsset(Asset):
                 return None, None
 
         for item in response.readlines():
-            # screen-scrape the content of the page and extract the full name of the needed file
-            # (this step is needed because part of the filename, the creation timestamp, is
+            # screen-scrape the content of the page and extract the
+            # full name of the needed file
+            # (this step is needed because part of the filename,
+            # the creation timestamp, is
             # effectively random).
             if cpattern.search(item):
                 if 'xml' in item:
@@ -123,7 +131,19 @@ class smapData(Data):
     version = '1.0.0'
     Asset = smapAsset
 
-    _projection = 'PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],TOWGS84[0,0,0,0,0,0,0],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9108"]],AUTHORITY["EPSG","4326"]],PROJECTION["Cylindrical_Equal_Area"],PARAMETER["standard_parallel_1",30],PARAMETER["central_meridian",0],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1],AUTHORITY["epsg","6933"]]'
+    _projection = 'PROJCS["unnamed",GEOGCS["WGS 84",DATUM["WGS_1984",' \
+                  'SPHEROID["WGS 84",6378137,298.257223563,' \
+                  'AUTHORITY["EPSG","7030"]],TOWGS84[0,0,0,0,0,0,0],' \
+                  'AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,' \
+                  'AUTHORITY["EPSG","8901"]],UNIT["degree",' \
+                  '0.0174532925199433,AUTHORITY["EPSG","9108"]],' \
+                  'AUTHORITY["EPSG","4326"]],' \
+                  'PROJECTION["Cylindrical_Equal_Area"],' \
+                  'PARAMETER["standard_parallel_1",30],' \
+                  'PARAMETER["central_meridian",0],' \
+                  'PARAMETER["false_easting",0],' \
+                  'PARAMETER["false_northing",0],UNIT["Meter",1],' \
+                  'AUTHORITY["epsg","6933"]]'
     _products = {
         'smp': {
             'description': 'SMAP SM AM Acquisiton posted on native grid ',
@@ -132,7 +152,7 @@ class smapData(Data):
             'startdate': datetime.date(2015, 3, 31),
             'sensor': 'RAD',
             'latency': 1,
-            '_geotransform': (-17367530.44516138, 36032.220850622405123, 0, 7314540.79258289, 0, -36032.217290640393912),
+
         },
         'smpe': {
             'description': 'SMAP SM AM Acquisiton posted on enhanced 9km grid',
@@ -141,7 +161,7 @@ class smapData(Data):
             'startdate': datetime.date(2015, 3, 31),
             'sensor': 'RAD',
             'latency': 1,
-            '_geotransform': (-17367530.44516138, 9000.0, 0, 7314540.79258289, 0, -9000.0),
+
         }
     }
 
@@ -174,6 +194,33 @@ class smapData(Data):
 
         return asset, missingassets, availassets, allsds
 
+    def geotransform(self,img):
+        """This function provides the geotranform information needed for output tif"""
+        # Proj4 format of SMAP _projection
+        projection='+proj=cea +lon_0=0 +lat_ts=30 +ellps=WGS84 +units=m'
+        srs = osr.SpatialReference()
+        srs.ImportFromProj4(projection)
+
+        # WGS84 projection reference
+        OSR_WGS84_REF = osr.SpatialReference()
+        OSR_WGS84_REF.ImportFromEPSG(4326)
+
+        # OSR transformation
+        wgs84_to_image_transformation = osr.CoordinateTransformation(OSR_WGS84_REF, srs)
+        point = ogr.Geometry(ogr.wkbPoint)
+        x1,y1 = -1*int(img.Meta('Metadata_Extent_eastBoundLongitude')),float(img.Meta('Metadata_Extent_northBoundLatitude'))
+        point.AddPoint(x1, y1)
+        point.Transform(wgs84_to_image_transformation)
+        x2,y2 = point.GetX(), point.GetY()
+
+        # resolution calculation
+        xcount = img.XSize()
+        ycount = img.YSize()
+        xres = (-1*x2-x2)/xcount
+        yres = (-1*y2-y2)/ycount
+        
+        return np.array([x2, xres, 0, y2, 0, yres])
+
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
         """Produce requested products."""
@@ -190,13 +237,17 @@ class smapData(Data):
                 self.asset_check(prod_type)
 
             if not availassets:
-                # some products aren't available for every day but this is trying every day
-                VerboseOut('There are no available assets (%s) on %s for tile %s'
-                           % (str(missingassets), str(self.date), str(self.id),), 5)
+                # some products aren't available for every day but this is
+                # trying every day
+                VerboseOut('There are no available assets (%s) on '
+                           '%s for tile %s'
+                           % (str(missingassets), str(self.date),
+                              str(self.id),), 5)
                 continue
 
             sensor = self._products[prod_type]['sensor']
-            fname = self.temp_product_filename(sensor, prod_type)  # moved to archive at end of loop
+            fname = self.temp_product_filename(sensor, prod_type)  # moved
+            # to archive at end of loop
 
             if val[0] == 'smp':
                 img = gippy.GeoImage(allsds[15])
@@ -204,18 +255,21 @@ class smapData(Data):
                 img = gippy.GeoImage(allsds[13])
 
             imgdata = img.Read()
-            imgout = gippy.GeoImage(fname, img.XSize(), img.YSize(), 1, gippy.GDT_Float32)
-            del img
+            imgout = gippy.GeoImage(fname, img.XSize(), img.YSize(), 1,
+                                    gippy.GDT_Float32)
             imgout.SetNoData(-9999.0)
             imgout.SetOffset(0.0)
             imgout.SetGain(1.0)
             imgout.SetBandName('Soil Moisture', 1)
             imgout.SetProjection(self._projection)
-            imgout.SetAffine(np.array(self._products[prod_type]['_geotransform']))
+            imgout.SetAffine(self.geotransform(img))
+            del img
+
             imgout[0].Write(imgdata)
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
             self.AddFile(sensor, key, archive_fp)
             del imgout  # to cover for GDAL's internal problems
             utils.verbose_out(' -> {}: processed in {}'.format(
-                os.path.basename(fname), datetime.datetime.now() - start), level=1)
+                os.path.basename(fname), datetime.datetime.now() - start),
+                level=1)

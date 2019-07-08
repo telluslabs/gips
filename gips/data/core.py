@@ -1451,8 +1451,8 @@ class Data(object):
                     # TODO: need to modify error handler to allow random junk in the project dir
                     try:
                         datetime.strptime(parts[len(parts) - 3], datedir)
-                    except:
-                        pass
+                    except Exception as e:
+                        utils.verbose_out("Error parsing product date:  " + str(e), 3)
                     else:
                         files.append(f)
 
