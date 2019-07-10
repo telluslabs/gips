@@ -194,15 +194,23 @@ class S3Mixin(object):
     """
     @classmethod
     @lru_cache(maxsize=1)
-    def s3_prefix_search(cls, prefix, profile=None):
+    def s3_prefix_search(cls, prefix, profile=None, creds=None):
         # find the layer and metadata files matching the current scene
         import boto3 # import here so it only breaks if it's actually needed
-        if profile is None:
+        if profile is None and creds is None:
             validate_s3_env_vars()
-        else:
+        elif profile is not None:
             # the user has a [profile] set up in $HOME/.aws/credentials
             boto3.setup_default_session(profile_name=profile)
-        s3 = boto3.resource('s3')
+        elif creds is not None and profile is not None:
+            raise Exception('Both creds and profile can not be present')
+
+        if creds is None:
+            s3 = boto3.resource('s3')
+        else:
+            s3 = boto3.resource('s3', aws_access_key_id=creds[0],
+                                      aws_secret_access_key=creds[1])
+
         bucket = s3.Bucket(cls._s3_bucket_name)
         keys = [o.key for o in bucket.objects.filter(Prefix=prefix)]
         utils.verbose_out("Found {} S3 keys while searching for for key fragment"

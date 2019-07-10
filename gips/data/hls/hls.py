@@ -26,6 +26,7 @@ from backports.functools_lru_cache import lru_cache
 import requests
 import numpy
 import gippy
+import configparser
 
 from gips.data.core import Repository, Data
 import gips.data.core
@@ -169,6 +170,14 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
     _s3_base_key = "HLS_LOCAL_IO.v1.4"
 
     @classmethod
+    def get_creds(cls):
+        print('assigning credentials')
+        settings = configparser.ConfigParser()
+        settings.read(['/gips/credentials'])
+        return (settings['nasa'].get('AWS_ACCESS_KEY_ID'),
+               settings['nasa'].get('AWS_SECRET_ACCESS_KEY'))
+
+    @classmethod
     def query_s3(cls, asset, tile, date, **ignored):
 
         # TODO: check version in S3 mode
@@ -193,8 +202,12 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
                           version='1.4')
 
         # the user must have a [nasa] profile in their $HOME/.aws/credentials
-        s30keys = cls.s3_prefix_search(s30_key, profile='nasa')
-        l30keys = cls.s3_prefix_search(l30_key, profile='nasa')
+        # s30keys = cls.s3_prefix_search(s30_key, profile='nasa')
+        # l30keys = cls.s3_prefix_search(l30_key, profile='nasa')
+
+        creds = cls.get_creds()
+        s30keys = cls.s3_prefix_search(s30_key, creds=creds)
+        l30keys = cls.s3_prefix_search(l30_key, creds=creds)
 
         if len(s30keys) > 0:
             key = [k for k in s30keys if '.hdf' in k][0]
@@ -231,8 +244,12 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
     @classmethod
     def download_s3(cls, url, download_fp, pclouds=100.0):
         import boto3
-        boto3.setup_default_session(profile_name='nasa')
-        s3_client = boto3.client('s3')
+        # boto3.setup_default_session(profile_name='nasa')
+
+        creds = cls.get_creds()
+        s3_client = boto3.client('s3', aws_access_key_id=creds[0],
+                                       aws_secret_access_key=creds[1])
+
         extra_args = {'RequestPayer': 'requester'}
         bucket = url.lstrip('s3://').split('/')[0]
         key = '/'.join(url.lstrip('s3://').split('/')[1:])

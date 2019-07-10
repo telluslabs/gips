@@ -10,3 +10,4 @@ backports.tempfile
 click
 progressbar
 shapely
+configparser
