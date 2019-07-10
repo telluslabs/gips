@@ -139,3 +139,4 @@ REPOS = {
         #'tiles': '~/randomdir/dataname_tiles.shp'      # file format
     }
 """
+GIPS_ORM = False
