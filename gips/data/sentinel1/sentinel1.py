@@ -180,7 +180,7 @@ class sentinel1Asset(Asset):
 
     @classmethod
     def query_esa(cls, tile, date):
-        import gips.data.sentinel1.sentinel_api as api
+        import gips.data.sentinel1.sentinel_api.sentinel_api as api
 
         # use username and password for ESA DATA Hub authentication
         username = cls.get_setting('username')
@@ -297,7 +297,7 @@ class sentinel1Asset(Asset):
             result = downloader.download_all()
             print(result)
             if not len(result['success']) == len(scenes):
-                raise Exception('Not all files were successfully downloaded')
+                print('Warning: number of successfully downloaded files')
 
             # TODO: check they are complete before moving them
             for scene in scenes:
