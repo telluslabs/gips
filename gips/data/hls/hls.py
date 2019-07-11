@@ -172,10 +172,16 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
     @classmethod
     def get_creds(cls):
         print('assigning credentials')
-        settings = configparser.ConfigParser()
-        settings.read(['/gips/credentials'])
-        return (settings['nasa'].get('AWS_ACCESS_KEY_ID'),
-               settings['nasa'].get('AWS_SECRET_ACCESS_KEY'))
+
+        try:
+            credfile = cls.get_setting('credfile')
+        except ValueError:
+            credfile = '/root/.aws/credentials'
+
+        config = configparser.ConfigParser()
+        config.read(['/gips/credentials'])
+        return (config['nasa'].get('AWS_ACCESS_KEY_ID'),
+               config['nasa'].get('AWS_SECRET_ACCESS_KEY'))
 
     @classmethod
     def query_s3(cls, asset, tile, date, **ignored):
