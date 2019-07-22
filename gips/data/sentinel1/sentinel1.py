@@ -297,7 +297,7 @@ class sentinel1Asset(Asset):
             result = downloader.download_all()
             print(result)
             if not len(result['success']) == len(scenes):
-                raise Exception('Not all files were successfully downloaded')
+                print('Warning: number of successfully downloaded files')
 
             # TODO: check they are complete before moving them
             for scene in scenes:
