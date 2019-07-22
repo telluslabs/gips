@@ -37,6 +37,9 @@ from gips.data.sentinel2 import sentinel2
 from gips.data.landsat import landsat
 
 
+from pdb import set_trace
+
+
 # User guide & other docs here:  https://hls.gsfc.nasa.gov/documents/
 
 _hls_version = '1.4'
@@ -187,32 +190,18 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
         basename = 'HLS.{}.T{}.{}.v{}.hdf'.format(
             asset, tile, date.strftime('%Y%j'), _hls_version)
 
-        s30_key = '{base}/S30/{year}/{tile1}/{tile2}/{tile3}/{tile4}/'\
-                  'HLS.S30.T{tile}.{datestr}.v{version}.hdf'\
-                  .format(base=cls._s3_base_key, year=date.year, tile1=tile[0:2],
-                          tile2=tile[2], tile3=tile[3], tile4=tile[4],
+        x30_key = '{base}/{asset}/{year}/{tile1}/{tile2}/{tile3}/{tile4}/'\
+                  'HLS.{asset}.T{tile}.{datestr}.v{version}.hdf'\
+                  .format(base=cls._s3_base_key, asset=asset, year=date.year,
+                          tile1=tile[0:2], tile2=tile[2], tile3=tile[3], tile4=tile[4],
                           tile=tile, datestr=date.strftime('%Y%j'),
                           version='1.4')
-
-        l30_key = '{base}/L30/{year}/{tile1}/{tile2}/{tile3}/{tile4}/'\
-                  'HLS.S30.T{tile}.{datestr}.v{version}.hdf'\
-                  .format(base=cls._s3_base_key, year=date.year, tile1=tile[0:2],
-                          tile2=tile[2], tile3=tile[3], tile4=tile[4],
-                          tile=tile, datestr=date.strftime('%Y%j'),
-                          version='1.4')
-
-        # the user must have a [nasa] profile in their $HOME/.aws/credentials
-        # s30keys = cls.s3_prefix_search(s30_key, profile='nasa')
-        # l30keys = cls.s3_prefix_search(l30_key, profile='nasa')
 
         creds = cls.get_creds()
-        s30keys = cls.s3_prefix_search(s30_key, creds=creds)
-        l30keys = cls.s3_prefix_search(l30_key, creds=creds)
+        x30keys = cls.s3_prefix_search(x30_key, creds=creds)
 
-        if len(s30keys) > 0:
-            key = [k for k in s30keys if '.hdf' in k][0]
-        elif len(l30keys) > 0:
-            key = [k for k in l30keys if '.hdf' in k][0]
+        if len(x30keys) > 0:
+            key = [k for k in x30keys if '.hdf' in k][0]
         else:
             return None
 
@@ -244,7 +233,6 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
     @classmethod
     def download_s3(cls, url, download_fp, pclouds=100.0):
         import boto3
-        # boto3.setup_default_session(profile_name='nasa')
 
         creds = cls.get_creds()
         s3_client = boto3.client('s3', aws_access_key_id=creds[0],
