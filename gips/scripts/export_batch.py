@@ -101,7 +101,10 @@ def main(jobid):
         args.res = [config['res'], config['res']]
         year = config['year']
         s3shpfile = config['shapefile']
-        name = s3shpfile.split('/')[-1].split('.zip')[0]
+        try:
+            name = config['name']
+        except:
+            name = s3shpfile.split('/')[-1].split('.zip')[0]
 
         shppath = get_s3_shppath(s3shpfile, tmpdir)
         driver = ogr.GetDriverByName('ESRI Shapefile')
