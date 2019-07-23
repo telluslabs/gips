@@ -200,11 +200,6 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
                           tile=tile, datestr=date.strftime('%Y%j'),
                           version='1.4')
 
-<<<<<<< HEAD
-=======
-        # the user must have a [nasa] profile in their $HOME/.aws/credentials
-        # or some other place specified with 'credfile' in settings.py
->>>>>>> master
         creds = cls.get_creds()
         x30keys = cls.s3_prefix_search(x30_key, creds=creds)
 
