@@ -37,9 +37,6 @@ from gips.data.sentinel2 import sentinel2
 from gips.data.landsat import landsat
 
 
-from pdb import set_trace
-
-
 # User guide & other docs here:  https://hls.gsfc.nasa.gov/documents/
 
 _hls_version = '1.4'
@@ -175,10 +172,16 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
     @classmethod
     def get_creds(cls):
         print('assigning credentials')
-        settings = configparser.ConfigParser()
-        settings.read(['/gips/credentials'])
-        return (settings['nasa'].get('AWS_ACCESS_KEY_ID'),
-               settings['nasa'].get('AWS_SECRET_ACCESS_KEY'))
+
+        try:
+            credfile = cls.get_setting('credfile')
+        except ValueError:
+            credfile = '/root/.aws/credentials'
+
+        config = configparser.ConfigParser()
+        config.read(['/gips/credentials'])
+        return (config['nasa'].get('AWS_ACCESS_KEY_ID'),
+               config['nasa'].get('AWS_SECRET_ACCESS_KEY'))
 
     @classmethod
     def query_s3(cls, asset, tile, date, **ignored):
@@ -197,6 +200,11 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
                           tile=tile, datestr=date.strftime('%Y%j'),
                           version='1.4')
 
+<<<<<<< HEAD
+=======
+        # the user must have a [nasa] profile in their $HOME/.aws/credentials
+        # or some other place specified with 'credfile' in settings.py
+>>>>>>> master
         creds = cls.get_creds()
         x30keys = cls.s3_prefix_search(x30_key, creds=creds)
 
@@ -233,11 +241,9 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
     @classmethod
     def download_s3(cls, url, download_fp, pclouds=100.0):
         import boto3
-
         creds = cls.get_creds()
         s3_client = boto3.client('s3', aws_access_key_id=creds[0],
                                        aws_secret_access_key=creds[1])
-
         extra_args = {'RequestPayer': 'requester'}
         bucket = url.lstrip('s3://').split('/')[0]
         key = '/'.join(url.lstrip('s3://').split('/')[1:])
