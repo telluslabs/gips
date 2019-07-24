@@ -179,7 +179,7 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
             credfile = '/root/.aws/credentials'
 
         config = configparser.ConfigParser()
-        config.read(['/gips/credentials'])
+        config.read([credfile])
         return (config['nasa'].get('AWS_ACCESS_KEY_ID'),
                config['nasa'].get('AWS_SECRET_ACCESS_KEY'))
 
