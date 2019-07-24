@@ -201,7 +201,7 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
                           version='1.4')
 
         creds = cls.get_creds()
-        x30keys = cls.s3_prefix_search(x30_key, creds=creds)
+        x30keys = cls.s3_prefix_search(x30_key, creds=creds, requester_pays=True)
 
         if len(x30keys) > 0:
             key = [k for k in x30keys if '.hdf' in k][0]
@@ -239,10 +239,11 @@ class hlsAsset(gips.data.core.CloudCoverAsset,
         creds = cls.get_creds()
         s3_client = boto3.client('s3', aws_access_key_id=creds[0],
                                        aws_secret_access_key=creds[1])
+
         extra_args = {'RequestPayer': 'requester'}
         bucket = url.lstrip('s3://').split('/')[0]
         key = '/'.join(url.lstrip('s3://').split('/')[1:])
-        head = s3_client.head_object(Bucket=bucket, Key=key)
+        head = s3_client.head_object(Bucket=bucket, Key=key, **extra_args)
         metadata = head['Metadata']
         with open(download_fp, 'wb') as data:
             s3_client.download_fileobj(Bucket=cls._s3_bucket_name,
