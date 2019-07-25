@@ -53,6 +53,7 @@ from gips.data.core import Repository, Asset, Data
 import gips.data.core
 from gips import utils
 from gips.data.sentinel1.tiles import write_feature, make_tilegrid, make_rectangular_tilegrid
+import gips.data.sentinel1.sentinel_api.sentinel_api as api
 
 
 _asset_types = ('L1',)
@@ -180,7 +181,6 @@ class sentinel1Asset(Asset):
 
     @classmethod
     def query_esa(cls, tile, date):
-        import gips.data.sentinel1.sentinel_api.sentinel_api as api
 
         # use username and password for ESA DATA Hub authentication
         username = cls.get_setting('username')
@@ -209,7 +209,6 @@ class sentinel1Asset(Asset):
             assert rectfile == outpath
 
         print('loading file outpath!', outpath)
-
         downloader.load_sites(outpath)
         datestr = date.date().isoformat()
 
@@ -230,7 +229,6 @@ class sentinel1Asset(Asset):
             basename = 'S1_IW_GRDH_{}_{}.tif'.format(date.date().strftime('%Y%m%d'), tile)
             print('returning', basename)
             return {'basename': basename, 'downloader': downloader, 'url': ''}
-
 
     @classmethod
     @lru_cache(maxsize=100) # cache size chosen arbitrarily
@@ -283,7 +281,6 @@ class sentinel1Asset(Asset):
                 print('but some paths exist')
 
                 # if the download already exists, then remove it from the request
-
                 downloader._SentinelDownloader__scenes = [
                     s for s in downloader._SentinelDownloader__scenes \
                     if not os.path.exists(os.path.join(stagedir, s['identifier'] + '.zip'))
@@ -364,6 +361,7 @@ class sentinel1Asset(Asset):
             shutil.move(outfiles[0], download_fp)
 
         # TODO: use temp file
+        # this just removes the shapefile
         for file in glob.glob(os.path.splitext(shpfile)[0] + '.*'):
            os.remove(file)
 
