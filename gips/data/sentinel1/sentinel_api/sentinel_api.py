@@ -30,19 +30,15 @@ from datetime import datetime, date
 class SentinelDownloader(object):
     """Class to search and download for Sentinel data"""
 
-    __esa_username = None
-    __esa_password = None
-    __esa_api_url = None
-
-    __geometries = []
-    __scenes = []
-    __download_dir = './'
-    __data_dirs = []
-
     def __init__(self, username, password, api_url='https://scihub.copernicus.eu/apihub/'):
-        self.__esa_api_url = api_url
         self.__esa_username = username
         self.__esa_password = password
+        self.__esa_api_url = api_url
+
+        self.__geometries = []
+        self.__download_dir = './'
+        self.__data_dirs = []
+        self.__scenes = []
 
     def set_download_dir(self, download_dir):
         """Set directory for check against existing downloaded files and as directory where to download
