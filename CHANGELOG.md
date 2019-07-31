@@ -5,7 +5,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## v0.15.0(rc)
+## v0.16.0
+### Changed
+- gips_process: --batchout only produces scene-proc-job when needed
+### Added
+- gips_export: --dont-process option for if you have already processed and
+               don't want to loop through doing nothing.
+
+## v0.15.0
 ### Added
 - landsat: custom coregistration mosaic via settings
 
