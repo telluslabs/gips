@@ -7,6 +7,21 @@ and this project adheres to
 ## [UNRELEASED]
 
 
+## v0.16.0
+### Changed
+- gips_process: --batchout only produces scene-proc-job when needed
+### Added
+- gips_export: --dont-process option for if you have already processed and
+               don't want to loop through doing nothing.
+
+## v0.15.0
+### Added
+- landsat: custom coregistration mosaic via settings
+
+## v0.14.6
+### Fixed
+- fixed less common use-case with NameError
+
 ## v0.14.5
 ### Fixed
 - was passing str, instead of list-of-str, to landsat's `_cache_if_vsicurl`
