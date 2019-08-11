@@ -55,12 +55,10 @@ def main(jobid):
     print(title)
 
     args = Args()
-    args.products = ['ndvi', 'lswi', 'brgt']
     args.stop_on_error = "False"
     args.suffix = ""
     args.format = "GTiff"
     args.verbose = 5
-    args.interpolation = 0
     args.ptile = 0
     args.pcov = 0
     args.pclouds = 100.
@@ -89,16 +87,12 @@ def main(jobid):
         S3 = boto3.resource('s3')
         S3.Bucket('tl-octopus').download_file('user/gips/config', confpath)
 
+        # get config parameters
         config = eval(open(confpath).read())
-
         args.command = config['source']
-        if args.command == "hls":
-            args.products.append('cmask')
-        else:
-            args.products.append('ndsi')
-            args.products.append('quality')
-
+        args.products = config['products']
         args.res = [config['res'], config['res']]
+        args.interpolation = config['interp']
         year = config['year']
         s3shpfile = config['shapefile']
         try:

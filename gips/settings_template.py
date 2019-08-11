@@ -118,7 +118,8 @@ REPOS = {
     },
     'hls': {
         'repository': '$TLD/hls',
-        'source': 's3'
+        'source': 's3',
+        'credfile': '/gips/credentials'
     },
     'chirps': {
         'repository': '$TLD/chirps',
