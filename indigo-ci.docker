@@ -1,0 +1,3 @@
+FROM indigo-gips
+
+RUN pip3 install -r dev_requirements.txt
