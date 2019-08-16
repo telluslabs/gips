@@ -1,10 +1,13 @@
 FROM ubuntu:16.04
 
-RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
-       /etc/apt/sources.list \
-    && apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 314DF160 \
-    && apt-get -y update \
-    && apt-get install -y \
+# && /usr/bin/add-apt-repository ppa:ubuntugis/ppa \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y software-properties-common \
+    && add-apt-repository ppa:ubuntugis/ppa \
+    && apt-get -y update
+
+RUN apt-get install -y \
     python python-apt \
     python-pip \
     gfortran \
@@ -22,12 +25,16 @@ RUN echo "deb http://ppa.launchpad.net/ubuntugis/ppa/ubuntu xenial main" >> \
     swig2.0 \
     wget \
     git \
-    mg \
-    && ln -s  /usr/bin/mg /usr/bin/emacs \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install -U pip==9.0.3 setuptools wheel \
-    && pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy \
-    && apt-get -y purge \
+    mg
+
+RUN ln -s /usr/bin/mg /usr/bin/emacs && rm -rf /var/lib/apt/lists/*
+
+RUN pip install -U pip==9.0.3 \
+    && /usr/local/bin/pip install -U pip setuptools wheel
+
+RUN pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy
+
+RUN apt-get -y purge \
        gfortran \
        libboost-all-dev \
        libfreetype6-dev \
