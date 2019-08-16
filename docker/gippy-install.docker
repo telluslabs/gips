@@ -29,9 +29,8 @@ RUN apt-get install -y \
 
 RUN ln -s /usr/bin/mg /usr/bin/emacs && rm -rf /var/lib/apt/lists/*
 
-# TODO would be great to have a recent pip (but have to upgrade to 9.0.3 first)
-# RUN pip install -U pip==9.0.3 && pip install -U pip setuptools wheel
-RUN pip install -U pip==9.0.3 && pip install -U setuptools wheel
+RUN pip install -U pip==9.0.3 \
+    && /usr/local/bin/pip install -U pip setuptools wheel
 
 RUN pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy
 
