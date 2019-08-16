@@ -1,1 +1,1 @@
-from weld import weldRepository, weldAsset, weldData
+from .weld import weldRepository, weldAsset, weldData

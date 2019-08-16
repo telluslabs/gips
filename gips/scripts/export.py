@@ -25,8 +25,9 @@ import os
 from gips import __version__
 from gips.parsers import GIPSParser
 from gips.core import SpatialExtent, TemporalExtent
-from gips.utils import Colors, VerboseOut, import_data_class
+from gips.utils import Colors, import_data_class
 from gips import utils
+from gips.utils import vprint
 from gips.inventory import DataInventory, ProjectInventory
 from gips.inventory import orm
 
@@ -37,7 +38,7 @@ import shutil
 
 
 def get_s3_shppath(s3path, tmpdir):
-    print('s3path', s3path)
+    vprint('s3path', s3path)
     S3 = boto3.resource('s3')
     s3path = s3path.lstrip('s3://')
     assert s3path.endswith('.zip'), "unzipped shapefiles not supported yet"
@@ -76,7 +77,7 @@ def run_export(args):
                 s3_key = "/".join(s3path.split('/')[1:])
                 s3outdir = args.outdir
                 args.outdir = os.path.join(tmpdir, dirname)
-                print('temp outdir', args.outdir)
+                vprint('temp outdir', args.outdir)
             else:
                 s3outdir = None
 
@@ -112,11 +113,7 @@ def run_export(args):
                     inv = ProjectInventory(datadir)
                     inv.pprint()
                 else:
-                    VerboseOut(
-                        'No data found for {} within temporal extent {}'
-                        .format(str(t_extent), str(t_extent)),
-                        2,
-                    )
+                    vprint('No data found for', t_extent, level=2)
 
             if s3outdir is not None and os.path.exists(args.outdir):
                 outpath = args.outdir
@@ -129,13 +126,13 @@ def run_export(args):
                 s3_bucket = s3path.split('/')[0]
                 s3_key = "/".join(s3path.split('/')[1:]) + ".zip"
 
-                print('uploading', zippath, s3_bucket, s3_key)
+                vprint('uploading', zippath, s3_bucket, s3_key)
                 S3.meta.client.upload_file(zippath, s3_bucket, s3_key)
 
 
 def main():
     title = Colors.BOLD + 'GIPS Data Export (v%s)' % __version__ + Colors.OFF
-    print(title)
+    vprint(title)
 
     # argument parsing
     parser0 = GIPSParser(description=title)

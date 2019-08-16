@@ -89,6 +89,15 @@ def verbose_out(obj, level=1, stream=sys.stdout):
 VerboseOut = verbose_out # VerboseOut name is deprecated
 
 
+def vprint(*args, **kwargs):
+    """Just print() but gatekept by verbosity similarly to verbose_out.
+
+    Except for 'level' all kwargs are passed on to print() (sep, file, etc).
+    """
+    l = kwargs.pop('level', 1)
+    if verbosity() >= level:
+        print(*args, **kwargs)
+
 
 def verbosity(new=None):
     """Returns after optionally setting the gips verbosity level.

@@ -1,11 +1,11 @@
 import pytest
 
-import util
-from util import repo_wrapper
-import driver_setup
+from . import util
+from .util import repo_wrapper
+from . import driver_setup
 
 # 'driver': {'product': [ (path, type, data...),...]...}
-from expected.std_fetch import expectations, mark_spec
+from .expected.std_fetch import expectations, mark_spec
 
 pytestmark = util.sys # skip everything unless --sys
 

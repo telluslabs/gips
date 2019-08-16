@@ -394,4 +394,4 @@ def expected(request):
     expected.modis.t_process.
     """
     module = load_expectation_module(request.module.__name__)
-    return GipsProcResult(**getattr(module, request.function.func_name))
+    return GipsProcResult(**getattr(module, request.function.__name__))

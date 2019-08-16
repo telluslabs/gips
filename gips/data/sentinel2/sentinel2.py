@@ -1049,7 +1049,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         rad_image = gippy.GeoImage(rad_toa_img)
         # to check the gain & other values set on the object:
-        # print('rad_image info:', rad_image.Info()
+        # from gips.utils import vprint; vprint('rad_image info:', rad_image.Info())
 
         # set meta to pass along to indices
         rad_image._aod_source = str(atm6s.aod[0])
@@ -1090,9 +1090,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
 
         for prod_and_args, split_p_and_a in indices.items():
-            print(prod_and_args, split_p_and_a)
             temp_fp = self.temp_product_filename(sensor, prod_and_args)
-            print(temp_fp)
             imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
             imgout.add_meta(metadata)
             archived_fp = self.archive_temp_path(temp_fp)
@@ -1173,7 +1171,6 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         DEVNULL = open(os.devnull, 'w')
 
-        print("ASSET", ao.asset)
         if ao.asset == 'L1CGS':
             band_files = self._download_gcs_bands(self._temp_proc_dir)
         else:

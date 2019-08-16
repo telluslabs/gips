@@ -9,7 +9,7 @@ import glob
 import pytest
 import sh
 
-import util
+from . import util
 
 nh_shp = util.NH_SHP_PATH
 

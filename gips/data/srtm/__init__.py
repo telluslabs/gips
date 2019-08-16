@@ -1,1 +1,1 @@
-from srtm import srtmRepository, srtmAsset, srtmData
+from .srtm import srtmRepository, srtmAsset, srtmData

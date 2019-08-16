@@ -1,1 +1,1 @@
-from smap import smapRepository, smapAsset, smapData
+from .smap import smapRepository, smapAsset, smapData

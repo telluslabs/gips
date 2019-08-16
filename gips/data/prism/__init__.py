@@ -1,1 +1,1 @@
-from prism import prismRepository, prismAsset, prismData
+from .prism import prismRepository, prismAsset, prismData

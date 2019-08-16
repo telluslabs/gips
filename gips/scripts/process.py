@@ -28,6 +28,7 @@ from gips.utils import Colors, VerboseOut, open_vector, import_data_class
 from gips import utils
 from gips.inventory import DataInventory
 from gips.inventory import orm
+from functools import reduce
 
 
 def main():

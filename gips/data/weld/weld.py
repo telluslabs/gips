@@ -35,11 +35,18 @@ import gippy
 # TODO: Use this:
 # from gippy.algorithms import indices
 from gips.data.core import Repository, Asset, Data
-from gips.utils import VerboseOut
 from gips import utils
+from gips.utils import vprint
 
 
-PROJ = """PROJCS["WELD_CONUS",GEOGCS["GCS_WGS_1984",DATUM["WGS_1984",SPHEROID["WGS_84",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],UNIT["Degree",0.0174532925199433]],PROJECTION["Albers_Conic_Equal_Area"],PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],PARAMETER["longitude_of_center",-96.0],PARAMETER["Standard_Parallel_1",29.5],PARAMETER["Standard_Parallel_2",45.5],PARAMETER["latitude_of_center",23.0],UNIT["Meter",1.0]]"""
+PROJ = (
+    'PROJCS["WELD_CONUS",GEOGCS["GCS_WGS_1984",DATUM["WGS_1984",'
+    'SPHEROID["WGS_84",6378137.0,298.257223563]],PRIMEM["Greenwich",0.0],'
+    'UNIT["Degree",0.0174532925199433]],PROJECTION["Albers_Conic_Equal_Area"],'
+    'PARAMETER["False_Easting",0.0],PARAMETER["False_Northing",0.0],'
+    'PARAMETER["longitude_of_center",-96.0],PARAMETER["Standard_Parallel_1",'
+    '29.5],PARAMETER["Standard_Parallel_2",45.5],PARAMETER["latitude_of_center",'
+    '23.0],UNIT["Meter",1.0]]')
 
 
 def binmask(arr, bit):
@@ -217,13 +224,13 @@ class weldData(Data):
                 ndsi = missing + np.zeros_like(grnimg)
                 wg = np.where((grnimg != missing) & (swrimg != missing) & (grnimg + swrimg != 0.0) & (cldimg == 0))
                 ng = len(wg[0])
-                print("ng", ng)
+                vprint("ng", ng)
                 if ng == 0:
                     continue
                 ndsi[wg] = (grnimg[wg] - swrimg[wg]) / (grnimg[wg] + swrimg[wg])
-                print(ndsi.min(), ndsi.max())
-                print(ndsi[wg].min(), ndsi[wg].max())
-                print("writing", fname)
+                vprint(ndsi.min(), ndsi.max())
+                vprint(ndsi[wg].min(), ndsi[wg].max())
+                vprint("writing", fname)
                 imgout = gippy.GeoImage.create_from(refl, fname, 1, 'float32')
                 imgout.set_nodata(float(missing))
                 imgout.set_offset(0.0)
@@ -252,7 +259,7 @@ class weldData(Data):
                 ndsi = missing + np.zeros_like(grnimg)
                 wg = np.where((grnimg != missing) & (swrimg != missing) & (grnimg + swrimg != 0.0) & (cldimg == 0))
                 ng = len(wg[0])
-                print("ng", ng)
+                vprint("ng", ng)
                 if ng == 0:
                     continue
                 ndsi[wg] = (grnimg[wg] - swrimg[wg]) / (grnimg[wg] + swrimg[wg])
@@ -260,12 +267,12 @@ class weldData(Data):
                 wc = np.where((ndsi != missing) & (ndsi > 0.4) & (nirimg <= 0.11) & (swrimg <= 0.1))
                 ns = len(ws[0])
                 nc = len(wc[0])
-                print(ng, ns, nc)
+                vprint(ng, ns, nc)
                 if (ns > 0):
                     snow[ws] = 1
                 if (nc > 0):
                     snow[wc] = 0
-                print("writing", fname)
+                vprint("writing", fname)
                 imgout = gippy.GeoImage.create_from(refl, fname, 1, 'uint8')
                 imgout.set_nodata(127)
                 imgout.set_offset(0.)
@@ -290,13 +297,13 @@ class weldData(Data):
                 ndvi = missing + np.zeros_like(redimg)
                 wg = np.where((redimg != missing) & (nirimg != missing) & (redimg + nirimg != 0.0) & (cldimg == 0))
                 ng = len(wg[0])
-                print("ng", ng)
+                vprint("ng", ng)
                 if ng == 0:
                     continue
                 ndvi[wg] = (nirimg[wg] - redimg[wg]) / (nirimg[wg] + redimg[wg])
-                print(ndvi.min(), ndvi.max())
-                print(ndvi[wg].min(), ndvi[wg].max())
-                print("writing", fname)
+                vprint(ndvi.min(), ndvi.max())
+                vprint(ndvi[wg].min(), ndvi[wg].max())
+                vprint("writing", fname)
                 imgout = gippy.GeoImage.create_from(refl, fname, 1, 'float32')
                 imgout.set_nodata(float(missing))
                 imgout.set_offset(0.0)
@@ -323,13 +330,13 @@ class weldData(Data):
                 brgt = missing + np.zeros_like(redimg)
                 wg = np.where((grnimg != missing) & (redimg != missing) & (nirimg != missing) & (cldimg == 0))
                 ng = len(wg[0])
-                print("ng", ng)
+                vprint("ng", ng)
                 if ng == 0:
                     continue
                 brgt[wg] = (grnimg[wg] + redimg[wg] + nirimg[wg])/3.
-                print(brgt.min(), brgt.max())
-                print(brgt[wg].min(), brgt[wg].max())
-                print("writing", fname)
+                vprint(brgt.min(), brgt.max())
+                vprint(brgt[wg].min(), brgt[wg].max())
+                vprint("writing", fname)
                 imgout = gippy.GeoImage.create_from(refl, fname, 1, 'float32')
                 imgout.set_nodata(float(missing))
                 imgout.set_offset(0.0)
@@ -345,4 +352,5 @@ class weldData(Data):
             # add product to inventory
             archive_fp = self.archive_temp_path(fname)
             self.AddFile(sensor, key, archive_fp)
-            VerboseOut(' -> %s: processed in %s' % (os.path.basename(fname), datetime.datetime.now() - start), 1)
+            vprint(' -> {}: processed in {}'.format(os.path.basename(fname),
+                                                    datetime.datetime.now() - start))

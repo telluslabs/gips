@@ -1,1 +1,1 @@
-from modis import modisRepository, modisAsset, modisData
+from .modis import modisRepository, modisAsset, modisData

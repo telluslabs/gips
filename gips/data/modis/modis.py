@@ -37,8 +37,8 @@ import gippy
 from gippy import algorithms
 from gips.data.core import Repository, Asset, Data
 import gips.data.core
-from gips.utils import VerboseOut, settings
 from gips import utils
+from gips.utils import vprint
 
 
 def binmask(arr, bit):
@@ -561,8 +561,8 @@ class modisData(Data):
 
             if not availassets:
                 # some products aren't available for every day but this is trying every day
-                VerboseOut('There are no available assets (%s) on %s for tile %s'
-                           % (str(missingassets), str(self.date), str(self.id), ), 5)
+                vprint('There are no available assets ({}) on {} for tile {}'.format(
+                           missingassets, self.date, self.id), level=5)
                 continue
 
             meta = {'AVAILABLE_ASSETS': ' '.join(availassets)} # TODO obselete?
@@ -744,7 +744,7 @@ class modisData(Data):
                 qc[w255] = missing  # mark as missing if any are missing
 
                 # create output gippy image
-                print("writing", fname)
+                vprint("writing", fname)
                 imgout = gippy.GeoImage.create_from(refl, fname, 7, 'int16')
                 del refl
 
@@ -898,7 +898,7 @@ class modisData(Data):
                 numvalidcover = np.sum(coverout != 127)
 
                 if totsnowcover == 0 or totsnowfrac == 0:
-                    print("no snow or ice: skipping", str(self.date), str(self.id), str(missingassets))
+                    vprint("no snow or ice: skipping", self.date, self.id, missingassets)
 
                 meta['FRACMISSINGCOVERCLEAR'] = fracmissingcoverclear
                 meta['FRACMISSINGCOVERSNOW'] = fracmissingcoversnow
@@ -1153,9 +1153,7 @@ class modisData(Data):
                                         {'VERSION': '1.0'})
             indices = products.groups()['Index']
             for prod_and_args, split_p_and_a in indices.items():
-                print(prod_and_args, split_p_and_a)
                 temp_fp = self.temp_product_filename(sensor, prod_and_args)
-                print(temp_fp)
                 imgout = algorithms.indices(img, [split_p_and_a[0]], temp_fp)
                 imgout.add_meta(prepped_md)
                 archived_fp = self.archive_temp_path(temp_fp)

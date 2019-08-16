@@ -1,1 +1,1 @@
-from chirps import chirpsRepository, chirpsAsset, chirpsData
+from .chirps import chirpsRepository, chirpsAsset, chirpsData

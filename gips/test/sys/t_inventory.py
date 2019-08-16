@@ -2,8 +2,8 @@ import pytest
 import sh
 import os
 
-import util
-import driver_setup
+from . import util
+from . import driver_setup
 
 pytestmark = util.sys # skip everything unless --sys
 
