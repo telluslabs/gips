@@ -26,7 +26,6 @@ import sys
 import re
 import datetime
 import urllib
-import urllib2
 
 import numpy as np
 import requests
@@ -114,7 +113,7 @@ class weldAsset(Asset):
             response = cls.Repository.managed_request(mainurl)
             if response is None:
                 return []
-        pattern = '(%s.week\d{2}.%s.%s.doy\d{3}to\d{3}.v1.5.hdf)' % (asset, str(year), tile)
+        pattern = r'(%s.week\d{2}.%s.%s.doy\d{3}to\d{3}.v1.5.hdf)' % (asset, str(year), tile)
         cpattern = re.compile(pattern)
         fetched = []
         http_kw = {'timeout': 10,

@@ -3,11 +3,9 @@
 import sys
 import os
 import datetime
-import urllib2
 
 
 import pytest
-import mock
 
 from gips import core
 from ...data.modis import modis

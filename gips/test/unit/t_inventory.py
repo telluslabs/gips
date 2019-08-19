@@ -4,7 +4,6 @@ import os
 import datetime
 
 import pytest
-import mock
 from django.forms.models import model_to_dict
 
 from .data import asset_filenames, expected_assets, expected_products

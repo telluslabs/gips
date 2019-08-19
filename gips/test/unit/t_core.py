@@ -8,7 +8,6 @@ import datetime
 from datetime import datetime as dt
 
 import pytest
-import mock
 
 import gips
 from gips import core
