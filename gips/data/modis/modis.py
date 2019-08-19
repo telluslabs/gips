@@ -218,8 +218,8 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
                               " are only available for Jan. 1", 1, stream=sys.stderr)
             return None
 
-        mainurl = "%s/%s.%02d.%02d" % (cls._assets[asset]['url'], str(year), month, day)
-        pattern = '(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (
+        mainurl = r'%s/%s.%02d.%02d' % (cls._assets[asset]['url'], str(year), month, day)
+        pattern = r'(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (
                         asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
         cpattern = re.compile(pattern)
 

@@ -159,7 +159,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
     _sensors['S2B'] = copy.deepcopy(_sensors['S2A'])
     _sensors['S2B']['description'] = 'Sentinel-2, Satellite B'
 
-    _asset_fn_pat_base = '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*'
+    _asset_fn_pat_base = r'^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*'
 
     # TODO find real start date for S2 data:
     # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
@@ -171,7 +171,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             'source': 'esa',
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both datastrip and single-tile assets.
-            'pattern': _asset_fn_pat_base + '\.zip$',
+            'pattern': _asset_fn_pat_base + r'\.zip$',
             'startdate': _start_date,
             'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
                           # only needed by Asset.end_date and Asset.available, but those are never called?
@@ -180,7 +180,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             'source': 'gs',
             'startdate': _start_date,
             'latency': 3,
-            'pattern': _asset_fn_pat_base + '_gs\.json$',
+            'pattern': _asset_fn_pat_base + r'_gs\.json$',
         }
     }
 
@@ -191,27 +191,27 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
 
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
-    _tile_re = '(?P<tile>\d\d[A-Z]{3})'
+    _tile_re = r'(?P<tile>\d\d[A-Z]{3})'
     # example, note that leading tile code is spliced in by Asset.fetch:
     # 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
     _ds_name_re = (
-        '(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
-        '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
-        'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
-        '_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
+        r'(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
+        r'_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
+        r'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
+        r'_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
         # observation datetime:
-        '_V(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
-        'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
-        '_\d{8}T\d{6}.zip') # repeated observation datetime for no known reason
+        r'_V(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
+        r'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
+        r'_\d{8}T\d{6}.zip') # repeated observation datetime for no known reason
 
     _name_re = (
-        '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
-        '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
-        'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
-        '_N\d{4}_R\d\d\d_T' + _tile_re +  # tile
-        '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
-        'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
-        '\.(SAFE_gs\.json|zip)$'
+        r'^(?P<sensor>S2[AB])_MSIL1C_' # sensor
+        r'(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
+        r'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
+        r'_N\d{4}_R\d\d\d_T' + _tile_re +  # tile
+        r'_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
+        r'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
+        r'\.(SAFE_gs\.json|zip)$'
     )
 
     _asset_styles = {
@@ -237,11 +237,11 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             'downloaded-name-re': _name_re,
             'archived-name-re': _name_re,
             # raster file pattern
-            'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B(?P<band>\d[\dA]).jp2$',
+            'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_B(?P<band>\d[\dA]).jp2$',
             # internal metadata file patterns
-            'datastrip-md-re': '^.*/DATASTRIP/.*/MTD_DS.xml$',
-            'tile-md-re': '^.*/GRANULE/.*/MTD_TL.xml$',
-            'asset-md-re': '^.*/MTD_MSIL1C.xml$',
+            'datastrip-md-re': r'^.*/DATASTRIP/.*/MTD_DS.xml$',
+            'tile-md-re': r'^.*/GRANULE/.*/MTD_TL.xml$',
+            'asset-md-re': r'^.*/MTD_MSIL1C.xml$',
         },
     }
 
@@ -971,7 +971,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         self._time_report('Start download from GCS')
         band_files = []
         for path in self.raster_paths():
-            match = re.match("/[\w_]+/(.+)", path)
+            match = re.match(r'/[\w_]+/(.+)', path)
             url = match.group(1)
             output_path = os.path.join(
                 output_dir, os.path.basename(url)

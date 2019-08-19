@@ -1044,7 +1044,7 @@ class landsatData(gips.data.core.CloudCoverData):
         band_files = []
 
         for path in self.assets['C1GS'].band_paths():
-            match = re.match("/[\w_]+/(.+)", path)
+            match = re.match(r'/[\w_]+/(.+)', path)
             url = match.group(1)
             output_path = os.path.join(
                 output_dir, os.path.basename(url)
@@ -2053,7 +2053,7 @@ class landsatData(gips.data.core.CloudCoverData):
             mtl = asset.extract([f for f in asset.datafiles() if f.endswith("MTL.txt")])[0]
             with open(mtl, 'r') as mtl_file:
                 text = mtl_file.read()
-        match = re.search(".*UTM_ZONE = (\d+).*", text)
+        match = re.search(r'.*UTM_ZONE = (\d+).*', text)
         if match:
             self.utm_zone_number = match.group(1)
         else:
