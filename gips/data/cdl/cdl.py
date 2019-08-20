@@ -184,10 +184,10 @@ class cdlData(Data):
     def legend(self):
         """Open the legend file, keeping it memoized for future calls."""
         if getattr(self, "_legend", None) is None:
-            if self.assets.keys()[0] == _cdlmkii:
+            if next(iter(self.assets)) == _cdlmkii:
                 self._legend = [''] * 256
                 im = gdal.Open(os.path.splitext(self.assets[_cdlmkii].filename)[0] + '.tif')
-                for key, val in im.GetMetadata().iteritems():
+                for key, val in im.GetMetadata().items():
                     if key[0:10] == 'CLASS_NAME':
                         self._legend[int(val)] = key[11:]
             else:
