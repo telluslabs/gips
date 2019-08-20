@@ -22,7 +22,7 @@ def _grouper(iterable, n, fillvalue=None):
     Taken nearly verbatim from the python itertools docs:
     https://docs.python.org/2/library/itertools.html"""
     args = [iter(iterable)] * n
-    return itertools.izip_longest(fillvalue=fillvalue, *args)
+    return itertools.zip_longest(fillvalue=fillvalue, *args)
 
 
 def _chunky_transaction(iterable, function, chunk_sz=1000, item_desc="items"):

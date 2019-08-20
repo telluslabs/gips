@@ -85,7 +85,7 @@ def t_rectify_products(mocker):
         md.ParseAndAddFiles([full_fn])
         # sanity check, not part of the test
         assert len(md.filenames) == 1 and md.name.lower() == 'modis'
-        (sensor, product) = md.filenames.keys()[0] # only one so it must be the right one
+        (sensor, product) = next(iter(md.filenames)) # only one so it must be the right one
         product = models.Product(
             product=product,
             sensor =sensor,
