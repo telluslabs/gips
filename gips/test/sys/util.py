@@ -241,7 +241,7 @@ def generate_gdalinfo_stats_expectation(filename):
     # The output includes unpredictable file paths, so filter them out:
     lines = []
     in_files_block = False
-    for l in outcome.stdout.splitlines():
+    for l in outcome.stdout.decode().splitlines():
         # first detect whether we're in a 'Files:' block
         in_files_block = (l.startswith('Files: ')
                           or (in_files_block and l.startswith(' ')))
