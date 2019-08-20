@@ -219,6 +219,7 @@ def fetch_mocks(mocker, test_asset_fn):
     return m_popen
 
 
+@pytest.mark.skip(reason="old assets are deprecated by official sources")
 def t_fetch_old_asset(fetch_mocks):
     """Integration test for sentinel2Asset.fetch.
 
@@ -238,6 +239,7 @@ def t_fetch_old_asset(fetch_mocks):
         os.path.exists(staged_fn) and os.remove(staged_fn)
 
 
+@pytest.mark.skip(reason="old assets are deprecated by official sources")
 def t_fetch_old_asset_duplicate(fetch_mocks, mocker):
     """Integration test for sentinel2Asset.fetch.
 
@@ -310,6 +312,7 @@ def archive_setup(test_asset_fn):
         [os.path.exists(fn) and os.remove(fn) for fn in archived_asset_fns]
 
 
+@pytest.mark.skip(reason="old assets are deprecated by official sources")
 @pytest.mark.django_db
 def t_archive_old_asset(archive_setup, mocker):
     """Confirm old-style assets archive properly."""
