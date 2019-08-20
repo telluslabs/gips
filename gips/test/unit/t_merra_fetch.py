@@ -51,7 +51,7 @@ FLX_listing = [
     '</html>\n',
 ]
 
-def t_fetch_asset_found_case(mocker):
+def t_fetch_asset_found_case(mocker, mock_context_manager):
     """Query http server, extract asset URL, then download it."""
 
     # various useful values
@@ -70,7 +70,7 @@ def t_fetch_asset_found_case(mocker):
     content = mocker.Mock(code=200, msg='OK')
     managed_request.side_effect = [listing, content]
     # don't care about these, just need them to not do I/O
-    mocker.patch.object(merra.tempfile, 'mkstemp')
+    mock_context_manager(merra.utils, 'make_temp_dir', 'fake-temp-dir')
     mocker.patch.object(merra, 'Dataset')
     mocker.patch.object(merra.os, 'rename')
 
