@@ -1,3 +1,7 @@
 FROM indigo-gips
 
 RUN pip3 install -r dev_requirements.txt
+
+# set with --build-arg or at runtime with -e
+ARG GIPS_OVERRIDE_VERSION
+ENV GIPS_OVERRIDE_VERSION 0.0.0-dev

@@ -67,6 +67,7 @@ publish_image:
     - VERSION=$(PYTHONPATH=. python -c 'import gips ; print(gips.__version__)')
     - test -z "$(docker image ls --quiet registry.ags.io/gips:$VERSION)" -a "v$VERSION" = "$CI_COMMIT_REF_NAME"
     - docker build -t gippy-03x-release -f docker/gippy-release.docker docker
+    # TODO GIPS_VERSION isn't actually used?
     - docker build --no-cache
       --build-arg GIPS_VERSION=$VERSION
       -t registry.ags.io/gips:$VERSION
