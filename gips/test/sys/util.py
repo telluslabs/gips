@@ -6,6 +6,7 @@ import hashlib
 import pprint
 
 import pytest
+import _pytest.mark.structures
 import scripttest
 import envoy # deprecated
 import sh
@@ -265,7 +266,7 @@ def params_from_expectations(expectations, mark_spec=None):
 
     def get_mark_spec(i):
         msi = mark_spec.get(i, [])
-        is_mark = isinstance(msi, pytest.mark.MarkDecorator.__class__)
+        is_mark = isinstance(msi, _pytest.mark.structures.MarkDecorator)
         return [msi] if is_mark else list(msi) # handle case of multiple marks
 
     for driver, prod_expectations in expectations.items():
