@@ -219,7 +219,7 @@ class hlsData(gips.data.core.CloudCoverData):
             temp_fp = self.temp_product_filename(sensor, prod_and_args)
             # indices() assumes many indices per file; we just want one
             imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
-            imgout.add_meta(metadata)
+            imgout.add_meta(self.prep_meta(asset_fn, metadata))
             archived_fp = self.archive_temp_path(temp_fp)
             self.AddFile(sensor, prod_and_args, archived_fp)
 

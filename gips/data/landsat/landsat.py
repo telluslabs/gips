@@ -1010,7 +1010,7 @@ class landsatData(gips.data.core.CloudCoverData):
             temp_fp = self.temp_product_filename(sensor, prod_and_args)
             # indices() assumes many indices per file; we just want one
             imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
-            imgout.add_meta(metadata)
+            imgout.add_meta(self.prep_meta(asset_fn, metadata))
             if coreg_shift:
                 self._time_report("coregistering index")
                 xcoreg = coreg_shift.get('x', 0.0)
