@@ -87,9 +87,9 @@ class gpmAsset(Asset):
 
         bname = os.path.basename(filename)
         try:
-            indicator = (re.search('(?<=3B-)\w*(?=-{1})', bname)).group(0)
+            indicator = (re.search(r'(?<=3B-)\w*(?=-{1})', bname)).group(0)
         except AttributeError:
-            indicator = (re.search('(?<=3B)\w*(?=\.{1})', bname)).group(0)
+            indicator = (re.search(r'(?<=3B)\w*(?=\.{1})', bname)).group(0)
             pass
 
         if indicator == 'DAY':

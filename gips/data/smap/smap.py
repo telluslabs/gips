@@ -56,10 +56,10 @@ class smapAsset(Asset):
         super(smapAsset, self).__init__(filename)
 
         bname = os.path.basename(filename)
-        self.asset = (re.search('(?<=SMAP_L3_)\w*(?=_[0-9]{8})', bname)).group(0)
-        date_here = (re.search('[0-9]{8}', bname)).group(0)
+        self.asset = (re.search(r'(?<=SMAP_L3_)\w*(?=_[0-9]{8})', bname)).group(0)
+        date_here = (re.search(r'[0-9]{8}', bname)).group(0)
         self.date = datetime.datetime.strptime(date_here, "%Y%m%d").date()
-        self._version = (re.search('R[0-9]*', bname)).group(0)
+        self._version = (re.search(r'R[0-9]*', bname)).group(0)
         self.tile = 'h01v01'
 
     @classmethod
