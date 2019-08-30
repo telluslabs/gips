@@ -69,8 +69,8 @@ def command(cmd):
 
 
 class sentinel1Repository(Repository):
-    if not os.path.exists('/usr/bin/gpt'):
-        raise Exception('SNAP GPT not installed')
+    #if not os.path.exists('/usr/bin/gpt'):
+    #    raise Exception('SNAP GPT not installed')
 
     name = 'Sentinel1'
     description = 'Data from the Sentinel 1 satellite(s) from the ESA'
