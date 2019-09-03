@@ -371,11 +371,11 @@ class DataInventory(Inventory):
 
     def pprint(self, **kwargs):
         """ Print inventory """
-        print('')
+        print()
         if self.spatial.site is not None:
             print(Colors.BOLD + 'Asset Coverage for site %s' % (self.spatial.sitename) + Colors.OFF)
             self.spatial.print_tile_coverage()
-            print('')
+            print()
         else:
             # constructor makes it safe to assume there is only one tile when
             # self.spatial.site is None, but raise an error anyway just in case

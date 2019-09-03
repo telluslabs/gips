@@ -82,13 +82,13 @@ def main():
             dbinv.rectify_products(cls)
             return
 
-        extents = SpatialExtent.factory(
+        spatial_extents = SpatialExtent.factory(
             cls, site=args.site, rastermask=args.rastermask,
             key=args.key, where=args.where, tiles=args.tiles,
             pcov=args.pcov, ptile=args.ptile
         )
-        for extent in extents:
-            inv = DataInventory(cls, extent, TemporalExtent(args.dates, args.days), **vars(args))
+        for se in spatial_extents:
+            inv = DataInventory(cls, se, TemporalExtent(args.dates, args.days), **vars(args))
             inv.pprint(md=args.md, size=args.size)
 
 

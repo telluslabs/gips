@@ -1198,14 +1198,9 @@ class Data(object):
         """
         filenames = glob.glob(os.path.join(self.path, self._pattern))
         assetnames = [a.filename for a in self.assets.values()]
-        badexts = ['.index', '.xml']
-        test = lambda x: x not in assetnames and os.path.splitext(f)[1] not in badexts
-        # list comprehensions aren't all that
-        filenames = []
-        for f in filenames:
-            if test(f):
-                filenames.append(f)
-        return filenames
+        validated_filenames = [fn for fn in filenames
+                if fn not in assetnames and os.path.splitext(fn)[1] not in ('.index', '.xml')]
+        return validated_filenames
 
 
     @classmethod
@@ -1453,13 +1448,8 @@ class Data(object):
                 VerboseOut(f, 4)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
-                    #with utils.error_handler('Error parsing product date', continuable=True):
-                    # TODO: need to modify error handler to allow random junk in the project dir
-                    try:
+                    with utils.error_handler('Error parsing product date', continuable=True):
                         datetime.strptime(parts[len(parts) - 3], datedir)
-                    except:
-                        pass
-                    else:
                         files.append(f)
 
         datas = []
