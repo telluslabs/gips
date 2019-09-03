@@ -186,7 +186,7 @@ def generate_expectation(filename, base_path, e_type=None):
 
     # symlinks
     if e_type == 'symlink':
-        #                  have to rmeove this non-generic bit
+        #                  have to remove this non-generic bit
         #                     vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
         # HDF4_EOS:EOS_GRID:"/home/tolson/src/gips/data-root/modis/tiles/h12v04/2012337
         #   /MCD43A2.A2012337.h12v04.006.2016112013509.hdf":MOD_Grid_BRDF:Snow_BRDF_Albedo
