@@ -1089,8 +1089,7 @@ class modisData(Data):
                 refl.set_bandname("NIR", 2)
                 refl.set_nodata(-28762)
 
-                fouts = dict(Indices(refl, {'ndvi': fname}, meta))
-                imgout = gippy.GeoImage(fouts['ndvi'])
+                imgout = algorithms.indices(refl, products=['ndvi'], filename=fname)
                 del refl
 
             # TEMPERATURE PRODUCT (8-day) - Terra only

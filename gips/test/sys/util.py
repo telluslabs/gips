@@ -314,7 +314,7 @@ def sys_test_wrapper(request, path):
         if rp:
             initial_files.extend(find_files(path))
         # TODO can't pdb within a system test's subprocess; think settinng _in
-        # might help, but `_in=sys.stdin` doesn't work:
+        # might help, but neither `_in=sys.stdin` nor `_in='/dev/stdin'` works
         outcome = sh.Command(cmd_string)(
             *args, _err='/dev/stderr', _out='/dev/stdout')
         return outcome, [generate_expectation(e[0], path, e[1])
