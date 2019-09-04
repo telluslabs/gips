@@ -45,6 +45,8 @@ mark_spec[('landsat', 'cloudmask-coreg')] = pytest.mark.skip(
     'causing coreg not to find any local sentinel2 -- even though it is there.'
 )
 
+mark_spec[('landsat', 'bqashadow')] = pytest.mark.skip(
+ 'Deleted in branch but extant on dev; needs to be fixed post-merge.')
 
 
 expectations['prism'] = collections.OrderedDict([
