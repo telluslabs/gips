@@ -44,7 +44,7 @@ from scipy.ndimage import binary_dilation
 import osr
 import gippy
 from gippy import algorithms
-from gippy.algorithms import acca, fmask, linear_transform
+from gippy.algorithms import fmask, linear_transform
 from gips import __version__ as __gips_version__
 from gips.core import SpatialExtent, TemporalExtent
 from gips.data.core import Repository, Data
@@ -770,22 +770,6 @@ class landsatData(gips.data.core.CloudCoverData):
             # units given by https://landsat.usgs.gov/landsat-8-l8-data-users-handbook-section-5
             'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
-        'acca': {
-            'assets': ['DN', 'C1'],
-            'description': 'Automated Cloud Cover Assessment',
-            'arguments': [
-                'X: erosion kernel diameter in pixels (default: 5)',
-                'Y: dilation kernel diameter in pixels (default: 10)',
-                'Z: cloud height in meters (default: 4000)'
-            ],
-            'nargs': '*',
-            'toa': True,
-            'startdate': _lt5_startdate,
-            'latency': 0,
-            # percentage, so unitless, per landsat docs:
-            # https://landsat.usgs.gov/how-percentage-cloud-cover-calculated
-            'bands': unitless_bands('finalmask', 'cloudmask', 'ambclouds', 'pass1'),
-        },
         'fmask': {
             'assets': ['DN', 'C1'],
             'description': 'Fmask cloud cover',
@@ -1289,25 +1273,7 @@ class landsatData(gips.data.core.CloudCoverData):
                         .format(key, basename(self.assets[asset].filename)),
                         continuable=True):
                     fname = self.temp_product_filename(sensor, key)
-                    if val[0] == 'acca':
-                        s_azim = self.metadata['geometry']['solarazimuth']
-                        s_elev = 90 - self.metadata['geometry']['solarzenith']
-                        erosion, dilation, cloudheight = 5, 10, 4000
-                        if len(val) >= 4:
-                            erosion, dilation, cloudheight = [int(v) for v in val[1:4]]
-                        resset = set(
-                            [(reflimg[band].Resolution().x(),
-                              reflimg[band].Resolution().y())
-                             for band in (self.assets[asset].visbands +
-                                          self.assets[asset].lwbands)]
-                        )
-                        if len(resset) > 1:
-                            raise Exception(
-                                'ACCA requires all bands to have the same '
-                                'spatial resolution.  Found:\n\t' + str(resset)
-                            )
-                        imgout = acca(reflimg, fname, s_elev, s_azim, erosion, dilation, cloudheight)
-                    elif val[0] == 'fmask':
+                    if val[0] == 'fmask':
                         tolerance, dilation = 3, 5
                         if len(val) >= 3:
                             tolerance, dilation = [int(v) for v in val[1:3]]

@@ -282,16 +282,6 @@ expectations['landsat'] = collections.OrderedDict([
        ['date,band,min,max,mean,sd,skew,count\r\n',
         '2017-213,ndvi,-0.4883,0.8611,0.640444,0.223033,-2.00842,220848.0\r\n'])]),
 
-    # t_stats[landsat-acca] recording:
-    ('acca',
-     [('acca_stats.txt',
-       'text-full',
-       ['date,band,min,max,mean,sd,skew,count\r\n',
-        '2017-213,finalmask,1.0,1.0,1.0,0.0,nan,199899.0\r\n',
-        '2017-213,cloudmask,1.0,1.0,1.0,0.0,nan,20949.0\r\n',
-        '2017-213,ambclouds,1.0,1.0,1.0,0.0,nan,15396.0\r\n',
-        '2017-213,pass1,1.0,1.0,1.0,0.0,nan,4642.0\r\n'])]),
-
     # t_stats[landsat-rad-toa] recording:
     ('rad-toa',
      [('rad-toa_stats.txt',

@@ -37,7 +37,7 @@ mark_spec['sentinel2'] = util.slow
 
 # TODO some of these may be fast enough without --setup-repo
 for k in (('landsat', 'bqashadow'), ('landsat', 'ref-toa'),
-          ('landsat', 'acca'), ('landsat', 'rad-toa')):
+          ('landsat', 'rad-toa')):
     mark_spec[k] = util.slow
 
 mark_spec[('landsat', 'cloudmask-coreg')] = pytest.mark.skip(

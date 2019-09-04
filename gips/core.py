@@ -51,7 +51,7 @@ class RequestedProducts(object):
 
     @property
     def products(self):
-        """ Return list of requested products (e.g., ndvi-toa lswi-TEST acca-5 """
+        """ Return list of requested products (e.g. ndvi-toa, lswi-TEST)"""
         return sorted(self.requested.keys())
 
     @property
