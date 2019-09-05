@@ -119,10 +119,9 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                 ['01', '02', '03', '04', '05', '06',
                  '07', '08', '8A', '09', '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
-            ## N.B.> swapped colors for 8 and 8a for better corespondence with
-            ## landsat 
             'colors':
                 ("COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
+                 # swapped colors for 8 and 8a for better corespondence with landsat:
                  "REDEDGE3", "REDEDGE4", "NIR",  "WV",  "CIRRUS",   "SWIR1",    "SWIR2"),
             # center wavelength of band in micrometers, CF:
             # https://earth.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/radiometric
@@ -1260,8 +1259,12 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         mtci = missing + 0. * b4.copy()
         wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b5 - b4 != 0.)
+        # TODO grab full diffs for failing prods and post to the issue, @ircwaves
+        # TODO also apparently crcm is ok as-is
+        # TODO confirm floaty division
         mtci[wg] = ((b6[wg] - b5[wg]) / (b5[wg] - b4[wg]))
         mtci[(mtci < -6.)|(mtci >= 6.)] = missing
+        # TODO confirm floaty division
         mtci[mtci != missing] = mtci[mtci != missing]/gain
         mtci = mtci.astype('int16')
 
