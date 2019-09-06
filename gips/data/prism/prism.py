@@ -262,20 +262,19 @@ class prismData(Data):
                 imgs = []
                 asset_fns = [] # have to grab filenames for multiple days
                 for tileobj in inv.data.values():
-                    datobj = tileobj.tiles.values()[0]
-                    asset_fns.append(
-                        os.path.basename(datobj.assets['_ppt'].filename))
-                    imgs.append(GeoImage(get_bil_vsifile(datobj, '_ppt')))
+                    data_obj = next(iter(tileobj.tiles.values()))
+                    asset_fns.append(os.path.basename(data_obj.assets['_ppt'].filename))
+                    imgs.append(GeoImage(get_bil_vsifile(data_obj, '_ppt')))
 
                 with self.make_temp_proc_dir() as tmp_dir:
                     tmp_fp = os.path.join(tmp_dir, prod_fn)
-                    oimg = GeoImage(tmp_fp, imgs[0])
+                    oimg = GeoImage.create_from(imgs[0], tmp_fp)
                     oimg.set_nodata(-9999)
                     oimg.set_bandname(
                         description + '({} day window)'.format(lag), 1
                     )
                     oimg.add_meta(self.prep_meta(sorted(asset_fns)))
-                    for chunk in oimg.Chunks():
+                    for chunk in oimg.chunks():
                         oarr = oimg[0].read(chunk) * 0.0 # wat
                         for img in imgs:
                             oarr += img[0].read(chunk)
@@ -283,6 +282,5 @@ class prismData(Data):
                     oimg.save()
                     os.rename(tmp_fp, archived_fp)
                 oimg = None  # help swig+gdal with GC
-                products.requested.pop(key)
             self.AddFile(sensor, key, archived_fp)  # add product to inventory
         return products

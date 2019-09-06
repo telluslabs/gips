@@ -137,7 +137,8 @@ expectations['prism'] = collections.OrderedDict([
      '    STATISTICS_MAXIMUM=332.60000610',
      '    STATISTICS_MEAN=-13428.78234099',
      '    STATISTICS_MINIMUM=-29997',
-     '    STATISTICS_STDDEV=14925.79199996'])]),
+     '    STATISTICS_STDDEV=14925.79199996',
+     '    STATISTICS_VALID_PERCENT=100'])])
 ])
 
 
