@@ -908,7 +908,7 @@ class Asset(object):
         overwritten_ao = None
         try:
             asset = cls(filename)
-        except Exception(e):
+        except Exception as e:
             cls._quarantine_file(filename, e)
             return (None, 0, None)
 

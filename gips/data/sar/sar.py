@@ -209,7 +209,7 @@ class sarAsset(Asset):
         elif len(mats) > 1:
             raise Exception('{} matches pattern for: ' + ','.join(mats))
 
-        self.asset, m = mats.items()[0]
+        self.asset, m = next(iter(mats.items()))
         self.tile = m.group('tile')
         self.sensor = m.group('satellite') + m.group('mode')
 
@@ -241,10 +241,8 @@ class sarAsset(Asset):
         return copy.deepcopy(self._meta_dict)
 
     def _jaxa_opener(self, f, path=None):
-        if type(f) in (str, unicode):
-            f = (f,)
-        paths = self.extract(f, path=path).values()
-        img = gippy.GeoImage(paths)
+        paths = self.extract([f] if isinstance(f, str) else f, path=path).values()
+        img = gippy.GeoImage.open(filenames=tuple(paths))
         return img
 
     def _proc_meta(self):
@@ -325,8 +323,8 @@ class sarAsset(Asset):
         #VerboseOut('%s: inspect %s' % (fname,datetime.datetime.now()-start), 4)
 
 
-    def extract(self, filenames=[], path=None):
-        """ Extract filenames from asset and create ENVI header files """
+    def extract(self, filenames=(), path=None):
+        """Extract filenames from asset and create ENVI header files."""
         files = super(sarAsset, self).extract(filenames, path=path)
         meta = self.get_meta_dict()
         datafiles = {}
@@ -384,9 +382,9 @@ class sarData(Data):
         if len(products) == 0:
             return
 
-        sensor = self.sensor_set[0]    # for a given time-space, there should
-        #                              # only be a look from one sensor,
-        asset = self.assets.keys()[0]  # and one asset.
+        # for a given time-space, there should only be a look from one sensor and one asset.
+        sensor = self.sensor_set[0]
+        asset = next(iter(self.assets.keys()))
 
         datafiles = self.assets[asset].extract(path=self._temp_proc_dir)
 
@@ -414,8 +412,8 @@ class sarData(Data):
                 img = jo(bands)
                 img.set_nodata(0)
                 mask = jo(datafiles['mask'])
-                mask[0] = mask[0].BXOR(150.) > 0
-                img.AddMask(mask[0])
+                mask[0] = mask[0].bxor(150.) > 0
+                img.add_mask(mask[0])
                 # apply date mask
                 dateimg = jo(datafiles['date'])
                 dateday = (
