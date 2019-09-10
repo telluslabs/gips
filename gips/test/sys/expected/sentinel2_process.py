@@ -257,6 +257,7 @@ expectations = OrderedDict([
      'Upper Right (  409800.000, 4800000.000) ( 70d 6\'46.52"W, 43d20\'50.79"N)',
      'Lower Right (  409800.000, 4690200.000) ( 70d 5\'43.11"W, 42d21\'31.82"N)',
      'Center      (  354900.000, 4745100.000) ( 70d46\'32.52"W, 42d50\'40.97"N)',
+     # mtci surface
      'Band 1 Block=5490x1 Type=Int16, ColorInterp=Gray',
      '  Minimum=-30000.000, Maximum=29998.000, Mean=12443.862, StdDev=11332.215',
      '  NoData Value=-32768',
@@ -312,9 +313,10 @@ expectations = OrderedDict([
      'Upper Right (  409800.000, 4800000.000) ( 70d 6\'46.52"W, 43d20\'50.79"N)',
      'Lower Right (  409800.000, 4690200.000) ( 70d 5\'43.11"W, 42d21\'31.82"N)',
      'Center      (  354900.000, 4745100.000) ( 70d46\'32.52"W, 42d50\'40.97"N)',
+     # mtci-toa
      'Band 1 Block=5490x1 Type=Int16, ColorInterp=Gray',
      '  Minimum=-7.000, Maximum=6.000, Mean=-0.635, StdDev=5.246',
-     '  NoData Value=0',
+     '  NoData Value=-32768',
      '  Metadata:',
      '    STATISTICS_MAXIMUM=6',
      '    STATISTICS_MEAN=-0.63534817',

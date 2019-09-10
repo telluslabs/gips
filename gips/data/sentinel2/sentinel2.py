@@ -1154,6 +1154,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             (T, Lu, Ld) = atm6s.results[c]
             lu = 0.0001 * Lu # see rad_geoimage for reason for this
             TLdS = T * Ld * scaling_factor
+            # sr_image[c] = (rad_toa_image[c] - lu) / TLdS # old version
             sr_image[c] = (rad_toa_image[c] - lu) * (1.0 / TLdS)
         self._product_images['ref'] = sr_image
 
@@ -1240,12 +1241,12 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         cloudmask_img[0].write(np_cloudmask)
         self._product_images['cloudmask'] = cloudmask_img
 
-
     def mtci_geoimage(self, mode):
         """Generate Python implementation of MTCI."""
         # test this with eg:
         # gips_process sentinel2 -t 16TDP -d 2017-10-01 -v5 -p mtci --overwrite
-        self._time_report('Generating MTCI')
+        product = 'mtci-' + mode
+        self._time_report('Generating {}'.format(product))
 
         # change this to 'ref'
         ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
@@ -1257,23 +1258,22 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         gain = 0.0002
         missing = -32768
 
+        # start by creating a field of ndv values
         mtci = missing + 0. * b4.copy()
+        # which pixels are valid to compute mtci?
         wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b5 - b4 != 0.)
-        # TODO grab full diffs for failing prods and post to the issue, @ircwaves
-        # TODO also apparently crcm is ok as-is
-        # TODO confirm floaty division
         mtci[wg] = ((b6[wg] - b5[wg]) / (b5[wg] - b4[wg]))
         mtci[(mtci < -6.)|(mtci >= 6.)] = missing
-        # TODO confirm floaty division
-        mtci[mtci != missing] = mtci[mtci != missing]/gain
+        # mtci[mtci != missing] = mtci[mtci != missing]/gain
+        print(product, "before astype:\n", mtci)
         mtci = mtci.astype('int16')
+        print(product, "after astype:\n", mtci)
 
         mtci_filename = "%s/mtci.tif" % self._temp_proc_dir
         mtci_img = gippy.GeoImage.create_from(ref_img, mtci_filename, 1, 'int16')
 
+        # nodata & gain are set on the output image in process()
         mtci_img[0].write(mtci)
-        mtci_img[0].set_gain(gain)
-        mtci_img[0].set_nodata(missing)
 
         self._product_images[
                 'mtci-toa' if mode == 'toa' else 'mtci'] = mtci_img
@@ -1389,7 +1389,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                     output_image.add_meta('FMASK_3', 'cloud shadow')
                     output_image.add_meta('FMASK_4', 'snow')
                     output_image.add_meta('FMASK_5', 'water')
-                if prod_type == 'mtci':
+                if prod_type in ('mtci', 'mtci-toa'):
                     output_image.set_gain(0.0002)
                     output_image.set_nodata(-32768)
                 if prod_type == 's2rep':
