@@ -167,6 +167,7 @@ class aodAsset(Asset):
     @classmethod
     def fetch(cls, asset, tile, date):
         """Fetch the AOD asset matching the ATD."""
+        raise Exception("DO NOT FETCH during system tests")
         query_rv = cls.query_service(asset, tile, date)
         if query_rv is None:
             return []
