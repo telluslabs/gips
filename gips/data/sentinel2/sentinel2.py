@@ -1007,12 +1007,11 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         if p.returncode != 0:
             raise IOError("Expected gdalbuildvrt exit status 0, got {}".format(p.returncode))
 
-        vrt_img = gippy.GeoImage(vrt_filename)
-        vrt_img.set_nodata(0)
-        vrt_img.set_gain(0.0001) # 16-bit storage values / 10^4 = refl values
+        ndv, gain = 0, 0.0001
         # eg:   1        '02', which yields color_name 'BLUE'
-        for band_num, band_string in enumerate(indices_bands, 1): # starts at 0
-            vrt_img.set_bandname(colors[b_strings.index(band_string)], band_num)
+        bandnames = [colors[b_strings.index(ib)] for ib in indices_bands]
+        vrt_img = gippy.GeoImage.open(filenames=[vrt_filename], bandnames=bandnames,
+                                      nodata=ndv, gain=gain)
         self._product_images['ref-toa'] = vrt_img
         self._time_report('Finished VRT for ref-toa image')
 
@@ -1365,15 +1364,16 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         sensor = self.current_sensor()
         # Process standard products
         for prod_type in products.groups()['Standard']:
-            if prod_type not in ('mtci', 'mtci-toa', 'ref-toa'):
+            if prod_type not in ('mtci', 'mtci-toa', 'ref-toa', 'rad-toa'):
                 raise NotImplementedError('everything is broken, fuck it')
             err_msg = 'Error creating product {} for {}'.format(prod_type, a_obj.basename)
             with utils.error_handler(err_msg, continuable=True):
                 self._time_report('Starting {} processing'.format(prod_type))
                 image = self._product_images[prod_type]
                 image.add_meta(self.prep_meta())
-                archive_fp = self.archive_temp_path(image.filename())
-                image.save()
+                fp = self.temp_product_filename(self.current_sensor(), prod_type)
+                image.save(filename=fp)
+                archive_fp = self.archive_temp_path(fp)
                 self.AddFile(sensor, prod_type, archive_fp)
 
             self._time_report('Finished {} processing'.format(prod_type))
@@ -1394,7 +1394,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                 # if prod_type in ('ref', 'rad'): # atmo-correction metadata
                 #     output_image.add_meta('AOD Source', source_image._aod_source)
                 #     output_image.add_meta('AOD Value',  source_image._aod_value)
-                # if prod_type in ('ref-toa', 'rad-toa', 'rad', 'ref'):
+                # if prod_type in ('rad', 'ref'):
                 #     output_image.set_gain(0.0001)
                 # if prod_type == 'cfmask':
                 #     output_image.add_meta('FMASK_0', 'nodata')
