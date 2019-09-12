@@ -1,2 +1,3 @@
 # non-fancy run GIPS container
-docker run -v /mnt/storage/gips:/archive -v /Users/rob/repo/test/gips/gips:/gips/gips -it --rm gips1 bash
+LOCAL_ARCHIVE="/mnt/storage"
+docker run -v $HOME:/root -v $PWD/gips:/gips/gips -v {LOCAL_ARCHIVE}/gips:/archive -it --rm gips-user bash
