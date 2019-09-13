@@ -1230,16 +1230,11 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         # Set cfmask 2 and 3 to 1's, everything else to 0's
         np_cloudmask = numpy.logical_or( npfm == 2, npfm == 3).astype('uint8')
-
-        # cloudmask.tif is taken by cfmask
-        cloudmask_filename = "%s/cloudmask2.tif" % self._temp_proc_dir
-        cloudmask_img = gippy.GeoImage.create_from(
-            fmask_image,
-            cloudmask_filename,
-            1,
-            'uint8'
-        )
+        fp = self.temp_product_filename(self.current_sensor(), 'cloudmask')
+        cloudmask_img = gippy.GeoImage.create_from(fmask_image, fp, 1, 'uint8')
         cloudmask_img[0].write(np_cloudmask)
+        # no way to clear existing metadata, so note the band's provenance and move on
+        cloudmask_img.add_meta('cloudmask_0', 'FMASK_2 OR FMASK_3')
         self._product_images['cloudmask'] = cloudmask_img
 
     def mtci_geoimage(self, mode):
