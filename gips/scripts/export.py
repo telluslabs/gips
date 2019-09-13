@@ -112,7 +112,7 @@ def run_export(args):
                     inv = ProjectInventory(datadir)
                     inv.pprint()
                 else:
-                    print('No data found for', t_extent, level=2)
+                    print('No data found for', t_extent)
 
             if s3outdir is not None and os.path.exists(args.outdir):
                 outpath = args.outdir
