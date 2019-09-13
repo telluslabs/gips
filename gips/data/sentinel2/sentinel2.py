@@ -1145,7 +1145,6 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         rad_toa_image = self.load_image('rad-toa')
         sr_image = gippy.GeoImage(rad_toa_image)
         # set meta to pass along to indices
-        # TODO needs to be set for rad as well
         sr_image.add_meta('AOD Source', str(atm6s.aod[0]))
         sr_image.add_meta('AOD Value',  str(atm6s.aod[1]))
         for c in ao.sensor_spec('indices-colors'):
@@ -1156,7 +1155,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             sr_image[c] = (rad_toa_image[c] - lu) * (1.0 / TLdS)
         self._product_images['ref'] = sr_image
 
-    def fmask_geoimage(self):
+    def cfmask_geoimage(self):
         """Generate cloud mask.
 
         Uses python implementation of cfmask. Builds a VRT of all the necessary
@@ -1211,6 +1210,9 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         DEVNULL.close()
         fmask_image = gippy.GeoImage("%s/cloudmask.tif" % self._temp_proc_dir)
+        [fmask_image.add_meta(k, v) for (k, v) in (
+            ('FMASK_0', 'nodata'),       ('FMASK_1', 'valid'), ('FMASK_2', 'cloud'),
+            ('FMASK_3', 'cloud shadow'), ('FMASK_4', 'snow'),  ('FMASK_5', 'water'))]
         self._product_images['cfmask'] = fmask_image
 
 
@@ -1279,6 +1281,11 @@ class sentinel2Data(gips.data.core.CloudCoverData):
     def s2rep_geoimage(self, mode):
         """Generate Python implementation of S2REP."""
         self._time_report('Generating S2REP')
+        # TODO
+        # if prod_type == 's2rep':
+        #     output_image.set_gain(0.04)
+        #     output_image.set_offset(400.0)
+        #     output_image.set_nodata(-32768)
 
         # change this to 'ref'
         ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
@@ -1347,7 +1354,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         if 'ref' in work:
             self.ref_geoimage()
         if 'cfmask' in work:
-            self.fmask_geoimage()
+            self.cfmask_geoimage()
         if 'cloudmask' in work:
             self.cloudmask_geoimage()
         if 'mtci-toa' in work:
@@ -1364,8 +1371,6 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         sensor = self.current_sensor()
         # Process standard products
         for prod_type in products.groups()['Standard']:
-            if prod_type not in ('mtci', 'mtci-toa', 'ref-toa', 'rad-toa', 'rad', 'ref'):
-                raise NotImplementedError('everything is broken, fuck it')
             err_msg = 'Error creating product {} for {}'.format(prod_type, a_obj.basename)
             with utils.error_handler(err_msg, continuable=True):
                 self._time_report('Starting {} processing'.format(prod_type))
@@ -1375,46 +1380,9 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                 image.save(filename=fp)
                 archive_fp = self.archive_temp_path(fp)
                 self.AddFile(sensor, prod_type, archive_fp)
-
             self._time_report('Finished {} processing'.format(prod_type))
             # not known if this is necessary in gippy 1.0, bit it's harmless to leave in
             image = None # gc hint due to C++/swig weirdness
-
-                # here down is all the bustified leftovers
-                ##########################################
-
-                # have to reproduce the whole object because gippy refuses to write metadata when
-                # you do image.save(filename).
-                # source_image = self._product_images[prod_type]
-                # if prod_type in ('mtci', 'mtci-toa'):
-                #     output_image = source_image
-                # else:
-                #     output_image = gippy.GeoImage.create_from(source_image, temp_fp)
-                #     output_image.set_nodata(0)
-                # output_image.add_meta(self.prep_meta())
-                # if prod_type == 'cfmask':
-                #     output_image.add_meta('FMASK_0', 'nodata')
-                #     output_image.add_meta('FMASK_1', 'valid')
-                #     output_image.add_meta('FMASK_2', 'cloud')
-                #     output_image.add_meta('FMASK_3', 'cloud shadow')
-                #     output_image.add_meta('FMASK_4', 'snow')
-                #     output_image.add_meta('FMASK_5', 'water')
-                # if prod_type in ('mtci', 'mtci-toa'):
-                #     output_image.set_gain(0.0002)
-                #     output_image.set_nodata(-32768)
-                # if prod_type == 's2rep':
-                #     output_image.set_gain(0.04)
-                #     output_image.set_offset(400.0)
-                #     output_image.set_nodata(-32768)
-                # for b_num, b_name in enumerate(source_image.bandnames(), 1):
-                #     output_image.set_bandname(b_name, b_num)
-                # # process bandwise because gippy had an error doing it all at once
-                # for i in range(len(source_image)):
-                #     source_image[i].save(output_image[i])
-                # archive_fp = self.archive_temp_path(temp_fp)
-                # self.AddFile(sensor, prod_type, archive_fp)
-            # self._time_report('Finished {} processing'.format(prod_type))
-            # (source_image, output_image) = (None, None) # gc hint due to C++/swig weirdness
         self._time_report('Completed standard product processing')
 
         # process indices in two groups:  toa and surf
