@@ -1059,7 +1059,8 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             # that same gain to Lu, apparently the atmosphere's
             # inherent radiance, to get a reasonable difference.
             lu = 0.0001 * Lu
-            rad_image[c] = (rad_toa_img[c] - lu).__div__(T) # literal `/` results in an error
+            # see https://github.com/gipit/gippy/issues/170
+            rad_image[c] = (rad_toa_img[c] - lu).__div__(T)
         self._product_images['rad'] = rad_image
 
 
@@ -1151,7 +1152,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             (T, Lu, Ld) = atm6s.results[c]
             lu = 0.0001 * Lu # see rad_geoimage for reason for this
             TLdS = T * Ld * scaling_factor
-            # sr_image[c] = (rad_toa_image[c] - lu) / TLdS # old version
+            # see https://github.com/gipit/gippy/issues/170
             sr_image[c] = (rad_toa_image[c] - lu) * (1.0 / TLdS)
         self._product_images['ref'] = sr_image
 
@@ -1243,8 +1244,6 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
     def mtci_geoimage(self, mode):
         """Generate Python implementation of MTCI."""
-        # test this with eg:
-        # gips_process sentinel2 -t 16TDP -d 2017-10-01 -v5 -p mtci --overwrite
         prod_type = 'mtci-toa' if mode == 'toa' else 'mtci'
         self._time_report('Generating {}'.format(prod_type))
 
@@ -1264,28 +1263,18 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b5 - b4 != 0.)
         mtci[wg] = ((b6[wg] - b5[wg]) / (b5[wg] - b4[wg]))
         mtci[(mtci < -6.)|(mtci >= 6.)] = missing
-        # mtci[mtci != missing] = mtci[mtci != missing]/gain
-        # print(product, "before astype:\n", mtci)
-        # mtci = mtci.astype('int16')
-        # print(product, "after astype:\n", mtci)
 
         fp = self.temp_product_filename(self.current_sensor(), prod_type)
         mtci_img = gippy.GeoImage.create_from(ref_img, fp, 1, 'int16')
         mtci_img.set_gain(gain)
         mtci_img.set_nodata(missing)
         mtci_img[0].write(mtci)
-
-        self._product_images[
-                'mtci-toa' if mode == 'toa' else 'mtci'] = mtci_img
+        self._product_images[prod_type] = mtci_img
 
     def s2rep_geoimage(self, mode):
-        """Generate Python implementation of S2REP."""
+        """s2rep generates Sentinel-2 Red Edge Position."""
+        prod_type = 's2rep-toa' if mode == 'toa' else 's2rep'
         self._time_report('Generating S2REP')
-        # TODO
-        # if prod_type == 's2rep':
-        #     output_image.set_gain(0.04)
-        #     output_image.set_offset(400.0)
-        #     output_image.set_nodata(-32768)
 
         # change this to 'ref'
         ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
@@ -1300,23 +1289,18 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         missing = -32768
 
         s2rep = missing + 0. * b4.copy()
-        wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b7 > 0.)&(b7 <= 1.)&(b6 - b5 != 0.)
-        s2rep[wg] = 705. + 35. * ((((b7[wg] + b4[wg])/2.) - b5[wg])/(b6[wg] - b5[wg]))
-
+        wg = ((b4 > 0.) & (b4 <= 1.) & (b5 > 0.) & (b5 <= 1.)
+            & (b6 > 0.) & (b6 <= 1.) & (b7 > 0.) & (b7 <= 1.) & (b6 - b5 != 0.))
+        s2rep[wg] = 705. + 35. * ((((b7[wg] + b4[wg]) / 2.) - b5[wg]) / (b6[wg] - b5[wg]))
         s2rep[(s2rep < 400.)|(s2rep >= 1100.)] = missing
-        s2rep[s2rep != missing] = (s2rep[s2rep != missing] - offset)/gain
-        s2rep = s2rep.astype('int16')
 
-        s2rep_filename = "%s/s2rep.tif" % self._temp_proc_dir
-        s2rep_img = gippy.GeoImage.create_from(ref_img, s2rep_filename, 1, 'int16')
-
-        s2rep_img[0].write(s2rep)
+        fp = self.temp_product_filename(self.current_sensor(), prod_type)
+        s2rep_img = gippy.GeoImage.create_from(ref_img, fp, 1, 'int16')
         s2rep_img[0].set_gain(gain)
         s2rep_img[0].set_offset(offset)
         s2rep_img[0].set_nodata(missing)
-
-        self._product_images[
-                's2rep-toa' if mode == 'toa' else 's2rep'] = s2rep_img
+        s2rep_img[0].write(s2rep)
+        self._product_images[prod_type] = s2rep_img
 
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
