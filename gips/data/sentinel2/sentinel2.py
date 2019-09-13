@@ -1048,9 +1048,8 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         # to check the gain & other values set on the object:
         # from gips.utils import vprint; vprint('rad_image info:', rad_image.Info())
 
-        # set meta to pass along to indices
-        rad_image._aod_source = str(atm6s.aod[0])
-        rad_image._aod_value  = str(atm6s.aod[1])
+        rad_image.add_meta('AOD Source', str(atm6s.aod[0]))
+        rad_image.add_meta('AOD Value',  str(atm6s.aod[1]))
 
         for c in ca._sensors[self.current_sensor()]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c] # Ld is unused for this product
@@ -1060,7 +1059,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             # that same gain to Lu, apparently the atmosphere's
             # inherent radiance, to get a reasonable difference.
             lu = 0.0001 * Lu
-            rad_image[c] = (rad_toa_img[c] - lu) / T
+            rad_image[c] = (rad_toa_img[c] - lu).__div__(T) # literal `/` results in an error
         self._product_images['rad'] = rad_image
 
 
@@ -1146,8 +1145,9 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         rad_toa_image = self.load_image('rad-toa')
         sr_image = gippy.GeoImage(rad_toa_image)
         # set meta to pass along to indices
-        sr_image._aod_source = str(atm6s.aod[0])
-        sr_image._aod_value  = str(atm6s.aod[1])
+        # TODO needs to be set for rad as well
+        sr_image.add_meta('AOD Source', str(atm6s.aod[0]))
+        sr_image.add_meta('AOD Value',  str(atm6s.aod[1]))
         for c in ao.sensor_spec('indices-colors'):
             (T, Lu, Ld) = atm6s.results[c]
             lu = 0.0001 * Lu # see rad_geoimage for reason for this
@@ -1364,7 +1364,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         sensor = self.current_sensor()
         # Process standard products
         for prod_type in products.groups()['Standard']:
-            if prod_type not in ('mtci', 'mtci-toa', 'ref-toa', 'rad-toa'):
+            if prod_type not in ('mtci', 'mtci-toa', 'ref-toa', 'rad-toa', 'rad', 'ref'):
                 raise NotImplementedError('everything is broken, fuck it')
             err_msg = 'Error creating product {} for {}'.format(prod_type, a_obj.basename)
             with utils.error_handler(err_msg, continuable=True):
@@ -1377,7 +1377,8 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                 self.AddFile(sensor, prod_type, archive_fp)
 
             self._time_report('Finished {} processing'.format(prod_type))
-            (source_image, output_image) = (None, None) # gc hint due to C++/swig weirdness
+            # not known if this is necessary in gippy 1.0, bit it's harmless to leave in
+            image = None # gc hint due to C++/swig weirdness
 
                 # here down is all the bustified leftovers
                 ##########################################
@@ -1391,11 +1392,6 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                 #     output_image = gippy.GeoImage.create_from(source_image, temp_fp)
                 #     output_image.set_nodata(0)
                 # output_image.add_meta(self.prep_meta())
-                # if prod_type in ('ref', 'rad'): # atmo-correction metadata
-                #     output_image.add_meta('AOD Source', source_image._aod_source)
-                #     output_image.add_meta('AOD Value',  source_image._aod_value)
-                # if prod_type in ('rad', 'ref'):
-                #     output_image.set_gain(0.0001)
                 # if prod_type == 'cfmask':
                 #     output_image.add_meta('FMASK_0', 'nodata')
                 #     output_image.add_meta('FMASK_1', 'valid')
