@@ -435,15 +435,13 @@ class merraData(Data):
         daily = fun(hourly)
         daily[daily.mask] = missing
         utils.verbose_out('writing %s' % fout, 4)
-        imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
+        imgout = gippy.GeoImage.create(fout, nx, ny, 1, proj=self._projection, dtype='float32')
         imgout[0].write(np.array(np.flipud(daily)).astype('float32'))
         imgout.set_bandname(prod, 1)
-        imgout.add_meta({'units': units})
+        imgout.add_meta('units', units)
         imgout.set_nodata(missing)
-        imgout.set_srs(self._projection)
         imgout.set_affine(np.array(self._geotransform))
         imgout.add_meta(self.prep_meta(assetfile, meta))
-
 
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
@@ -533,13 +531,12 @@ class merraData(Data):
                 rh[rh < 0.] = 0.
                 rhday = rh.mean(axis=0)
                 rhday[rhday.mask] = missing
-                utils.verbose_out('writing %s' % fout, 4)
-                imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
+                utils.vprint('writing', fout, level=4)
+                imgout = gippy.GeoImage.create(fout, nx, ny, 1, proj=self._projection, dtype='float32')
                 imgout[0].write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.set_bandname(val[0], 1)
-                imgout.add_meta({'units': '%'})
+                imgout.add_meta('units', '%')
                 imgout.set_nodata(missing)
-                imgout.set_srs(self._projection)
                 imgout.set_affine(np.array(self._geotransform))
                 imgout.add_meta(self.prep_meta(assetfile, meta))
 
@@ -564,12 +561,11 @@ class merraData(Data):
                 if frland.mask.sum() > 0:
                     frland[frland.mask] = missing
                 utils.verbose_out('writing %s' % fout, 4)
-                imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
+                imgout = gippy.GeoImage.create(fout, nx, ny, 1, proj=self._projection, dtype='float32')
                 imgout[0].write(np.array(np.flipud(frland)).astype('float32'))
                 imgout.set_bandname(prod, 1)
-                imgout.add_meta({'units': 'fraction'})
+                imgout.add_meta('units', 'fraction')
                 imgout.set_nodata(missing)
-                imgout.set_srs(self._projection)
                 imgout.set_affine(np.array(self._geotransform))
                 imgout.add_meta(self.prep_meta(assetfile, meta))
 

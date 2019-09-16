@@ -94,7 +94,7 @@ def vprint(*args, **kwargs):
 
     Except for 'level' all kwargs are passed on to print() (sep, file, etc).
     """
-    l = kwargs.pop('level', 1)
+    level = kwargs.pop('level', 1)
     if verbosity() >= level:
         print(*args, **kwargs)
 
