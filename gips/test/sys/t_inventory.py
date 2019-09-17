@@ -34,7 +34,7 @@ def t_cli_inventory(driver, spatial, product, datespec, expected):
     outcome = sh.gips_inventory(
         ('modis', spat_opt, spatial, '-d', datespec, '-p', product)
     )
-    assert (outcome.exit_code == 0 and expected in outcome.stdout)
+    assert (outcome.exit_code == 0 and expected in outcome.stdout.decode())
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("driver, spatial, product, datespec, expected", inv_api_params)
@@ -66,4 +66,4 @@ def t_landsat_pclouds_inventory(pclouds_value, key_string):
     driver_setup.setup_repo_data('landsat')
     outcome = sh.gips_inventory(driver_setup.STD_ARGS['landsat'] + (
         '--pclouds', pclouds_value))
-    assert (outcome.exit_code == 0 and key_string in outcome.stdout)
+    assert (outcome.exit_code == 0 and key_string in outcome.stdout.decode())
