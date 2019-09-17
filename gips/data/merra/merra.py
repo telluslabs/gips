@@ -189,23 +189,11 @@ class merraAsset(Asset):
             # asset ASM is for constants which all go into 1980-01-01
             mainurl = cls._assets[asset]['url']
             pattern = cls._assets[asset]['re_pattern'] % (0, 0, 0)
-        cpattern = re.compile(pattern)
-        with utils.error_handler("Error downloading"):
-            # obtain the list of files
-            response = cls.Repository.managed_request(mainurl, verbosity=2)
-            if response is None:
-                return None, None
-        for item in response.readlines():
-            # inspect the page and extract the full name of the needed file
-            if cpattern.search(item):
-                if 'xml' in item:
-                    continue
-                basename = cpattern.findall(item)[0]
-                url = '/'.join([mainurl, basename])
-                return basename, url
-        utils.verbose_out("Unable to find a remote match for"
-                          " {} at {}".format(pattern, mainurl), 4)
-        return None, None
+        basename = cls.Repository.find_pattern_in_url(mainurl, pattern, verbosity=2)
+        if basename is None:
+            utils.vprint("Unable to find a remote match for", pattern, "at", mainurl, level=4)
+            return None, None
+        return basename, '/'.join([mainurl, basename])
 
     @classmethod
     def fetch(cls, asset, tile, date):

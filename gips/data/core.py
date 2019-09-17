@@ -315,6 +315,25 @@ class Repository(object):
                          " {} driver".format(key, cls.name))
 
     @classmethod
+    def find_pattern_in_url(cls, url, pattern, verbosity=1, debuglevel=0):
+        """Returns the first match for the pattern from the url, else None.
+
+        Excludes lines that match 'xml'.  Relies on managed_request.
+        """
+        cp = re.compile(pattern)
+        with utils.error_handler("Error downloading"):
+            resp = cls.managed_request(url, verbosity, debuglevel)
+            if resp is None:
+                return None
+            # inspect the page and extract the first match
+            for line in resp:
+                l = line.decode()
+                match_obj = cp.search(l)
+                if 'xml' not in l and match_obj is not None:
+                    return match_obj.group(0)
+        return None
+
+    @classmethod
     def managed_request(cls, url, verbosity=1, debuglevel=0):
         """Visit the given http URL and return the response.
 
