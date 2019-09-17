@@ -113,6 +113,7 @@ expectations = {
         '    STATISTICS_MEAN=138.76125755',
         '    STATISTICS_MINIMUM=1',
         '    STATISTICS_STDDEV=22.38743605',
+        '    STATISTICS_VALID_PERCENT=50.56',
         '  Color Table (RGB with 256 entries)',
         '    0: 0,0,0,0',
         '    1: 255,211,0,255',
