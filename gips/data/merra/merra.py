@@ -189,7 +189,8 @@ class merraAsset(Asset):
             # asset ASM is for constants which all go into 1980-01-01
             mainurl = cls._assets[asset]['url']
             pattern = cls._assets[asset]['re_pattern'] % (0, 0, 0)
-        basename = cls.Repository.find_pattern_in_url(mainurl, pattern, verbosity=2)
+        with utils.error_handler("Error downloading"):
+            basename = cls.Repository.find_pattern_in_url(mainurl, pattern, verbosity=2)
         if basename is None:
             utils.vprint("Unable to find a remote match for", pattern, "at", mainurl, level=4)
             return None, None

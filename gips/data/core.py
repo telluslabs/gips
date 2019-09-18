@@ -321,16 +321,15 @@ class Repository(object):
         Excludes lines that match 'xml'.  Relies on managed_request.
         """
         cp = re.compile(pattern)
-        with utils.error_handler("Error downloading"):
-            resp = cls.managed_request(url, verbosity, debuglevel)
-            if resp is None:
-                return None
-            # inspect the page and extract the first match
-            for line in resp:
-                l = line.decode()
-                match_obj = cp.search(l)
-                if 'xml' not in l and match_obj is not None:
-                    return match_obj.group(0)
+        resp = cls.managed_request(url, verbosity, debuglevel)
+        if resp is None:
+            return None
+        # inspect the page and extract the first match
+        for line in resp:
+            l = line.decode()
+            match_obj = cp.search(l)
+            if 'xml' not in l and match_obj is not None:
+                return match_obj.group(0)
         return None
 
     @classmethod
