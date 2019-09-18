@@ -558,11 +558,9 @@ class Asset(object):
     def datafiles(self):
         """Get list of readable datafiles from asset.
 
-        A 'datafile' in this context is a file contained within the
-        asset file, such as for tar, zip, and hdf files.
-
-        In the case of JSON files, the files pointed to are considered 'within'
-        the JSON asset."""
+        A 'datafile' is a file contained within the asset file, or else pointed
+        to by it.
+        """
         path = os.path.dirname(self.filename)
         indexfile = os.path.join(path, self.filename + '.index')
         if os.path.exists(indexfile):
@@ -583,8 +581,7 @@ class Asset(object):
                 else: # else take strings and lists of strings at the top level
                     raw_df = sum([v if type(v) is list else [v]
                                   for v in content.values()], [])
-                datafiles = tuple(v.encode('ascii', 'ignore')
-                                  for v in raw_df if isinstance(v, basestring))
+                datafiles = tuple(v for v in raw_df if isinstance(v, str))
             else: # Try subdatasets
                 fh = gdal.Open(self.filename)
                 datafiles = [s[0] for s in fh.GetSubDatasets()]

@@ -318,10 +318,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
         if not self.in_cloud_storage():
             raise NotImplementedError(
                 'porting local files to this method is a TODO')
-        spectral_bands = self.load_c1_json()[
-            {'C1S3': '30m-bands', 'C1GS': 'spectral-bands'}[self.asset]]
-        # json module insists on returning unicode, which gippy no likey
-        return [p.encode('ascii','ignore') for p in spectral_bands]
+        return self.load_c1_json()[{'C1S3': '30m-bands', 'C1GS': 'spectral-bands'}[self.asset]]
 
     @classmethod
     def cloud_cover_from_mtl_text(cls, text):
@@ -1567,7 +1564,7 @@ class landsatData(gips.data.core.CloudCoverData):
             r = self.Asset.gs_backoff_get(c1_json['mtl'])
             r.raise_for_status()
             text = r.text
-            qafn = c1_json['qa-band'].encode('ascii', 'ignore')
+            qafn = c1_json['qa-band']
         else:
             datafiles = asset_obj.datafiles()
             # save for later; defaults to None
@@ -1715,7 +1712,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 paths = [os.path.join('/vsitar/' + asset_obj.filename, f)
                          for f in md['filenames']]
         self._time_report("reading bands")
-        image = gippy.GeoImage(paths)
+        image = gippy.GeoImage.open(paths)
         image.set_nodata(0)
 
         # TODO - set appropriate metadata
