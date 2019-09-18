@@ -229,7 +229,6 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         with utils.error_handler(err_msg):
             basename = cls.Repository.find_pattern_in_url(mainurl, pattern, verbosity=2)
         if basename is None:
-            utils.vprint('Unable to find remote match for', pattern, 'at', mainurl, level=4)
             return None
         url = ''.join([mainurl, '/', basename])
         return {'basename': basename, 'url': url}

@@ -64,37 +64,17 @@ class smapAsset(Asset):
 
     @classmethod
     def query_provider(cls, asset, tile, date):
-        """Find out from the SMAP servers what assets are available.
+        """Query the SMAP servers for assets for the given tile & date.
 
-        Uses the given (asset, date) tuple as a search key, andcat
-        returns a tuple:  base-filename, url
+        Returns (base-filename, url).
         """
-
         mainurl = "%s/%s" % (cls._assets[asset]['url'], str(date.strftime('%Y.%m.%d')))
-
         pattern = r'SMAP\_.{2}\_%s\_%s\_.{6}\_.{3}\.h5' % (asset, str(date.strftime('%Y%m%d')))
-        cpattern = re.compile(pattern)
-        err_msg = "Error downloading: " + mainurl
-        with utils.error_handler(err_msg):
-            response = cls.Repository.managed_request(mainurl, verbosity=2)
-            if response is None:
-                return None, None
-
-        for item in response.readlines():
-            # screen-scrape the content of the page and extract the full name of the needed file
-            # (this step is needed because part of the filename, the creation timestamp, is
-            # effectively random).
-            item = item.decode('utf-8')
-            if cpattern.search(item):
-                if 'xml' in item:
-                    continue
-                basename = cpattern.findall(item)[0]
-                url = ''.join([mainurl, '/', basename])
-                return basename, url
-        utils.verbose_out('Unable to find remote match for '
-                          '{} at {}'.format(pattern, mainurl), 4)
-        return None, None
-
+        with utils.error_handler("Error downloading: " + mainurl):
+            basename = cls.Repository.find_pattern_in_url(mainurl, pattern, verbosity=2)
+        if basename == None:
+            return None, None
+        return basename, '/'.join([mainurl, basename])
 
     @classmethod
     def fetch(cls, asset, tile, date):

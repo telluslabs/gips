@@ -106,6 +106,7 @@ class weldAsset(Asset):
 
     @classmethod
     def fetch(cls, asset, tile, date):
+        raise NotImplementedError("http://e4ftl01.cr.usgs.gov/WELD/ no longer exists")
         year, month, day = date.timetuple()[:3]
         mainurl = '%s/%s.%02d.%02d' % (cls._assets[asset]['url'], str(year), month, day)
         utils.verbose_out("searching at " + mainurl, 4)

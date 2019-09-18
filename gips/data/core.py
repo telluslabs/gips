@@ -366,11 +366,11 @@ class Repository(object):
                 request = urllib.Request(redirect_url)
                 response = urllib.urlopen(request)
             return response
-        except urllib.URLError as e:
+        except urllib.error.URLError as e:
             utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
                               verbosity, sys.stderr)
             return None
-        except urllib.HTTPError as e:
+        except urllib.error.HTTPError as e:
             utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
                               verbosity, sys.stderr)
             return None
