@@ -476,6 +476,7 @@ def vectorize(img, vector, oformat=None):
 
 def mosaic(images, outfile, vector):
     """ Mosaic multiple files together, but do not warp """
+    raise NotImplementedError("NumImages no longer supported; needs to be ported to gippy 1.0")
     nd = images[0][0].nodata()
     srs = images[0].srs()
     # check they all have same projection

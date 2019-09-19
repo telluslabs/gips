@@ -7,8 +7,6 @@ import pprint
 
 import pytest
 import _pytest.mark.structures
-import scripttest
-import envoy # deprecated
 import sh
 
 from gips.inventory import orm # believed to be safe even though it's the code under test
@@ -133,16 +131,6 @@ class GipsProcResult(object):
         )
         return all(matches)
 
-
-def rectify(driver):
-    """Ensure inv DB matches files on disk."""
-    if not orm.use_orm():
-        return
-    rectify_cmd = 'gips_inventory {} --rectify'.format(driver)
-    outcome = envoy.run(rectify_cmd)
-    if outcome.status_code != 0:
-        raise RuntimeError("failed: " + rectify_cmd,
-                           outcome.std_out, outcome.std_err, outcome)
 
 def find_files(path):
     """Finds all non-directory files under the given path.

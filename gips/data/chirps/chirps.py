@@ -80,7 +80,7 @@ class chirpsAsset(Asset):
     @classmethod
     def ftp_connect(cls, asset, date):
         """As super, but make the working dir out of (asset, date)."""
-        # TODO this is exactly like prismAsset.ftp_connect, DRY out?
+        # TODO dry out with `class chirpsAsset(gips.data.core.FtpAsset):`?
         wd = cls._assets[asset]['ftp-basedir'] + str(date.year)
         return super(chirpsAsset, cls).ftp_connect(wd)
 

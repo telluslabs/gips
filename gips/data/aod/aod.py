@@ -137,12 +137,6 @@ class aodAsset(Asset):
         return datafiles
 
     @classmethod
-    def ftp_connect(cls, asset, date):
-        """As super, but make the working dir out of (asset, date)."""
-        wd = os.path.join(cls._assets[asset]['path'], date.strftime('%Y'), date.strftime('%j'))
-        return super(aodAsset, cls).ftp_connect(wd)
-
-    @classmethod
     def query_provider(cls, asset, tile, date):
         """Find out from the NASA servers what AOD assets are available."""
         if asset not in cls._assets:

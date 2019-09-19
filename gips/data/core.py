@@ -264,7 +264,8 @@ class Repository(object):
             return dbinv.list_dates(cls.name.lower(), tile)
         tdir = cls.data_path(tile=tile)
         if os.path.exists(tdir):
-            return sorted([datetime.strptime(os.path.basename(d), cls._datedir).date() for d in os.listdir(tdir)])
+            return sorted([datetime.strptime(os.path.basename(d), cls._datedir).date()
+                           for d in os.listdir(tdir)])
         else:
             return []
 
@@ -1364,7 +1365,9 @@ class Data(object):
             dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
                                         tile=self.id, date=self.date, name=filename)
 
+    # TODO never called if open_assets is never called
     def asset_filenames(self, product):
+        """For the given product type, list assset filenames in the inventory."""
         assets = self._products[product]['assets']
         filenames = []
         for asset in assets:
@@ -1387,6 +1390,7 @@ class Data(object):
         return img
 
 
+    # TODO never called
     def open_assets(self, product):
         """ Open and return a GeoImage of the assets """
         return gippy.GeoImage(self.asset_filenames(product))
