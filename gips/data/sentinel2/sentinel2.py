@@ -248,7 +248,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
     }
 
     # default resultant resolution for resampling during to Data().copy()
-    _defaultresolution = (10, 10)
+    _defaultresolution = (20, 20)
 
     def __init__(self, filename):
         """Inspect a single file and set some metadata.
