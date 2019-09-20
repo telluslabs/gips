@@ -695,6 +695,12 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
 
     @lru_cache(maxsize=1)
     def raster_full_paths(self, spatial_res=None):
+        """ Returns paths to rasters
+
+        Args:
+            spatial_res (int, optional): If provided and not default (20), returns paths to
+            imagery matching this spatial resolution
+        """
         ao = self.current_asset()
         rfn_re = re.compile(self.style_res['raster-re'])
         fnl = [df for df in self.datafiles() if rfn_re.match(df)]
@@ -849,26 +855,24 @@ class sentinel2Data(gips.data.core.CloudCoverData):
     }
 
     # 10m products for rad & ref
+    _band_names_10m = [
+        band_name for band_name, spatial_res in
+        zip(Asset._sensors['S2A']['indices-colors'],
+            Asset._sensors['S2A']['spatial-resolutions'])
+        if spatial_res == 10
+    ]
     _products.update({
         'rad@10m': {
             'description': 'Surface-leaving radiance (10m)',
             'assets': _asset_types,
-            'bands': [
-                {'name': band_name, 'units': 'W/m^2/um'}
-                for band_name, spatial_res in zip(Asset._sensors['S2A']['indices-colors'],
-                                                  Asset._sensors['S2A']['spatial-resolutions'])
-                if spatial_res == 10
-            ]
+            'bands': [{'name': band_name, 'units': 'W/m^2/um'}
+                      for band_name in _band_names_10m]
         },
         'ref@10m': {
             'description': 'Surface-leaving radiance (10m)',
             'assets': _asset_types,
-            'bands': [
-                {'name': band_name, 'units': Data._unitless}
-                for band_name, spatial_res in zip(Asset._sensors['S2A']['indices-colors'],
-                                                  Asset._sensors['S2A']['spatial-resolutions'])
-                if spatial_res == 10
-            ]
+            'bands': [{'name': band_name, 'units': Data._unitless}
+                      for band_name in _band_names_10m]
         }
     })
 
@@ -997,12 +1001,18 @@ class sentinel2Data(gips.data.core.CloudCoverData):
     # TODO move to Asset?
     @lru_cache(maxsize=1)
     def raster_paths(self, spatial_res=None):
-        """Return paths to raster files, extracting them if necessary."""
+        """Return paths to raster files, extracting them if necessary.
+
+        Args:
+            spatial_res (int, optional): If provided and not default (20), returns paths to
+            imagery matching this spatial resolution
+        """
         ao = self.current_asset()
 
         if ao.asset == 'L1CGS':
             fnl = ao.json_content['spectral-bands']
             sres = ao.sensor_spec('spatial-resolutions')
+            # subset if spatial_res != default (20m)
             if spatial_res and spatial_res != ao._defaultresolution[0]:
                 fnl = [fn for fn, res in zip(fnl, sres) if res == spatial_res]
             return fnl
@@ -1038,18 +1048,21 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         It is equivalent to ref-toa; it's needed because the asset's
         spatial resolution must be resampled to be equal for all bands
         of interest.
+
+        Args:
+            spatial_res (int, optional): If provided and not default (20), outputs imagery
+            matching this spatial resolution
         """
         suffix = self._product_suffix(spatial_res)
         self._time_report('Start VRT for ref-toa{0} image'.format(suffix))
 
         ao = self.current_asset()
-        indices_bands, b_strings, colors, spatial_resolutions = ao.sensor_spec(
+        indices_bands, b_strings, colors, sres = ao.sensor_spec(
             'indices-bands', 'band-strings', 'colors', 'spatial-resolutions')
 
         # Filter to bands of desired resolution
         if spatial_res and spatial_res != ao._defaultresolution[0]:
-            indices_bands = [bs for bs, sres in zip(b_strings, spatial_resolutions)
-                             if sres == spatial_res]
+            indices_bands = [bs for bs, res in zip(b_strings, sres) if res == spatial_res]
 
         vrt_filename = os.path.join(self._temp_proc_dir,
                                     self.basename + '_ref-toa{0}.vrt'.format(suffix))
@@ -1086,13 +1099,17 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         This is used as intermediary data but is congruent to the rad-toa
         product.
+
+        Args:
+            spatial_res (int, optional): If provided and not default (20), outputs imagery
+            matching this spatial resolution
         """
         self._time_report('Starting reversion to TOA radiance.')
         suffix = self._product_suffix(spatial_res)
         reftoa_img = self.load_image('ref-toa' + suffix)
         asset_instance = self.current_asset()
         colors = asset_instance.sensor_spec('colors')
-        radiance_factors = asset_instance.radiance_factors()  # TODO
+        radiance_factors = asset_instance.radiance_factors()
         rad_image = gippy.GeoImage(reftoa_img)
 
         for i in range(len(rad_image)):
@@ -1105,7 +1122,12 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         self._product_images['rad-toa' + suffix] = rad_image
 
     def rad_geoimage(self, spatial_res=None):
-        """Transmute TOA radiance product into a surface radiance product."""
+        """Transmute TOA radiance product into a surface radiance product.
+
+        Args:
+            spatial_res (int, optional): If provided and not default (20), outputs imagery
+            matching this spatial resolution
+        """
         suffix = self._product_suffix(spatial_res)
         self._time_report('Setting up for converting radiance from TOA to surface')
         rad_toa_img = self.load_image('rad-toa' + suffix)
@@ -1214,6 +1236,10 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         Made from a rad-toa image (the reverted ref-toa data sentinel-2 L1C
         provides), put through an atmospheric correction process.  CF landsat.
+
+        Args:
+            spatial_res (int, optional): If provided and not default (20), outputs imagery
+            matching this spatial resolution
         """
         suffix = self._product_suffix(spatial_res)
         ao = self.current_asset()
@@ -1416,15 +1442,17 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             raise NotImplementedError(
                 "Datastrip assets aren't compatible with acolite")
 
+        _defaultres = a_obj._defaultresolution[0]
+
         # only do the bits that need doing
         if 'ref-toa' in work:
-            self.ref_toa_geoimage(20)
+            self.ref_toa_geoimage(_defaultres)
         if 'rad-toa' in work:
-            self.rad_toa_geoimage(20)
+            self.rad_toa_geoimage(_defaultres)
         if 'rad' in work:
-            self.rad_geoimage(20)
+            self.rad_geoimage(_defaultres)
         if 'ref' in work:
-            self.ref_geoimage(20)
+            self.ref_geoimage(_defaultres)
         if 'ref-toa@10m' in work:
             self.ref_toa_geoimage(10)
         if 'rad-toa@10m' in work:
