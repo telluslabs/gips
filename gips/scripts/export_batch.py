@@ -24,6 +24,7 @@
 from __future__ import print_function
 
 import os
+
 from gips import __version__
 from gips.core import SpatialExtent, TemporalExtent
 from gips.utils import Colors, VerboseOut, import_data_class
@@ -40,11 +41,30 @@ import ogr
 
 from backports import tempfile
 import boto3
+from botocore.exceptions import ClientError
 import zipfile
 
 
 class Args(object):
     pass
+
+
+BUCKET = "tl-octopus"
+
+
+def s3_head(bucket, key):
+    s3 = boto3.client('s3')
+    try:
+        return s3.head_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        if e.response['ResponseMetadata']['HTTPStatusCode'] == 404:
+            return None
+        else:
+            raise e
+
+
+def s3_exists(bucket, key):
+    return s3_head(bucket, key) is not None
 
 
 @click.command()
@@ -53,6 +73,16 @@ def main(jobid):
 
     title = Colors.BOLD + 'GIPS Data Export (v%s)' % __version__ + Colors.OFF
     print(title)
+
+    print('cleaning up')
+    assetdirs = ['hls', 'modis']
+    subdirs = ['tiles', 'stage']
+    for assetdir in assetdirs:
+        for subdir in subdirs:
+            path = os.path.join('/archive', assetdir, subdir)
+            for file_or_dir in os.listdir(path):
+                shutil.rmtree(os.path.join(path, file_or_dir))
+
 
     args = Args()
     args.stop_on_error = "False"
@@ -85,7 +115,7 @@ def main(jobid):
 
         confpath = os.path.join(tmpdir, 'config')
         S3 = boto3.resource('s3')
-        S3.Bucket('tl-octopus').download_file('user/gips/config', confpath)
+        S3.Bucket(BUCKET).download_file('user/gips/config', confpath)
 
         # get config parameters
         config = eval(open(confpath).read())
@@ -114,8 +144,16 @@ def main(jobid):
             print(fid)
 
             args.site = s3shpfile
-            args.outdir = "s3://tl-octopus/user/gips/export/{}/{}_{}_{}_{}_{}".format(
+
+            key = "user/gips/export/{}/{}_{}_{}_{}_{}".format(
                 name, name, args.command, year, doy, fid)
+
+            args.outdir = "s3://{}/{}".format(BUCKET, key)
+
+            if s3_exists(BUCKET, key + '.zip'):
+                print('skipping', BUCKET, key)
+                continue
+
 
             args.dates = "{}-{}".format(year, str(doy+1).zfill(3))
             args.where = "FID={}".format(fid)
