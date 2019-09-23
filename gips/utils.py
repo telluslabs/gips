@@ -475,20 +475,18 @@ def vectorize(img, vector, oformat=None):
 
 
 def mosaic(images, outfile, vector):
-    """ Mosaic multiple files together, but do not warp """
-    raise NotImplementedError("NumImages no longer supported; needs to be ported to gippy 1.0")
+    """Mosaic multiple files together without warping."""
+    # TODO confirm they all have the same nodata?
     nd = images[0][0].nodata()
-    srs = images[0].srs()
-    # check they all have same projection
-    filenames = [images[0].filename()]
-    for f in range(1, images.NumImages()):
-        if images[f].srs() != srs:
-            raise Exception("Input files have non-matching projections and must be warped")
-        filenames.append(images[f].filename())
-    # transform vector to image projection
-    geom = wktloads(transform_shape(vector.WKT(), vector.srs(), srs))
+    filenames = [i.filename() for i in images]
 
-    extent = geom.bounds
+    # check they all have same projection
+    srs_set = {i.srs() for i in images}
+    if len(srs_set) > 1:
+        raise ValueError("Input files have non-matching projections and must be warped")
+
+    # transform vector to image projection
+    extent = wktloads(transform_shape(vector.wkt_geometry(), vector.srs(), srs_set.pop())).bounds
     ullr = "%f %f %f %f" % (extent[0], extent[3], extent[2], extent[1])
 
     # run merge command

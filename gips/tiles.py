@@ -29,7 +29,7 @@ import collections
 
 import gippy
 from gippy.algorithms import cookie_cutter
-from gips.utils import VerboseOut, Colors, mosaic, gridded_mosaic, mkdir
+from gips.utils import VerboseOut, Colors, mkdir
 from gips import utils
 
 
@@ -111,15 +111,15 @@ class Tiles(object):
                         images = [gippy.GeoImage(f) for f in filenames]
 
                         if self.spatial.rastermask is not None:
-                            gridded_mosaic(images, tmp_fp,
-                                           self.spatial.rastermask, interpolation)
+                            utils.gridded_mosaic(images, tmp_fp, self.spatial.rastermask,
+                                                 interpolation)
                         elif res is not None:
                             cookie_cutter(
                                 images, tmp_fp, self.spatial.site, crop,
                                 "", res[0], res[1], interpolation,
                             )
                         else:
-                            mosaic(images, tmp_fp, self.spatial.site)
+                            utils.mosaic(images, tmp_fp, self.spatial.site)
                         os.rename(tmp_fp, final_fp)
         t = datetime.now() - start
         VerboseOut('%s: created project files for %s tiles in %s' % (self.date, len(self.tiles), t), 2)
