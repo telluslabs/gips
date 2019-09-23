@@ -71,7 +71,7 @@ def main():
                         utils.verbose_out('Computing stats for {} {}'.format(
                                 p_type, date_str), 2)
                         for b in img:
-                            stats = [str(s) for s in b.Stats()]
+                            stats = [str(s) for s in b.stats()]
                             writer.writerow(
                                     [date_str, b.description()] + stats)
                         img = None
