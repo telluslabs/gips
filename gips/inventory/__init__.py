@@ -33,7 +33,6 @@ import gippy
 from gips.tiles import Tiles
 from gips.utils import VerboseOut, Colors
 from gips import utils
-from gips.mapreduce import MapReduce
 from . import dbinv, orm
 
 
@@ -211,18 +210,6 @@ class ProjectInventory(Inventory):
         filenames = [self.data[date][product] for date in dates]
         img = gippy.GeoImage(filenames)
         return img
-
-    def map_reduce(self, func, numbands=1, products=None, readfunc=None, nchunks=100, **kwargs):
-        """ Apply func to inventory to generate an image with numdim output bands """
-        if products is None:
-            products = self.requested_products
-        if readfunc is None:
-            readfunc = lambda x: self.get_data(products=products, chunk=x)
-        inshape = self.data_size()
-        outshape = [numbands, inshape[1], inshape[2]]
-        mr = MapReduce(inshape, outshape, readfunc, func, **kwargs)
-        mr.run(nchunks=nchunks)
-        return mr.assemble()
 
 
 class DataInventory(Inventory):

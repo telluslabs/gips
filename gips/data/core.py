@@ -1104,50 +1104,6 @@ class Data(object):
         """ Process composite products using provided inventory """
         pass
 
-    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False,
-             overwrite=False, tree=False):
-        """ Copy products to new directory, warp to projection if given site.
-
-        Arguments
-        =========
-        dout:       output or destination directory; mkdir(dout) is done if needed.
-        products:   which products to copy (passed to self.RequestedProducts())
-
-
-        """
-        # TODO - allow hard and soft linking options
-        if res is None:
-            res = self.Asset._defaultresolution
-            #VerboseOut('Using default resolution of %s x %s' % (res[0], res[1]))
-        dout = os.path.join(dout, self.id)
-        if tree:
-            dout = os.path.join(dout, self.date.strftime('%Y%j'))
-        mkdir(dout)
-        products = self.RequestedProducts(products)
-        bname = '%s_%s' % (self.id, self.date.strftime('%Y%j'))
-        for p in products.requested:
-            if p not in self.sensors:
-                # this product is not available for this day
-                continue
-            sensor = self.sensors[p]
-            fin = self.filenames[(sensor, p)]
-            fout = os.path.join(dout, "%s_%s_%s.tif" % (bname, sensor, p))
-            if not os.path.exists(fout) or overwrite:
-                with utils.error_handler('Problem creating ' + fout, continuable=True):
-                    if site is not None:
-                        # warp just this tile
-                        resampler = ['near', 'bilinear', 'cubic']
-                        cmd = 'gdalwarp %s %s -t_srs "%s" -tr %s %s -r %s' % \
-                               (fin, fout, site.srs(), res[0], res[1], resampler[interpolation])
-                        print(cmd)
-                        # TODO: what is this?
-                        #result = subprocess.getstatusoutput(cmd)
-                    else:
-                        gippy.GeoImage(fin).save(fout)
-                        #shutil.copyfile(fin, fout)
-        procstr = 'copied' if site is None else 'warped'
-        VerboseOut('%s tile %s: %s files %s' % (self.date, self.id, len(products.requested), procstr))
-
     @classmethod
     def natural_percentage(cls, raw_value):
         """Callable used for argparse, defines a new type for %0.0 to %100.0.
