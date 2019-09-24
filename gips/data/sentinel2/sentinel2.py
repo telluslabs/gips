@@ -1042,6 +1042,40 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         self._time_report('Finished download from GCS ({} bands)'.format(len(band_files)))
         return band_files
 
+    def _downsample_bands(self, raster_paths, raster_sres, output_sres,
+                          resampling='average'):
+        """ Downsample bands to desired output resolution as needed
+
+        This method is unfortunately needed because GDAL defaults to using
+        the overviews included in the JPEG2000 files for downsampling of the
+        10m data. The only way to affect this decision is using gdalwarp with
+        "-ovr NONE". If we let gdalbuildvrt/gdal_translate handle the
+        resampling, then we're stuck with what the overviews used (nearest
+        neighbor, which looks bad and inaccurate relative to 10m data).
+        """
+        cmd = ('gdalwarp -ovr NONE -tr {output_sres} {output_sres} -r {resampling} '
+               '-srcnodata 0 -dstnodata 0 {input_image} {output_image}')
+
+        return_paths = []
+        for path, sres in zip(raster_paths, raster_sres):
+            if sres >= output_sres:  # no need to resample (same res OR nearest is fine)
+                return_paths.append(path)
+            else:  # need to downsample intelligently
+                # Use existing filename but with different extension
+                img_base, _ = os.path.splitext(path)
+                output_image = img_base + '.tif'
+
+                cmd_ = cmd.format(output_sres=output_sres, resampling=resampling,
+                                  input_image=path, output_image=output_image).split(' ')
+                print(' '.join(cmd_))
+                p = subprocess.Popen(cmd_)
+                p.communicate()
+                if p.returncode != 0:
+                    raise IOError("Expected gdalwarp exit status 0, got {}"
+                                  .format(p.returncode))
+                return_paths.append(output_image)
+        return return_paths
+
     def ref_toa_geoimage(self, spatial_res=None):
         """Make a proto-product which acts as a basis for several products.
 
@@ -1073,6 +1107,10 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             raster_paths = self._download_gcs_bands(self._temp_proc_dir, spatial_res=spatial_res)
         else:
             raster_paths = self.raster_paths(spatial_res=spatial_res)
+
+        # Downsample 10m bands to desired resolution
+        if spatial_res > 10:
+            raster_paths = self._downsample_bands(raster_paths, sres, spatial_res)
 
         cmd_args += [vrt_filename] + [
             f for f in raster_paths if f[-6:-4] in indices_bands
