@@ -1,3 +1,4 @@
+# TODO document the purpose of this dockerfile here
 FROM gippy-03x-release
 
 ARG GIPS_VERSION
