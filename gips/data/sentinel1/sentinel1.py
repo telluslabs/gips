@@ -319,7 +319,7 @@ class sentinel1Asset(Asset):
 
                 cmd = "/usr/bin/gpt {} -c 48G -J-Xmx32G -J-Xms12G -q 8 -e -SsourceProduct={} -PtargetProduct={} " \
                       "-Dsnap.dataio.bigtiff.compression.type=LZW" \
-                      "-Dsnap.parallelism=1".format(graph_xml_path, sourcefile, targetfile)
+                      "-Dsnap.parallelism=8".format(graph_xml_path, sourcefile, targetfile)
                 print(cmd)
                 command(cmd)
 
