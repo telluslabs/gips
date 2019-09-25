@@ -194,7 +194,7 @@ class S3Mixin(object):
     """
     @classmethod
     @lru_cache(maxsize=1)
-    def s3_prefix_search(cls, prefix, profile=None, creds=None):
+    def s3_prefix_search(cls, prefix, profile=None, creds=None, requester_pays=False):
         # find the layer and metadata files matching the current scene
         import boto3 # import here so it only breaks if it's actually needed
         if profile is None and creds is None:
@@ -212,7 +212,8 @@ class S3Mixin(object):
                                       aws_secret_access_key=creds[1])
 
         bucket = s3.Bucket(cls._s3_bucket_name)
-        keys = [o.key for o in bucket.objects.filter(Prefix=prefix)]
+        extra_args = {'RequestPayer': 'requester'} if requester_pays else {}
+        keys = [o.key for o in bucket.objects.filter(Prefix=prefix, **extra_args)]
         utils.verbose_out("Found {} S3 keys while searching for for key fragment"
                     " '{}'".format(len(keys), prefix), 5)
         return keys

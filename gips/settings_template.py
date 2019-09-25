@@ -100,11 +100,11 @@ REPOS = {
     'sar': {
         'repository': '$TLD/sar',
     },
-    #'sentinel1': {
-    #    'repository': '$TLD/sentinel1',
-    #    'username': ESA_USER,
-    #    'password': ESA_PASS
-    #},
+    'sentinel1': {
+        'repository': '$TLD/sentinel1',
+        'username': ESA_USER,
+        'password': ESA_PASS
+    },
     #'sarannual': {
     #    'repository': '$TLD/sarannual',
     #},
@@ -118,7 +118,8 @@ REPOS = {
     },
     'hls': {
         'repository': '$TLD/hls',
-        'source': 's3'
+        'source': 's3',
+        'credfile': '/gips/credentials'
     },
     'chirps': {
         'repository': '$TLD/chirps',

@@ -1,8 +1,8 @@
 FROM gippy-0.3.x
 
 ARG GIPS_UID
-RUN apt-get update \
-    && apt-get -y install libcurl4-gnutls-dev \
+RUN apt-get update --allow-unauthenticated --fix-missing \
+    && apt-get install -y --allow-unauthenticated libcurl4-gnutls-dev \
         python-geopandas awscli python-rtree
 
 COPY . /gips
