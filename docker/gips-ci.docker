@@ -1,37 +1,28 @@
 FROM gips-base
 
-ARG GIPS_UID
-
 ENV GIPS_OVERRIDE_VERSION='0.0.0-dev'
 
-COPY gitlab_ci /root/.ssh/gitlab_ci
-COPY sixs /usr/local/bin/sixs
-COPY ortho /usr/local/bin/ortho
-COPY gips_creds.sh.enc /root/gips_creds.sh.enc
+# not needed for CI test suite:
+# for atmo correction:
+#COPY sixs /usr/local/bin/sixs
+# for coreg products (in landsat & maybe s2):
+#COPY ortho /usr/local/bin/ortho
+# fetch tests (not part of CI pipeline atm):
+#COPY gitlab_ci /root/.ssh/gitlab_ci
+#COPY gips_creds.sh.enc /root/gips_creds.sh.enc
 
 COPY docker/pytest-ini /gips/pytest.ini
 
-RUN apt-get update && apt-get -y install libcurl4-gnutls-dev
+# doesn't seem to be needed for CI test suite:
+#RUN apt-get update && apt-get -y install libcurl4-gnutls-dev
 
-# note settings.py is removed, then regenerated with gips_config, then edited.
-# pre-install cython to work around a cftime issue; no longer needed when this
-# is fixed:  https://github.com/Unidata/cftime/issues/34
-# GIPS_ORM is set false for hls; once hls is compatible with the ORM, that
-# line can be removed
-# TODO Also, shouldn't need to do this (went after dev_requirements install,
-# and thanks so much to docker for having a wonderful format in which in-line
-# comments are not supported):
-# && /usr/local/bin/pip install -e file:///gips/ \
-RUN echo $PATH
-RUN pip3 --version
 RUN pip3 install -U pip
-RUN pip3 install 'idna<2.8' Cython
 RUN pip3 install -r dev_requirements.txt
-RUN cd /gips \
-    && chmod +x /usr/local/bin/sixs \
-    && chmod +x /usr/local/bin/ortho \
-    && true
-# technically not needed for gips CI pipeline (also doesn't work at the moment)
+
+# technically not needed for CI test suite (also decryption doesn't work at the moment)
+#RUN cd /gips \
+#    && chmod +x /usr/local/bin/sixs \
+#    && chmod +x /usr/local/bin/ortho \
 #    && openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh \
 #        -pass file:/root/.ssh/gitlab_ci \
 #    && eval $(cat gips_creds.sh) \
@@ -45,10 +36,12 @@ RUN cd /gips \
 #    && groupadd -g $GIPS_UID gips \
 #    && useradd -m -r -u $GIPS_UID -g gips gips \
 #    && chown -R gips:gips /gips /archive
-RUN echo "setting up gips settings:" \
-    && rm -f /gips/gips/settings.py \
-    && gips_config env -r /archive -e icooke@ags.io \
+
+# note settings.py is removed in case it exists (it shouldn't) then
+# regenerated with gips_config, then edited.  GIPS_ORM is set false for hls;
+# once hls is compatible with the ORM, that line can be removed.
+RUN rm -f /gips/gips/settings.py \
+    && gips_config env -r /archive -e nobody@example.com \
     && echo 'GIPS_ORM = False' >> /gips/gips/settings.py
 
-#USER gips # root is fine, keep it simple
 WORKDIR /gips
