@@ -31,7 +31,7 @@ RUN cd /gips \
     && chmod +x /usr/local/bin/sixs \
     && chmod +x /usr/local/bin/ortho \
     && true
-# technically not needed for gips CI pipeline
+# technically not needed for gips CI pipeline (also doesn't work at the moment)
 #    && openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh \
 #        -pass file:/root/.ssh/gitlab_ci \
 #    && eval $(cat gips_creds.sh) \
@@ -50,6 +50,5 @@ RUN echo "setting up gips settings:" \
     && gips_config env -r /archive -e icooke@ags.io \
     && echo 'GIPS_ORM = False' >> /gips/gips/settings.py
 
-# TODO restore?
-#USER gips
+#USER gips # root is fine, keep it simple
 WORKDIR /gips

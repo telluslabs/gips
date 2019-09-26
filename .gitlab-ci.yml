@@ -32,13 +32,13 @@ run_tests:
   stage: test
   script:
     #- whoami && pwd && ls -lh
-    - docker run --rm gips-base /bin/echo "everything is under control"
-    - docker run --rm gips_test_$CI_COMMIT_REF_SLUG /bin/echo "yeah all good in the hood"
-    #- docker run --rm gips_test_$CI_COMMIT_REF_SLUG pytest -vv -s -k unit # TODO both int & unit
-    #- docker run --dns=10.0.4.1 --rm
-    #  -v /net/cluster/projects/gips-dev/sys-test-assets/:/artifact-store
-    #  gips_test_$CI_COMMIT_REF_SLUG
-    #  pytest -r es -vv --slow --setup-repo --sys -s -m lite
+    - docker run --rm gips_test_$CI_COMMIT_REF_SLUG /bin/echo "test execution of CI container"
+    # TODO next:
+    - docker run --rm gips_test_$CI_COMMIT_REF_SLUG pytest -vv -s -k unit # TODO both int & unit
+    # TODO don't think this DNS line needs to be there
+    - docker run --dns=10.0.4.1 --rm
+      -v /net/cluster/projects/gips-dev/sys-test-assets/:/artifact-store
+      gips_test_$CI_COMMIT_REF_SLUG pytest -r es -vv --slow --setup-repo --sys -s -m lite
   tags:
     - gipsdev
   after_script:
