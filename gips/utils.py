@@ -40,6 +40,7 @@ import requests
 
 import gippy
 from gippy import GeoVector
+from .exceptions import GipsException
 
 
 class Colors():
@@ -206,8 +207,11 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
                 except Exception as e: # TODO don't conceal the original exception; it may matter
                     ### This whole block is ugly, but somehow the directory is
                     ### not emptying out immediately, but it is emptying out eventually.
-                    if tries == rm_num_tries:
-                        raise
+                    if tries > rm_num_tries:
+                        print('Open files: ')
+                        os.system('/bin/ls -l /proc/{}/fd'.format(os.getpid()))
+                        print('^^^^^^^^^^^^^^^^^^^^^^^^^')
+                        raise e
                     # it can occur that it has now been deleted, so break
                     if not os.path.exists(absolute_pathname):
                         verbose_out('tempdir: infintesimal delay on deletion', 5)
@@ -616,13 +620,20 @@ def lib_error_handler(msg_prefix='Error', continuable=False):
 error_handler = lib_error_handler # set this so gips code can use the right error handler
 
 
+def errors_exit_status(errors):
+    """Determine an apropos exit status given the set of errors."""
+    statii = set([e.exc_code if isinstance(e, GipsException) else 1
+                  for e in errors])
+    return 2 if len(statii) > 1 else list(statii)[0]
+
+
 def gips_exit():
     """Deliver an error report if needed, then exit."""
     if len(_accumulated_errors) == 0:
         sys.exit(0)
     verbose_out("Fatal: {} error(s) occurred:".format(len(_accumulated_errors)), 1, sys.stderr)
     [report_error(error, error.msg_prefix) for error in _accumulated_errors]
-    sys.exit(1)
+    sys.exit(errors_exit_status(_accumulated_errors))
 
 
 @contextmanager

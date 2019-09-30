@@ -1,0 +1,46 @@
+FROM ubuntu:16.04
+
+# && /usr/bin/add-apt-repository ppa:ubuntugis/ppa \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y software-properties-common \
+    && add-apt-repository ppa:ubuntugis/ppa \
+    && apt-get -y update
+
+RUN apt-get install -y \
+    python python-apt \
+    python-pip \
+    gfortran \
+    libboost-system1.58.0 \
+    libboost-log1.58.0 \
+    libboost-all-dev \
+    libfreetype6-dev \
+    libgnutls-dev \
+    libatlas-base-dev \
+    libgdal-dev \
+    gdal-bin \
+    python-numpy \
+    python-scipy \
+    python-gdal \
+    swig2.0 \
+    wget \
+    git \
+    mg
+
+RUN ln -s /usr/bin/mg /usr/bin/emacs && rm -rf /var/lib/apt/lists/*
+
+RUN pip install -U pip==9.0.3 \
+    && /usr/local/bin/pip install -U pip setuptools wheel
+
+RUN pip install https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy
+
+RUN apt-get -y purge \
+       gfortran \
+       libboost-all-dev \
+       libfreetype6-dev \
+       libatlas-base-dev \
+       libgdal-dev \
+       swig2.0 \
+    && apt-get -y autoremove \
+    && apt-get -y autoclean
+

@@ -23,13 +23,10 @@
 
 import os
 import sys
-import errno
-from osgeo import gdal, ogr
 from datetime import datetime, timedelta
 import glob
 import re
 from itertools import groupby
-from shapely.wkt import loads
 import tarfile
 import zipfile
 import json
@@ -46,10 +43,13 @@ from backports.functools_lru_cache import lru_cache
 import requests
 import backoff
 
+from osgeo import gdal
+from shapely.wkt import loads
+
 import gippy
 from gips import __version__
-from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File, Colors,
-        basename, mkdir, open_vector)
+from gips.utils import (settings, VerboseOut, RemoveFiles, File2List,
+                        List2File, Colors, basename, mkdir, open_vector)
 from gips import utils
 from ..inventory import dbinv, orm
 
@@ -84,9 +84,9 @@ def add_gippy_index_products(p_dict, p_groups, a_types):
         (p, {'description': d,
              'assets': a_types,
              'bands': [{'name': p, 'units': Data._unitless}]}
-         ) for p, d in gippy_index_product_glossary)
+        ) for p, d in gippy_index_product_glossary)
 
-def _gs_stop_trying(e):
+def _gs_stop_trying(exc):
     """Should backoff keep retrying based on this HTTPError?
 
     For searching using backoff per GCP docs:
@@ -94,9 +94,9 @@ def _gs_stop_trying(e):
     to Cloud Storage that return HTTP 5xx and 429 response codes,
     including uploads and downloads of data or metadata.
     """
-    return (e.response is not None
-            and e.response.status_code != 429
-            and not (499 < e.response.status_code < 600))
+    return (exc.response is not None
+            and exc.response.status_code != 429
+            and not (499 < exc.response.status_code < 600))
 
 
 class GoogleStorageMixin(object):
@@ -136,10 +136,11 @@ class GoogleStorageMixin(object):
 
     @classmethod
     @backoff.on_exception(backoff.expo,
-                              requests.exceptions.RequestException,
-                              max_time=_gs_backoff_max,
-                              giveup=_gs_stop_trying)
+                          requests.exceptions.RequestException,
+                          max_time=_gs_backoff_max,
+                          giveup=_gs_stop_trying)
     def gs_backoff_downloader(cls, src, dst, chunk_size=512 * 1024):
+        '''Download following the exponential backoff protocol.'''
         r = requests.get(src, stream=True)# NOTE the stream=True
         r.raise_for_status()
         with open(dst, 'wb') as f:
@@ -149,10 +150,12 @@ class GoogleStorageMixin(object):
 
     @classmethod
     @backoff.on_exception(backoff.expo,
-                              requests.exceptions.RequestException,
-                              max_time=_gs_backoff_max,
-                              giveup=_gs_stop_trying)
+                          requests.exceptions.RequestException,
+                          max_time=_gs_backoff_max,
+                          giveup=_gs_stop_trying)
     def gs_backoff_get(cls, src, stream=False):
+        '''This follows backoff proto until handed func exit.  Still could
+        encounter HTTP503s then.'''
         r = requests.get(src, stream=stream)# NOTE the stream=True
         r.raise_for_status()
         return r
@@ -200,7 +203,7 @@ class S3Mixin(object):
         bucket = s3.Bucket(cls._s3_bucket_name)
         keys = [o.key for o in bucket.objects.filter(Prefix=prefix)]
         utils.verbose_out("Found {} S3 keys while searching for for key fragment"
-                    " '{}'".format(len(keys), prefix), 5)
+                          " '{}'".format(len(keys), prefix), 5)
         return keys
 
     @classmethod
@@ -223,10 +226,10 @@ class Repository(object):
     default_settings = {}
 
     @classmethod
-    def in_stage(cls, basename):
+    def in_stage(cls, base_fn):
         """Tests for the existence of the file in this driver's stage dir."""
-        if os.path.exists(os.path.join(cls.path('stage'), basename)):
-            utils.verbose_out('File `{}` already in stage/'.format(basename), 2)
+        if os.path.exists(os.path.join(cls.path('stage'), base_fn)):
+            utils.verbose_out('File `{}` already in stage/'.format(base_fn), 2)
             return True
         return False
 
@@ -247,6 +250,7 @@ class Repository(object):
         if tile != '':
             path = os.path.join(path, tile)
         if date != '':
+            # TODO: string or date obj...pick one.
             path = os.path.join(path, str(date.strftime(cls._datedir)))
         return path
 
@@ -508,12 +512,12 @@ class Asset(object):
         return str(self._version)
 
 
-    def get_geometry(self):
-        """Get the geometry of the asset
+    def get_geofeature(self):
+        """Get the geofeature of the asset
 
         For tiled assets, this will return the geometry of the tile in the
         respective 'tiles.shp' file as WKT. Needs to be extended for
-        untiled assets.
+        untiled assets -- see sentinel2.footprint.
         """
         # If tileID is a number, drop leading 0
         try:
@@ -521,12 +525,24 @@ class Asset(object):
         except:
             tile_num = self.tile
 
-        v = gippy.GeoVector(self.get_setting("tiles"))
-        v.set_primary_key(self.Repository._tile_attribute)
-        # If a GeoVector is indexed with an int, it queries using
-        # FID field.
-        feat = v[str(tile_num)]
-        return feat.WKT()
+        ### py3 + gippy 1.0 branch version
+        # v = gippy.GeoVector(self.get_setting("tiles"))
+        # v.set_primary_key(self.Repository._tile_attribute)
+        # If a GeoVector is indexed with an int, it queries using FID field.
+        # feat = v[str(tile_num)]
+        # return feat.WKT()
+        ### dev version:
+        v =  utils.open_vector(self.get_setting("tiles"), key=self.Repository._tile_attribute)
+        return v[str(tile_num)]
+
+    def get_geometry(self):
+        """Get the geometry of the asset
+
+        For tiled assets, this will return the geometry of the tile in the
+        respective 'tiles.shp' file as WKT. Needs to be extended for
+        untiled assets.
+        """
+        return self.get_geofeature().WKT()
 
     ##########################################################################
     # Child classes should not generally have to override anything below here
@@ -1423,8 +1439,13 @@ class Data(object):
                 VerboseOut(f, 4)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
-                    with utils.error_handler('Error parsing product date', continuable=True):
+                    #with utils.error_handler('Error parsing product date', continuable=True):
+                    # TODO: need to modify error handler to allow random junk in the project dir
+                    try:
                         datetime.strptime(parts[len(parts) - 3], datedir)
+                    except Exception as e:
+                        utils.verbose_out("Error parsing product date:  " + str(e), 3)
+                    else:
                         files.append(f)
 
         datas = []
@@ -1674,10 +1695,14 @@ class CloudCoverAsset(Asset):
             return True
         cc = self.cloud_cover()
         asset_passes_filter = cc <= pclouds
-        msg = ('Asset cloud cover is {}%, meets pclouds threshold of {}%'
-               if asset_passes_filter else
-               'Asset cloud cover is {}%, fails to meet pclouds threshold of {}%')
-        utils.verbose_out(msg.format(cc, pclouds), 3)
+        msg = '{}Asset {} cloud cover is {}%, {} pclouds threshold of {}%'
+
+        utils.verbose_out(msg.format(
+                self.Repository.name.lower(), 
+                self.tile, cc,
+                'meets' if asset_passes_filter else 'fails to meet',
+                pclouds),
+            3)
         return asset_passes_filter
 
 

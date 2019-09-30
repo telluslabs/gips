@@ -336,10 +336,11 @@ class DataInventory(Inventory):
             self.dataclass.process_composites(self, self.products.composite, **kwargs)
         VerboseOut('Processing completed in %s' % (dt.now() - start), 2)
 
-    def mosaic(self, datadir='./', tree=False, **kwargs):
+    def mosaic(self, datadir='./', tree=False, process=True, **kwargs):
         """ Create project files for data in inventory """
         # make sure products have been processed first
-        self.process(overwrite=False)
+        if process:
+            self.process(overwrite=False)
         start = dt.now()
         VerboseOut('Creating mosaic project %s' % datadir, 2)
         VerboseOut('  Dates: %s' % self.datestr)

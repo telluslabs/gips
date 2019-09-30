@@ -25,11 +25,11 @@ WARP_DATUM = 12
 WARP_SATELLITE = {warp_satellite}
 
 OUT_PIXEL_SIZE = {out_pixel_size}
-RESAMPLE_METHOD = BI
+RESAMPLE_METHOD = none
 OUT_EXTENT = WARP
 OUT_LANDSAT_BAND = {out_bands}
 OUT_BASE_MATCH_BAND = {out_base_band}
-OUT_BASE_POLY_ORDER = 1
+OUT_BASE_POLY_ORDER = {out_poly_order}
 CP_LOG_FILE = {tmpdir}/cp_log.txt
 
 CP_PARAMETERS_FILE = {tmpdir}/lndortho.cps_par.ini

@@ -79,6 +79,23 @@ REPOS = {
 After this is done, `gips_inventory --fetch`, `gips_inventory`, and
 `gips_process -p <product-list-here>` should work for S3 assets.
 
+Contributor & Developer Guide
+-----------------------------
+We're grateful for any contributions to GIPS.  Guidelines:
+
+* New code should be based on branch 'dev'; we use 'master' for official
+  releases.
+* Keep your diff to about 500 lines or less, breaking up your PRs if needed
+  (use feature toggles etc to keep the dev branch clean).
+* Style:  For new code, follow PEP8, but know that we're loose about some of
+  its rules (such as two spaces before a comment).  Also, don't reformat files
+  for compliance alone.
+* Testing:  New code should be covered by unit tests.  Know also that we use
+  an internal CI pipeline to run our suite of system tests and won't generally
+  merge code that breaks them.  See `gips/test/README.md` for details.
+* These rules aren't absolute; ask if you feel an exception is warranted.
+
+
 ## Authors and Contributors
 The following have been authors or contributers to GIPS
 
