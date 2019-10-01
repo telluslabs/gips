@@ -126,14 +126,7 @@ expectations = collections.OrderedDict([
      '    STATISTICS_MINIMUM=1',
      '    STATISTICS_STDDEV=0',
      '    STATISTICS_VALID_PERCENT=12.7']),
-   ('landsat/tiles/012030/2017213/LC08_L1TP_012030_20170801_20170811_01_T1_MTL.txt',
-    'hash',
-    'sha256',
-    'ec8d39b14f3403c5df4fcfe36e0c7dacf1c5fee4b0b7bf956b051b570444ba05'),
-   ('landsat/tiles/012030/2017213/LC08_L1TP_012030_20170801_20170811_01_T1.tar.gz.properties',
-    'hash',
-    'sha256',
-    '2cb32eafa836d1197d2d98705aa923e37ea70d29e4a93e297b466c5e087eb5e2')]),
+   ]),
 
  # t_process[landsat-ndvi-toa] recording:
  ('ndvi-toa',
