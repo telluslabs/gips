@@ -2,7 +2,6 @@ pytest!=4.2.0  # temp pin to apease django
 pytest-timeout
 pytest-mock
 pytest-django
-scripttest
-envoy # deprecated
+pytest-cov
 sh
-fiona
+envoy # TODO remove after conftest.py is upated

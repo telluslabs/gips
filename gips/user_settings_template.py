@@ -26,8 +26,7 @@
 # this block will try to read in an environment (e.g., system-level or virtual)
 # settings file so that individual settings can be changed
 import gips.settings
-execfile(gips.settings.__file__.rstrip('c'))
-
+exec(open(gips.settings.__file__.rstrip('c')).read())
 
 # change email used for FTP
 #EMAIL = ''

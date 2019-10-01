@@ -1,0 +1,21 @@
+# builds a container that can run the full gips test suite (you must provide
+# auth creds for fetch tests, eg EARTHDATA_PASS etc, if you run them).  Meant
+# to sit atop an image built by gips-ci.docker.
+
+FROM gips-ci
+
+# brittle makeflie munging is a bad choice; none better available?
+RUN mkdir /tmp/sixs && \
+    curl http://rtwilson.com/downloads/6SV-1.1.tar -o /tmp/sixs/6SV-1.1.tar && \
+    cd /tmp/sixs && \
+    tar xf 6SV-1.1.tar && \
+    cd /tmp/sixs/6SV1.1 && \
+    sed -i 's/g77/gfortran -std=legacy -ffixed-line-length-none -ffpe-summary=none/g' Makefile && \
+    make && \
+    mv sixsV1.1 /usr/local/bin/sixs && \
+    rm -rf /tmp/sixs
+
+# way to do it if you have the binary handy:
+#run apt-get install -y libgfortran3
+#copy sixs /usr/local/bin/sixs
+#run chmod +x /usr/local/bin/sixs

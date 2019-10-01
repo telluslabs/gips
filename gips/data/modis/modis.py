@@ -221,32 +221,17 @@ class modisAsset(Asset, gips.data.core.S3Mixin):
         mainurl = r'%s/%s.%02d.%02d' % (cls._assets[asset]['url'], str(year), month, day)
         pattern = r'(%s.A%s%s.%s.\d{3}.\d{13}.hdf)' % (
                         asset, str(year), str(date.timetuple()[7]).zfill(3), tile)
-        cpattern = re.compile(pattern)
-
         if datetime.datetime.today().date().weekday() == 2:
             err_msg = ("Error downloading on a Wednesday;"
                        " possible planned MODIS provider downtime: " + mainurl)
         else:
             err_msg = "Error downloading: " + mainurl
         with utils.error_handler(err_msg):
-            response = cls.Repository.managed_request(mainurl, verbosity=2)
-            if response is None:
-                return None
-
-        for item in response.readlines():
-            # screen-scrape the content of the page and extract the full name of the needed file
-            # (this step is needed because part of the filename, the creation timestamp, is
-            # effectively random).
-            item = item.decode('utf-8')
-            if cpattern.search(item):
-                if 'xml' in item:
-                    continue
-                basename = cpattern.findall(item)[0]
-                url = ''.join([mainurl, '/', basename])
-                return {'basename': basename, 'url': url}
-        utils.verbose_out('Unable to find remote match for '
-                          '{} at {}'.format(pattern, mainurl), 4)
-        return None
+            basename = cls.Repository.find_pattern_in_url(mainurl, pattern, verbosity=2)
+        if basename is None:
+            return None
+        url = ''.join([mainurl, '/', basename])
+        return {'basename': basename, 'url': url}
 
     # complete S3 url:  at   col  h  v   y doy
     # s3://modis-pds/MCD43A4.006/21/11/2017006/

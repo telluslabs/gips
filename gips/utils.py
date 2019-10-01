@@ -40,6 +40,7 @@ import requests
 
 import gippy
 from gippy import GeoVector
+from .exceptions import GipsException
 
 
 class Colors():
@@ -94,7 +95,7 @@ def vprint(*args, **kwargs):
 
     Except for 'level' all kwargs are passed on to print() (sep, file, etc).
     """
-    l = kwargs.pop('level', 1)
+    level = kwargs.pop('level', 1)
     if verbosity() >= level:
         print(*args, **kwargs)
 
@@ -203,30 +204,28 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
             for tries in range(1, rm_num_tries + 1):
                 try:
                     shutil.rmtree(absolute_pathname)
-                except Exception as e:
+                except Exception as e: # TODO don't conceal the original exception; it may matter
                     ### This whole block is ugly, but somehow the directory is
                     ### not emptying out immediately, but it is emptying out eventually.
-                    if tries == rm_num_tries:
-                        raise
+                    if tries > rm_num_tries:
+                        print('Open files: ')
+                        os.system('/bin/ls -l /proc/{}/fd'.format(os.getpid()))
+                        print('^^^^^^^^^^^^^^^^^^^^^^^^^')
+                        raise e
                     # it can occur that it has now been deleted, so break
                     if not os.path.exists(absolute_pathname):
-                        verbose_out('tempdir: infintesimal delay on deletion', 4)
+                        verbose_out('tempdir: infintesimal delay on deletion', 5)
                         break
-                    verbose_out('GIPS_RMTREE_DELAY: delaying {} sec'
-                                .format(rm_delay), 3)
+                    verbose_out('GIPS_RMTREE_DELAY: delaying {} sec'.format(rm_delay), 5)
                     time.sleep(rm_delay)
                     # though less likely, post-delay it could have been deleted, so break
                     if not os.path.exists(absolute_pathname):
-                        verbose_out('tempdir: {} sec delay on deletion'
-                                    .format(rm_delay), 3)
+                        verbose_out('tempdir: {} sec delay on deletion'.format(rm_delay), 5)
                         break
-                    verbose_out(
-                        'GIPS_RMTREE_TRIES: Trying again (try {} of {}): {}'
-                        .format(tries, rm_num_tries, absolute_pathname), 3
-                    )
+                    verbose_out('GIPS_RMTREE_TRIES: Trying again (try {} of {}): {}'.format(
+                            tries, rm_num_tries, absolute_pathname), 1)
         else:
-            verbose_out('GIPS_DEBUG: Orphaning {}'
-                        .format(absolute_pathname), 1)
+            verbose_out('GIPS_DEBUG: Orphaning {}'.format(absolute_pathname), 1)
 
 def find_files(regex, path='.'):
     """Find filenames in the given directory that match the regex.
@@ -480,19 +479,18 @@ def vectorize(img, vector, oformat=None):
 
 
 def mosaic(images, outfile, vector):
-    """ Mosaic multiple files together, but do not warp """
+    """Mosaic multiple files together without warping."""
+    # TODO confirm they all have the same nodata?
     nd = images[0][0].nodata()
-    srs = images[0].srs()
-    # check they all have same projection
-    filenames = [images[0].filename()]
-    for f in range(1, images.NumImages()):
-        if images[f].srs() != srs:
-            raise Exception("Input files have non-matching projections and must be warped")
-        filenames.append(images[f].filename())
-    # transform vector to image projection
-    geom = wktloads(transform_shape(vector.WKT(), vector.srs(), srs))
+    filenames = [i.filename() for i in images]
 
-    extent = geom.bounds
+    # check they all have same projection
+    srs_set = {i.srs() for i in images}
+    if len(srs_set) > 1:
+        raise ValueError("Input files have non-matching projections and must be warped")
+
+    # transform vector to image projection
+    extent = wktloads(transform_shape(vector.wkt_geometry(), vector.srs(), srs_set.pop())).bounds
     ullr = "%f %f %f %f" % (extent[0], extent[3], extent[2], extent[1])
 
     # run merge command
@@ -622,13 +620,20 @@ def lib_error_handler(msg_prefix='Error', continuable=False):
 error_handler = lib_error_handler # set this so gips code can use the right error handler
 
 
+def errors_exit_status(errors):
+    """Determine an apropos exit status given the set of errors."""
+    statii = set([e.exc_code if isinstance(e, GipsException) else 1
+                  for e in errors])
+    return 2 if len(statii) > 1 else list(statii)[0]
+
+
 def gips_exit():
     """Deliver an error report if needed, then exit."""
     if len(_accumulated_errors) == 0:
         sys.exit(0)
     verbose_out("Fatal: {} error(s) occurred:".format(len(_accumulated_errors)), 1, sys.stderr)
     [report_error(error, error.msg_prefix) for error in _accumulated_errors]
-    sys.exit(1)
+    sys.exit(errors_exit_status(_accumulated_errors))
 
 
 @contextmanager

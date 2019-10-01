@@ -49,6 +49,7 @@ def main():
     args = parser.parse_args()
 
     # TODO - check that at least 1 of filemask or pmask is supplied
+    #           ^-- (otherwise gips_mask doesn't do anything)
 
     utils.gips_script_setup(None, args.stop_on_error)
 
@@ -80,15 +81,16 @@ def main():
                         continue
 
                     if args.filemask is not None:
-                        img.AddMask(mask_file[0])
+                        # TODO should filemask really ignore --invert?
+                        img.add_mask(mask_file[0])
                         meta = basename(args.filemask) + ' '
                     for mask in available_masks:
                         mask_img = inv[date].open(mask)[0]
                         if mask in args.invert:
                             mask_img.set_nodata(utils.np.nan)
-                            mask_img = mask_img.BXOR(1)
+                            mask_img = mask_img.bxor(1)
                             meta += 'inverted-'
-                        img.AddMask(mask_img)
+                        img.add_mask(mask_img)
                         meta = meta + basename(inv[date][mask]) + ' '
                     if meta != '':
                         if args.original:

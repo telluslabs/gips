@@ -129,7 +129,7 @@ class cdlAsset(Asset):
                 prefix='fetch', dir=cls.Repository.path('stage')) as tmp_dir:
             fname = "{}_{}_cdl_cdl.tif".format(tile, date.year)
             tmp_fname = tmp_dir + '/' + fname
-            with open(tmp_fname, 'w') as asset:
+            with open(tmp_fname, 'wb') as asset:
                 asset.write(file_response.content)
             imgout = GeoImage(tmp_fname, True)
             imgout.set_nodata(0)

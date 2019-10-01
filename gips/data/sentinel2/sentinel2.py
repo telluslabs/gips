@@ -367,7 +367,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                       'tile-md':      style_regexes['tile-md-re'],
                       'asset-md':     style_regexes['asset-md-re']}
         # for sanity checking later
-        expected_key_set = set(md_regexes.keys() + ['spectral-bands'])
+        expected_key_set = set(list(md_regexes.keys()) + ['spectral-bands'])
         expected_band_cnt = len(cls._sensors['S2A']['band-strings'])
         bands = []
         asset_keys = {'spectral-bands': bands}
@@ -378,10 +378,8 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                 continue
             for md_key, regex in md_regexes.items():
                 if regex.match(p):
-                    utils.verbose_out('query_gs_find_keys found {}:'
-                                      '  {}'.format(md_key, k), 5)
+                    utils.vprint('query_gs_find_keys found ', md_key, ': ', k, sep='', level=5)
                     asset_keys[md_key] = k
-                    del md_regexes[md_key] # don't repeat useless searches
 
         # sort correctly despite the wart in the band numbering scheme ('8A')
         def band_sort_key(fn):
@@ -438,12 +436,10 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
 
         # handle cloud cover
         r = cls.gs_backoff_get(cls.gs_object_url_base() + keys['tile-md'])
-        cc = cls.cloud_cover_from_et(
-                ElementTree.parse(StringIO.StringIO(r.text)))
+        cc = cls.cloud_cover_from_et(ElementTree.parse(StringIO(r.text)))
         if cc > pclouds:
-            cc_msg = ('C1GS asset found for {}, but cloud cover'
-                      ' percentage ({}%) fails to meet threshold ({}%)')
-            utils.verbose_out(cc_msg.format(atd_triad, cc, pclouds), 3)
+            utils.vprint('Found C1GS asset for', atd_triad, 'has cloud cover percentage', cc,
+                         'which fails to meet threshold of', pclouds, level=3)
             return None
         # save it in the asset file to reduce network traffic
         keys['cloud-cover'] = cc

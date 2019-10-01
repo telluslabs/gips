@@ -141,6 +141,8 @@ class GIPSParser(argparse.ArgumentParser):
         group.add_argument('--notld', help=h, default=False, action='store_true')
         h = 'Create project directories in tree form'
         group.add_argument('--tree', help=h, default=False, action='store_true')
+        h = "Don't process tiles when exporting"
+        group.add_argument('--dont-process', help=h, default=False, action='store_true')
         self.parent_parsers.append(parser)
         return parser
 

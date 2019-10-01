@@ -23,13 +23,10 @@
 
 import os
 import sys
-import errno
-from osgeo import gdal, ogr
 from datetime import datetime, timedelta
 import glob
 import re
 from itertools import groupby
-from shapely.wkt import loads
 import tarfile
 import zipfile
 import json
@@ -46,10 +43,13 @@ from backports.functools_lru_cache import lru_cache
 import requests
 import backoff
 
+from osgeo import gdal
+from shapely.wkt import loads
+
 import gippy
 from gips import __version__
-from gips.utils import (settings, VerboseOut, RemoveFiles, File2List, List2File, Colors,
-        basename, mkdir, open_vector)
+from gips.utils import (settings, VerboseOut, RemoveFiles, File2List,
+                        List2File, Colors, basename, mkdir, open_vector)
 from gips import utils
 from ..inventory import dbinv, orm
 
@@ -84,9 +84,9 @@ def add_gippy_index_products(p_dict, p_groups, a_types):
         (p, {'description': d,
              'assets': a_types,
              'bands': [{'name': p, 'units': Data._unitless}]}
-         ) for p, d in gippy_index_product_glossary)
+        ) for p, d in gippy_index_product_glossary)
 
-def _gs_stop_trying(e):
+def _gs_stop_trying(exc):
     """Should backoff keep retrying based on this HTTPError?
 
     For searching using backoff per GCP docs:
@@ -94,9 +94,9 @@ def _gs_stop_trying(e):
     to Cloud Storage that return HTTP 5xx and 429 response codes,
     including uploads and downloads of data or metadata.
     """
-    return (e.response is not None
-            and e.response.status_code != 429
-            and not (499 < e.response.status_code < 600))
+    return (exc.response is not None
+            and exc.response.status_code != 429
+            and not (499 < exc.response.status_code < 600))
 
 
 class GoogleStorageMixin(object):
@@ -136,10 +136,11 @@ class GoogleStorageMixin(object):
 
     @classmethod
     @backoff.on_exception(backoff.expo,
-                              requests.exceptions.RequestException,
-                              max_time=_gs_backoff_max,
-                              giveup=_gs_stop_trying)
+                          requests.exceptions.RequestException,
+                          max_time=_gs_backoff_max,
+                          giveup=_gs_stop_trying)
     def gs_backoff_downloader(cls, src, dst, chunk_size=512 * 1024):
+        '''Download following the exponential backoff protocol.'''
         r = requests.get(src, stream=True)# NOTE the stream=True
         r.raise_for_status()
         with open(dst, 'wb') as f:
@@ -149,10 +150,12 @@ class GoogleStorageMixin(object):
 
     @classmethod
     @backoff.on_exception(backoff.expo,
-                              requests.exceptions.RequestException,
-                              max_time=_gs_backoff_max,
-                              giveup=_gs_stop_trying)
+                          requests.exceptions.RequestException,
+                          max_time=_gs_backoff_max,
+                          giveup=_gs_stop_trying)
     def gs_backoff_get(cls, src, stream=False):
+        '''This follows backoff proto until handed func exit.  Still could
+        encounter HTTP503s then.'''
         r = requests.get(src, stream=stream)# NOTE the stream=True
         r.raise_for_status()
         return r
@@ -200,7 +203,7 @@ class S3Mixin(object):
         bucket = s3.Bucket(cls._s3_bucket_name)
         keys = [o.key for o in bucket.objects.filter(Prefix=prefix)]
         utils.verbose_out("Found {} S3 keys while searching for for key fragment"
-                    " '{}'".format(len(keys), prefix), 5)
+                          " '{}'".format(len(keys), prefix), 5)
         return keys
 
     @classmethod
@@ -223,10 +226,10 @@ class Repository(object):
     default_settings = {}
 
     @classmethod
-    def in_stage(cls, basename):
+    def in_stage(cls, base_fn):
         """Tests for the existence of the file in this driver's stage dir."""
-        if os.path.exists(os.path.join(cls.path('stage'), basename)):
-            utils.verbose_out('File `{}` already in stage/'.format(basename), 2)
+        if os.path.exists(os.path.join(cls.path('stage'), base_fn)):
+            utils.verbose_out('File `{}` already in stage/'.format(base_fn), 2)
             return True
         return False
 
@@ -247,6 +250,7 @@ class Repository(object):
         if tile != '':
             path = os.path.join(path, tile)
         if date != '':
+            # TODO: string or date obj...pick one.
             path = os.path.join(path, str(date.strftime(cls._datedir)))
         return path
 
@@ -264,7 +268,8 @@ class Repository(object):
             return dbinv.list_dates(cls.name.lower(), tile)
         tdir = cls.data_path(tile=tile)
         if os.path.exists(tdir):
-            return sorted([datetime.strptime(os.path.basename(d), cls._datedir).date() for d in os.listdir(tdir)])
+            return sorted([datetime.strptime(os.path.basename(d), cls._datedir).date()
+                           for d in os.listdir(tdir)])
         else:
             return []
 
@@ -315,6 +320,24 @@ class Repository(object):
                          " {} driver".format(key, cls.name))
 
     @classmethod
+    def find_pattern_in_url(cls, url, pattern, verbosity=1, debuglevel=0):
+        """Returns the first match for the pattern from the url, else None.
+
+        Excludes lines that match 'xml'.  Relies on managed_request.
+        """
+        cp = re.compile(pattern)
+        resp = cls.managed_request(url, verbosity, debuglevel)
+        if resp is None:
+            return None
+        # inspect the page and extract the first match
+        for line in resp:
+            l = line.decode()
+            match_obj = cp.search(l)
+            if 'xml' not in l and match_obj is not None:
+                return match_obj.group(0)
+        return None
+
+    @classmethod
     def managed_request(cls, url, verbosity=1, debuglevel=0):
         """Visit the given http URL and return the response.
 
@@ -348,11 +371,11 @@ class Repository(object):
                 request = urllib.Request(redirect_url)
                 response = urllib.urlopen(request)
             return response
-        except urllib.URLError as e:
+        except urllib.error.URLError as e:
             utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
                               verbosity, sys.stderr)
             return None
-        except urllib.HTTPError as e:
+        except urllib.error.HTTPError as e:
             utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
                               verbosity, sys.stderr)
             return None
@@ -489,12 +512,12 @@ class Asset(object):
         return str(self._version)
 
 
-    def get_geometry(self):
-        """Get the geometry of the asset
+    def get_geofeature(self):
+        """Get the geofeature of the asset
 
         For tiled assets, this will return the geometry of the tile in the
         respective 'tiles.shp' file as WKT. Needs to be extended for
-        untiled assets.
+        untiled assets -- see sentinel2.footprint.
         """
         # If tileID is a number, drop leading 0
         try:
@@ -502,12 +525,24 @@ class Asset(object):
         except:
             tile_num = self.tile
 
-        v = gippy.GeoVector(self.get_setting("tiles"))
-        v.set_primary_key(self.Repository._tile_attribute)
-        # If a GeoVector is indexed with an int, it queries using
-        # FID field.
-        feat = v[str(tile_num)]
-        return feat.WKT()
+        ### py3 + gippy 1.0 branch version
+        # v = gippy.GeoVector(self.get_setting("tiles"))
+        # v.set_primary_key(self.Repository._tile_attribute)
+        # If a GeoVector is indexed with an int, it queries using FID field.
+        # feat = v[str(tile_num)]
+        # return feat.WKT()
+        ### dev version:
+        v =  utils.open_vector(self.get_setting("tiles"), key=self.Repository._tile_attribute)
+        return v[str(tile_num)]
+
+    def get_geometry(self):
+        """Get the geometry of the asset
+
+        For tiled assets, this will return the geometry of the tile in the
+        respective 'tiles.shp' file as WKT. Needs to be extended for
+        untiled assets.
+        """
+        return self.get_geofeature().WKT()
 
     ##########################################################################
     # Child classes should not generally have to override anything below here
@@ -540,11 +575,9 @@ class Asset(object):
     def datafiles(self):
         """Get list of readable datafiles from asset.
 
-        A 'datafile' in this context is a file contained within the
-        asset file, such as for tar, zip, and hdf files.
-
-        In the case of JSON files, the files pointed to are considered 'within'
-        the JSON asset."""
+        A 'datafile' is a file contained within the asset file, or else pointed
+        to by it.
+        """
         path = os.path.dirname(self.filename)
         indexfile = os.path.join(path, self.filename + '.index')
         if os.path.exists(indexfile):
@@ -565,8 +598,7 @@ class Asset(object):
                 else: # else take strings and lists of strings at the top level
                     raw_df = sum([v if type(v) is list else [v]
                                   for v in content.values()], [])
-                datafiles = tuple(v.encode('ascii', 'ignore')
-                                  for v in raw_df if isinstance(v, basestring))
+                datafiles = tuple(v for v in raw_df if isinstance(v, str))
             else: # Try subdatasets
                 fh = gdal.Open(self.filename)
                 datafiles = [s[0] for s in fh.GetSubDatasets()]
@@ -1088,50 +1120,6 @@ class Data(object):
         """ Process composite products using provided inventory """
         pass
 
-    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False,
-             overwrite=False, tree=False):
-        """ Copy products to new directory, warp to projection if given site.
-
-        Arguments
-        =========
-        dout:       output or destination directory; mkdir(dout) is done if needed.
-        products:   which products to copy (passed to self.RequestedProducts())
-
-
-        """
-        # TODO - allow hard and soft linking options
-        if res is None:
-            res = self.Asset._defaultresolution
-            #VerboseOut('Using default resolution of %s x %s' % (res[0], res[1]))
-        dout = os.path.join(dout, self.id)
-        if tree:
-            dout = os.path.join(dout, self.date.strftime('%Y%j'))
-        mkdir(dout)
-        products = self.RequestedProducts(products)
-        bname = '%s_%s' % (self.id, self.date.strftime('%Y%j'))
-        for p in products.requested:
-            if p not in self.sensors:
-                # this product is not available for this day
-                continue
-            sensor = self.sensors[p]
-            fin = self.filenames[(sensor, p)]
-            fout = os.path.join(dout, "%s_%s_%s.tif" % (bname, sensor, p))
-            if not os.path.exists(fout) or overwrite:
-                with utils.error_handler('Problem creating ' + fout, continuable=True):
-                    if site is not None:
-                        # warp just this tile
-                        resampler = ['near', 'bilinear', 'cubic']
-                        cmd = 'gdalwarp %s %s -t_srs "%s" -tr %s %s -r %s' % \
-                               (fin, fout, site.srs(), res[0], res[1], resampler[interpolation])
-                        print(cmd)
-                        # TODO: what is this?
-                        #result = subprocess.getstatusoutput(cmd)
-                    else:
-                        gippy.GeoImage(fin).save(fout)
-                        #shutil.copyfile(fin, fout)
-        procstr = 'copied' if site is None else 'warped'
-        VerboseOut('%s tile %s: %s files %s' % (self.date, self.id, len(products.requested), procstr))
-
     @classmethod
     def natural_percentage(cls, raw_value):
         """Callable used for argparse, defines a new type for %0.0 to %100.0.
@@ -1349,7 +1337,9 @@ class Data(object):
             dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
                                         tile=self.id, date=self.date, name=filename)
 
+    # TODO never called if open_assets is never called
     def asset_filenames(self, product):
+        """For the given product type, list assset filenames in the inventory."""
         assets = self._products[product]['assets']
         filenames = []
         for asset in assets:
@@ -1372,6 +1362,7 @@ class Data(object):
         return img
 
 
+    # TODO never called
     def open_assets(self, product):
         """ Open and return a GeoImage of the assets """
         return gippy.GeoImage(self.asset_filenames(product))
@@ -1448,8 +1439,13 @@ class Data(object):
                 VerboseOut(f, 4)
                 parts = basename(f).split('_')
                 if len(parts) == 3 or len(parts) == 4:
-                    with utils.error_handler('Error parsing product date', continuable=True):
+                    #with utils.error_handler('Error parsing product date', continuable=True):
+                    # TODO: need to modify error handler to allow random junk in the project dir
+                    try:
                         datetime.strptime(parts[len(parts) - 3], datedir)
+                    except Exception as e:
+                        utils.verbose_out("Error parsing product date:  " + str(e), 3)
+                    else:
                         files.append(f)
 
         datas = []
@@ -1699,10 +1695,14 @@ class CloudCoverAsset(Asset):
             return True
         cc = self.cloud_cover()
         asset_passes_filter = cc <= pclouds
-        msg = ('Asset cloud cover is {}%, meets pclouds threshold of {}%'
-               if asset_passes_filter else
-               'Asset cloud cover is {}%, fails to meet pclouds threshold of {}%')
-        utils.verbose_out(msg.format(cc, pclouds), 3)
+        msg = '{}Asset {} cloud cover is {}%, {} pclouds threshold of {}%'
+
+        utils.verbose_out(msg.format(
+                self.Repository.name.lower(), 
+                self.tile, cc,
+                'meets' if asset_passes_filter else 'fails to meet',
+                pclouds),
+            3)
         return asset_passes_filter
 
 

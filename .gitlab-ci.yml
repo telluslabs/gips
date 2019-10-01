@@ -1,21 +1,21 @@
 make_image:
   stage: build
   script:
-    - apt-get update && apt-get -y install wget git
-    - wget -O sixs ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/sixs
-    - wget -O ortho ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/ortho
-    - wget -O gitlab_ci ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gitlab_ci
-    - wget -O gips_creds.sh.enc ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gips_creds.sh.enc
-    - cp /home/icooke/bin/ortho ./
-    - git checkout $CI_COMMIT_SHA
-    - docker build -t gippy-0.3.x -f docker/gippy-install.docker docker
-    - docker build --no-cache
-      --build-arg GIPS_UID=$(id -u)
-      -t gips_test_$CI_COMMIT_REF_SLUG
-      -f docker/gips-ci.docker .
-      # defunct ftp artifact version
-      #--build-arg AGSFTPUSERNAME=$AGSFTPUSERNAME
-      #--build-arg AGSFTPPASSWORD=$AGSFTPPASSWORD
+    # TODO don't do system maintenance in the CI pipeline; do it properly with devops
+    #- apt-get update && apt-get -y install wget git
+    # needed for atmo correction tests (none in -m lite atm)
+    #- wget -O sixs ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/sixs
+
+    # need ortho for coreg but no coreg tests in the CI pipeline
+    #- wget -O ortho ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/ortho
+
+    # only needed for fetch tests
+    #- wget -O gitlab_ci ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gitlab_ci
+    #- wget -O gips_creds.sh.enc
+    #   ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/gips_creds.sh.enc
+
+    - docker build --no-cache -t gips-base -f Dockerfile .
+    - docker build --no-cache -t gips_test_$CI_COMMIT_REF_SLUG -f docker/gips-ci.docker .
   tags:
     - gipsdev
   after_script:
@@ -25,29 +25,10 @@ make_image:
 run_tests:
   stage: test
   script:
-    - docker run --rm gips_test_$CI_COMMIT_REF_SLUG pytest -vv -s -k unit # TODO both int & unit
-    - docker run --dns=10.0.4.1 --rm
+    - docker run --rm gips_test_$CI_COMMIT_REF_SLUG pytest -vv -s -k 'unit or int'
+    - docker run --rm
       -v /net/cluster/projects/gips-dev/sys-test-assets/:/artifact-store
-      gips_test_$CI_COMMIT_REF_SLUG
-      pytest -r es -vv --slow --setup-repo --sys -s -m lite
-
-    # TODO get this CI pipeline up to passing
-    # - docker run --dns=10.0.4.1 --rm
-    #   -v /net/cluster/projects/gips-dev/sys-test-assets/:/artifact-store
-    #   gips_test_$CI_COMMIT_REF_SLUG 
-    #   pytest -r es -vv --setup-repo --slow --sys -s -k 't_fetch['
-    # - docker run --dns=10.0.4.1 --rm
-    #   -v /net/cluster/projects/gips-sys-test-assets:/artifact-store
-    #   gips_test_$CI_COMMIT_REF_SLUG
-    #   pytest -r es -vv --setup-repo --slow --sys -s -k 't_process['
-    # - docker run --dns=10.0.4.1 --rm
-    #   -v /net/cluster/projects/gips-sys-test-assets:/artifact-store
-    #   gips_test_$CI_COMMIT_REF_SLUG
-    #   pytest -r es -vv --setup-repo --slow --sys -s -k 't_project['
-    # - docker run --dns=10.0.4.1 --rm
-    #   -v /net/cluster/projects/gips-sys-test-assets:/artifact-store
-    #   gips_test_$CI_COMMIT_REF_SLUG
-    #   pytest -r es -vv --setup-repo --slow --sys -s -k 't_stats['
+      gips_test_$CI_COMMIT_REF_SLUG pytest -r es -vv --slow --setup-repo --sys -s -m lite
   tags:
     - gipsdev
   after_script:
@@ -55,28 +36,26 @@ run_tests:
     - docker system prune -f
 
 
-publish_image:
-  stage: deploy
-  only:
-    - tags
-  script:
-    - apt-get update && apt-get -y install wget git
-    - wget -O sixs ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/sixs
-    - wget -O ortho ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/ortho
-    - git checkout $CI_COMMIT_SHA
-    - VERSION=$(PYTHONPATH=. python -c 'import gips ; print(gips.__version__)')
-    - test -z "$(docker image ls --quiet registry.ags.io/gips:$VERSION)" -a "v$VERSION" = "$CI_COMMIT_REF_NAME"
-    - docker build -t gippy-03x-release -f docker/gippy-release.docker docker
-    # TODO GIPS_VERSION isn't actually used?
-    - docker build --no-cache
-      --build-arg GIPS_VERSION=$VERSION
-      -t registry.ags.io/gips:$VERSION
-      -f docker/gips-production.docker .
-    - docker push registry.ags.io/gips:$VERSION
-    - docker rmi registry.ags.io/gips:$VERSION
-  tags:
-    - gipsdev
-  after_script:
-   - docker system prune -f
-
-
+#publish_image:
+#  stage: deploy
+#  only:
+#    - tags
+#  script:
+#    - apt-get update && apt-get -y install wget git
+#    - wget -O sixs ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/sixs
+#    - wget -O ortho ftp://$AGSFTPUSERNAME:$AGSFTPPASSWORD@agsftp.ags.io/gipsftp/ortho
+#    - git checkout $CI_COMMIT_SHA
+#    - VERSION=$(PYTHONPATH=. python -c 'import gips ; print(gips.__version__)')
+#    - test -z "$(docker image ls --quiet registry.ags.io/gips:$VERSION)" -a "v$VERSION" = "$CI_COMMIT_REF_NAME"
+#    - docker build -t gippy-03x-release -f docker/gippy-release.docker docker
+#    # TODO GIPS_VERSION isn't actually used?
+#    - docker build --no-cache
+#      --build-arg GIPS_VERSION=$VERSION
+#      -t registry.ags.io/gips:$VERSION
+#      -f docker/gips-production.docker .
+#    - docker push registry.ags.io/gips:$VERSION
+#    - docker rmi registry.ags.io/gips:$VERSION
+#  tags:
+#    - gipsdev
+#  after_script:
+#   - docker system prune -f

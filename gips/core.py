@@ -114,7 +114,10 @@ class SpatialExtent(object):
             # both be passed from elsewhere. for now, preferentially
             # use rastermask if provided.
             if rastermask is not None:
-                vectorfile = os.path.join(os.path.dirname(rastermask), os.path.basename(rastermask)[:-4] + '.shp')
+                # vectorize the raster mask into some shapes, then make a SpatialExtent for each one
+                # TODO [:-4] is a poor assumption:
+                vectorfile = os.path.join(os.path.dirname(rastermask),
+                                          os.path.basename(rastermask)[:-4] + '.shp')
                 features = open_vector(utils.vectorize(rastermask, vectorfile), where='DN=1')
                 for f in features:
                     extents.append(cls(dataclass, feature=f, rastermask=rastermask,
@@ -122,7 +125,7 @@ class SpatialExtent(object):
             else:
                 features = open_vector(site, key, where)
                 for f in features:
-                    extents.append(cls(dataclass, feature=f, rastermask=rastermask,
+                    extents.append(cls(dataclass, feature=f, rastermask=None,
                                        tiles=tiles, pcov=pcov, ptile=ptile))
         return extents
 

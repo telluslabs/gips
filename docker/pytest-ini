@@ -1,3 +1,4 @@
+# automatically installed in containers in gips CI pipelines.
 [pytest]
 # these will save time/prevent certain errors
 testpaths = gips/test

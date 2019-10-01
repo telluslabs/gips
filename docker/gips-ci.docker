@@ -1,53 +1,50 @@
-FROM gippy-0.3.x
+# Builds docker image useful for CI pipeline testing; see `.gitlab-ci.yml`.
+# Meant to sit atop the image produced by Dockerfile.
 
-ARG GIPS_UID
-RUN apt-get update \
-    && apt-get -y install libcurl4-gnutls-dev
-
-COPY . /gips
-COPY gitlab_ci /root/.ssh/gitlab_ci
-COPY sixs /usr/local/bin/sixs
-COPY ortho /usr/local/bin/ortho
-COPY gips_creds.sh.enc /root/gips_creds.sh.enc
+FROM gips-base
 
 ENV GIPS_OVERRIDE_VERSION='0.0.0-dev'
 
-# note settings.py is removed, then regenerated with gips_config, then edited.
-# pre-install cython to work around a cftime issue; no longer needed when this
-# is fixed:  https://github.com/Unidata/cftime/issues/34
-# GIPS_ORM is set false for hls; once hls is compatible with the ORM, that
-# line can be removed
-RUN cd /gips \
-    && chmod +x /usr/local/bin/sixs \
-    && chmod +x /usr/local/bin/ortho \
-    && pip install -U pip 'idna<2.8' Cython \
-    && /usr/local/bin/pip install -r dev_requirements.txt \
-    && /usr/local/bin/pip install -e file:///gips/ \
-    && rm -f /gips/gips/settings.py /gips/pytest.ini \
-    && gips_config env -r /archive -e icooke@ags.io \
-    && openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh  -pass file:/root/.ssh/gitlab_ci \
-    && eval $(cat gips_creds.sh) \
-    && sed -i~ \
- 	   -e "s/^EARTHDATA_USER.*/EARTHDATA_USER = \"${EARTHDATA_USER}\"/" \
- 	   -e "s/^EARTHDATA_PASS.*/EARTHDATA_PASS = \"${EARTHDATA_PASS}\"/" \
-	   -e "s/^USGS_USER.*/USGS_USER = \"${USGS_USER}\"/" \
- 	   -e "s/^USGS_PASS.*/USGS_PASS = \"${USGS_PASS}\"/" \
-	   -e "s/^ESA_USER.*/ESA_USER = \"${ESA_USER}\"/" \
- 	   -e "s/^ESA_PASS.*/ESA_PASS = \"${ESA_PASS}\"/" \
-           /gips/gips/settings.py \
-    && echo 'GIPS_ORM = False' >> /gips/gips/settings.py \
-    && groupadd -g $GIPS_UID gips \
-    && useradd -m -r -u $GIPS_UID -g gips gips \
-    && chown -R gips:gips /gips /archive
+# not needed for CI test suite:
+# for atmo correction:
+#COPY sixs /usr/local/bin/sixs
+# for coreg products (in landsat & maybe s2):
+#COPY ortho /usr/local/bin/ortho
+# fetch tests (not part of CI pipeline atm):
+#COPY gitlab_ci /root/.ssh/gitlab_ci
+#COPY gips_creds.sh.enc /root/gips_creds.sh.enc
 
 COPY docker/pytest-ini /gips/pytest.ini
 
-# defunct ftp fetch
-#RUN echo "# set in the dockerfile" >>/gips/pytest.ini
-#ARG AGSFTPUSERNAME=unset
-#RUN echo "artifact-store-user = $AGSFTPUSERNAME" >>/gips/pytest.ini
-#ARG AGSFTPPASSWORD=unset
-#RUN echo "artifact-store-password = $AGSFTPPASSWORD" >>/gips/pytest.ini
+# doesn't seem to be needed for CI test suite:
+#RUN apt-get update && apt-get -y install libcurl4-gnutls-dev
 
-USER gips
+RUN pip3 install -U pip
+RUN pip3 install -r dev_requirements.txt
+
+# technically not needed for CI test suite (also decryption doesn't work at the moment)
+#RUN cd /gips \
+#    && chmod +x /usr/local/bin/sixs \
+#    && chmod +x /usr/local/bin/ortho \
+#    && openssl enc -d -aes-256-ctr -in /root/gips_creds.sh.enc -out gips_creds.sh \
+#        -pass file:/root/.ssh/gitlab_ci \
+#    && eval $(cat gips_creds.sh) \
+#    && sed -i~ \
+#     -e "s/^EARTHDATA_USER.*/EARTHDATA_USER = \"${EARTHDATA_USER}\"/" \
+#     -e "s/^EARTHDATA_PASS.*/EARTHDATA_PASS = \"${EARTHDATA_PASS}\"/" \
+#     -e "s/^USGS_USER.*/USGS_USER = \"${USGS_USER}\"/" \
+#     -e "s/^USGS_PASS.*/USGS_PASS = \"${USGS_PASS}\"/" \
+#     -e "s/^ESA_USER.*/ESA_USER = \"${ESA_USER}\"/" \
+#     -e "s/^ESA_PASS.*/ESA_PASS = \"${ESA_PASS}\"/" /gips/gips/settings.py \
+#    && groupadd -g $GIPS_UID gips \
+#    && useradd -m -r -u $GIPS_UID -g gips gips \
+#    && chown -R gips:gips /gips /archive
+
+# note settings.py is removed in case it exists (it shouldn't) then
+# regenerated with gips_config, then edited.  GIPS_ORM is set false for hls;
+# once hls is compatible with the ORM, that line can be removed.
+RUN rm -f /gips/gips/settings.py \
+    && gips_config env -r /archive -e nobody@example.com \
+    && echo 'GIPS_ORM = False' >> /gips/gips/settings.py
+
 WORKDIR /gips

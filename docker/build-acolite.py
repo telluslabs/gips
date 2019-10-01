@@ -1,5 +1,7 @@
 #!/usr/bin/env python2
 
+"""Driver script for acolite docker image builds.  Calls acolite.docker."""
+
 import sys
 import os
 import subprocess

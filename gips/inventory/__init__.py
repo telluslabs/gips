@@ -33,7 +33,6 @@ import gippy
 from gips.tiles import Tiles
 from gips.utils import VerboseOut, Colors
 from gips import utils
-from gips.mapreduce import MapReduce
 from . import dbinv, orm
 
 
@@ -212,18 +211,6 @@ class ProjectInventory(Inventory):
         img = gippy.GeoImage(filenames)
         return img
 
-    def map_reduce(self, func, numbands=1, products=None, readfunc=None, nchunks=100, **kwargs):
-        """ Apply func to inventory to generate an image with numdim output bands """
-        if products is None:
-            products = self.requested_products
-        if readfunc is None:
-            readfunc = lambda x: self.get_data(products=products, chunk=x)
-        inshape = self.data_size()
-        outshape = [numbands, inshape[1], inshape[2]]
-        mr = MapReduce(inshape, outshape, readfunc, func, **kwargs)
-        mr.run(nchunks=nchunks)
-        return mr.assemble()
-
 
 class DataInventory(Inventory):
     """ Manager class for data inventories (collection of Tiles class) """
@@ -349,10 +336,11 @@ class DataInventory(Inventory):
             self.dataclass.process_composites(self, self.products.composite, **kwargs)
         VerboseOut('Processing completed in %s' % (dt.now() - start), 2)
 
-    def mosaic(self, datadir='./', tree=False, **kwargs):
+    def mosaic(self, datadir='./', tree=False, process=True, **kwargs):
         """ Create project files for data in inventory """
         # make sure products have been processed first
-        self.process(overwrite=False)
+        if process:
+            self.process(overwrite=False)
         start = dt.now()
         VerboseOut('Creating mosaic project %s' % datadir, 2)
         VerboseOut('  Dates: %s' % self.datestr)

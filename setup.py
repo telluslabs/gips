@@ -84,6 +84,8 @@ setup(
         'usgs', # 0.2.1 known to work
         'backports.functools_lru_cache',
         'backoff',
+        'geojson',
+        'fiona',
     ],
     entry_points={'console_scripts': console_scripts},
     zip_safe=False,

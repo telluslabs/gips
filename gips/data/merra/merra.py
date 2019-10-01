@@ -189,23 +189,11 @@ class merraAsset(Asset):
             # asset ASM is for constants which all go into 1980-01-01
             mainurl = cls._assets[asset]['url']
             pattern = cls._assets[asset]['re_pattern'] % (0, 0, 0)
-        cpattern = re.compile(pattern)
         with utils.error_handler("Error downloading"):
-            # obtain the list of files
-            response = cls.Repository.managed_request(mainurl, verbosity=2)
-            if response is None:
-                return None, None
-        for item in response.readlines():
-            # inspect the page and extract the full name of the needed file
-            if cpattern.search(item):
-                if 'xml' in item:
-                    continue
-                basename = cpattern.findall(item)[0]
-                url = '/'.join([mainurl, basename])
-                return basename, url
-        utils.verbose_out("Unable to find a remote match for"
-                          " {} at {}".format(pattern, mainurl), 4)
-        return None, None
+            basename = cls.Repository.find_pattern_in_url(mainurl, pattern, verbosity=2)
+        if basename is None:
+            return None, None
+        return basename, '/'.join([mainurl, basename])
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -435,15 +423,13 @@ class merraData(Data):
         daily = fun(hourly)
         daily[daily.mask] = missing
         utils.verbose_out('writing %s' % fout, 4)
-        imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
+        imgout = gippy.GeoImage.create(fout, nx, ny, 1, proj=self._projection, dtype='float32')
         imgout[0].write(np.array(np.flipud(daily)).astype('float32'))
         imgout.set_bandname(prod, 1)
-        imgout.add_meta({'units': units})
+        imgout.add_meta('units', units)
         imgout.set_nodata(missing)
-        imgout.set_srs(self._projection)
         imgout.set_affine(np.array(self._geotransform))
         imgout.add_meta(self.prep_meta(assetfile, meta))
-
 
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
@@ -533,13 +519,12 @@ class merraData(Data):
                 rh[rh < 0.] = 0.
                 rhday = rh.mean(axis=0)
                 rhday[rhday.mask] = missing
-                utils.verbose_out('writing %s' % fout, 4)
-                imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
+                utils.vprint('writing', fout, level=4)
+                imgout = gippy.GeoImage.create(fout, nx, ny, 1, proj=self._projection, dtype='float32')
                 imgout[0].write(np.array(np.flipud(rhday)).astype('float32'))
                 imgout.set_bandname(val[0], 1)
-                imgout.add_meta({'units': '%'})
+                imgout.add_meta('units', '%')
                 imgout.set_nodata(missing)
-                imgout.set_srs(self._projection)
                 imgout.set_affine(np.array(self._geotransform))
                 imgout.add_meta(self.prep_meta(assetfile, meta))
 
@@ -564,12 +549,11 @@ class merraData(Data):
                 if frland.mask.sum() > 0:
                     frland[frland.mask] = missing
                 utils.verbose_out('writing %s' % fout, 4)
-                imgout = gippy.GeoImage.create(fout, nx, ny, 1, 'float32')
+                imgout = gippy.GeoImage.create(fout, nx, ny, 1, proj=self._projection, dtype='float32')
                 imgout[0].write(np.array(np.flipud(frland)).astype('float32'))
                 imgout.set_bandname(prod, 1)
-                imgout.add_meta({'units': 'fraction'})
+                imgout.add_meta('units', 'fraction')
                 imgout.set_nodata(missing)
-                imgout.set_srs(self._projection)
                 imgout.set_affine(np.array(self._geotransform))
                 imgout.add_meta(self.prep_meta(assetfile, meta))
 

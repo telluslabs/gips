@@ -268,13 +268,6 @@ expectations['prism'] = collections.OrderedDict([
 
 mark_spec['landsat'] = util.slow
 expectations['landsat'] = collections.OrderedDict([
-    # t_stats[landsat-bqashadow] recording:
-    ('bqashadow',
-     [('bqashadow_stats.txt',
-       'text-full',
-       ['date,band,min,max,mean,sd,skew,count\r\n',
-        '2017-213,+shadow_smear,1.0,1.0,1.0,0.0,nan,220848.0\r\n'])]),
-
     # t_stats[landsat-ndvi-toa] recording:
     ('ndvi-toa',
      [('ndvi-toa_stats.txt',

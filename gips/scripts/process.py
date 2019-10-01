@@ -67,16 +67,24 @@ def main():
                 TemporalExtent(args.dates, args.days), **vars(args)
             )
             if args.batchout:
+                def get_commands(tiles_obj):
+                    commands = []
+                    for tile in tiles_obj.tiles.keys():
+                        needed = any([p not in [k for sen, k in tiles_obj.tiles[tile].filenames.keys()]
+                                      for p in args.products])
+                        if not needed:
+                            continue
+                        commands.append(args.command + ' -t ' + str(tile) +
+                                    ' -d ' + str(tiles_obj.date) + ' ' +
+                                    batchargs + '\n')
+                    return commands
+
+
                 tdl = reduce(
                     list.__add__,
                     map(
-                        lambda tiles: [
-                            args.command + ' -t ' + str(tile) +
-                            ' -d ' + str(tiles.date) + ' ' +
-                            batchargs + '\n'
-                            for tile in tiles.tiles.keys()
-                        ],
-                        inv.data.values(),
+                        get_commands,
+                        inv.data.values()
                     ),
                     tdl
                 )

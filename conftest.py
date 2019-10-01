@@ -1,7 +1,6 @@
 import os
 import shutil
 
-import envoy
 import pytest
 from _pytest.assertion.util import _compare_eq_dict, _diff_text
 
@@ -128,6 +127,9 @@ def setup_data_repo():
     """Construct the data repo if it is absent."""
     # confirm the user's done basic config
     # TODO do these checks every run if fast enough
+    # TODO replace with sh:
+    #   sh.gips_config('print', _err='/dev/stderr', _out='/dev/stdout')
+    import envoy
     gcp = envoy.run("gips_config print")
     if gcp.status_code != 0:
         raise RuntimeError("config check via `gips_config print` failed",
