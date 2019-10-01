@@ -843,20 +843,6 @@ class landsatData(gips.data.core.CloudCoverData):
             'latency': 0,
             'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
         },
-        'bqashadow': {
-            'assets': ['DN', 'C1'],
-            'description': 'LC8 QA + Shadow Smear',
-            'arguments': [
-                'X: erosion kernel diameter in pixels (default: 5)',
-                'Y: dilation kernel diameter in pixels (default: 10)',
-                'Z: cloud height in meters (default: 4000)'
-            ],
-            'nargs': '*',
-            'toa': True,
-            'startdate': _lc8_startdate,
-            'latency': 0,
-            'bands': unitless_bands('bqashadow'),
-        },
         #'Indices': {
         'bi': {
             'assets': ['DN', 'C1'],

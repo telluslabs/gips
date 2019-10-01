@@ -141,8 +141,7 @@ def m_fetch(mocker):
     return mocker.patch.object(landsatData.Asset, 'fetch')
 
 # useful constant for the following tests
-df_args = (['rad', 'ndvi', 'bqashadow'], ['012030'],
-           core.TemporalExtent('2017-08-01'))
+df_args = (['rad', 'ndvi'], ['012030'], core.TemporalExtent('2017-08-01'))
 
 def t_data_fetch_error_case(mocker, m_discover_asset, m_query_service, m_fetch):
     """Test error case of data.core.Data.fetch.

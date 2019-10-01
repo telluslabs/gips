@@ -36,17 +36,13 @@ expectations['landsat'] = landsat_process.expectations
 mark_spec['sentinel2'] = util.slow
 
 # TODO some of these may be fast enough without --setup-repo
-for k in (('landsat', 'bqashadow'), ('landsat', 'ref-toa'),
-          ('landsat', 'rad-toa')):
+for k in [('landsat', 'ref-toa'), ('landsat', 'rad-toa')]:
     mark_spec[k] = util.slow
 
 mark_spec[('landsat', 'cloudmask-coreg')] = pytest.mark.skip(
     'test not workable at the moment due to django db flush between tests, '
     'causing coreg not to find any local sentinel2 -- even though it is there.'
 )
-
-mark_spec[('landsat', 'bqashadow')] = pytest.mark.skip(
- 'Deleted in branch but extant on dev; needs to be fixed post-merge.')
 
 
 expectations['prism'] = collections.OrderedDict([
