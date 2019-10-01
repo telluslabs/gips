@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+echo "This hasn't yet been ported to python 3 + gippy 1.0"
+exit 1
+
 set -e
 git remote show origin | grep 'Fetch URL: .*gips.git$' -q
 
