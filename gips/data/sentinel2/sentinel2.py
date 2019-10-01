@@ -869,7 +869,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                       for band_name in _band_names_10m]
         },
         'ref-10m': {
-            'description': 'Surface-leaving radiance (10m)',
+            'description': 'Surface reflectance (10m)',
             'assets': _asset_types,
             'bands': [{'name': band_name, 'units': Data._unitless}
                       for band_name in _band_names_10m]
