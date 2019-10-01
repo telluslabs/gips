@@ -1,3 +1,5 @@
+# Builds basic gips docker image; used as a foundation or basis.
+
 FROM geographica/gdal2:latest
 
 COPY . /gips

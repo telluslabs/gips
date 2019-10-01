@@ -1,3 +1,4 @@
+# build a gippy 0.3.11 (AGS fork) image; not in active use.
 FROM ubuntu:16.04
 
 # && /usr/bin/add-apt-repository ppa:ubuntugis/ppa \
