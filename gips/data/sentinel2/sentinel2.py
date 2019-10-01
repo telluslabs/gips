@@ -862,13 +862,13 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         if spatial_res == 10
     ]
     _products.update({
-        'rad@10m': {
+        'rad-10m': {
             'description': 'Surface-leaving radiance (10m)',
             'assets': _asset_types,
             'bands': [{'name': band_name, 'units': 'W/m^2/um'}
                       for band_name in _band_names_10m]
         },
-        'ref@10m': {
+        'ref-10m': {
             'description': 'Surface-leaving radiance (10m)',
             'assets': _asset_types,
             'bands': [{'name': band_name, 'units': Data._unitless}
@@ -904,20 +904,25 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         's2rep':        'ref',
         'cloudmask':	'cfmask',
         # Similar set of dependencies but for 10m band export
-        'ref@10m':      'rad-toa@10m',
-        'rad@10m':      'rad-toa@10m',
-        'rad-toa@10m':  'ref-toa@10m',
-        'ref-toa@10m':  None
+        'ref-10m':      'rad-10m-toa',
+        'rad-10m':      'rad-10m-toa',
+        'rad-10m-toa':  'ref-10m-toa',
+        'ref-10m-toa':  None
     }
 
-    def _product_suffix(self, spatial_res):
-        """ Return a product/filename suffix for non-default resolutions
+    def _product_name(self, product, spatial_res):
+        """ Return a product/filename modifier for non-default resolutions
         """
         ao = self.current_asset()
         if spatial_res and spatial_res != ao._defaultresolution[0]:
-            return '@{0}m'.format(spatial_res)
+            # Handle the -toa suffix which should always be at end
+            if product.endswith('-toa'):
+                base, _ = product.split('-toa')
+                return '{0}-{1}m-toa'.format(base, spatial_res)
+            else:
+                return '{0}-{1}m'.format(product, spatial_res)
         else:
-            return ''
+            return product
 
     def plan_work(self, requested_products, overwrite):
         """Plan processing run using requested products & their dependencies.
@@ -1053,8 +1058,8 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             spatial_res (int, optional): If provided and not default (20), outputs imagery
             matching this spatial resolution
         """
-        suffix = self._product_suffix(spatial_res)
-        self._time_report('Start VRT for ref-toa{0} image'.format(suffix))
+        reftoa_name = self._product_name('ref-toa', spatial_res)
+        self._time_report('Start VRT for {0} image'.format(reftoa_name))
 
         ao = self.current_asset()
         indices_bands, b_strings, colors, sres = ao.sensor_spec(
@@ -1065,7 +1070,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             indices_bands = [bs for bs, res in zip(b_strings, sres) if res == spatial_res]
 
         vrt_filename = os.path.join(self._temp_proc_dir,
-                                    self.basename + '_ref-toa{0}.vrt'.format(suffix))
+                                    self.basename + '_{0}.vrt'.format(reftoa_name))
         cmd_args = ('gdalbuildvrt -tr {0} {0} -separate'
                     ' -srcnodata 0 -vrtnodata 0').format(spatial_res).split(' ')
 
@@ -1091,8 +1096,8 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         for band_num, band_string in enumerate(indices_bands, 1): # starts at 0
             vrt_img.SetBandName(colors[b_strings.index(band_string)], band_num)
 
-        self._product_images['ref-toa' + suffix] = vrt_img
-        self._time_report('Finished VRT for ref-toa{0} image'.format(suffix))
+        self._product_images[reftoa_name] = vrt_img
+        self._time_report('Finished VRT for {0} image'.format(reftoa_name))
 
     def rad_toa_geoimage(self, spatial_res=None):
         """Reverse-engineer TOA ref data back into a TOA radiance product.
@@ -1104,9 +1109,11 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             spatial_res (int, optional): If provided and not default (20), outputs imagery
             matching this spatial resolution
         """
+        reftoa_name = self._product_name('ref-toa', spatial_res)
+        radtoa_name = self._product_name('rad-toa', spatial_res)
+
         self._time_report('Starting reversion to TOA radiance.')
-        suffix = self._product_suffix(spatial_res)
-        reftoa_img = self.load_image('ref-toa' + suffix)
+        reftoa_img = self.load_image(reftoa_name)
         asset_instance = self.current_asset()
         colors = asset_instance.sensor_spec('colors')
         radiance_factors = asset_instance.radiance_factors()
@@ -1119,7 +1126,8 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                 'TOA radiance reversion factor for {} (band {}): {}'.format(color, i + 1, rf))
             rad_image[i] = rad_image[i] * rf
         rad_image.SetNoData(0)
-        self._product_images['rad-toa' + suffix] = rad_image
+
+        self._product_images[radtoa_name] = rad_image
 
     def rad_geoimage(self, spatial_res=None):
         """Transmute TOA radiance product into a surface radiance product.
@@ -1128,9 +1136,11 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             spatial_res (int, optional): If provided and not default (20), outputs imagery
             matching this spatial resolution
         """
-        suffix = self._product_suffix(spatial_res)
+        radtoa_name = self._product_name('rad-toa', spatial_res)
+        rad_name = self._product_name('rad', spatial_res)
+
         self._time_report('Setting up for converting radiance from TOA to surface')
-        rad_toa_img = self.load_image('rad-toa' + suffix)
+        rad_toa_img = self.load_image(radtoa_name)
 
         ca = self.current_asset()
         atm6s = ca.generate_atmo_corrector()
@@ -1153,7 +1163,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             lu = 0.0001 * Lu
             rad_image[c] = (rad_toa_img[c] - lu) / T
 
-        self._product_images['rad' + suffix] = rad_image
+        self._product_images[rad_name] = rad_image
 
 
     def process_indices(self, mode, sensor, indices):
@@ -1241,11 +1251,13 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             spatial_res (int, optional): If provided and not default (20), outputs imagery
             matching this spatial resolution
         """
-        suffix = self._product_suffix(spatial_res)
+        radtoa_name = self._product_name('rad-toa', spatial_res)
+        ref_name = self._product_name('ref', spatial_res)
+
         ao = self.current_asset()
 
         self._time_report('Computing atmospheric corrections for surface reflectance')
-        rad_toa_image = self.load_image('rad-toa' + suffix)
+        rad_toa_image = self.load_image(radtoa_name)
         sr_image = gippy.GeoImage(rad_toa_image)
 
         atm6s = ao.generate_atmo_corrector()
@@ -1261,7 +1273,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             TLdS = T * Ld * scaling_factor
             sr_image[c] = (rad_toa_image[c] - lu) / TLdS
 
-        self._product_images['ref' + suffix] = sr_image
+        self._product_images[ref_name] = sr_image
 
     def fmask_geoimage(self):
         """Generate cloud mask.
@@ -1320,7 +1332,6 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         DEVNULL.close()
         fmask_image = gippy.GeoImage("%s/cloudmask.tif" % self._temp_proc_dir)
         self._product_images['cfmask'] = fmask_image
-
 
     def cloudmask_geoimage(self):
         fmask_image = self.load_image('cfmask')
@@ -1453,13 +1464,13 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             self.rad_geoimage(_defaultres)
         if 'ref' in work:
             self.ref_geoimage(_defaultres)
-        if 'ref-toa@10m' in work:
+        if 'ref-10m-toa' in work:
             self.ref_toa_geoimage(10)
-        if 'rad-toa@10m' in work:
+        if 'rad-10m-toa' in work:
             self.rad_toa_geoimage(10)
-        if 'rad@10m' in work:
+        if 'rad-10m' in work:
             self.rad_geoimage(10)
-        if 'ref@10m' in work:
+        if 'ref-10m' in work:
             self.ref_geoimage(10)
         if 'cfmask' in work:
             self.fmask_geoimage()
@@ -1490,11 +1501,11 @@ class sentinel2Data(gips.data.core.CloudCoverData):
                 output_image = gippy.GeoImage(temp_fp, source_image)
                 output_image.SetNoData(0)
                 output_image.SetMeta(self.prep_meta())
-                if prod_type in ('ref', 'rad', 'ref@10m', 'rad@10m'): # atmo-correction metadata
+                if prod_type in ('ref', 'rad', 'ref-10m', 'rad-10m'): # atmo-correction metadata
                     output_image.SetMeta('AOD Source', source_image._aod_source)
                     output_image.SetMeta('AOD Value',  source_image._aod_value)
                 if prod_type in ('ref-toa', 'rad-toa', 'rad', 'ref',
-                                 'ref-toa@10m', 'rad-toa@10m', 'rad@10m', 'ref@10m'):
+                                 'ref-10m-toa', 'rad-10m-toa', 'rad-10m', 'ref-10m'):
                     output_image.SetGain(0.0001)
                 if prod_type == 'cfmask':
                     output_image.SetMeta('FMASK_0', 'nodata')
