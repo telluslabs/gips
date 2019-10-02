@@ -26,7 +26,6 @@ import re
 import datetime
 from csv import DictReader
 import glob
-from itertools import ifilter
 import shutil
 from xml.etree import ElementTree
 from zipfile import ZipFile
@@ -40,7 +39,7 @@ import gips
 from gips.data.core import Repository, Asset, Data
 from gips import utils
 from gips.utils import verbose_out
-from gippy import GeoImage, GeoImages
+from gippy import GeoImage
 from osgeo import gdal
 
 import imghdr
@@ -67,16 +66,16 @@ class cdlAsset(Asset):
     _assets = {
         _cdl: {
             # CDL assets are named just like products: tile_date_sensor_asset-product.tif
-            'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdl + '\.tif$',
+            'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdl + r'\.tif$',
             'startdate': datetime.date(1997, 1, 1),
-            'latency': 426, # released in february for the previous year
+            'latency': 365, # released in february for the previous year
                             # which we interpret as january that year
         },
         _cdlmkii: {
-            'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdlmkii + '\.zip$',
+            'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdlmkii + r'\.zip$',
             'description': '',
             'startdate': datetime.date(1997, 1, 1),
-            'latency': 426, # see previous for explanation for this crazy value
+            'latency': 365, # see previous for explanation for this crazy value
         },
     }
 
@@ -130,11 +129,11 @@ class cdlAsset(Asset):
                 prefix='fetch', dir=cls.Repository.path('stage')) as tmp_dir:
             fname = "{}_{}_cdl_cdl.tif".format(tile, date.year)
             tmp_fname = tmp_dir + '/' + fname
-            with open(tmp_fname, 'w') as asset:
+            with open(tmp_fname, 'wb') as asset:
                 asset.write(file_response.content)
             imgout = GeoImage(tmp_fname, True)
-            imgout.SetNoData(0)
-            imgout.SetMeta('GIPS_Version', gips.__version__)
+            imgout.set_nodata(0)
+            imgout.add_meta('GIPS_Version', gips.__version__)
             imgout = None
             shutil.copy(tmp_fname, cls.Repository.path('stage'))
 
@@ -170,13 +169,13 @@ class cdlData(Data):
                     os.rename(extracted, fname_without_ext + '.' + member_ext)
 
             image = GeoImage(fname, True)
-            image[0].SetNoData(0)
+            image[0].set_nodata(0)
             image = None
 
             image = gdal.Open(fname, gdal.GA_Update)
             dbf = DBF(fname + '.vat.dbf')
             for i, record in enumerate(dbf):
-                image.SetMetadataItem(str("CLASS_NAME_%s" % record['CLASS_NAME']), str(i))
+                image.add_meta(str("CLASS_NAME_%s" % record['CLASS_NAME']), str(i))
             image = None
 
             archive_fp = self.archive_temp_path(fname)
@@ -185,10 +184,10 @@ class cdlData(Data):
     def legend(self):
         """Open the legend file, keeping it memoized for future calls."""
         if getattr(self, "_legend", None) is None:
-            if self.assets.keys()[0] == _cdlmkii:
+            if next(iter(self.assets)) == _cdlmkii:
                 self._legend = [''] * 256
                 im = gdal.Open(os.path.splitext(self.assets[_cdlmkii].filename)[0] + '.tif')
-                for key, val in im.GetMetadata().iteritems():
+                for key, val in im.GetMetadata().items():
                     if key[0:10] == 'CLASS_NAME':
                         self._legend[int(val)] = key[11:]
             else:

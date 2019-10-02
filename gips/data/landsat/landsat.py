@@ -21,8 +21,6 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
-from __future__ import print_function
-
 from contextlib import contextmanager
 import sys
 import os
@@ -32,7 +30,6 @@ import shutil
 import glob
 import traceback
 from copy import deepcopy
-import commands # TODO unused?
 import subprocess
 import tempfile
 import tarfile
@@ -41,16 +38,15 @@ from xml.etree import ElementTree
 
 from backports.functools_lru_cache import lru_cache
 import numpy
-# once gippy==1.0, switch to GeoRaster.erode
+# TODO: now that gippy==1.0, switch to GeoRaster.erode
 from scipy.ndimage import binary_dilation
 
 import osr
 import gippy
+from gippy import algorithms
 from gips import __version__ as __gips_version__
 from gips.exceptions import GipsException
 from gips.core import SpatialExtent, TemporalExtent
-from gippy.algorithms import (ACCA, Fmask, LinearTransform, Indices,
-                              AddShadowMask, CookieCutter)
 from gips.data.core import Repository, Data
 import gips.data.core
 from gips.atmosphere import SIXS, MODTRAN
@@ -248,12 +244,12 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
         'C1': {
             'sensors': ['LT5', 'LE7', 'LC8'],
             'pattern': _c1_base_pattern + r'\.tar\.gz$',
-            'latency': 12,
+            'latency': 0,
         },
         'C1S3': {
             'sensors': ['LC8'],
             'pattern': _c1_base_pattern + r'_S3\.json$',
-            'latency': 12,
+            'latency': 0,
         },
         'C1GS': {
             'sensors': ['LT5', 'LE7', 'LC8'],
@@ -266,11 +262,14 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
     _ee_datasets = None
 
     # Set the startdate to the min date of the asset's sensors
-    for asset, asset_info in _assets.iteritems():
-        asset_info['startdate'] = min(
-            [_sensors[sensor]['startdate']
-                for sensor in asset_info['sensors']]
-        )
+    for asset, asset_info in _assets.items():
+
+        # TODO: there was some weird scope thing going on in the
+        # list comprehension that was here
+        startdates = []
+        for sensor in asset_info['sensors']:
+            startdates.append(_sensors[sensor]['startdate'])
+        asset_info['startdate'] = min(startdates)
 
     _defaultresolution = [30.0, 30.0]
 
@@ -342,10 +341,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
         if not self.in_cloud_storage():
             raise NotImplementedError(
                 'porting local files to this method is a TODO')
-        spectral_bands = self.load_c1_json()[
-            {'C1S3': '30m-bands', 'C1GS': 'spectral-bands'}[self.asset]]
-        # json module insists on returning unicode, which gippy no likey
-        return [p.encode('ascii','ignore') for p in spectral_bands]
+        return self.load_c1_json()[{'C1S3': '30m-bands', 'C1GS': 'spectral-bands'}[self.asset]]
 
     @classmethod
     def cloud_cover_from_mtl_text(cls, text):
@@ -454,6 +450,9 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
         and a list of S3 keys.  Returns None if no asset found for the
         given scene.  Filters by the given cloud percentage.
         """
+
+        import boto3
+
         # for finding assets matching the tile
         key_prefix = 'c1/L8/{}/{}/'.format(*path_row(tile))
         # match something like:  'LC08_L1TP_013030_20170402_20170414_01_T1'
@@ -770,7 +769,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Surface-leaving radiance',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             # units given by https://landsat.usgs.gov/landsat-8-l8-data-users-handbook-section-5
             'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
@@ -779,7 +778,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Surface reflectance',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands(*__visible_bands_union)
         },
         'temp': {
@@ -787,25 +786,9 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Brightness (apparent) temperature',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             # units given by https://landsat.usgs.gov/landsat-8-l8-data-users-handbook-section-5
             'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
-        },
-        'acca': {
-            'assets': ['DN', 'C1'],
-            'description': 'Automated Cloud Cover Assessment',
-            'arguments': [
-                'X: erosion kernel diameter in pixels (default: 5)',
-                'Y: dilation kernel diameter in pixels (default: 10)',
-                'Z: cloud height in meters (default: 4000)'
-            ],
-            'nargs': '*',
-            'toa': True,
-            'startdate': _lt5_startdate,
-            'latency': 1,
-            # percentage, so unitless, per landsat docs:
-            # https://landsat.usgs.gov/how-percentage-cloud-cover-calculated
-            'bands': unitless_bands('finalmask', 'cloudmask', 'ambclouds', 'pass1'),
         },
         'fmask': {
             'assets': ['DN', 'C1'],
@@ -813,7 +796,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'nargs': '*',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('finalmask', 'cloudmask',
                                     'PCP', 'clearskywater', 'clearskyland'),
         },
@@ -823,7 +806,7 @@ class landsatData(gips.data.core.CloudCoverData):
                             'bits of the quality band'),
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('cloudmask'),
         },
         'tcap': {
@@ -831,7 +814,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Tassled cap transformation',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6'),
         },
         'dn': {
@@ -839,7 +822,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Raw digital numbers',
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': [{'name': n, 'units': 'W/m^2/sr/um'} for n in __visible_bands_union],
         },
         'volref': {
@@ -847,7 +830,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Volumetric water reflectance - valid for water only',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             # reflectance is unitless therefore volref should be unitless
             'bands': unitless_bands(*__visible_bands_union),
         },
@@ -857,22 +840,8 @@ class landsatData(gips.data.core.CloudCoverData):
             # It's not really TOA, but the product code will take care of atm correction itself
             'toa': True,
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': [{'name': n, 'units': 'degree Kelvin'} for n in ['LWIR', 'LWIR2']],
-        },
-        'bqashadow': {
-            'assets': ['DN', 'C1'],
-            'description': 'LC8 QA + Shadow Smear',
-            'arguments': [
-                'X: erosion kernel diameter in pixels (default: 5)',
-                'Y: dilation kernel diameter in pixels (default: 10)',
-                'Z: cloud height in meters (default: 4000)'
-            ],
-            'nargs': '*',
-            'toa': True,
-            'startdate': _lc8_startdate,
-            'latency': 1,
-            'bands': unitless_bands('bqashadow'),
         },
         #'Indices': {
         'bi': {
@@ -880,7 +849,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Brightness Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('bi'),
         },
         'evi': {
@@ -888,7 +857,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Enhanced Vegetation Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('evi'),
         },
         'lswi': {
@@ -896,7 +865,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Land Surface Water Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('lswi'),
         },
         'msavi2': {
@@ -904,7 +873,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Modified Soil-Adjusted Vegetation Index (revised)',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('msavi2'),
         },
         'ndsi': {
@@ -912,7 +881,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Normalized Difference Snow Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndsi'),
         },
         'ndvi': {
@@ -920,7 +889,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Normalized Difference Vegetation Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndvi'),
         },
         'ndwi': {
@@ -928,7 +897,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Normalized Difference Water Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndwi'),
         },
         'satvi': {
@@ -936,7 +905,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Soil-Adjusted Total Vegetation Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('satvi'),
         },
         'vari': {
@@ -944,7 +913,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Visible Atmospherically Resistant Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('vari'),
         },
         #'Tillage Indices': {
@@ -953,7 +922,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Normalized Difference Tillage Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndti'),
         },
         'crc': {
@@ -961,7 +930,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Crop Residue Cover',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('crc'),
         },
         'sti': {
@@ -969,7 +938,7 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Standard Tillage Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('sti'),
         },
         'isti': {
@@ -977,21 +946,21 @@ class landsatData(gips.data.core.CloudCoverData):
             'description': 'Inverse Standard Tillage Index',
             'arguments': [__toastring],
             'startdate': _lt5_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('isti'),
         },
         'ndvi8sr': {
             'assets': ['SR'],
             'description': 'Normalized Difference Vegetation from LC8SR',
             'startdate': _lc8_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('ndvi8sr'),
         },
         'landmask': {
             'assets': ['SR'],
             'description': 'Land mask from LC8SR',
             'startdate': _lc8_startdate,
-            'latency': 1,
+            'latency': 0,
             'bands': unitless_bands('landmask'),
         },
     }
@@ -1002,7 +971,7 @@ class landsatData(gips.data.core.CloudCoverData):
         if 'C1' in pdict['assets']:
             pdict['assets'] += ['C1S3', 'C1GS']
 
-    for product, product_info in _products.iteritems():
+    for product, product_info in _products.items():
         product_info['startdate'] = min(
             [landsatAsset._assets[asset]['startdate']
                 for asset in product_info['assets']]
@@ -1025,49 +994,36 @@ class landsatData(gips.data.core.CloudCoverData):
         is a dict with keys `x` and `y` used to make affine
         transformation for `-coreg` products.
         """
-        gippy_input = {} # map prod types to temp output filenames for feeding to gippy
-        tempfps_to_ptypes = {} # map temp output filenames to prod types, for AddFile
-        for prod_type, pt_split in indices.items():
-            temp_fp = self.temp_product_filename(sensor, prod_type)
-            gippy_input[pt_split[0]] = temp_fp
-            tempfps_to_ptypes[temp_fp] = prod_type
-
-        self._time_report("Running Indices")
-        prodout = Indices(image, gippy_input,
-                          self.prep_meta(asset_fn, metadata))
-        self._time_report("Finshed running Indices")
-
-        if coreg_shift:
-            for key, val in prodout.iteritems():
+        verbose_out("Starting on {} indices: {}".format(len(indices), indices.keys()), 2)
+        for prod_and_args, split_p_and_a in indices.items():
+            verbose_out("Starting on {}".format(prod_and_args), 3)
+            temp_fp = self.temp_product_filename(sensor, prod_and_args)
+            # indices() assumes many indices per file; we just want one
+            imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
+            imgout.add_meta(self.prep_meta(asset_fn, metadata))
+            if coreg_shift:
                 self._time_report("coregistering index")
                 xcoreg = coreg_shift.get('x', 0.0)
                 ycoreg = coreg_shift.get('y', 0.0)
 
                 self._time_report("coreg (x, y) = ({:.3f}, {:.3f})"
                                   .format(xcoreg, ycoreg))
-                img = gippy.GeoImage(val, True)
 
                 coreg_mag = (xcoreg ** 2 + ycoreg ** 2) ** 0.5
                 insane =  coreg_mag > _default_coreg_mag_thresh  # TODO: actual fix
 
-                img.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
-                img.SetMeta("COREG_EXCESSIVE_SHIFT", str(insane))
-
-                if True: # not insane:
-                    affine = img.Affine()
+                imgout.add_meta("COREG_MAGNITUDE", str(coreg_mag))
+                imgout.add_meta("COREG_EXCESSIVE_SHIFT", str(insane))
+                if not insane:
+                    affine = imgout.affine()
                     affine[0] += xcoreg
                     affine[3] += ycoreg
-                    img.SetAffine(affine)
-                else:
-                    # quarantine
-                    pass
+                    imgout.set_affine(affine)
+                imgout.save()
+                imgout = None
 
-                img.Process()
-                img = None
-
-        for temp_fp in prodout.values():
             archived_fp = self.archive_temp_path(temp_fp)
-            self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
+            self.AddFile(sensor, prod_and_args, archived_fp)
 
     def _download_gcs_bands(self, output_dir):
         if 'C1GS' not in self.assets:
@@ -1078,7 +1034,7 @@ class landsatData(gips.data.core.CloudCoverData):
         band_files = []
 
         for path in self.assets['C1GS'].band_paths():
-            match = re.match("/[\w_]+/(.+)", path)
+            match = re.match(r'/[\w_]+/(.+)', path)
             url = match.group(1)
             output_path = os.path.join(
                 output_dir, os.path.basename(url)
@@ -1094,7 +1050,7 @@ class landsatData(gips.data.core.CloudCoverData):
             return self._preferred_asset
 
         # figure out which asset should be used for processing
-        self._preferred_asset = self.assets.keys()[0] # really an asset type string, eg 'SR'
+        self._preferred_asset = list(self.assets.keys())[0] # really an asset type string, eg 'SR'
         if len(self.assets) > 1:
             # if there's more than one, have to choose:
             # prefer local over fetching from the cloud, and prefer C1 over DN
@@ -1145,8 +1101,6 @@ class landsatData(gips.data.core.CloudCoverData):
 
                 imgpaths[key] = path
 
-            # print imgpaths
-
             sensor = 'LC8SR'
 
             for key, val in products.requested.items():
@@ -1155,10 +1109,10 @@ class landsatData(gips.data.core.CloudCoverData):
                 if val[0] == "ndvi8sr":
                     img = gippy.GeoImage([imgpaths['sr_band4'], imgpaths['sr_band5']])
 
-                    missing = float(img[0].NoDataValue())
+                    missing = float(img[0].nodata())
 
-                    red = img[0].Read().astype('float32')
-                    nir = img[1].Read().astype('float32')
+                    red = img[0].read().astype('float32')
+                    nir = img[1].read().astype('float32')
 
                     wvalid = numpy.where((red != missing) & (nir != missing) & (red + nir != 0.0))
 
@@ -1176,17 +1130,17 @@ class landsatData(gips.data.core.CloudCoverData):
                                     (nir[wvalid] + red[wvalid]))
 
                     verbose_out("writing " + fname, 2)
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32, 1)
-                    imgout.SetNoData(-9999.)
-                    imgout.SetOffset(0.0)
-                    imgout.SetGain(1.0)
-                    imgout.SetBandName('NDVI', 1)
-                    imgout[0].Write(ndvi)
+                    imgout = gippy.GeoImage.create_from(img, fname, 1, 'float32')
+                    imgout.set_nodata(-9999.)
+                    imgout.set_offset(0.0)
+                    imgout.set_gain(1.0)
+                    imgout.set_bandname('NDVI', 1)
+                    imgout[0].write(ndvi)
 
                 if val[0] == "landmask":
                     img = gippy.GeoImage([imgpaths['cfmask'], imgpaths['cfmask_conf']])
 
-                    cfmask = img[0].Read()
+                    cfmask = img[0].read()
                     # array([  0,   1,   2,   3,   4, 255], dtype=uint8)
                     # 0 means clear! but I want 1 to mean clear
 
@@ -1195,9 +1149,9 @@ class landsatData(gips.data.core.CloudCoverData):
                     cfmask[cfmask == 2] = 0
 
                     verbose_out("writing " + fname, 2)
-                    imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
-                    imgout.SetBandName('Land mask', 1)
-                    imgout[0].Write(cfmask)
+                    imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
+                    imgout.set_bandname('Land mask', 1)
+                    imgout[0].write(cfmask)
 
                 archive_fp = self.archive_temp_path(fname)
                 self.AddFile(sensor, key, archive_fp)
@@ -1249,6 +1203,14 @@ class landsatData(gips.data.core.CloudCoverData):
                         utils.mkdir(tmpdir_fp)
                         try:
                             # on error, use the unshifted image
+                            s2_export = self.sentinel2_coreg_export(tmpdir_fp)
+                            self.run_arop(s2_export, img['NIR'].filename())
+                        except NoSentinelError:
+                            verbose_out(
+                                'No Sentinel found for co-registration', 4)
+                        except CantAlignError as cae:
+                            verbose_out('Co-registration error '
+                                        '(FALLBACK): {}'.format(cae), 4)
                             mos_source = settings().REPOS['landsat'].get(
                                 'coreg_mos_source', 'sentinel2'
                             )
@@ -1300,7 +1262,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 #      all other bqa labels.
                 #      See https://landsat.usgs.gov/collectionqualityband
                 qaimg = self._readqa(asset)
-                img.AddMask(qaimg[0] > 1)
+                img.add_mask(qaimg[0] > 1)
                 qaimg = None
 
             asset_fn = self.assets[asset].filename
@@ -1308,7 +1270,6 @@ class landsatData(gips.data.core.CloudCoverData):
             meta = self.assets[asset].meta['bands']
             visbands = self.assets[asset].visbands
             lwbands = self.assets[asset].lwbands
-
 
             # running atmosphere if any products require it
             toa = True
@@ -1323,8 +1284,8 @@ class landsatData(gips.data.core.CloudCoverData):
                 with utils.error_handler('Problem running 6S atmospheric model'):
                     wvlens = [(meta[b]['wvlen1'], meta[b]['wvlen2']) for b in visbands]
                     geo = self.metadata['geometry']
-                    atm6s = SIXS(visbands, wvlens, geo, self.metadata['datetime'],
-                                 sensor=self.sensor_set[0])
+                    atm6s = SIXS(visbands, wvlens, geo, self.metadata['datetime'], sensor=self.sensor_set[0])
+
                     md["AOD Source"] = str(atm6s.aod[0])
                     md["AOD Value"] = str(atm6s.aod[1])
 
@@ -1358,33 +1319,15 @@ class landsatData(gips.data.core.CloudCoverData):
                         .format(key, basename(self.assets[asset].filename)),
                         continuable=True):
                     fname = self.temp_product_filename(sensor, key)
-                    if val[0] == 'acca':
-                        s_azim = self.metadata['geometry']['solarazimuth']
-                        s_elev = 90 - self.metadata['geometry']['solarzenith']
-                        erosion, dilation, cloudheight = 5, 10, 4000
-                        if len(val) >= 4:
-                            erosion, dilation, cloudheight = [int(v) for v in val[1:4]]
-                        resset = set(
-                            [(reflimg[band].Resolution().x(),
-                              reflimg[band].Resolution().y())
-                             for band in (self.assets[asset].visbands +
-                                          self.assets[asset].lwbands)]
-                        )
-                        if len(resset) > 1:
-                            raise Exception(
-                                'ACCA requires all bands to have the same '
-                                'spatial resolution.  Found:\n\t' + str(resset)
-                            )
-                        imgout = ACCA(reflimg, fname, s_elev, s_azim, erosion, dilation, cloudheight)
-                    elif val[0] == 'fmask':
+                    if val[0] == 'fmask':
                         tolerance, dilation = 3, 5
                         if len(val) >= 3:
                             tolerance, dilation = [int(v) for v in val[1:3]]
-                        imgout = Fmask(reflimg, fname, tolerance, dilation)
+                        imgout = algorithms.fmask(reflimg, fname, tolerance, dilation)
 
                     elif val[0] == 'cloudmask':
                         qaimg = self._readqa(asset)
-                        npqa = qaimg.Read()  # read image file into numpy array
+                        npqa = qaimg.read()  # read image file into numpy array
                         qaimg = None
                         # https://landsat.usgs.gov/collectionqualityband
                         # cloudmaskmask = (cloud and
@@ -1423,9 +1366,9 @@ class landsatData(gips.data.core.CloudCoverData):
                         np_cloudmask_dilated *= (npqa != 1)
                         #
 
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Byte, 1)
+                        imgout = gippy.GeoImage.create_from(img, fname, 1, 'uint8')
                         verbose_out("writing " + fname, 2)
-                        imgout.SetBandName(
+                        imgout.set_bandname(
                             self._products[val[0]]['bands'][0]['name'], 1
                         )
                         md.update(
@@ -1440,93 +1383,95 @@ class landsatData(gips.data.core.CloudCoverData):
                         # GIPPY1.0 note: replace this block with
                         # imgout[0].set_nodata(0.)
                         # imout[0].write_raw(np_cloudmask_dilated)
-                        imgout[0].Write(
+                        imgout[0].write(
                             np_cloudmask_dilated
                         )
                         imgout = None
                         imgout = gippy.GeoImage(fname, True)
-                        imgout[0].SetNoData(0.)
+                        imgout[0].set_nodata(0.)
                         ####################
                     elif val[0] == 'rad':
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
-                        for i in range(0, imgout.NumBands()):
-                            imgout.SetBandName(visbands[i], i + 1)
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.1)
+                        imgout = gippy.GeoImage.create_from(img, fname, len(visbands), 'int16')
+                        for i in range(0, len(imgout)):
+                            imgout.set_bandname(visbands[i], i + 1)
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.1)
                         if toa:
                             for col in visbands:
-                                img[col].Process(imgout[col])
+                                img[col].save(imgout[col])
                         else:
                             for col in visbands:
                                 ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
-                                        ).Process(imgout[col])
+                                        ).save(imgout[col])
                         # Mask out any pixel for which any band is nodata
-                        #imgout.ApplyMask(img.DataMask())
+                        # TODO: why is this commented out?
+                        # imgout.apply_mask(img.data_mask())
                     elif val[0] == 'ref':
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(visbands))
-                        for i in range(0, imgout.NumBands()):
-                            imgout.SetBandName(visbands[i], i + 1)
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.0001)
+                        imgout = gippy.GeoImage.create_from(img, fname, len(visbands), 'int16')
+                        for i in range(0, len(imgout)):
+                            imgout.set_bandname(visbands[i], i + 1)
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.0001)
                         if toa:
                             for c in visbands:
-                                reflimg[c].Process(imgout[c])
+                                reflimg[c].save(imgout[c])
                         else:
                             for c in visbands:
                                 (((img[c] - atm6s.results[c][1]) / atm6s.results[c][0])
-                                        * (1.0 / atm6s.results[c][2])).Process(imgout[c])
+                                        * (1.0 / atm6s.results[c][2])).save(imgout[c])
                         # Mask out any pixel for which any band is nodata
-                        #imgout.ApplyMask(img.DataMask())
+                        # TODO: why is this commented out?
+                        #imgout.apply_mask(img.DataMask())
                     elif val[0] == 'tcap':
                         tmpimg = gippy.GeoImage(reflimg)
-                        tmpimg.PruneBands(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'])
+                        tmpimg.select(['BLUE', 'GREEN', 'RED', 'NIR', 'SWIR1', 'SWIR2'])
                         arr = numpy.array(self.Asset._sensors[self.sensor_set[0]]['tcap']).astype('float32')
-                        imgout = LinearTransform(tmpimg, fname, arr)
-                        imgout.SetMeta('AREA_OR_POINT', 'Point')
+                        imgout = algorithms.linear_transform(tmpimg, fname, arr)
+                        imgout.add_meta('AREA_OR_POINT', 'Point')
                         outbands = ['Brightness', 'Greenness', 'Wetness', 'TCT4', 'TCT5', 'TCT6']
-                        for i in range(0, imgout.NumBands()):
-                            imgout.SetBandName(outbands[i], i + 1)
+                        for i in range(0, len(imgout)):
+                            imgout.set_bandname(outbands[i], i + 1)
                     elif val[0] == 'temp':
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
-                        for i in range(0, imgout.NumBands()):
-                            imgout.SetBandName(lwbands[i], i + 1)
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.1)
-                        [reflimg[col].Process(imgout[col]) for col in lwbands]
+                        imgout = gippy.GeoImage.create_from(img, fname, len(lwbands), 'int16')
+                        for i in range(0, len(imgout)):
+                            imgout.set_bandname(lwbands[i], i + 1)
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.1)
+                        [reflimg[col].save(imgout[col]) for col in lwbands]
                     elif val[0] == 'dn':
                         rawimg = self._readraw(asset)
-                        rawimg.SetGain(1.0)
-                        rawimg.SetOffset(0.0)
-                        imgout = rawimg.Process(fname)
+                        rawimg.set_gain(1.0)
+                        rawimg.set_offset(0.0)
+                        imgout = rawimg.save(fname)
                         rawimg = None
                     elif val[0] == 'volref':
                         bands = deepcopy(visbands)
                         bands.remove("SWIR1")
-                        imgout = gippy.GeoImage(fname, reflimg, gippy.GDT_Int16, len(bands))
-                        [imgout.SetBandName(band, i + 1) for i, band in enumerate(bands)]
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.0001)
+                        imgout = gippy.GeoImage.create_from(reflimg, fname, len(bands), 'int16')
+                        [imgout.set_bandname(band, i + 1) for i, band in enumerate(bands)]
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.0001)
                         r = 0.54    # Water-air reflection
                         p = 0.03    # Internal Fresnel reflectance
                         pp = 0.54   # Water-air Fresnel reflectance
                         n = 1.34    # Refractive index of water
                         Q = 1.0     # Downwelled irradiance / upwelled radiance
                         A = ((1 - p) * (1 - pp)) / (n * n)
-                        srband = reflimg['SWIR1'].Read()
-                        nodatainds = srband == reflimg['SWIR1'].NoDataValue()
+                        srband = reflimg['SWIR1'].read()
+                        nodatainds = srband == reflimg['SWIR1'].nodata()
                         for band in bands:
-                            bimg = reflimg[band].Read()
+                            bimg = reflimg[band].read()
                             diffimg = bimg - srband
                             diffimg = diffimg / (A + r * Q * diffimg)
-                            diffimg[bimg == reflimg[band].NoDataValue()] = imgout[band].NoDataValue()
-                            diffimg[nodatainds] = imgout[band].NoDataValue()
-                            imgout[band].Write(diffimg)
+                            diffimg[bimg == reflimg[band].nodata()] = imgout[band].nodata()
+                            diffimg[nodatainds] = imgout[band].nodata()
+                            imgout[band].write(diffimg)
                     elif val[0] == 'wtemp':
                         raise NotImplementedError('See https://gitlab.com/appliedgeosolutions/gips/issues/155')
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_Int16, len(lwbands))
-                        [imgout.SetBandName(lwbands[i], i + 1) for i in range(0, imgout.NumBands())]
-                        imgout.SetNoData(-32768)
-                        imgout.SetGain(0.1)
+                        imgout = gippy.GeoImage.create_from(img, fname, len(lwbands), 'int16')
+                        [imgout.set_bandname(lwbands[i], i + 1) for i in range(0, len(imgout))]
+                        imgout.set_nodata(-32768)
+                        imgout.set_gain(0.1)
                         tmpimg = gippy.GeoImage(img)
                         for col in lwbands:
                             band = tmpimg[col]
@@ -1540,63 +1485,27 @@ class landsatData(gips.data.core.CloudCoverData):
                                     ) / (atmos.output[0] * e)
                             band = (((band.pow(-1)) * meta[col]['K1'] + 1).log().pow(-1)
                                     ) * meta[col]['K2'] - 273.15
-                            band.Process(imgout[col])
+                            band.save(imgout[col])
 
-                    elif val[0] == 'bqashadow':
-                        if 'LC8' not in self.sensor_set:
-                            continue
-                        imgout = gippy.GeoImage(fname, img, gippy.GDT_UInt16, 1)
-                        imgout[0].SetNoData(0)
-                        qaimg = self._readqa(asset)
-                        qadata = qaimg.Read()
-                        qaimg = None
-                        fill = binmask(qadata, 1)
-                        dropped = binmask(qadata, 2)
-                        terrain = binmask(qadata, 3)
-                        cirrus = binmask(qadata, 14)
-                        othercloud = binmask(qadata, 16)
-                        cloud = (cirrus + othercloud) + 2 * (fill + dropped + terrain)
-                        abfn = fname + '-intermediate'
-                        abimg = gippy.GeoImage(abfn, img, gippy.GDT_UInt16, 1)
-                        abimg[0].SetNoData(2)
-                        abimg[0].Write(cloud.astype(numpy.uint16))
-                        abimg.Process()
-                        abimg = None
-                        abimg = gippy.GeoImage(abfn + '.tif')
-
-                        s_azim = self.metadata['geometry']['solarazimuth']
-                        s_elev = 90 - self.metadata['geometry']['solarzenith']
-                        erosion, dilation, cloudheight = 5, 10, 4000
-                        if len(val) >= 4:
-                            erosion, dilation, cloudheight = [int(v) for v in val[1:4]]
-                        imgout = AddShadowMask(
-                            abimg, imgout, 0, s_elev, s_azim, erosion,
-                            dilation, cloudheight, {'notes': 'dev-version'}
-                        )
-                        imgout.Process()
-                        abimg = None
-                        os.remove(abfn + '.tif')
-
-                    fname = imgout.Filename()
-                    imgout.SetMeta(self.prep_meta(asset_fn, md))
+                    fname = imgout.filename()
+                    imgout.add_meta(self.prep_meta(asset_fn, md))
 
                     if coreg:
                         coreg_mag = (coreg_xshift ** 2 + coreg_yshift ** 2) ** 0.5
                         insane =  coreg_mag > _default_coreg_mag_thresh  # TODO: actual fix
 
-                        imgout.SetMeta("COREG_MAGNITUDE", str(coreg_mag))
-                        imgout.SetMeta("COREG_EXCESSIVE_SHIFT", str(insane))
+                        imgout.add_meta("COREG_MAGNITUDE", str(coreg_mag))
+                        imgout.add_meta("COREG_EXCESSIVE_SHIFT", str(insane))
 
                         if True: #not insane:
                             self._time_report("Setting affine of product")
-                            affine = imgout.Affine()
+                            affine = imgout.affine()
                             self._time_report("Affine was: {}".format(affine.tolist()))
                             affine[0] += coreg_xshift
                             affine[3] += coreg_yshift
                             self._time_report("Affine set to: {}".format(affine.tolist()))
-                            imgout.SetAffine(affine)
-
-                    imgout.Process()
+                            imgout.set_affine(affine)
+                    imgout.save()
                     imgout = None
                     archive_fp = self.archive_temp_path(fname)
                     self.AddFile(sensor, key, archive_fp)
@@ -1630,12 +1539,16 @@ class landsatData(gips.data.core.CloudCoverData):
                 # Run atmospherically corrected
                 if len(indices) > 0:
                     for col in visbands:
-                        img[col] = ((img[col] - atm6s.results[col][1]) / atm6s.results[col][0]
-                                ) * (1.0 / atm6s.results[col][2])
+                        img[col] = (img[col] -  atm6s.results[col][1]) \
+                        * (1.0 / atm6s.results[col][0]) \
+                        * (1.0 / atm6s.results[col][2])
+
                     self._process_indices(img, asset_fn, md, sensor, indices,
                                           coreg_shift)
+
                 verbose_out(' -> %s: processed %s in %s' % (
                         self.basename, indices0.keys(), datetime.now() - start), 1)
+
             img = None
             # cleanup scene directory by removing (most) extracted files
             with utils.error_handler('Error removing extracted files', continuable=True):
@@ -1703,7 +1616,7 @@ class landsatData(gips.data.core.CloudCoverData):
             r = self.Asset.gs_backoff_get(c1_json['mtl'])
             r.raise_for_status()
             text = r.text
-            qafn = c1_json['qa-band'].encode('ascii', 'ignore')
+            qafn = c1_json['qa-band']
         else:
             datafiles = asset_obj.datafiles()
             # save for later; defaults to None
@@ -1851,12 +1764,12 @@ class landsatData(gips.data.core.CloudCoverData):
                 paths = [os.path.join('/vsitar/' + asset_obj.filename, f)
                          for f in md['filenames']]
         self._time_report("reading bands")
-        image = gippy.GeoImage(paths)
-        image.SetNoData(0)
+        image = gippy.GeoImage.open(paths)
+        image.set_nodata(0)
 
         # TODO - set appropriate metadata
-        #for key,val in meta.iteritems():
-        #    image.SetMeta(key,str(val))
+        #for key,val in meta.items():
+        #    image.add_meta(key,str(val))
 
         # Geometry used for calculating incident irradiance
         # colors = self.assets['DN']._sensors[self.sensor_set[0]]['colors']
@@ -1865,16 +1778,16 @@ class landsatData(gips.data.core.CloudCoverData):
         colors = asset_obj._sensors[sensor]['colors']
 
         for bi in range(0, len(md['filenames'])):
-            image.SetBandName(colors[bi], bi + 1)
+            image.set_bandname(colors[bi], bi + 1)
             # need to do this or can we index correctly?
             band = image[bi]
             gain = md['gain'][bi]
-            band.SetGain(gain)
-            band.SetOffset(md['offset'][bi])
+            band.set_gain(gain)
+            band.set_offset(md['offset'][bi])
             dynrange = md['dynrange'][bi]
             # #band.SetDynamicRange(dynrange[0], dynrange[1])
             # dynrange[0] was used internally to for conversion to radiance
-            # from DN in GeoRaster.Read:
+            # from DN in GeoRaster.read:
             #   img = Gain() * (img-_minDC) + Offset();  # (1)
             # and with the removal of _minDC and _maxDC it is now:
             #   img = Gain() * img + Offset();           # (2)
@@ -1894,7 +1807,7 @@ class landsatData(gips.data.core.CloudCoverData):
             #     Out[20]: -64.927711800095906
 
         self._time_report("done reading bands")
-        verbose_out('%s: read in %s' % (image.Basename(), datetime.now() - start), 2)
+        verbose_out('%s: read in %s' % (image.basename(), datetime.now() - start), 2)
         return image
 
     def _s2_tiles_for_coreg(self, inventory, date_found, landsat_footprint):
@@ -1957,9 +1870,7 @@ class landsatData(gips.data.core.CloudCoverData):
         cutter = gippy.GeoVector(tmp_feat_fp)
         tmp_fp = os.path.join(
             tmpdir_fp, 'custom_mosaic.bin')
-        CookieCutter(
-            images, cutter[0], tmp_fp, 30., 30.,
-        )
+        algorithms.cookie_cutter(images, cutter[0], tmp_fp, 30.0, 30.0)
         return tmp_fp
 
 
@@ -2110,11 +2021,11 @@ class landsatData(gips.data.core.CloudCoverData):
                 warp_data_type=' '.join(([
                     str(warp_base_band_img.DataType())
                 ] * len(warp_bands_bin))),
-                warp_nsample=warp_base_band_img.XSize(),
-                warp_nline=warp_base_band_img.YSize(),
+                warp_nsample=warp_base_band_img.xsize(),
+                warp_nline=warp_base_band_img.ysize(),
                 warp_pixel_size=warp_pixel_size,
-                warp_upper_left_x=warp_base_band_img.MinXY().x(),
-                warp_upper_left_y=warp_base_band_img.MaxXY().y(),
+                warp_upper_left_x=warp_base_band_img.minxy().x(),
+                warp_upper_left_y=warp_base_band_img.maxxy().y(),
                 warp_utm=self.utm_zone(),
                 out_bands=' '.join(
                     [os.path.join(tmpdir, basename(band) + '_warped.bin')
@@ -2131,11 +2042,11 @@ class landsatData(gips.data.core.CloudCoverData):
             mosaic_params = dict(
                 base_satellite=mos_sen_lut[source],
                 base_band=base_band_filename,
-                base_nsample=base_band_img.XSize(),
-                base_nline=base_band_img.YSize(),
+                base_nsample=base_band_img.xsize(),
+                base_nline=base_band_img.ysize(),
                 base_pixel_size=base_pixel_size,
-                base_upper_left_x=base_band_img.MinXY().x(),
-                base_upper_left_y=base_band_img.MaxXY().y(),
+                base_upper_left_x=base_band_img.minxy().x(),
+                base_upper_left_y=base_band_img.maxxy().y(),
                 base_utm=self.utm_zone(),
             )
             all_params = mosaic_params
@@ -2252,7 +2163,6 @@ class landsatData(gips.data.core.CloudCoverData):
                     if exc_code is not None:
                         cra.write("banned: {} ({})\n"
                                   .format(exc_msg, exc_code))
-                        
 
     def utm_zone(self):
         """
@@ -2283,7 +2193,7 @@ class landsatData(gips.data.core.CloudCoverData):
             mtl = asset.extract([f for f in asset.datafiles() if f.endswith("MTL.txt")])[0]
             with open(mtl, 'r') as mtl_file:
                 text = mtl_file.read()
-        match = re.search(".*UTM_ZONE = (\d+).*", text)
+        match = re.search(r'.*UTM_ZONE = (\d+).*', text)
         if match:
             self.utm_zone_number = match.group(1)
         else:

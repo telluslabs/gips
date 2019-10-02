@@ -1,3 +1,8 @@
+archive
+*venv
 docker/acolite_py_linux
 gips/data/merra/docs
 junk
+# all compiled python files everywhere
+**/*.pyc
+**/__pycache__

@@ -1,1 +1,1 @@
-from gpm import gpmRepository, gpmAsset, gpmData
+from .gpm import gpmRepository, gpmAsset, gpmData

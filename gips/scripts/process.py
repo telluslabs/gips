@@ -28,6 +28,7 @@ from gips.utils import Colors, VerboseOut, open_vector, import_data_class
 from gips import utils
 from gips.inventory import DataInventory
 from gips.inventory import orm
+from functools import reduce
 
 
 def main():
@@ -40,7 +41,7 @@ def main():
     args = parser0.parse_args()
 
     cls = utils.gips_script_setup(args.command, args.stop_on_error)
-    print title
+    print(title)
 
     with utils.error_handler():
         extents = SpatialExtent.factory(

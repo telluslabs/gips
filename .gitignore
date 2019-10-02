@@ -7,13 +7,14 @@ epydoc
 .eggs
 build
 dist
-gips.egg-info
 pytest.ini
 .cache
 .coverage
+.idea
 *venv
 aod.composites.tar.gz
 gips_creds.sh.enc
 ortho
 sixs
 docker/acolite_py_linux/
+gips.egg-info

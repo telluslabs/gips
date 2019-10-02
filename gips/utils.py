@@ -20,7 +20,6 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
-from __future__ import print_function
 
 import imp
 import sys
@@ -29,7 +28,7 @@ import re
 import errno
 from contextlib import contextmanager
 import tempfile
-import commands
+import subprocess
 import shutil
 import traceback
 import datetime
@@ -73,21 +72,44 @@ class Colors():
 
 def verbose_out(obj, level=1, stream=sys.stdout):
     """print(obj) but only if the user's chosen verbosity level warrants it.
-
     Print to stdout by default, but select any stream the user wishes.  Finally
     if the obj is a list or tuple, print each contained object consecutively on
-    separate lines.
+    separate lines.  The stream may be specified by passing in the stream object or
+    by the special strings, 'stderr' and 'stdout'.
     """
     #TODO: Add real documentation of rules regarding levels used within
     #      GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
     #      "let me see everything" level.
-    if gippy.Options.Verbose() >= level:
+    streams = {'stdout': sys.stdout, 'stderr': sys.stderr}
+    if verbosity() >= level:
         if not isinstance(obj, (list, tuple)):
             obj = [obj]
         for o in obj:
-            print(o, file=stream)
+            print(o, file=streams.get(stream, stream))
 
 VerboseOut = verbose_out # VerboseOut name is deprecated
+
+
+def vprint(*args, **kwargs):
+    """Just print() but gatekept by verbosity similarly to verbose_out.
+
+    Except for 'level' all kwargs are passed on to print() (sep, file, etc).
+    """
+    level = kwargs.pop('level', 1)
+    if verbosity() >= level:
+        print(*args, **kwargs)
+
+
+def verbosity(new=None):
+    """Returns after optionally setting the gips verbosity level.
+    Currently slaved to gippy's verbosity level."""
+    if new is not None:
+        gippy.Options.set_verbose(new)
+    return gippy.Options.verbose()
+
+
+
+
 
 ##############################################################################
 # Filesystem functions
@@ -182,7 +204,7 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
             for tries in range(1, rm_num_tries + 1):
                 try:
                     shutil.rmtree(absolute_pathname)
-                except Exception as e:
+                except Exception as e: # TODO don't conceal the original exception; it may matter
                     ### This whole block is ugly, but somehow the directory is
                     ### not emptying out immediately, but it is emptying out eventually.
                     if tries > rm_num_tries:
@@ -192,23 +214,18 @@ def make_temp_dir(suffix='', prefix='tmp', dir=None):
                         raise e
                     # it can occur that it has now been deleted, so break
                     if not os.path.exists(absolute_pathname):
-                        verbose_out('tempdir: infintesimal delay on deletion', 4)
+                        verbose_out('tempdir: infintesimal delay on deletion', 5)
                         break
-                    verbose_out('GIPS_RMTREE_DELAY: delaying {} sec'
-                                .format(rm_delay), 3)
+                    verbose_out('GIPS_RMTREE_DELAY: delaying {} sec'.format(rm_delay), 5)
                     time.sleep(rm_delay)
                     # though less likely, post-delay it could have been deleted, so break
                     if not os.path.exists(absolute_pathname):
-                        verbose_out('tempdir: {} sec delay on deletion'
-                                    .format(rm_delay), 3)
+                        verbose_out('tempdir: {} sec delay on deletion'.format(rm_delay), 5)
                         break
-                    verbose_out(
-                        'GIPS_RMTREE_TRIES: Trying again (try {} of {}): {}'
-                        .format(tries, rm_num_tries, absolute_pathname), 3
-                    )
+                    verbose_out('GIPS_RMTREE_TRIES: Trying again (try {} of {}): {}'.format(
+                            tries, rm_num_tries, absolute_pathname), 1)
         else:
-            verbose_out('GIPS_DEBUG: Orphaning {}'
-                        .format(absolute_pathname), 1)
+            verbose_out('GIPS_DEBUG: Orphaning {}'.format(absolute_pathname), 1)
 
 def find_files(regex, path='.'):
     """Find filenames in the given directory that match the regex.
@@ -312,14 +329,14 @@ def import_data_module(clsname):
 def import_repository_class(clsname):
     """ Get clsnameRepository class object """
     mod = import_data_module(clsname)
-    exec('repo = mod.%sRepository' % clsname)
+    repo = eval('mod.%sRepository' % clsname)
     return repo
 
 
 def import_data_class(clsname):
     """ Get clsnameData class object """
     mod = import_data_module(clsname)
-    exec('repo = mod.%sData' % clsname)
+    repo = eval('mod.%sData' % clsname)
     # prevent use of database inventory for certain incompatible drivers
     from gips.inventory import orm
     orm.driver_for_dbinv_feature_toggle = repo.name.lower()
@@ -335,7 +352,7 @@ def open_vector(fname, key="", where=''):
     parts = fname.split(':')
     if len(parts) == 1:
         vector = GeoVector(fname)
-        vector.SetPrimaryKey(key)
+        vector.set_primary_key(key)
     else:
         # or it is a database
         if parts[0] not in settings().DATABASES.keys():
@@ -344,7 +361,7 @@ def open_vector(fname, key="", where=''):
         filename = ("PG:dbname=%s host=%s port=%s user=%s password=%s" %
                     (db['NAME'], db['HOST'], db['PORT'], db['USER'], db['PASSWORD']))
         vector = GeoVector(filename, parts[1])
-        vector.SetPrimaryKey(key)
+        vector.set_primary_key(key)
     if where != '':
         # return array of features
         return vector.where(where)
@@ -377,25 +394,25 @@ def transform(filename, srs):
     f.write(srs)
     f.close()
     cmd = 'ogr2ogr %s %s -t_srs %s' % (fout, filename, prjfile)
-    result = commands.getstatusoutput(cmd)
+    result = subprocess.getstatusoutput(cmd)
     return fout
 
 
 def crop2vector(img, vector):
     """ Crop a GeoImage down to a vector - only used by mosaic """
     # transform vector to srs of image
-    vecname = transform(vector.Filename(), img.Projection())
+    vecname = transform(vector.filename(), img.srs())
     warped_vec = open_vector(vecname)
     # rasterize the vector
     td = tempfile.mkdtemp()
-    mask = gippy.GeoImage(os.path.join(td, vector.LayerName()), img, gippy.GDT_Byte, 1)
-    maskname = mask.Filename()
+    mask = gippy.GeoImage.create_from(img, os.path.join(td, vector.layer_name()), 1, 'uint8')
+    maskname = mask.filename()
     mask = None
-    cmd = 'gdal_rasterize -at -burn 1 -l %s %s %s' % (warped_vec.LayerName(), vecname, maskname)
-    result = commands.getstatusoutput(cmd)
+    cmd = 'gdal_rasterize -at -burn 1 -l %s %s %s' % (warped_vec.layer_name(), vecname, maskname)
+    result = subprocess.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
     mask = gippy.GeoImage(maskname)
-    img.AddMask(mask[0]).Process().ClearMasks()
+    img.add_mask(mask[0]).save(img.filename()).clear_masks()
     mask = None
     shutil.rmtree(os.path.dirname(maskname))
     shutil.rmtree(os.path.dirname(vecname))
@@ -418,7 +435,7 @@ def vectorize(img, vector, oformat=None):
         '''simple shell command wrapper'''
         with error_handler(emsg):
             verbose_out('Running: {}'.format(cmd), 4)
-            status, output = commands.getstatusoutput(cmd)
+            status, output = subprocess.getstatusoutput(cmd)
             if status != 0:
                 verbose_out(
                     '++\n Ran command:\n {}\n\n++++\n Console output:\n {}\n++\n'
@@ -428,18 +445,18 @@ def vectorize(img, vector, oformat=None):
                 raise RuntimeError(emsg)
 
     # Grab projection because gml doesn't carry it around by default
-    wkt = gippy.GeoImage(img).Projection()
+    wkt = gippy.GeoImage(img).srs()
     # rasterize the vector
     with make_temp_dir(prefix='vectorize') as td:
         tvec = os.path.join(td, os.path.basename(vector)[:-4] + '.gml')
         polygonize = (
-            'gdal_polygonize.py {CONNECTEDNESS} {IMAGE} {VECTOR}'
+            'gdal_polygonize.py -f GML {CONNECTEDNESS} {IMAGE} {VECTOR}'
             .format(CONNECTEDNESS=conn_opt, IMAGE=img, VECTOR=tvec)
         )
         emsg = 'Error vectorizing raster {} to {}'.format(img, tvec)
         gso_run(polygonize, emsg)
 
-        if gippy.GeoVector(tvec).NumFeatures() != 1:
+        if gippy.GeoVector(tvec).nfeatures() != 1:
             ivec = tvec
             tvec = tvec[:-4] + '_dissolve.gml'
             dissolve = (
@@ -462,55 +479,55 @@ def vectorize(img, vector, oformat=None):
 
 
 def mosaic(images, outfile, vector):
-    """ Mosaic multiple files together, but do not warp """
-    nd = images[0][0].NoDataValue()
-    srs = images[0].Projection()
-    # check they all have same projection
-    filenames = [images[0].Filename()]
-    for f in range(1, images.NumImages()):
-        if images[f].Projection() != srs:
-            raise Exception("Input files have non-matching projections and must be warped")
-        filenames.append(images[f].Filename())
-    # transform vector to image projection
-    geom = wktloads(transform_shape(vector.WKT(), vector.Projection(), srs))
+    """Mosaic multiple files together without warping."""
+    # TODO confirm they all have the same nodata?
+    nd = images[0][0].nodata()
+    filenames = [i.filename() for i in images]
 
-    extent = geom.bounds
+    # check they all have same projection
+    srs_set = {i.srs() for i in images}
+    if len(srs_set) > 1:
+        raise ValueError("Input files have non-matching projections and must be warped")
+
+    # transform vector to image projection
+    extent = wktloads(transform_shape(vector.wkt_geometry(), vector.srs(), srs_set.pop())).bounds
     ullr = "%f %f %f %f" % (extent[0], extent[3], extent[2], extent[1])
 
     # run merge command
     nodatastr = '-n %s -a_nodata %s -init %s' % (nd, nd, nd)
     cmd = 'gdal_merge.py -o %s -ul_lr %s %s %s' % (outfile, ullr, nodatastr, " ".join(filenames))
-    result = commands.getstatusoutput(cmd)
+    result = subprocess.getstatusoutput(cmd)
     VerboseOut('%s: %s' % (cmd, result), 4)
     imgout = gippy.GeoImage(outfile, True)
-    imgout.SetMeta(
+    imgout.add_meta(
         'GIPS_MOSAIC_SOURCES',
         ';'.join([os.path.basename(f) for f in filenames])
     )
-    for b in range(0, images[0].NumBands()):
-        imgout[b].CopyMeta(images[0][b])
-    imgout.CopyColorTable(images[0])
+    for b in range(0, images[0].nbands()):
+        imgout[b].add_meta(images[0][b].meta())
+
+    #NOTE: CopyColorTable is not supported
+    #imgout.CopyColorTable(images[0])
     return crop2vector(imgout, vector)
 
 
 def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     """ Mosaic multiple files to grid and mask specified in rastermask """
-    nd = images[0][0].NoDataValue()
+    nd = images[0][0].nodata()
     mask_img = gippy.GeoImage(rastermask)
-    srs = mask_img.Projection()
-    filenames = [images[0].Filename()]
+    srs = mask_img.srs()
+    filenames = [images[0].filename()]
     for f in range(1, images.NumImages()):
-        filenames.append(images[f].Filename())
+        filenames.append(images[f].filename())
 
-    imgout = gippy.GeoImage(outfile, mask_img,
-                            images[0].DataType(), images[0].NumBands())
+    imgout = gippy.GeoImage.create_from(mask_img, outfile,
+                                        len(images[0]), images[0].DataType())
 
-    imgout.SetNoData(nd)
-    #imgout.ColorTable(images[0])
-    nddata = np.empty((images[0].NumBands(),
-                       mask_img.YSize(), mask_img.XSize()))
+    imgout.set_nodata(nd)
+    nddata = np.empty((len(images[0]),
+                       mask_img.ysize(), mask_img.xsize()))
     nddata[:] = nd
-    imgout.Write(nddata)
+    imgout.write(nddata)
     imgout = None
 
     # run warp command
@@ -521,21 +538,21 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
         " ".join(filenames),
         outfile
     )
-    status, output = commands.getstatusoutput(cmd)
+    status, output = subprocess.getstatusoutput(cmd)
     verbose_out(' COMMAND: {}\n exit_status: {}\n output: {}'
                 .format(cmd, status, output ), 4)
 
     imgout = gippy.GeoImage(outfile, True)
-    imgout.SetMeta(
+    imgout.add_meta(
         'GIPS_GRIDDED_MOSAIC_SOURCES',
         ';'.join([os.path.basename(f) for f in filenames])
     )
-    for b in range(0, images[0].NumBands()):
-        imgout[b].CopyMeta(images[0][b])
+    for b in range(0, images[0].nbands()):
+        imgout[b].add_meta(images[0][b].meta())
     imgout.AddMask(mask_img[0])
-    imgout.Process()
+    imgout.save()
 
-    
+
 def julian_date(date_and_time, variant=None):
     """Returns the julian date for the given datetime object.
 
@@ -579,7 +596,7 @@ def report_error(error, msg_prefix, show_tb=True):
 
     Caller can suppress the traceback with show_tb.  The user can suppress
     it via the GIPS global verbosity setting."""
-    if show_tb and gippy.Options.Verbose() >= _traceback_verbosity:
+    if show_tb and gippy.Options.verbose() >= _traceback_verbosity:
         verbose_out(msg_prefix + ':', 1, stream=sys.stderr)
         error_text = getattr(error, 'tb_text', 'Error text not found.')
         verbose_out(error_text, 1, stream=sys.stderr)
@@ -673,7 +690,7 @@ def prune_unhashable(d):
 def stringify_meta_dict(md):
     """Mostly return {str(k): str(v)...}, except for non-dict iterables."""
     def stringify(o):
-        if isinstance(o, (basestring, dict)):
+        if isinstance(o, (str, dict)):
             return str(o)
         try:
             return ','.join(str(i) for i in o)

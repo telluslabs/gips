@@ -40,7 +40,7 @@ def migrate_database():
     """Migrate the database if the ORM is turned on."""
     if not orm.use_orm():
         return
-    print 'Migrating database'
+    print('Migrating database')
     orm.setup()
     call_command('migrate', interactive=False)
 
@@ -60,7 +60,7 @@ def main():
     #h = 'Install full configuration file without inheriting from environment settings'
     #p.add_argument('-f', '--full', help=h, default=False, action='store_true')
     args = parser.parse_args()
-    print title
+    print(title)
 
     utils.gips_script_setup(
         driver_string=None,  # NOTE: no driver string for gips_config
@@ -74,8 +74,8 @@ def main():
             s = settings()
             for v in dir(s):
                 if not v.startswith('__') and v != 'gips':
-                    print
-                    print v
+                    print('')
+                    print(v)
                     exec('pprint.pprint(s.%s)' % v)
 
     elif args.command == 'env':
@@ -93,14 +93,14 @@ def main():
     if args.command in ('user', 'env'):
         msg = ('Wrote new config file:  {}.' if created_cf else
                'Found existing config, left unmodified:  {}.')
-        print msg.format(cfgfile)
+        print(msg.format(cfgfile))
         with utils.error_handler('Could not create repos'):
-            print 'Creating repository directories, if needed.'
+            print('Creating repository directories, if needed.')
             try:
                 create_repos()
             except:
                 if created_cf:
-                    print ('Error; removing (likely broken) config file:'
+                    print('Error; removing (likely broken) config file:'
                            '  {}.'.format(cfgfile))
                     os.remove(cfgfile)
                 raise

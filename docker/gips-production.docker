@@ -1,3 +1,5 @@
+# TODO was this used to build optis gips containers?  If so rebase onto
+# existing gips containerization as needed.
 FROM gippy-03x-release
 
 ARG GIPS_VERSION

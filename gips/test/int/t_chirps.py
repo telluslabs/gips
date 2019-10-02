@@ -28,7 +28,7 @@ def scene_dir_setup():
     use_fake_asset = not os.path.exists(target_asset_fp)
     if use_fake_asset:
         source_asset_fp = os.path.join(os.path.dirname(__file__), 'data', asset_bn)
-        made_dirs = [d for d in tile_fp, scene_fp if not os.path.exists(d)]
+        made_dirs = [d for d in (tile_fp, scene_fp) if not os.path.exists(d)]
         [os.mkdir(d) for d in made_dirs]
         shutil.copy(source_asset_fp, target_asset_fp)
         dbinv.rectify_assets(chirps.chirpsAsset)

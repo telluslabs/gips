@@ -63,7 +63,7 @@ REPOS = {
     'landsat': {
         'repository': '$TLD/landsat',
         # Landsat specific settings
-        '6S': False,            # atm correction for VIS/NIR/SWIR bands
+        '6S': True,            # atm correction for VIS/NIR/SWIR bands
         'MODTRAN': False,       # atm correction for LWIR
         'extract': False,       # extract files from tar.gz before processing instead of direct access
         'username': USGS_USER,
@@ -81,6 +81,14 @@ REPOS = {
         'username': ESA_USER,
         'password': ESA_PASS,
         'extract': False,  # extract files from tar.gz before processing instead of direct access
+    },
+    'smap': {
+        'repository': '$TLD/smap',
+        'username': EARTHDATA_USER,
+        'password': EARTHDATA_PASS,
+    },
+    'gpm': {
+        'repository': '$TLD/gpm',
     },
     # these drivers tend to more specialized and experimental so turned off by default
     'cdl': {
@@ -105,6 +113,9 @@ REPOS = {
     },
     'hls': {
         'repository': '$TLD/hls',
+    },
+    'chirps': {
+        'repository': '$TLD/chirps',
     }
 }
 

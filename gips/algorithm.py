@@ -22,7 +22,6 @@
 ################################################################################
 
 import argparse
-#from datetime import datetime
 import traceback
 
 import gippy
@@ -94,9 +93,9 @@ class Algorithm(object):
         parser = cls.parser(parser)
 
         args = parser.parse_args()
-        gippy.Options.SetVerbose(args.verbose)
-        VerboseOut(cls.info())
 
+        gippy.Options.set_verbose(args.verbose)
+        VerboseOut(cls.info())
         utils.gips_script_setup(driver_string=None, setup_orm=False)
 
         with utils.error_handler('Error in {}'.format(cls.name)):

@@ -41,7 +41,7 @@ def main():
     args = parser0.parse_args()
 
     utils.gips_script_setup(stop_on_error=args.stop_on_error)
-    print title
+    print(title)
 
     # TODO - check that at least 1 of filemask or pmask is supplied
     header = ['date', 'band', 'min', 'max', 'mean', 'sd', 'skew', 'count']
@@ -71,9 +71,9 @@ def main():
                         utils.verbose_out('Computing stats for {} {}'.format(
                                 p_type, date_str), 2)
                         for b in img:
-                            stats = [str(s) for s in b.Stats()]
+                            stats = [str(s) for s in b.stats()]
                             writer.writerow(
-                                    [date_str, b.Description()] + stats)
+                                    [date_str, b.description()] + stats)
                         img = None
 
     utils.gips_exit() # produce a summary error report then quit with a proper exit status

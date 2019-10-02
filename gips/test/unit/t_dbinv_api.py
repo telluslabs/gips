@@ -20,8 +20,6 @@ def t_rectify_assets(mocker):
     rubbish_filenames = [os.path.join(path, fn) for fn in (
         # landsat is wrong obviously; shouldn't show up in results
         '012030/2015352/012030_2015352_LC8_rad-toa.tif',
-        '012030/2015352/012030_2015352_LC8_bqashadow.tif',
-        '012030/2015352/012030_2015352_LC8_acca.tif',
         '012030/2015352/LC80120302015352LGN00_MTL.txt',
         # erroneous assets
         'h12v04/2012338/A2003266.h12v09.005.hdf',  # missing generation stamp per issue #79
@@ -85,7 +83,7 @@ def t_rectify_products(mocker):
         md.ParseAndAddFiles([full_fn])
         # sanity check, not part of the test
         assert len(md.filenames) == 1 and md.name.lower() == 'modis'
-        (sensor, product) = md.filenames.keys()[0] # only one so it must be the right one
+        (sensor, product) = next(iter(md.filenames)) # only one so it must be the right one
         product = models.Product(
             product=product,
             sensor =sensor,

@@ -37,7 +37,7 @@ def main():
 
     cls = utils.gips_script_setup(args.command, args.stop_on_error)
 
-    print title
+    print(title)
 
     with utils.error_handler():
         cls.print_products()

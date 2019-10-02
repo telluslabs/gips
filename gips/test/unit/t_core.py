@@ -8,7 +8,6 @@ import datetime
 from datetime import datetime as dt
 
 import pytest
-import mock
 
 import gips
 from gips import core
@@ -46,7 +45,7 @@ def t_repository_find_dates_normal_case(mocker, orm):
     """Test Repository.find_dates using landsatRepository as a guinea pig."""
     m_list_dates = mocker.patch('gips.data.core.dbinv.list_dates')
     expected = [datetime.datetime(*a) for a in
-                (1900, 1, 1), (1950, 10, 10), (2000, 12, 12)]
+                ((1900, 1, 1), (1950, 10, 10), (2000, 12, 12))]
     m_list_dates.return_value = expected
     actual = landsatRepository.find_dates('some-tile')
     assert expected == actual
@@ -142,8 +141,7 @@ def m_fetch(mocker):
     return mocker.patch.object(landsatData.Asset, 'fetch')
 
 # useful constant for the following tests
-df_args = (['rad', 'ndvi', 'bqashadow'], ['012030'],
-           core.TemporalExtent('2017-08-01'))
+df_args = (['rad', 'ndvi'], ['012030'], core.TemporalExtent('2017-08-01'))
 
 def t_data_fetch_error_case(mocker, m_discover_asset, m_query_service, m_fetch):
     """Test error case of data.core.Data.fetch.
@@ -159,7 +157,7 @@ def t_Asset_dates():
     # tile isn't used --------------vvv     dayrange --vvvvvv
     actual = sar.sarAsset.dates('alos1', 'dontcare', dates_in, (1, 366))
     expected = [datetime.datetime(*a) for a in
-                (2006, 1, 24), (2006, 1, 25), (2006, 1, 26), (2006, 1, 27)]
+                ((2006, 1, 24), (2006, 1, 25), (2006, 1, 26), (2006, 1, 27))]
     assert expected == actual
 
 @pytest.fixture

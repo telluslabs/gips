@@ -49,6 +49,7 @@ def main():
     args = parser.parse_args()
 
     # TODO - check that at least 1 of filemask or pmask is supplied
+    #           ^-- (otherwise gips_mask doesn't do anything)
 
     utils.gips_script_setup(None, args.stop_on_error)
 
@@ -73,28 +74,35 @@ def main():
                     meta = ''
                     update = True if args.original else False
                     img = inv[date].open(p, update=update)
+                    fname = img.filename()
+
+                    # TODO: this is a little hacky
+                    if "mask" in fname:
+                        continue
+
                     if args.filemask is not None:
-                        img.AddMask(mask_file[0])
+                        # TODO should filemask really ignore --invert?
+                        img.add_mask(mask_file[0])
                         meta = basename(args.filemask) + ' '
                     for mask in available_masks:
                         mask_img = inv[date].open(mask)[0]
                         if mask in args.invert:
-                            mask_img.SetNoData(utils.np.nan)
-                            mask_img = mask_img.BXOR(1)
+                            mask_img.set_nodata(utils.np.nan)
+                            mask_img = mask_img.bxor(1)
                             meta += 'inverted-'
-                        img.AddMask(mask_img)
+                        img.add_mask(mask_img)
                         meta = meta + basename(inv[date][mask]) + ' '
                     if meta != '':
                         if args.original:
-                            VerboseOut('  %s' % (img.Basename()), 2)
-                            img.Process()
-                            img.SetMeta('MASKS', meta)
+                            VerboseOut('  %s' % (img.basename()), 2)
+                            img.save()
+                            img.add_meta('MASKS', meta)
                         else:
-                            fout = os.path.splitext(img.Filename())[0] + args.suffix + '.tif'
+                            fout = os.path.splitext(img.filename())[0] + args.suffix + '.tif'
                             if not os.path.exists(fout) or args.overwrite:
-                                VerboseOut('  %s -> %s' % (img.Basename(), basename(fout)), 2)
-                                imgout = img.Process(fout)
-                                imgout.SetMeta('MASKS', meta)
+                                VerboseOut('  %s -> %s' % (img.basename(), basename(fout)), 2)
+                                imgout = img.save(fout)
+                                imgout.add_meta('MASKS', meta)
                                 imgout = None
                     img = None
             mask_file = None

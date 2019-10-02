@@ -29,12 +29,11 @@ date/time, and location).
 
 Any info passed in beyond this should be via keywords
 """
-from __future__ import print_function
 
 import os
 import sys
 import datetime
-import commands
+import subprocess
 import tempfile
 import shutil
 import tarfile
@@ -225,7 +224,7 @@ class MODTRAN():
 
         try:
             # run output and get results
-            modout = commands.getstatusoutput('modtran')
+            modout = subprocess.getstatusoutput('modtran')
             #VerboseOut("MODTRAN Output:", 4)
             #[VerboseOut(m, 4) for m in modout]
             self.output = self.readoutput(bandnum)
@@ -237,7 +236,6 @@ class MODTRAN():
         # Change back to original directory
         os.chdir(pwd)
 
-        #print 'MODTRAN dir: ', tmpdir
         # Remove directory
         shutil.rmtree(tmpdir)
 
@@ -368,32 +366,6 @@ class MODTRAN():
         c = ('{IRPT:>5}')
         return c.format(IRPT=0)
 
-    """ old plotting code
-    if plot:
-        #fig = plt.figure()
-        #plt.title('Atmospheric Transmittance vs Wavelength (um)')
-
-        results = table.Table()
-        results.read_csv('tape7.scn',skip=11, delim=' ', ignorebad=True, hasheader=False)
-        #pdb.set_trace()
-
-        wvlens = results.as_numpy_col(0)
-        T = results.as_numpy_col(1)
-        rad = results.as_numpy_col(2)
-        fout.write('{:5d}{:20.10f}{:20.10f}\n'.format(bandnum,np.mean(T),np.mean(rad)))
-
-        if plot:
-            fig.add_subplot(4,2,bandnum)
-            plt.title("Band %s" % bandnum)
-            plt.plot(wvlens,T)
-            plt.ylim([0.0,1.0])
-
-        bandnum = bandnum+1
-    if plot:
-        plt.tight_layout()
-        plt.show()
-    fout.close()
-    """
 
 _s2_ls_aco_prod_templs = {
     'rhow': { # product passed in eg process_acolite(products={'rhow':...}...)
@@ -548,9 +520,9 @@ def add_acolite_product_dicts(_products, *assets, **kwargs):
 _acolite_ndv = 1.875 * 2 ** 122 # acolite's no-data value
 
 _aco_img_params = {
-    'float32': (gippy.GDT_Float32, -32768.0),
-    'int16': (gippy.GDT_Int16, -32768),
-    'uint8': (gippy.GDT_Byte, 1),
+    'float32': ('float32', -32768.0),
+    'int16': ('int16', -32768),
+    'uint8': ('uint8', 1),
 }
 
 def acolite_nc_to_prods(products, nc_file, meta, model_image):
@@ -570,13 +542,13 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
         dtype, missing = _aco_img_params[npdtype]
         gain = p_spec.get('gain', 1.0)
         offset = p_spec.get('offset', 0.0)
-        imgout = gippy.GeoImage(p_fp, model_image, dtype, len(bands))
+        imgout = gippy.GeoImage.create_from(model_image, p_fp, len(bands), dtype)
         pmeta = {'description': p_spec['description']}
         pmeta.update(meta)
-        imgout.SetMeta(pmeta)
+        imgout.add_meta(pmeta)
 
         for i, b in enumerate(bands):
-            imgout.SetBandName(str(b), i + 1)
+            imgout.set_bandname(str(b), i + 1)
             arr = numpy.array(dsroot.variables[b][:])
             fill = getattr(dsroot.variables[b], '_FillValue', _acolite_ndv)
             mask = arr != fill
@@ -584,14 +556,14 @@ def acolite_nc_to_prods(products, nc_file, meta, model_image):
             arr[mask] = ((arr[mask] - offset) / gain)
             verbose_out('acolite processing:  writing band {} of {}'.format(
                 i, p_fp), 2)
-            imgout[i].Write(arr.astype(npdtype))
+            imgout[i].write(arr.astype(npdtype))
 
-        prodout[p_type] = imgout.Filename()
+        prodout[p_type] = imgout.filename()
         imgout = None
         imgout = gippy.GeoImage(p_fp, True)
-        imgout.SetGain(gain)
-        imgout.SetOffset(offset)
-        imgout.SetNoData(missing)
+        imgout.set_gain(gain)
+        imgout.set_offset(offset)
+        imgout.set_nodata(missing)
     return prodout
 
 def process_acolite(asset, aco_proc_dir, products, meta, model_image,
@@ -674,7 +646,7 @@ def process_acolite(asset, aco_proc_dir, products, meta, model_image,
             extracted_asset_fp, settings_path)
     verbose_out('acolite processing:  starting acolite: `{}`'.format(cmd), 2)
 
-    status, output = commands.getstatusoutput(cmd)
+    status, output = subprocess.getstatusoutput(cmd)
 
     verbose_out('acolite processing:  ====== begin acolite output ======', 4)
     verbose_out(output, 4)

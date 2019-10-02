@@ -18,8 +18,6 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
-from __future__ import print_function
-
 import math
 import os
 import shutil
@@ -33,9 +31,9 @@ import tempfile
 import zipfile
 import copy
 import glob
-from itertools import izip_longest
+from itertools import zip_longest
 from xml.etree import ElementTree
-import StringIO
+from io import StringIO
 
 from backports.functools_lru_cache import lru_cache
 
@@ -46,7 +44,7 @@ from requests.auth import HTTPBasicAuth
 from shapely.wkt import loads as wkt_loads
 
 import gippy
-import gippy.algorithms
+from gippy import algorithms
 
 from gips.data.core import Repository, Asset, Data
 import gips.data.core
@@ -101,7 +99,7 @@ class sentinel2Repository(Repository):
         Returns (x0, x1, y0, y1), which is
         (west lon, east lon, south lat, north lat) in degrees.
         """
-        e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[tileid].Extent()
+        e = utils.open_vector(cls.get_setting('tiles'), cls._tile_attribute)[tileid].extent()
         return e.x0(), e.x1(), e.y0(), e.y1()
 
 
@@ -121,10 +119,9 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                 ['01', '02', '03', '04', '05', '06',
                  '07', '08', '8A', '09', '10', '11', '12'],
             # for GIPS' & gippy's use, not inherent to driver
-            ## N.B.> swapped colors for 8 and 8a for better corespondence with
-            ## landsat 
             'colors':
                 ("COASTAL",  "BLUE", "GREEN",    "RED", "REDEDGE1", "REDEDGE2",
+                 # swapped colors for 8 and 8a for better corespondence with landsat:
                  "REDEDGE3", "REDEDGE4", "NIR",  "WV",  "CIRRUS",   "SWIR1",    "SWIR2"),
             # center wavelength of band in micrometers, CF:
             # https://earth.esa.int/web/sentinel/user-guides/sentinel-2-msi/resolutions/radiometric
@@ -161,7 +158,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
     _sensors['S2B'] = copy.deepcopy(_sensors['S2A'])
     _sensors['S2B']['description'] = 'Sentinel-2, Satellite B'
 
-    _asset_fn_pat_base = '^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*'
+    _asset_fn_pat_base = r'^.*S2._.*MSIL1C_.*.{8}T.{6}_.*R..._.*'
 
     # TODO find real start date for S2 data:
     # https://scihub.copernicus.eu/dhus/search?q=filename:S2?*&orderby=ingestiondate%20asc
@@ -173,7 +170,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             'source': 'esa',
             # 'pattern' is used for searching the repository of locally-managed assets; this pattern
             # is used for both datastrip and single-tile assets.
-            'pattern': _asset_fn_pat_base + '\.zip$',
+            'pattern': _asset_fn_pat_base + r'\.zip$',
             'startdate': _start_date,
             'latency': 3, # actually seems to be 3,7,3,7..., but this value seems to be unused;
                           # only needed by Asset.end_date and Asset.available, but those are never called?
@@ -182,7 +179,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             'source': 'gs',
             'startdate': _start_date,
             'latency': 3,
-            'pattern': _asset_fn_pat_base + '_gs\.json$',
+            'pattern': _asset_fn_pat_base + r'_gs\.json$',
         }
     }
 
@@ -193,27 +190,27 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
 
     # regexes for verifying filename correctness & extracting metadata; convention:
     # https://sentinels.copernicus.eu/web/sentinel/user-guides/sentinel-2-msi/naming-convention
-    _tile_re = '(?P<tile>\d\d[A-Z]{3})'
+    _tile_re = r'(?P<tile>\d\d[A-Z]{3})'
     # example, note that leading tile code is spliced in by Asset.fetch:
     # 19TCH_S2A_OPER_PRD_MSIL1C_PDMC_20170221T213809_R050_V20151123T091302_20151123T091302.zip
     _ds_name_re = (
-        '(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
-        '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
-        'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
-        '_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
+        r'(?P<sensor>S2[AB])_OPER_PRD_MSIL1C_....' # sensor
+        r'_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
+        r'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
+        r'_R(?P<rel_orbit>\d\d\d)' # relative orbit, not sure if want
         # observation datetime:
-        '_V(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
-        'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
-        '_\d{8}T\d{6}.zip') # repeated observation datetime for no known reason
+        r'_V(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
+        r'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
+        r'_\d{8}T\d{6}.zip') # repeated observation datetime for no known reason
 
     _name_re = (
-        '^(?P<sensor>S2[AB])_MSIL1C_' # sensor
-        '(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
-        'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
-        '_N\d{4}_R\d\d\d_T' + _tile_re +  # tile
-        '_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
-        'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
-        '\.(SAFE_gs\.json|zip)$'
+        r'^(?P<sensor>S2[AB])_MSIL1C_' # sensor
+        r'(?P<year>\d{4})(?P<mon>\d\d)(?P<day>\d\d)' # year, month, day
+        r'T(?P<hour>\d\d)(?P<min>\d\d)(?P<sec>\d\d)' # hour, minute, second
+        r'_N\d{4}_R\d\d\d_T' + _tile_re +  # tile
+        r'_(?P<pyear>\d{4})(?P<pmon>\d\d)(?P<pday>\d\d)' # processing date
+        r'T(?P<phour>\d\d)(?P<pmin>\d\d)(?P<psec>\d\d)' # processing time
+        r'\.(SAFE_gs\.json|zip)$'
     )
 
     _asset_styles = {
@@ -239,11 +236,11 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
             'downloaded-name-re': _name_re,
             'archived-name-re': _name_re,
             # raster file pattern
-            'raster-re': '^.*/GRANULE/.*/IMG_DATA/.*_B(?P<band>\d[\dA]).jp2$',
+            'raster-re': r'^.*/GRANULE/.*/IMG_DATA/.*_B(?P<band>\d[\dA]).jp2$',
             # internal metadata file patterns
-            'datastrip-md-re': '^.*/DATASTRIP/.*/MTD_DS.xml$',
-            'tile-md-re': '^.*/GRANULE/.*/MTD_TL.xml$',
-            'asset-md-re': '^.*/MTD_MSIL1C.xml$',
+            'datastrip-md-re': r'^.*/DATASTRIP/.*/MTD_DS.xml$',
+            'tile-md-re': r'^.*/GRANULE/.*/MTD_TL.xml$',
+            'asset-md-re': r'^.*/MTD_MSIL1C.xml$',
         },
     }
 
@@ -370,7 +367,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                       'tile-md':      style_regexes['tile-md-re'],
                       'asset-md':     style_regexes['asset-md-re']}
         # for sanity checking later
-        expected_key_set = set(md_regexes.keys() + ['spectral-bands'])
+        expected_key_set = set(list(md_regexes.keys()) + ['spectral-bands'])
         expected_band_cnt = len(cls._sensors['S2A']['band-strings'])
         bands = []
         asset_keys = {'spectral-bands': bands}
@@ -381,10 +378,8 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
                 continue
             for md_key, regex in md_regexes.items():
                 if regex.match(p):
-                    utils.verbose_out('query_gs_find_keys found {}:'
-                                      '  {}'.format(md_key, k), 5)
+                    utils.vprint('query_gs_find_keys found ', md_key, ': ', k, sep='', level=5)
                     asset_keys[md_key] = k
-                    del md_regexes[md_key] # don't repeat useless searches
 
         # sort correctly despite the wart in the band numbering scheme ('8A')
         def band_sort_key(fn):
@@ -441,12 +436,10 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
 
         # handle cloud cover
         r = cls.gs_backoff_get(cls.gs_object_url_base() + keys['tile-md'])
-        cc = cls.cloud_cover_from_et(
-                ElementTree.parse(StringIO.StringIO(r.text)))
+        cc = cls.cloud_cover_from_et(ElementTree.parse(StringIO(r.text)))
         if cc > pclouds:
-            cc_msg = ('C1GS asset found for {}, but cloud cover'
-                      ' percentage ({}%) fails to meet threshold ({}%)')
-            utils.verbose_out(cc_msg.format(atd_triad, cc, pclouds), 3)
+            utils.vprint('Found C1GS asset for', atd_triad, 'has cloud cover percentage', cc,
+                         'which fails to meet threshold of', pclouds, level=3)
             return None
         # save it in the asset file to reduce network traffic
         keys['cloud-cover'] = cc
@@ -501,7 +494,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
         # archive actions and fetch actions by concurrent processes)
         fetch_cmd_template = ('wget --no-check-certificate --user="{}" --password="{}" --timeout=30'
                               ' --no-verbose --output-document="{}" "{}"')
-        if gippy.Options.Verbose() != 0:
+        if gippy.Options.verbose() != 0:
             fetch_cmd_template += ' --show-progress --progress=dot:giga'
         utils.verbose_out("Fetching " + basename, 5)
         with utils.error_handler(
@@ -715,7 +708,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
         sil_elem = self.xml_subtree('datastrip', 'Solar_Irradiance_List')
         values_tags = sil_elem.findall('SOLAR_IRRADIANCE')
         # sanity check that the bands are in the right order
-        assert range(13) == [int(vt.attrib['bandId']) for vt in values_tags]
+        assert [r for r in range(13)] == [int(vt.attrib['bandId']) for vt in values_tags]
         return [float(vt.text) for vt in values_tags]
 
     #def gridded_zenith_angle(self):
@@ -794,7 +787,7 @@ class sentinel2Asset(gips.data.core.CloudCoverAsset,
 
         # format as valid WKT
         points = values_tags.text.strip().split(" ")
-        zipped_points = izip_longest(*[iter(points)]*2)  # fancy way to group list into pairs
+        zipped_points = zip_longest(*[iter(points)]*2)  # fancy way to group list into pairs
         wkt_points = ", ".join([y + " " + x for x, y in list(zipped_points)])
         footprint_wkt = "POLYGON (({}))".format(wkt_points)
 
@@ -847,7 +840,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
     gips.data.core.add_gippy_index_products(
         _products, _productgroups, _asset_types)
 
-    # indices not processed by gippy.Indices(); L1CGS not supported:
+    # indices not processed by gippy.indices(); L1CGS not supported:
     _products.update(
         (p, {'description': d, 'assets': ('L1C',),
              'bands': [{'name': p, 'units': Data._unitless}]}
@@ -973,7 +966,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         self._time_report('Start download from GCS')
         band_files = []
         for path in self.raster_paths():
-            match = re.match("/[\w_]+/(.+)", path)
+            match = re.match(r'/[\w_]+/(.+)', path)
             url = match.group(1)
             output_path = os.path.join(
                 output_dir, os.path.basename(url)
@@ -1008,15 +1001,13 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         p = subprocess.Popen(cmd_args)
         p.communicate()
         if p.returncode != 0:
-            raise IOError("Expected gdalbuildvrt exit status 0,"
-                          " got {}".format(p.returncode))
+            raise IOError("Expected gdalbuildvrt exit status 0, got {}".format(p.returncode))
 
-        vrt_img = gippy.GeoImage(vrt_filename)
-        vrt_img.SetNoData(0)
-        vrt_img.SetGain(0.0001) # 16-bit storage values / 10^4 = refl values
+        ndv, gain = 0, 0.0001
         # eg:   1        '02', which yields color_name 'BLUE'
-        for band_num, band_string in enumerate(indices_bands, 1): # starts at 0
-            vrt_img.SetBandName(colors[b_strings.index(band_string)], band_num)
+        bandnames = [colors[b_strings.index(ib)] for ib in indices_bands]
+        vrt_img = gippy.GeoImage.open(filenames=[vrt_filename], bandnames=bandnames,
+                                      nodata=ndv, gain=gain)
         self._product_images['ref-toa'] = vrt_img
         self._time_report('Finished VRT for ref-toa image')
 
@@ -1034,12 +1025,12 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         rad_image = gippy.GeoImage(reftoa_img)
 
         for i in range(len(rad_image)):
-            color = rad_image[i].Description()
+            color = rad_image[i].description()
             rf = radiance_factors[colors.index(color)]
             self._time_report(
                 'TOA radiance reversion factor for {} (band {}): {}'.format(color, i + 1, rf))
             rad_image[i] = rad_image[i] * rf
-        rad_image.SetNoData(0)
+        rad_image.set_nodata(0)
         self._product_images['rad-toa'] = rad_image
 
     def rad_geoimage(self):
@@ -1051,11 +1042,10 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         rad_image = gippy.GeoImage(rad_toa_img)
         # to check the gain & other values set on the object:
-        # print('rad_image info:', rad_image.Info()
+        # from gips.utils import vprint; vprint('rad_image info:', rad_image.Info())
 
-        # set meta to pass along to indices
-        rad_image._aod_source = str(atm6s.aod[0])
-        rad_image._aod_value  = str(atm6s.aod[1])
+        rad_image.add_meta('AOD Source', str(atm6s.aod[0]))
+        rad_image.add_meta('AOD Value',  str(atm6s.aod[1]))
 
         for c in ca._sensors[self.current_sensor()]['indices-colors']:
             (T, Lu, Ld) = atm6s.results[c] # Ld is unused for this product
@@ -1065,7 +1055,8 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             # that same gain to Lu, apparently the atmosphere's
             # inherent radiance, to get a reasonable difference.
             lu = 0.0001 * Lu
-            rad_image[c] = (rad_toa_img[c] - lu) / T
+            # see https://github.com/gipit/gippy/issues/170
+            rad_image[c] = (rad_toa_img[c] - lu).__div__(T)
         self._product_images['rad'] = rad_image
 
 
@@ -1084,26 +1075,20 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         if mode != 'toa':
             image = self.load_image('ref')
             # this faff is needed because gippy shares metadata across images behind your back
-            metadata['AOD Source'] = getattr(image, '_aod_source', image.Meta('AOD Source'))
-            metadata['AOD Value']  = getattr(image, '_aod_value',  image.Meta('AOD Value'))
+            metadata['AOD Source'] = getattr(image, '_aod_source', image.meta('AOD Source'))
+            metadata['AOD Value']  = getattr(image, '_aod_value',  image.meta('AOD Value'))
         else:
             image = self.load_image('ref-toa')
 
         # reminder - indices' values are the keys, split by hyphen, eg {ndvi-toa': ['ndvi', 'toa']}
-        gippy_input = {} # map prod types to temp output filenames for feeding to gippy
-        tempfps_to_ptypes = {} # map temp output filenames to prod types, needed for AddFile
-        for prod_type, pt_split in indices.items():
-            temp_fp = self.temp_product_filename(sensor, prod_type)
-            gippy_input[pt_split[0]] = temp_fp
-            tempfps_to_ptypes[temp_fp] = prod_type
 
-        prodout = gippy.algorithms.Indices(image, gippy_input, metadata)
-
-        for temp_fp in prodout.values():
+        for prod_and_args, split_p_and_a in indices.items():
+            temp_fp = self.temp_product_filename(sensor, prod_and_args)
+            imgout = algorithms.indices(image, [split_p_and_a[0]], temp_fp)
+            imgout.add_meta(metadata)
             archived_fp = self.archive_temp_path(temp_fp)
-            self.AddFile(sensor, tempfps_to_ptypes[temp_fp], archived_fp)
+            self.AddFile(sensor, prod_and_args, archived_fp)
 
-        self._time_report(' -> %s: processed %s' % (self.basename, indices))
 
     # this function creates a geolocation error
     #def shrunk_bbox(self, tile):
@@ -1157,16 +1142,17 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         rad_toa_image = self.load_image('rad-toa')
         sr_image = gippy.GeoImage(rad_toa_image)
         # set meta to pass along to indices
-        sr_image._aod_source = str(atm6s.aod[0])
-        sr_image._aod_value  = str(atm6s.aod[1])
+        sr_image.add_meta('AOD Source', str(atm6s.aod[0]))
+        sr_image.add_meta('AOD Value',  str(atm6s.aod[1]))
         for c in ao.sensor_spec('indices-colors'):
             (T, Lu, Ld) = atm6s.results[c]
             lu = 0.0001 * Lu # see rad_geoimage for reason for this
             TLdS = T * Ld * scaling_factor
-            sr_image[c] = (rad_toa_image[c] - lu) / TLdS
+            # see https://github.com/gipit/gippy/issues/170
+            sr_image[c] = (rad_toa_image[c] - lu) * (1.0 / TLdS)
         self._product_images['ref'] = sr_image
 
-    def fmask_geoimage(self):
+    def cfmask_geoimage(self):
         """Generate cloud mask.
 
         Uses python implementation of cfmask. Builds a VRT of all the necessary
@@ -1179,7 +1165,6 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         DEVNULL = open(os.devnull, 'w')
 
-        print("ASSET", ao.asset)
         if ao.asset == 'L1CGS':
             band_files = self._download_gcs_bands(self._temp_proc_dir)
         else:
@@ -1204,7 +1189,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
             "-a", "%s/allbands.vrt" % self._temp_proc_dir,
             "-z", "%s/angles.img" % self._temp_proc_dir,
             "-o", "%s/cloudmask.tif" % self._temp_proc_dir,
-            "--cloudprobthreshold", "5",
+            "--cloudprobthreshold", "22.5",
             "-v",
         ]
         # Temp dir for intermediaries that pyfmask generates in the current
@@ -1222,12 +1207,15 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         DEVNULL.close()
         fmask_image = gippy.GeoImage("%s/cloudmask.tif" % self._temp_proc_dir)
+        [fmask_image.add_meta(k, v) for (k, v) in (
+            ('FMASK_0', 'nodata'),       ('FMASK_1', 'valid'), ('FMASK_2', 'cloud'),
+            ('FMASK_3', 'cloud shadow'), ('FMASK_4', 'snow'),  ('FMASK_5', 'water'))]
         self._product_images['cfmask'] = fmask_image
 
 
     def cloudmask_geoimage(self):
         fmask_image = self.load_image('cfmask')
-        npfm = fmask_image.Read()
+        npfm = fmask_image.read()
         # cfmask values:
         # 0 = NoData
         # 1 = Land
@@ -1238,86 +1226,72 @@ class sentinel2Data(gips.data.core.CloudCoverData):
 
         # Set cfmask 2 and 3 to 1's, everything else to 0's
         np_cloudmask = numpy.logical_or( npfm == 2, npfm == 3).astype('uint8')
-
-        # cloudmask.tif is taken by cfmask
-        cloudmask_filename = "%s/cloudmask2.tif" % self._temp_proc_dir
-        cloudmask_img = gippy.GeoImage(
-            cloudmask_filename,
-            fmask_image,
-            gippy.GDT_Byte,
-            1
-        )
-        cloudmask_img[0].Write(np_cloudmask)
+        fp = self.temp_product_filename(self.current_sensor(), 'cloudmask')
+        cloudmask_img = gippy.GeoImage.create_from(fmask_image, fp, 1, 'uint8')
+        cloudmask_img[0].write(np_cloudmask)
+        # no way to clear existing metadata, so note the band's provenance and move on
+        cloudmask_img.add_meta('cloudmask_0', 'FMASK_2 OR FMASK_3')
         self._product_images['cloudmask'] = cloudmask_img
-
 
     def mtci_geoimage(self, mode):
         """Generate Python implementation of MTCI."""
-        # test this with eg:
-        # gips_process sentinel2 -t 16TDP -d 2017-10-01 -v5 -p mtci --overwrite
-        self._time_report('Generating MTCI')
+        prod_type = 'mtci-toa' if mode == 'toa' else 'mtci'
+        self._time_report('Generating {}'.format(prod_type))
 
         # change this to 'ref'
         ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
 
-        b4 = ref_img['RED'].Read()
-        b5 = ref_img['REDEDGE1'].Read()
-        b6 = ref_img['REDEDGE2'].Read()
+        b4 = ref_img['RED'].read()
+        b5 = ref_img['REDEDGE1'].read()
+        b6 = ref_img['REDEDGE2'].read()
 
         gain = 0.0002
         missing = -32768
 
+        # start by creating a field of ndv values
         mtci = missing + 0. * b4.copy()
+        # which pixels are valid to compute mtci?
         wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b5 - b4 != 0.)
         mtci[wg] = ((b6[wg] - b5[wg]) / (b5[wg] - b4[wg]))
         mtci[(mtci < -6.)|(mtci >= 6.)] = missing
-        mtci[mtci != missing] = mtci[mtci != missing]/gain
-        mtci = mtci.astype('int16')
 
-        mtci_filename = "%s/mtci.tif" % self._temp_proc_dir
-        mtci_img = gippy.GeoImage(mtci_filename, ref_img, gippy.GDT_Int16, 1)
-
-        mtci_img[0].Write(mtci)
-        mtci_img[0].SetGain(gain)
-        mtci_img[0].SetNoData(missing)
-
-        self._product_images[
-                'mtci-toa' if mode == 'toa' else 'mtci'] = mtci_img
+        fp = self.temp_product_filename(self.current_sensor(), prod_type)
+        mtci_img = gippy.GeoImage.create_from(ref_img, fp, 1, 'int16')
+        mtci_img.set_gain(gain)
+        mtci_img.set_nodata(missing)
+        mtci_img[0].write(mtci)
+        self._product_images[prod_type] = mtci_img
 
     def s2rep_geoimage(self, mode):
-        """Generate Python implementation of S2REP."""
+        """s2rep generates Sentinel-2 Red Edge Position."""
+        prod_type = 's2rep-toa' if mode == 'toa' else 's2rep'
         self._time_report('Generating S2REP')
 
         # change this to 'ref'
         ref_img = self.load_image('ref-toa' if mode == 'toa' else 'ref')
 
-        b4 = ref_img['RED'].Read()
-        b5 = ref_img['REDEDGE1'].Read()
-        b6 = ref_img['REDEDGE2'].Read()
-        b7 = ref_img['REDEDGE3'].Read()
+        b4 = ref_img['RED'].read()
+        b5 = ref_img['REDEDGE1'].read()
+        b6 = ref_img['REDEDGE2'].read()
+        b7 = ref_img['REDEDGE3'].read()
 
         gain = 0.04
         offset = 400.
         missing = -32768
 
         s2rep = missing + 0. * b4.copy()
-        wg = (b4 > 0.)&(b4 <= 1.)&(b5 > 0.)&(b5 <= 1.)&(b6 > 0.)&(b6 <= 1.)&(b7 > 0.)&(b7 <= 1.)&(b6 - b5 != 0.)
-        s2rep[wg] = 705. + 35. * ((((b7[wg] + b4[wg])/2.) - b5[wg])/(b6[wg] - b5[wg]))
-
+        wg = ((b4 > 0.) & (b4 <= 1.) & (b5 > 0.) & (b5 <= 1.)
+            & (b6 > 0.) & (b6 <= 1.) & (b7 > 0.) & (b7 <= 1.) & (b6 - b5 != 0.))
+        s2rep[wg] = 705. + 35. * ((((b7[wg] + b4[wg]) / 2.) - b5[wg]) / (b6[wg] - b5[wg]))
         s2rep[(s2rep < 400.)|(s2rep >= 1100.)] = missing
-        s2rep[s2rep != missing] = (s2rep[s2rep != missing] - offset)/gain
-        s2rep = s2rep.astype('int16')
 
-        s2rep_filename = "%s/s2rep.tif" % self._temp_proc_dir
-        s2rep_img = gippy.GeoImage(s2rep_filename, ref_img, gippy.GDT_Int16, 1)
-
-        s2rep_img[0].Write(s2rep)
-        s2rep_img[0].SetGain(gain)
-        s2rep_img[0].SetOffset(offset)
-        s2rep_img[0].SetNoData(missing)
-
-        self._product_images[
-                's2rep-toa' if mode == 'toa' else 's2rep'] = s2rep_img
+        fp = self.temp_product_filename(self.current_sensor(), prod_type)
+        s2rep_img = gippy.GeoImage.create_from(ref_img, fp, 1, 'int16')
+        s2rep_img[0].set_gain(gain)
+        s2rep_img[0].set_offset(offset)
+        s2rep_img[0].set_nodata(missing)
+        s2rep_img[0].write(s2rep)
+        self._product_images[prod_type] = s2rep_img
 
     @Data.proc_temp_dir_manager
     def process(self, products=None, overwrite=False, **kwargs):
@@ -1355,7 +1329,7 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         if 'ref' in work:
             self.ref_geoimage()
         if 'cfmask' in work:
-            self.fmask_geoimage()
+            self.cfmask_geoimage()
         if 'cloudmask' in work:
             self.cloudmask_geoimage()
         if 'mtci-toa' in work:
@@ -1372,46 +1346,18 @@ class sentinel2Data(gips.data.core.CloudCoverData):
         sensor = self.current_sensor()
         # Process standard products
         for prod_type in products.groups()['Standard']:
-            err_msg = 'Error creating product {} for {}'.format(
-                    prod_type, a_obj.basename)
+            err_msg = 'Error creating product {} for {}'.format(prod_type, a_obj.basename)
             with utils.error_handler(err_msg, continuable=True):
                 self._time_report('Starting {} processing'.format(prod_type))
-                temp_fp = self.temp_product_filename(sensor, prod_type)
-                # have to reproduce the whole object because gippy refuses to write metadata when
-                # you do image.Process(filename).
-                source_image = self._product_images[prod_type]
-                output_image = gippy.GeoImage(temp_fp, source_image)
-                output_image.SetNoData(0)
-                output_image.SetMeta(self.prep_meta())
-                if prod_type in ('ref', 'rad'): # atmo-correction metadata
-                    output_image.SetMeta('AOD Source', source_image._aod_source)
-                    output_image.SetMeta('AOD Value',  source_image._aod_value)
-                if prod_type in ('ref-toa', 'rad-toa', 'rad', 'ref'):
-                    output_image.SetGain(0.0001)
-                if prod_type == 'cfmask':
-                    output_image.SetMeta('FMASK_0', 'nodata')
-                    output_image.SetMeta('FMASK_1', 'valid')
-                    output_image.SetMeta('FMASK_2', 'cloud')
-                    output_image.SetMeta('FMASK_3', 'cloud shadow')
-                    output_image.SetMeta('FMASK_4', 'snow')
-                    output_image.SetMeta('FMASK_5', 'water')
-                if prod_type == 'mtci':
-                    output_image.SetGain(0.0002)
-                    output_image.SetNoData(-32768)
-                if prod_type == 's2rep':
-                    output_image.SetGain(0.04)
-                    output_image.SetOffset(400.0)
-                    output_image.SetNoData(-32768)
-                for b_num, b_name in enumerate(source_image.BandNames(), 1):
-                    output_image.SetBandName(b_name, b_num)
-                # process bandwise because gippy had an error doing it all at once
-                for i in range(len(source_image)):
-                    source_image[i].Process(output_image[i])
-                archive_fp = self.archive_temp_path(temp_fp)
+                image = self._product_images[prod_type]
+                image.add_meta(self.prep_meta())
+                fp = self.temp_product_filename(self.current_sensor(), prod_type)
+                image.save(filename=fp)
+                archive_fp = self.archive_temp_path(fp)
                 self.AddFile(sensor, prod_type, archive_fp)
-
             self._time_report('Finished {} processing'.format(prod_type))
-            (source_image, output_image) = (None, None) # gc hint due to C++/swig weirdness
+            # not known if this is necessary in gippy 1.0, bit it's harmless to leave in
+            image = None # gc hint due to C++/swig weirdness
         self._time_report('Completed standard product processing')
 
         # process indices in two groups:  toa and surf

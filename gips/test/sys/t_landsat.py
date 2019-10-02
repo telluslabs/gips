@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 from .util import *
 
 pytestmark = sys  # skip everything unless --sys

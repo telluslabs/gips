@@ -32,8 +32,10 @@ import zipfile
 import json
 import traceback
 import ftplib
-import urllib2
-from cookielib import CookieJar
+import shutil
+import subprocess
+import urllib
+from http.cookiejar import CookieJar
 import argparse
 
 # from functools import lru_cache <-- python 3.2+ can do this instead
@@ -86,7 +88,7 @@ def add_gippy_index_products(p_dict, p_groups, a_types):
 
 def _gs_stop_trying(exc):
     """Should backoff keep retrying based on this HTTPError?
-    
+
     For searching using backoff per GCP docs:
     Clients should use truncated exponential backoff for all requests
     to Cloud Storage that return HTTP 5xx and 429 response codes,
@@ -266,10 +268,8 @@ class Repository(object):
             return dbinv.list_dates(cls.name.lower(), tile)
         tdir = cls.data_path(tile=tile)
         if os.path.exists(tdir):
-            return sorted([
-                datetime.strptime(os.path.basename(d), cls._datedir).date()
-                for d in os.listdir(tdir)
-            ])
+            return sorted([datetime.strptime(os.path.basename(d), cls._datedir).date()
+                           for d in os.listdir(tdir)])
         else:
             return []
 
@@ -300,6 +300,8 @@ class Repository(object):
         cls.default_settings, a dict of such things.  If still not found,
         resorts to magic for 'driver' and 'tiles', ValueError otherwise.
         """
+        import importlib
+
         dataclass = cls.__name__[:-10] # name of a class, not the class object
         r = settings().REPOS[dataclass]
         if key in r:
@@ -308,7 +310,7 @@ class Repository(object):
             return cls.default_settings[key]
 
         # not in settings file nor default, so resort to magic
-        exec('import gips.data.%s as clsname' % dataclass)
+        clsname = importlib.import_module('gips.data.%s' % dataclass)
         driverpath = os.path.dirname(clsname.__file__)
         if key == 'driver':
             return driverpath
@@ -318,45 +320,63 @@ class Repository(object):
                          " {} driver".format(key, cls.name))
 
     @classmethod
+    def find_pattern_in_url(cls, url, pattern, verbosity=1, debuglevel=0):
+        """Returns the first match for the pattern from the url, else None.
+
+        Excludes lines that match 'xml'.  Relies on managed_request.
+        """
+        cp = re.compile(pattern)
+        resp = cls.managed_request(url, verbosity, debuglevel)
+        if resp is None:
+            return None
+        # inspect the page and extract the first match
+        for line in resp:
+            l = line.decode()
+            match_obj = cp.search(l)
+            if 'xml' not in l and match_obj is not None:
+                return match_obj.group(0)
+        return None
+
+    @classmethod
     def managed_request(cls, url, verbosity=1, debuglevel=0):
         """Visit the given http URL and return the response.
 
         Uses auth settings and cls._manager_url, and also follows custom
         weird redirects (specific to Earthdata servers seemingly).
-        Returns urllib2.urlopen(...), or None if errors are encountered.
+        Returns urllib.urlopen(...), or None if errors are encountered.
         debuglevel is ultimately passed in to httplib; if >0, http info,
         such as headers, will be printed on standard out.
         """
         username = cls.get_setting('username')
         password = cls.get_setting('password')
         manager_url = cls._manager_url
-        password_manager = urllib2.HTTPPasswordMgrWithDefaultRealm()
+        password_manager = urllib.request.HTTPPasswordMgrWithDefaultRealm()
         password_manager.add_password(
             None, manager_url, username, password)
         cookie_jar = CookieJar()
-        opener = urllib2.build_opener(
-            urllib2.HTTPBasicAuthHandler(password_manager),
-            urllib2.HTTPHandler(debuglevel=debuglevel),
-            urllib2.HTTPSHandler(debuglevel=debuglevel),
-            urllib2.HTTPCookieProcessor(cookie_jar))
-        urllib2.install_opener(opener)
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPBasicAuthHandler(password_manager),
+            urllib.request.HTTPHandler(debuglevel=debuglevel),
+            urllib.request.HTTPSHandler(debuglevel=debuglevel),
+            urllib.request.HTTPCookieProcessor(cookie_jar))
+        urllib.request.install_opener(opener)
         try: # try instead of error handler because the exceptions have funny values to unpack
-            request = urllib2.Request(url)
-            response = urllib2.urlopen(request)
+            request = urllib.request.Request(url)
+            response = urllib.request.urlopen(request)
             redirect_url = response.geturl()
             # some data centers do it differently
             if "redirect" in redirect_url: # TODO is this the right way to detect redirects?
                 utils.verbose_out('Redirected to ' + redirect_url, 3)
                 redirect_url += "&app_type=401"
-                request = urllib2.Request(redirect_url)
-                response = urllib2.urlopen(request)
+                request = urllib.Request(redirect_url)
+                response = urllib.urlopen(request)
             return response
-        except urllib2.HTTPError as e:
-            utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
+        except urllib.error.URLError as e:
+            utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
                               verbosity, sys.stderr)
             return None
-        except urllib2.URLError as e:
-            utils.verbose_out('{} gave bad response: {}'.format(url, e.reason),
+        except urllib.error.HTTPError as e:
+            utils.verbose_out('{} gave bad response: {} {}'.format(url, e.code, e.reason),
                               verbosity, sys.stderr)
             return None
 
@@ -373,19 +393,20 @@ class Repository(object):
 
         # open tiles vector
         v = open_vector(cls.get_setting('tiles'))
-        shp = ogr.Open(v.Filename())
-        if v.LayerName() == '':
+        shp = ogr.Open(v.filename())
+        if v.layer_name() == '':
             layer = shp.GetLayer(0)
         else:
-            layer = shp.GetLayer(v.LayerName())
+            layer = shp.GetLayer(v.layer_name())
 
         # create and warp site geometry
-        ogrgeom = ogr.CreateGeometryFromWkt(vector.WKT())
-        srs = osr.SpatialReference(vector.Projection())
+        ogrgeom = ogr.CreateGeometryFromWkt(vector.wkt_geometry())
+        srs = osr.SpatialReference(vector.srs())
         trans = osr.CoordinateTransformation(srs, layer.GetSpatialRef())
         ogrgeom.Transform(trans)
         # convert to shapely
         geom = loads(ogrgeom.ExportToWkt())
+        geom = geom if geom.is_valid else geom.buffer(0)  # bugfix: attempt to fix topology errors
 
         # find overlapping tiles
         tiles = {}
@@ -504,10 +525,14 @@ class Asset(object):
         except:
             tile_num = self.tile
 
-        v =  utils.open_vector(
-            self.get_setting("tiles"),
-            key=self.Repository._tile_attribute
-        )
+        ### py3 + gippy 1.0 branch version
+        # v = gippy.GeoVector(self.get_setting("tiles"))
+        # v.set_primary_key(self.Repository._tile_attribute)
+        # If a GeoVector is indexed with an int, it queries using FID field.
+        # feat = v[str(tile_num)]
+        # return feat.WKT()
+        ### dev version:
+        v =  utils.open_vector(self.get_setting("tiles"), key=self.Repository._tile_attribute)
         return v[str(tile_num)]
 
     def get_geometry(self):
@@ -550,11 +575,9 @@ class Asset(object):
     def datafiles(self):
         """Get list of readable datafiles from asset.
 
-        A 'datafile' in this context is a file contained within the
-        asset file, such as for tar, zip, and hdf files.
-
-        In the case of JSON files, the files pointed to are considered 'within'
-        the JSON asset."""
+        A 'datafile' is a file contained within the asset file, or else pointed
+        to by it.
+        """
         path = os.path.dirname(self.filename)
         indexfile = os.path.join(path, self.filename + '.index')
         if os.path.exists(indexfile):
@@ -575,8 +598,7 @@ class Asset(object):
                 else: # else take strings and lists of strings at the top level
                     raw_df = sum([v if type(v) is list else [v]
                                   for v in content.values()], [])
-                datafiles = tuple(v.encode('ascii', 'ignore')
-                                  for v in raw_df if isinstance(v, basestring))
+                datafiles = tuple(v for v in raw_df if isinstance(v, str))
             else: # Try subdatasets
                 fh = gdal.Open(self.filename)
                 datafiles = [s[0] for s in fh.GetSubDatasets()]
@@ -630,7 +652,7 @@ class Asset(object):
                 tmp_fname = os.path.join(tmp_dn, f)
                 # this ensures we have permissions on extracted files
                 if not os.path.isdir(tmp_fname):
-                    os.chmod(tmp_fname, 0664)
+                    os.chmod(tmp_fname, 0o664)
                 extracted_fnames.append((tmp_fname, final_fname))
             if extracted_fnames:
                 utils.verbose_out("Moving files from {} to {}".format(tmp_dn, path), 3)
@@ -918,7 +940,7 @@ class Asset(object):
         overwritten_ao = None
         try:
             asset = cls(filename)
-        except Exception, e:
+        except Exception as e:
             cls._quarantine_file(filename, e)
             return (None, 0, None)
 
@@ -1098,49 +1120,6 @@ class Data(object):
         """ Process composite products using provided inventory """
         pass
 
-    def copy(self, dout, products, site=None, res=None, interpolation=0, crop=False,
-             overwrite=False, tree=False):
-        """ Copy products to new directory, warp to projection if given site.
-
-        Arguments
-        =========
-        dout:       output or destination directory; mkdir(dout) is done if needed.
-        products:   which products to copy (passed to self.RequestedProducts())
-
-
-        """
-        # TODO - allow hard and soft linking options
-        if res is None:
-            res = self.Asset._defaultresolution
-            #VerboseOut('Using default resolution of %s x %s' % (res[0], res[1]))
-        dout = os.path.join(dout, self.id)
-        if tree:
-            dout = os.path.join(dout, self.date.strftime('%Y%j'))
-        mkdir(dout)
-        products = self.RequestedProducts(products)
-        bname = '%s_%s' % (self.id, self.date.strftime('%Y%j'))
-        for p in products.requested:
-            if p not in self.sensors:
-                # this product is not available for this day
-                continue
-            sensor = self.sensors[p]
-            fin = self.filenames[(sensor, p)]
-            fout = os.path.join(dout, "%s_%s_%s.tif" % (bname, sensor, p))
-            if not os.path.exists(fout) or overwrite:
-                with utils.error_handler('Problem creating ' + fout, continuable=True):
-                    if site is not None:
-                        # warp just this tile
-                        resampler = ['near', 'bilinear', 'cubic']
-                        cmd = 'gdalwarp %s %s -t_srs "%s" -tr %s %s -r %s' % \
-                               (fin, fout, site.Projection(), res[0], res[1], resampler[interpolation])
-                        print cmd
-                        #result = commands.getstatusoutput(cmd)
-                    else:
-                        gippy.GeoImage(fin).Process(fout)
-                        #shutil.copyfile(fin, fout)
-        procstr = 'copied' if site is None else 'warped'
-        VerboseOut('%s tile %s: %s files %s' % (self.date, self.id, len(products.requested), procstr))
-
     @classmethod
     def natural_percentage(cls, raw_value):
         """Callable used for argparse, defines a new type for %0.0 to %100.0.
@@ -1179,9 +1158,10 @@ class Data(object):
         defaulted to None, self.assets' filenames is used instead.
         """
         sa = src_afns
+
         if src_afns is None:
             sa = [ao.filename for ao in self.assets.values()]
-        elif isinstance(src_afns, basestring):
+        elif isinstance(src_afns, str):
             sa = [src_afns]
         md = {
             'GIPS_Version': __version__,
@@ -1195,7 +1175,7 @@ class Data(object):
         return md
 
     def prep_meta(self, src_afns, additional=None):
-        """Prepare product metadata for consumption by GeoImage.SetMeta()."""
+        """Prepare product metadata for consumption by GeoImage.add_meta()."""
         return utils.stringify_meta_dict(self.meta_dict(src_afns, additional))
 
     def find_files(self):
@@ -1206,10 +1186,9 @@ class Data(object):
         """
         filenames = glob.glob(os.path.join(self.path, self._pattern))
         assetnames = [a.filename for a in self.assets.values()]
-        badexts = ['.index', '.xml']
-        test = lambda x: x not in assetnames and os.path.splitext(f)[1] not in badexts
-        filenames[:] = [f for f in filenames if test(f)]
-        return filenames
+        validated_filenames = [fn for fn in filenames
+                if fn not in assetnames and os.path.splitext(fn)[1] not in ('.index', '.xml')]
+        return validated_filenames
 
 
     @classmethod
@@ -1358,7 +1337,9 @@ class Data(object):
             dbinv.update_or_add_product(driver=self.name.lower(), product=product, sensor=sensor,
                                         tile=self.id, date=self.date, name=filename)
 
+    # TODO never called if open_assets is never called
     def asset_filenames(self, product):
+        """For the given product type, list assset filenames in the inventory."""
         assets = self._products[product]['assets']
         filenames = []
         for asset in assets:
@@ -1381,6 +1362,7 @@ class Data(object):
         return img
 
 
+    # TODO never called
     def open_assets(self, product):
         """ Open and return a GeoImage of the assets """
         return gippy.GeoImage(self.asset_filenames(product))
@@ -1389,7 +1371,7 @@ class Data(object):
     def masks(self, patterns=None):
         """ List all products that are masks """
         if patterns is None:
-            patterns = ['acca', 'fmask', 'mask']
+            patterns = ['fmask', 'mask']
         m = []
         for p in self.products:
             if any(pattern in p for pattern in patterns):
@@ -1411,7 +1393,7 @@ class Data(object):
         for a in sorted(cls.Asset._assets.keys()):
             header = header + ('{:^10}'.format(a if a != '' else 'Coverage'))
         header = header + '{:^10}'.format('Product') + Colors.OFF
-        print header
+        print(header)
 
     def pprint(self, dformat='%j', colors=None):
         """ Print product inventory for this date """
@@ -1589,7 +1571,7 @@ class Data(object):
 
     @classmethod
     def print_products(cls):
-        print Colors.BOLD + "\n%s Products v%s" % (cls.name, cls.version) + Colors.OFF
+        print(Colors.BOLD + "\n%s Products v%s" % (cls.name, cls.version) + Colors.OFF)
         groups = cls.product_groups()
         opts = False
         txt = ""
@@ -1605,8 +1587,8 @@ class Data(object):
                     for a in args:
                         txt = txt + '{:>12}     {:<40}\n'.format(a[0], a[1])
         if opts:
-            print "  Optional qualifiers listed below each product."
-            print "  Specify by appending '-option' to product (e.g., ref-toa)"
+            print("  Optional qualifiers listed below each product.")
+            print("  Specify by appending '-option' to product (e.g., ref-toa)")
         sys.stdout.write(txt)
 
     def make_temp_proc_dir(self):

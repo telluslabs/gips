@@ -1,4 +1,3 @@
-from __future__ import print_function
 
 import datetime
 import ftplib
@@ -10,7 +9,7 @@ import glob
 import pytest
 import sh
 
-import util
+from . import util
 
 nh_shp = util.NH_SHP_PATH
 
@@ -23,7 +22,9 @@ STD_ARGS = {
     'landsat': ('landsat', '-s', nh_shp, '-d', '2017-08-01', '-v4'),
     # Here down, not NH shapefile:
     'aod': ('aod', '-s', util.NE_SHP_PATH, '-d', '2017-004', '-v4'),
-    'sentinel2': ('sentinel2', '-s', util.DURHAM_SHP_PATH, '-d2017-183', '-v4'),
+    # --overwrite prevents re-use of extant product files to help stabilize
+    # test outcomes; see https://gitlab.com/appliedgeosolutions/gips/issues/522
+    'sentinel2': ('sentinel2', '-s', util.DURHAM_SHP_PATH, '-d2017-183', '-v4', '--overwrite'),
     'sar': ('sar', '-t', 'N07E099', 'N19E100', 'N00E099', '-d2009,2015', '-v4'),
     'daymet' : ('daymet', '-d', '1993-1-18', '-s', util.DURHAM_SHP_PATH),
     'hls': tuple(('hls -v4 -d2016-156 -s ' + util.DURHAM_SHP_PATH).split()),

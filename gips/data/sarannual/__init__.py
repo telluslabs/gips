@@ -1,1 +1,1 @@
-from sarannual import sarannualRepository, sarannualAsset, sarannualData
+from .sarannual import sarannualRepository, sarannualAsset, sarannualData

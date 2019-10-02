@@ -1,6 +1,7 @@
 import sys
 
 import pytest
+import importlib # yo dawg
 
 import gips.utils
 from gips.inventory.orm import settings
@@ -19,12 +20,13 @@ def override_settings(mocker):
     saved_settings = sys.modules['gips.utils'].settings # for restoration after test
     sys.modules['gips.utils'].settings = s_mock
     # do the test run; have to reload to exercise the module code again after installing the mock
-    reload(settings)
-    yield s_mock
-    # we twiddled a global object so clean that up
-    sys.modules['gips.utils'].settings = saved_settings # restore normal settings function
-    reload(settings) # load correct values
-    del settings.CUSTOM_SETTING # delete test value
+    importlib.reload(settings)
+    try:
+        yield s_mock
+    finally:
+        # we twiddled a global object so clean that up
+        sys.modules['gips.utils'].settings = saved_settings # restore normal settings function
+        importlib.reload(settings) # load correct values
 
 
 def t_inventory_settings_melding(override_settings):

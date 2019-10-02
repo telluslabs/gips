@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import os
 import shutil
 import re
@@ -8,8 +6,7 @@ import hashlib
 import pprint
 
 import pytest
-import scripttest
-import envoy # deprecated
+import _pytest.mark.structures
 import sh
 
 from gips.inventory import orm # believed to be safe even though it's the code under test
@@ -135,16 +132,6 @@ class GipsProcResult(object):
         return all(matches)
 
 
-def rectify(driver):
-    """Ensure inv DB matches files on disk."""
-    if not orm.use_orm():
-        return
-    rectify_cmd = 'gips_inventory {} --rectify'.format(driver)
-    outcome = envoy.run(rectify_cmd)
-    if outcome.status_code != 0:
-        raise RuntimeError("failed: " + rectify_cmd,
-                           outcome.std_out, outcome.std_err, outcome)
-
 def find_files(path):
     """Finds all non-directory files under the given path.
 
@@ -187,7 +174,7 @@ def generate_expectation(filename, base_path, e_type=None):
 
     # symlinks
     if e_type == 'symlink':
-        #                  have to rmeove this non-generic bit
+        #                  have to remove this non-generic bit
         #                     vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
         # HDF4_EOS:EOS_GRID:"/home/tolson/src/gips/data-root/modis/tiles/h12v04/2012337
         #   /MCD43A2.A2012337.h12v04.006.2016112013509.hdf":MOD_Grid_BRDF:Snow_BRDF_Albedo
@@ -243,7 +230,7 @@ def generate_gdalinfo_stats_expectation(filename):
     # The output includes unpredictable file paths, so filter them out:
     lines = []
     in_files_block = False
-    for l in outcome.stdout.splitlines():
+    for l in outcome.stdout.decode().splitlines():
         # first detect whether we're in a 'Files:' block
         in_files_block = (l.startswith('Files: ')
                           or (in_files_block and l.startswith(' ')))
@@ -267,7 +254,7 @@ def params_from_expectations(expectations, mark_spec=None):
 
     def get_mark_spec(i):
         msi = mark_spec.get(i, [])
-        is_mark = isinstance(msi, pytest.mark.MarkDecorator.__class__)
+        is_mark = isinstance(msi, _pytest.mark.structures.MarkDecorator)
         return [msi] if is_mark else list(msi) # handle case of multiple marks
 
     for driver, prod_expectations in expectations.items():
@@ -315,7 +302,7 @@ def sys_test_wrapper(request, path):
         if rp:
             initial_files.extend(find_files(path))
         # TODO can't pdb within a system test's subprocess; think settinng _in
-        # might help, but `_in=sys.stdin` doesn't work:
+        # might help, but neither `_in=sys.stdin` nor `_in='/dev/stdin'` works
         outcome = sh.Command(cmd_string)(
             *args, _err='/dev/stderr', _out='/dev/stdout')
         return outcome, [generate_expectation(e[0], path, e[1])
@@ -396,4 +383,4 @@ def expected(request):
     expected.modis.t_process.
     """
     module = load_expectation_module(request.module.__name__)
-    return GipsProcResult(**getattr(module, request.function.func_name))
+    return GipsProcResult(**getattr(module, request.function.__name__))

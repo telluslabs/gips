@@ -51,7 +51,7 @@ class RequestedProducts(object):
 
     @property
     def products(self):
-        """ Return list of requested products (e.g., ndvi-toa lswi-TEST acca-5 """
+        """ Return list of requested products (e.g. ndvi-toa, lswi-TEST)"""
         return sorted(self.requested.keys())
 
     @property
@@ -114,7 +114,10 @@ class SpatialExtent(object):
             # both be passed from elsewhere. for now, preferentially
             # use rastermask if provided.
             if rastermask is not None:
-                vectorfile = os.path.join(os.path.dirname(rastermask), os.path.basename(rastermask)[:-4] + '.shp')
+                # vectorize the raster mask into some shapes, then make a SpatialExtent for each one
+                # TODO [:-4] is a poor assumption:
+                vectorfile = os.path.join(os.path.dirname(rastermask),
+                                          os.path.basename(rastermask)[:-4] + '.shp')
                 features = open_vector(utils.vectorize(rastermask, vectorfile), where='DN=1')
                 for f in features:
                     extents.append(cls(dataclass, feature=f, rastermask=rastermask,
@@ -122,7 +125,7 @@ class SpatialExtent(object):
             else:
                 features = open_vector(site, key, where)
                 for f in features:
-                    extents.append(cls(dataclass, feature=f, rastermask=rastermask,
+                    extents.append(cls(dataclass, feature=f, rastermask=None,
                                        tiles=tiles, pcov=pcov, ptile=ptile))
         return extents
 
@@ -137,8 +140,8 @@ class SpatialExtent(object):
 
         if feature is not None:
             tiles = self.repo.vector2tiles(feature, pcov, ptile, tiles)
-            self.feature = (feature.Filename(), feature.LayerName(), feature.FID())
-            self.sitename = feature.Basename()
+            self.feature = (feature.filename(), feature.layer_name(), feature.fid())
+            self.sitename = feature.basename()
         else:
             tiles = {t: (1, 1) for t in tiles}
             self.sitename = 'tiles'
@@ -160,10 +163,10 @@ class SpatialExtent(object):
     def print_tile_coverage(self):
         """ Print tile coverage info """
         if self.site is not None:
-            print Colors.BOLD + '\nTile Coverage'
-            print Colors.UNDER + '{:^8}{:>14}{:>14}'.format('Tile', '% Coverage', '% Tile Used') + Colors.OFF
+            print(Colors.BOLD + '\nTile Coverage')
+            print(Colors.UNDER + '{:^8}{:>14}{:>14}'.format('Tile', '% Coverage', '% Tile Used') + Colors.OFF)
             for t in sorted(self.coverage):
-                print "{:>8}{:>11.1f}%{:>11.1f}%".format(t, self.coverage[t][0] * 100, self.coverage[t][1] * 100)
+                print("{:>8}{:>11.1f}%{:>11.1f}%".format(t, self.coverage[t][0] * 100, self.coverage[t][1] * 100))
 
     def __str__(self):
         """ String representation of spatial extent """

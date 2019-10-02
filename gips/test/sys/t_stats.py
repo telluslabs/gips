@@ -1,17 +1,17 @@
-from __future__ import print_function
-
 import pytest
 import sh
 
-import util
-from util import export_wrapper
-import driver_setup
+from . import util
+from .util import export_wrapper
+from . import driver_setup
 
 pytestmark = util.sys # skip everything unless --sys
 
 # 'driver': {'product': [ (path, type, data...),...]...}
-from expected.std_stats import expectations, mark_spec
+from .expected.std_stats import expectations, mark_spec
 
+# see https://gitlab.com/appliedgeosolutions/gips/issues/651
+@pytest.mark.xfail(run=False, reason="gippy 1.0 has a problem related to bounding boxes")
 @pytest.mark.parametrize("driver, product",
                          util.params_from_expectations(expectations, mark_spec))
 def t_stats(export_wrapper, driver, product):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-from __future__ import print_function
+"""Driver script for acolite docker image builds.  Calls acolite.docker."""
 
 import sys
 import os

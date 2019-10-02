@@ -28,8 +28,8 @@ import traceback
 import collections
 
 import gippy
-from gippy.algorithms import CookieCutter
-from gips.utils import VerboseOut, Colors, mosaic, gridded_mosaic, mkdir
+from gippy.algorithms import cookie_cutter
+from gips.utils import VerboseOut, Colors, mkdir
 from gips import utils
 
 
@@ -71,7 +71,7 @@ class Tiles(object):
 
     def process(self, *args, **kwargs):
         """ Calls process for each tile """
-        [t.process(*args, products=self.products.products, **kwargs) for t in self.tiles.values()]
+        [t.process(*args, products=self.products.products, **kwargs) for t in list(self.tiles.values())]
 
     def mosaic(self, datadir, res=None, interpolation=0, crop=False,
                overwrite=False, alltouch=False):
@@ -96,26 +96,31 @@ class Tiles(object):
             if not os.path.exists(final_fp) or overwrite:
                 err_msg = ("Error mosaicking " + final_fp + ". Did you forget"
                            " to specify a resolution (`--res x x`)?")
-                with utils.error_handler(err_msg, continuable=True), \
-                        utils.make_temp_dir(dir=datadir,
-                                            prefix='mosaic') as tmp_dir:
-                    tmp_fp = os.path.join(tmp_dir, fn) # for safety
-                    filenames = [self.tiles[t].filenames[(sensor, product)]
-                                 for t in self.tiles
-                                 if (sensor, product) in self.tiles[t].filenames
-                    ]
-                    images = gippy.GeoImages(filenames)
-                    if self.spatial.rastermask is not None:
-                        gridded_mosaic(images, tmp_fp,
-                                       self.spatial.rastermask, interpolation)
-                    elif self.spatial.site is not None and res is not None:
-                        CookieCutter(
-                            images, self.spatial.site, tmp_fp, res[0], res[1],
-                            crop, interpolation, {}, alltouch,
-                        )
-                    else:
-                        mosaic(images, tmp_fp, self.spatial.site)
-                    os.rename(tmp_fp, final_fp)
+
+                with utils.error_handler(err_msg, continuable=True):
+
+                    with utils.make_temp_dir(dir=datadir, prefix='mosaic') as tmp_dir:
+
+                        tmp_fp = os.path.join(tmp_dir, fn) # for safety
+
+                        filenames = [self.tiles[t].filenames[(sensor, product)]
+                                     for t in self.tiles
+                                     if (sensor, product) in self.tiles[t].filenames
+                        ]
+
+                        images = [gippy.GeoImage(f) for f in filenames]
+
+                        if self.spatial.rastermask is not None:
+                            utils.gridded_mosaic(images, tmp_fp, self.spatial.rastermask,
+                                                 interpolation)
+                        elif res is not None:
+                            cookie_cutter(
+                                images, tmp_fp, self.spatial.site, crop,
+                                "", res[0], res[1], interpolation,
+                            )
+                        else:
+                            utils.mosaic(images, tmp_fp, self.spatial.site)
+                        os.rename(tmp_fp, final_fp)
         t = datetime.now() - start
         VerboseOut('%s: created project files for %s tiles in %s' % (self.date, len(self.tiles), t), 2)
 
@@ -148,7 +153,6 @@ class Tiles(object):
             coverage[p] = cov * 100
         return coverage
 
-    # TODO - remove this nonsense
     def pprint_asset_header(self):
         """ Print asset header """
         self.dataclass.pprint_asset_header()
@@ -184,7 +188,7 @@ class Tiles(object):
         # print product types, colored by sensor, but only if there's a product
         # in each of the tiles
         s_pt = collections.defaultdict(list)
-        for s, pt in self.tiles.values()[0].filenames:
+        for s, pt in list(self.tiles.values())[0].filenames:
             if all((s, pt) in d.filenames for d in self.tiles.values()):
                 s_pt[s].append(pt)
         for s in sorted(s_pt):

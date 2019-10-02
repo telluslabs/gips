@@ -88,6 +88,7 @@ class aodAsset(Asset):
         'MOD08': {
             'pattern': r'^MOD08_D3.+?hdf$',
             'startdate': datetime.date(2000, 2, 18),
+            'path': '/allData/6/MOD08_D3',
             'latency': 7,
             'url': 'https://ladsweb.modaps.eosdis.nasa.gov/'
                    'archive/allData/61/MOD08_D3/',
@@ -156,6 +157,7 @@ class aodAsset(Asset):
             return filename, url_head + '/' + filename
         return None, None
 
+
     @classmethod
     def fetch(cls, asset, tile, date):
         """Fetch the AOD asset matching the ATD."""
@@ -171,19 +173,11 @@ class aodAsset(Asset):
                 url, tmp_fp), 5)
             resp = requests.get(url, stream=True)
             resp.raise_for_status()
-            with open(tmp_fp, 'w') as tmp_fo:
+            with open(tmp_fp, 'wb') as tmp_fo:
                 for chunk in resp.iter_content(chunk_size=(1024**2)):
                     tmp_fo.write(chunk)
             os.rename(tmp_fp, stage_fp)
         return [stage_fp]
-
-    #@classmethod
-    #def archive(cls, path='.', recursive=False, keep=False):
-        #assets = super(aodAsset, cls).archive(path, recursive, keep)
-        # this creates new LTA files every archiving
-        #dates = [a.date for a in assets]
-        #for date in set(dates):
-        #    aodData.process_aerolta_daily(date.strftime('%j'))
 
 
 class aodData(Data):
@@ -238,8 +232,8 @@ class aodData(Data):
             utils.verbose_out('lta composites already initialized', 2)
             return
         a = inv[inv.dates[0]].tiles[cls.Asset.Repository._the_tile].open('aod')
-        a[0] = a[0] * 0 + a[0].NoDataValue()
-        a.Process(ltatif)
+        a[0] = a[0] * 0 + a[0].nodata()
+        a.save(ltatif)
 
 
     @classmethod
@@ -282,12 +276,12 @@ class aodData(Data):
         start = datetime.datetime.now()
         if len(filenames) > 0:
             img = gippy.GeoImage(filenames)
-            imgout = gippy.GeoImage(fout, img, gippy.GDT_Float32, 2)
-            imgout.SetNoData(-32768)
-            img.Mean(imgout[0])
-            meanimg = imgout[0].Read()
-            for band in range(0, img.NumBands()):
-                data = img[band].Read()
+            imgout = gippy.GeoImage.create_from(img, fout, 2, 'float32')
+            imgout.set_nodata(-32768)
+            img.mean(imgout[0])
+            meanimg = imgout[0].read()
+            for band in range(0, len(img)):
+                data = img[band].read()
                 mask = img[band].DataMask()
                 var = numpy.multiply(numpy.power(data - meanimg, 2), mask)
                 if band == 0:
@@ -300,7 +294,7 @@ class aodData(Data):
             totalvar[inds] = -32768
             inds = numpy.where(counts != 0)
             totalvar[inds] = numpy.divide(totalvar[inds], counts[inds])
-            imgout[1].Write(totalvar)
+            imgout[1].write(totalvar)
             t = datetime.datetime.now() - start
             utils.verbose_out(
                 '%s: mean/var for %s files processed in %s' %
@@ -313,12 +307,15 @@ class aodData(Data):
     @classmethod
     def _read_point(cls, filename, roi, nodata):
         """ Read single point from mean/var file and return if valid, or mean/var of 3x3 neighborhood """
+        # hacky unpack the region of interest
+        x0, y0, x1, y1 = roi
+
         if not os.path.exists(filename):
             return (numpy.nan, numpy.nan)
         with utils.error_handler('Unable to read point from {}'.format(filename), continuable=True):
             img = gippy.GeoImage(filename)
-            vals = img[0].Read(roi).squeeze()
-            variances = img[1].Read(roi)
+            vals = img[0].read()[x0:x1,y0:y1].squeeze()
+            variances = img[1].read()[x0:x1,y0:y1]
             vals[numpy.where(vals == nodata)] = numpy.nan
             variances[numpy.where(variances == nodata)] = numpy.nan
             val = numpy.nan
@@ -345,16 +342,22 @@ class aodData(Data):
         """
         pixx = int(numpy.round(float(lon) + 179.5))
         pixy = int(numpy.round(89.5 - float(lat)))
-        roi = gippy.Recti(pixx - 1, pixy - 1, 3, 3)
+
+        # hacky create region of interest
+        x0, y0, x1, y1 = pixx - 1, pixy - 1, pixx + 2, pixy + 2
+        roi = (x0, y0, x1, y1)
+
         # try reading actual data file first
         aod = numpy.nan
+
         with utils.error_handler('Unable to load aod values', continuable=True):
+
             # this is just for fetching the data
             inv = cls.inventory(dates=date.strftime('%Y-%j'), fetch=fetch, products=['aod'])
             img = inv[date].tiles[cls.Asset.Repository._the_tile].open('aod')
-            vals = img[0].Read(roi)
+            vals = img[0].read()[x0:x1,y0:y1]
             # TODO - do this automagically in swig wrapper
-            vals[numpy.where(vals == img[0].NoDataValue())] = numpy.nan
+            vals[numpy.where(vals == img[0].nodata())] = numpy.nan
             aod = vals[1, 1]
             img = None
             source = 'MODIS (MOD08_D3)'
@@ -380,7 +383,6 @@ class aodData(Data):
                 # Negative values don't make sense
                 if val < 0:
                     val = 0
-
                 if var == 0:
                     # There is only one observation, so make up
                     # the variance.
@@ -388,15 +390,14 @@ class aodData(Data):
                         var = 0.15
                     else:
                         var = val / 2
-
                 if not numpy.isnan(val) and not numpy.isnan(var):
                     aod = val / var
                     norm = 1.0 / var
                     utils.verbose_out('AOD: LTA-Daily = %s, %s' % (val, var), 3)
-
                 return aod, norm
 
             # LTA-Daily
+            utils.verbose_out('Using long term average AOD')
             filename = os.path.join(cpath, 'ltad', 'ltad%s.tif' % str(day).zfill(4))
             daily_aod, daily_norm = _calculate_estimate(filename)
 

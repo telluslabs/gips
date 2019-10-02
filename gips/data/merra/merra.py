@@ -21,15 +21,12 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>
 ################################################################################
 
-from __future__ import print_function
-
 import os
 import re
 import sys
 import datetime
 import time
 
-import tempfile
 import urllib
 import requests
 import signal
@@ -78,7 +75,7 @@ class merraRepository(Repository):
         features = vector.where('tileid', tile)
         if len(features) != 1:
             raise Exception('there should be a single tile with id %s' % tile)
-        extent = features[0].Extent()
+        extent = features[0].extent()
         return [extent.x0(), extent.y0(), extent.x1(), extent.y1()]
 
 
@@ -93,9 +90,9 @@ class merraAsset(Asset):
 
     _bandnames = ['%02d30GMT' % i for i in range(24)]
     # used in _assets[asset_type]['pattern'], which is used by data/core.py to search the filesystem
-    _asset_re_pattern = '^MERRA2_\d\d\d\.%s\.\d{4}\d{2}\d{2}\.nc4$'
+    _asset_re_pattern = r'^MERRA2_\d\d\d\.%s\.\d{4}\d{2}\d{2}\.nc4$'
     # used in _assets[asset_type]['re_pattern'], which is used exclusively by query_service
-    _asset_re_format_pattern = "MERRA2_\d\d\d\.{name}\.%04d%02d%02d\.nc4"
+    _asset_re_format_pattern = r'MERRA2_\d\d\d\.{name}\.%04d%02d%02d\.nc4'
 
     _assets = {
         # MERRA2 SLV
@@ -192,23 +189,11 @@ class merraAsset(Asset):
             # asset ASM is for constants which all go into 1980-01-01
             mainurl = cls._assets[asset]['url']
             pattern = cls._assets[asset]['re_pattern'] % (0, 0, 0)
-        cpattern = re.compile(pattern)
         with utils.error_handler("Error downloading"):
-            # obtain the list of files
-            response = cls.Repository.managed_request(mainurl, verbosity=2)
-            if response is None:
-                return None, None
-        for item in response.readlines():
-            # inspect the page and extract the full name of the needed file
-            if cpattern.search(item):
-                if 'xml' in item:
-                    continue
-                basename = cpattern.findall(item)[0]
-                url = '/'.join([mainurl, basename])
-                return basename, url
-        utils.verbose_out("Unable to find a remote match for"
-                          " {} at {}".format(pattern, mainurl), 4)
-        return None, None
+            basename = cls.Repository.find_pattern_in_url(mainurl, pattern, verbosity=2)
+        if basename is None:
+            return None, None
+        return basename, '/'.join([mainurl, basename])
 
     @classmethod
     def fetch(cls, asset, tile, date):
@@ -231,7 +216,7 @@ class merraAsset(Asset):
         stage_dir = cls.Repository.path('stage')
         with utils.make_temp_dir(prefix='fetch', dir=stage_dir) as tmp_dn:
             tmp_outpath = os.path.join(tmp_dn, basename)
-            with open(tmp_outpath, 'w') as fd:
+            with open(tmp_outpath, 'wb') as fd:
                 fd.write(response.read())
             # verify that it is a netcdf file
             try:
@@ -438,15 +423,13 @@ class merraData(Data):
         daily = fun(hourly)
         daily[daily.mask] = missing
         utils.verbose_out('writing %s' % fout, 4)
-        imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
-        imgout[0].Write(np.array(np.flipud(daily)).astype('float32'))
-        imgout.SetBandName(prod, 1)
-        imgout.SetUnits(units)
-        imgout.SetNoData(missing)
-        imgout.SetProjection(self._projection)
-        imgout.SetAffine(np.array(self._geotransform))
-        imgout.SetMeta(self.prep_meta(assetfile, meta))
-
+        imgout = gippy.GeoImage.create(fout, nx, ny, 1, proj=self._projection, dtype='float32')
+        imgout[0].write(np.array(np.flipud(daily)).astype('float32'))
+        imgout.set_bandname(prod, 1)
+        imgout.add_meta('units', units)
+        imgout.set_nodata(missing)
+        imgout.set_affine(np.array(self._geotransform))
+        imgout.add_meta(self.prep_meta(assetfile, meta))
 
     @Data.proc_temp_dir_manager
     def process(self, *args, **kwargs):
@@ -536,15 +519,14 @@ class merraData(Data):
                 rh[rh < 0.] = 0.
                 rhday = rh.mean(axis=0)
                 rhday[rhday.mask] = missing
-                utils.verbose_out('writing %s' % fout, 4)
-                imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
-                imgout[0].Write(np.array(np.flipud(rhday)).astype('float32'))
-                imgout.SetBandName(val[0], 1)
-                imgout.SetUnits('%')
-                imgout.SetNoData(missing)
-                imgout.SetProjection(self._projection)
-                imgout.SetAffine(np.array(self._geotransform))
-                imgout.SetMeta(self.prep_meta(assetfile, meta))
+                utils.vprint('writing', fout, level=4)
+                imgout = gippy.GeoImage.create(fout, nx, ny, 1, proj=self._projection, dtype='float32')
+                imgout[0].write(np.array(np.flipud(rhday)).astype('float32'))
+                imgout.set_bandname(val[0], 1)
+                imgout.add_meta('units', '%')
+                imgout.set_nodata(missing)
+                imgout.set_affine(np.array(self._geotransform))
+                imgout.add_meta(self.prep_meta(assetfile, meta))
 
             elif val[0] == "frland":
                 startdate = merraAsset._assets[self._products[val[0]]['assets'][0]]['startdate']
@@ -567,28 +549,29 @@ class merraData(Data):
                 if frland.mask.sum() > 0:
                     frland[frland.mask] = missing
                 utils.verbose_out('writing %s' % fout, 4)
-                imgout = gippy.GeoImage(fout, nx, ny, 1, gippy.GDT_Float32)
-                imgout[0].Write(np.array(np.flipud(frland)).astype('float32'))
-                imgout.SetBandName(prod, 1)
-                imgout.SetUnits('fraction')
-                imgout.SetNoData(missing)
-                imgout.SetProjection(self._projection)
-                imgout.SetAffine(np.array(self._geotransform))
-                imgout.SetMeta(self.prep_meta(assetfile, meta))
+                imgout = gippy.GeoImage.create(fout, nx, ny, 1, proj=self._projection, dtype='float32')
+                imgout[0].write(np.array(np.flipud(frland)).astype('float32'))
+                imgout.set_bandname(prod, 1)
+                imgout.add_meta('units', 'fraction')
+                imgout.set_nodata(missing)
+                imgout.set_affine(np.array(self._geotransform))
+                imgout.add_meta(self.prep_meta(assetfile, meta))
 
+            # TODO: revive this?
+            # create a temperature product aligned with MODIS overpass times
             """
             if val[0] == "temp_modis":
                 img = gippy.GeoImage(assets[0])
-                imgout = gippy.GeoImage(fout, img, img.DataType(), 4)
+                imgout = gippy.GeoImage.create_from(img, fout, 4, img.DataType())
                 # Aqua AM, Terra AM, Aqua PM, Terra PM
                 localtimes = [1.5, 10.5, 13.5, 22.5]
                 strtimes = ['0130LT', '1030LT', '1330LT', '2230LT']
                 hroffset = self.gmtoffset()
                 # TODO: loop across the scene in latitude
                 # calculate local time for each latitude column
-                print 'localtimes', localtimes
+                print('localtimes', localtimes)
                 for itime, localtime in enumerate(localtimes):
-                    print itime
+                    print(itime)
                     picktime = localtime - hroffset
                     pickhour = int(picktime)
                     if pickhour < 0:
@@ -601,15 +584,15 @@ class merraData(Data):
                         # same day local time
                         pickday = 0
                     pickidx = pickhour % 24
-                    print "localtime", localtime
-                    print "picktime", picktime
-                    print "pickhour", pickhour
-                    print "pickday", pickday
-                    print "pickidx", pickidx
-                    img[pickidx].Process(imgout[itime])
+                    print("localtime", localtime)
+                    print("picktime", picktime)
+                    print("pickhour", pickhour)
+                    print("pickday", pickday)
+                    print("pickidx", pickidx)
+                    img[pickidx].save(imgout[itime])
                     obsdate = self.date + datetime.timedelta(pickday)
                     descr = " ".join([strtimes[itime], obsdate.isoformat()])
-                    imgout.SetBandName(descr, itime + 1)
+                    imgout.set_bandname(descr, itime + 1)
 
             elif val[0] == 'profile':
                 pass

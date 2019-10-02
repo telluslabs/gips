@@ -117,7 +117,7 @@ class prismAsset(gips.data.core.FtpAsset):
 
     def datafiles(self):
         datafiles = super(prismAsset, self).datafiles()
-        datafiles = filter(lambda x: x.lower().endswith('.bil'), datafiles)
+        datafiles = [d for d in datafiles if d.lower().endswith('.bil')]
         if len(datafiles) > 0:
             indexfile = self.filename + '.index'
             utils.verbose_out('indexfile: {}'.format(indexfile), 3)
@@ -188,7 +188,7 @@ class prismData(Data):
         # TODO: overwrite doesn't play well with pptsum -- wonder if it would
         #       if it was made into a composite product (which it is)
         assert len(prismAsset._sensors) == 1  # sanity check to force this code to stay current
-        sensor = prismAsset._sensors.keys()[0]
+        sensor = list(prismAsset._sensors.keys())[0]
 
         def get_bil_vsifile(d, a):
             with utils.error_handler('Error accessing asset {}'
@@ -262,27 +262,25 @@ class prismData(Data):
                 imgs = []
                 asset_fns = [] # have to grab filenames for multiple days
                 for tileobj in inv.data.values():
-                    datobj = tileobj.tiles.values()[0]
-                    asset_fns.append(
-                        os.path.basename(datobj.assets['_ppt'].filename))
-                    imgs.append(GeoImage(get_bil_vsifile(datobj, '_ppt')))
+                    data_obj = next(iter(tileobj.tiles.values()))
+                    asset_fns.append(os.path.basename(data_obj.assets['_ppt'].filename))
+                    imgs.append(GeoImage(get_bil_vsifile(data_obj, '_ppt')))
 
                 with self.make_temp_proc_dir() as tmp_dir:
                     tmp_fp = os.path.join(tmp_dir, prod_fn)
-                    oimg = GeoImage(tmp_fp, imgs[0])
-                    oimg.SetNoData(-9999)
-                    oimg.SetBandName(
+                    oimg = GeoImage.create_from(imgs[0], tmp_fp)
+                    oimg.set_nodata(-9999)
+                    oimg.set_bandname(
                         description + '({} day window)'.format(lag), 1
                     )
-                    oimg.SetMeta(self.prep_meta(sorted(asset_fns)))
-                    for chunk in oimg.Chunks():
-                        oarr = oimg[0].Read(chunk) * 0.0 # wat
+                    oimg.add_meta(self.prep_meta(sorted(asset_fns)))
+                    for chunk in oimg.chunks():
+                        oarr = oimg[0].read(chunk) * 0.0 # wat
                         for img in imgs:
-                            oarr += img[0].Read(chunk)
-                        oimg[0].Write(oarr, chunk)
-                    oimg.Process()
+                            oarr += img[0].read(chunk)
+                        oimg[0].write(oarr, chunk)
+                    oimg.save()
                     os.rename(tmp_fp, archived_fp)
                 oimg = None  # help swig+gdal with GC
-                products.requested.pop(key)
             self.AddFile(sensor, key, archived_fp)  # add product to inventory
         return products

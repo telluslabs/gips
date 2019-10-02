@@ -4,7 +4,6 @@ import os
 import datetime
 
 import pytest
-import mock
 from django.forms.models import model_to_dict
 
 from .data import asset_filenames, expected_assets, expected_products
@@ -81,7 +80,7 @@ def t_data_inventory_load(orm):
         assert len(data_obj.assets) == 1
 
         # compare the asset object
-        asset_obj = data_obj.assets.values()[0]
+        asset_obj = next(iter(data_obj.assets.values()))
         ea = expected_assets[asset_obj.asset]
         for field in ('asset', 'date', 'sensor', 'tile'):
             assert ea[field] == getattr(asset_obj, field)
@@ -89,7 +88,7 @@ def t_data_inventory_load(orm):
 
         # compare the stored product
         assert len(data_obj.filenames) == 1
-        ((sensor, product), fname) = (data_obj.filenames.items())[0]
+        ((sensor, product), fname) = next(iter(data_obj.filenames.items()))
         ep = expected_products[product]
         assert (ep['sensor'] == sensor and
                 ep['product'] == product and

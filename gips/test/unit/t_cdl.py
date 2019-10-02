@@ -57,7 +57,7 @@ def t_cdlAsset_query_service_success_case(mocker):
     m_root.find.return_value.text = expected_url
 
     actual = cdl.cdlAsset.query_service('cdl', fake_tile,
-                                        datetime.date(2015, 01, 01))
+                                        datetime.date(2015, 1, 1))
     assert {'basename': 'fake-tile_2015_cdl_cdl.tif',
             'url': expected_url} == actual
 
@@ -75,7 +75,7 @@ def t_cdlAsset_fetch_success_case(mocker, mpo, mock_context_manager):
 
     cdl.cdlAsset.fetch('cdl', 'NH', datetime.date(2016, 1, 1))
 
-    expected_open_call = mocker.call('fake-temp-dir/NH_2016_cdl_cdl.tif', 'w')
+    expected_open_call = mocker.call('fake-temp-dir/NH_2016_cdl_cdl.tif', 'wb')
     expected_copy_call = mocker.call('fake-temp-dir/NH_2016_cdl_cdl.tif',
                                      'fake-stage/stage')
     assert (test_url == m_requests_get.call_args[0][0]

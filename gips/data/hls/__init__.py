@@ -1,1 +1,1 @@
-from hls import hlsRepository, hlsAsset, hlsData
+from .hls import hlsRepository, hlsAsset, hlsData

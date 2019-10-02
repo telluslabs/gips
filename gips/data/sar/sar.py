@@ -209,7 +209,7 @@ class sarAsset(Asset):
         elif len(mats) > 1:
             raise Exception('{} matches pattern for: ' + ','.join(mats))
 
-        self.asset, m = mats.items()[0]
+        self.asset, m = next(iter(mats.items()))
         self.tile = m.group('tile')
         self.sensor = m.group('satellite') + m.group('mode')
 
@@ -241,10 +241,8 @@ class sarAsset(Asset):
         return copy.deepcopy(self._meta_dict)
 
     def _jaxa_opener(self, f, path=None):
-        if type(f) in (str, unicode):
-            f = (f,)
-        paths = self.extract(f, path=path).values()
-        img = gippy.GeoImage(paths)
+        paths = self.extract([f] if isinstance(f, str) else f, path=path).values()
+        img = gippy.GeoImage.open(filenames=tuple(paths))
         return img
 
     def _proc_meta(self):
@@ -290,8 +288,8 @@ class sarAsset(Asset):
         self._meta_dict = meta
 
         dateimg = self._jaxa_opener(datefile)
-        dateimg.SetNoData(0)
-        datevals = numpy.unique(dateimg.Read())
+        dateimg.set_nodata(0)
+        datevals = numpy.unique(dateimg.read())
         dateimg = None
         RemoveFiles((datefile,), ['.hdr', '.aux.xml'])
         dates = [
@@ -325,8 +323,8 @@ class sarAsset(Asset):
         #VerboseOut('%s: inspect %s' % (fname,datetime.datetime.now()-start), 4)
 
 
-    def extract(self, filenames=[], path=None):
-        """ Extract filenames from asset and create ENVI header files """
+    def extract(self, filenames=(), path=None):
+        """Extract filenames from asset and create ENVI header files."""
         files = super(sarAsset, self).extract(filenames, path=path)
         meta = self.get_meta_dict()
         datafiles = {}
@@ -384,9 +382,9 @@ class sarData(Data):
         if len(products) == 0:
             return
 
-        sensor = self.sensor_set[0]    # for a given time-space, there should
-        #                              # only be a look from one sensor,
-        asset = self.assets.keys()[0]  # and one asset.
+        # for a given time-space, there should only be a look from one sensor and one asset.
+        sensor = self.sensor_set[0]
+        asset = next(iter(self.assets.keys()))
 
         datafiles = self.assets[asset].extract(path=self._temp_proc_dir)
 
@@ -399,9 +397,9 @@ class sarData(Data):
 
             if val[0] == 'mask':
                 mask = jo(datafiles['mask'])
-                imgout = mask.Process(fname)
-                imgout[0].SetNoData(0)
-                imgout.Process()
+                imgout = mask.save(fname)
+                imgout[0].set_nodata(0)
+                imgout.save()
                 # Sometimes the I/O seems to be put off until garbage
                 # collection time, so trick gippy into getting on with it:
                 del imgout
@@ -412,39 +410,39 @@ class sarData(Data):
                 #          if any((b.endswith(sl) for sl in ["sl_HH", "sl_HV"]))
                 # ]
                 img = jo(bands)
-                img.SetNoData(0)
+                img.set_nodata(0)
                 mask = jo(datafiles['mask'])
-                mask[0] = mask[0].BXOR(150.) > 0
-                img.AddMask(mask[0])
+                mask[0] = mask[0].bxor(150.) > 0
+                img.add_mask(mask[0])
                 # apply date mask
                 dateimg = jo(datafiles['date'])
                 dateday = (
                     self.date -
                     self.assets[asset]._sensors[sensor]['startdate']).days
-                img.AddMask(dateimg[0] == dateday)
-                imgout = gippy.GeoImage(fname, img, gippy.GDT_Float32)
-                imgout.SetNoData(-32768)
-                for b in range(0, imgout.NumBands()):
-                    imgout.SetBandName(img[b].Description(), b + 1)
+                img.add_mask(dateimg[0] == dateday)
+                imgout = gippy.GeoImage.create_from(img, fname, 1, 'float32')
+                imgout.set_nodata(-32768)
+                for b in range(0, len(imgout)):
+                    imgout.set_bandname(img[b].description(), b + 1)
                     (
                         img[b].pow(2).log10() * 10 +
                         self.assets[asset].get_meta_dict()['CF']
-                    ).Process(imgout[b])
-                fname = imgout.Filename()
+                    ).save(imgout[b])
+                fname = imgout.filename()
                 del imgout
             elif val[0] == 'linci':
                 # Note the linci product DOES NOT mask by date
                 img = gippy.GeoImage(datafiles['linci'])
-                img.Process(fname)
+                img.save(fname)
             elif val[0] == 'date':
                 # Note the date product DOES NOT mask by date
                 img = gippy.GeoImage(datafiles['date'])
-                img.Process(fname)
+                img.save(fname)
             else:
                 raise Exception('Unrecognized product: ' + key)
-            # True = r/w mode, otherwise SetMeta silently does nothing
+            # True = r/w mode, otherwise add_meta silently does nothing
             smi = gippy.GeoImage(fname, True)
-            smi.SetMeta(self.prep_meta(self.assets[asset].filename))
+            smi.add_meta(self.prep_meta(self.assets[asset].filename))
             archive_fp = self.archive_temp_path(fname)
             self.AddFile(sensor, key, archive_fp)
         # Remove unused files
