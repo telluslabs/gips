@@ -503,10 +503,16 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
 
     imgout.SetNoData(nd)
     #imgout.ColorTable(images[0])
-    nddata = np.empty((images[0].NumBands(),
-                       mask_img.YSize(), mask_img.XSize()))
-    nddata[:] = nd
-    imgout.Write(nddata)
+
+    # Write an image that is completely NoDataValue so we can use gdalwarp to
+    # mosaic into it. This is done in chunks because allocating the entire thing
+    # at once can blow up memory for high-res data (e.g., 10m S2 tiles)
+    nband = images[0].NumBands()
+    chunks = imgout.Chunks()
+    for chunk in chunks:
+        nddata = np.full((chunk.y1(), chunk.x1()), nd)
+        for i_b in range(nband):
+            imgout[i_b].Write(nddata, chunk)
     imgout = None
 
     # run warp command
@@ -531,7 +537,7 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     imgout.AddMask(mask_img[0])
     imgout.Process()
 
-    
+
 def julian_date(date_and_time, variant=None):
     """Returns the julian date for the given datetime object.
 

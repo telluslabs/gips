@@ -317,8 +317,9 @@ class sentinel1Asset(Asset):
                 targetfile = os.path.join(downloaddir, scene + '.tif')
                 print('processing', sourcefile, targetfile)
 
-                cmd = "/usr/bin/gpt {} -e -SsourceProduct={} -PtargetProduct={} -Dsnap.dataio.bigtiff.compression.type=LZW".format(
-                    graph_xml_path, sourcefile, targetfile)
+                cmd = "/usr/bin/gpt {} -c 48G -J-Xmx32G -J-Xms12G -q 8 -e -SsourceProduct={} -PtargetProduct={} " \
+                      "-Dsnap.dataio.bigtiff.compression.type=LZW" \
+                      "-Dsnap.parallelism=1".format(graph_xml_path, sourcefile, targetfile)
                 print(cmd)
                 command(cmd)
 
