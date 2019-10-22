@@ -37,6 +37,7 @@ import subprocess
 import urllib
 from http.cookiejar import CookieJar
 import argparse
+import importlib
 
 # from functools import lru_cache <-- python 3.2+ can do this instead
 from backports.functools_lru_cache import lru_cache
@@ -300,8 +301,6 @@ class Repository(object):
         cls.default_settings, a dict of such things.  If still not found,
         resorts to magic for 'driver' and 'tiles', ValueError otherwise.
         """
-        import importlib
-
         dataclass = cls.__name__[:-10] # name of a class, not the class object
         r = settings().REPOS[dataclass]
         if key in r:
@@ -524,14 +523,6 @@ class Asset(object):
             tile_num = int(self.tile)
         except:
             tile_num = self.tile
-
-        ### py3 + gippy 1.0 branch version
-        # v = gippy.GeoVector(self.get_setting("tiles"))
-        # v.set_primary_key(self.Repository._tile_attribute)
-        # If a GeoVector is indexed with an int, it queries using FID field.
-        # feat = v[str(tile_num)]
-        # return feat.WKT()
-        ### dev version:
         v =  utils.open_vector(self.get_setting("tiles"), key=self.Repository._tile_attribute)
         return v[str(tile_num)]
 

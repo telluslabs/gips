@@ -53,6 +53,7 @@ setup(
     author='Matthew Hanson',
     author_email='matt.a.hanson@gmail.com',
     license='GNU General Public License v3 (GPLv3)',
+    python_requires='>=3',
     packages=find_packages(),
     package_data={
         '': ['*.shp', '*.prj', '*.shx', '*.dbf', '*.csv'],
@@ -73,12 +74,13 @@ setup(
         'pyproj',
         'Py6S>=1.7.0',
         'shapely',
-        'gippy @ https://github.com/Applied-GeoSolutions/gippy/archive/v0.3.11.tar.gz#egg=gippy-0.3.11',
+        'gippy',
         'homura==0.1.3',
         'python-dateutil',
         'pydap==3.2',
         'pysolar==0.6',
         'dbfread==2.0.7',
+        # TODO this format doesn't seem to work and I can find no documentation for it:
         'rios @ https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3',
         'python-fmask @ https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.5.0.zip#egg=python-fmask-0.5.0',
         'usgs', # 0.2.1 known to work
