@@ -225,7 +225,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
         # DN & SR assets are no longer fetchable
         'DN': {
             'sensors': ['LT5', 'LE7', 'LC8'],
-            'enddate': date.today(),
+            'enddate': date(2017, 4, 30),
             'pattern': (
                 r'^L(?P<sensor>[A-Z])(?P<satellite>\d)'
                 r'(?P<pathrow>\d{6})(?P<acq_date>\d{7})'

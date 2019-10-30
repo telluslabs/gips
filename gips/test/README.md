@@ -1,5 +1,7 @@
 GIPS Automated Testing
 ======================
+See also `docker/README.md`.
+
 See the end of this file for a quick-start section, after configuring pytest:
 
 Configuration
@@ -174,8 +176,8 @@ that requires `--setup-repo` or `--clear-repo` for the other tests to pass.
 Testing Within Docker Containers
 --------------------------------
 Gips can be built into a docker container; crib the approach in
-`.gitlab-ci.yml`; it's suggested to `docker build -t gips_test` for
-convenience.  Note exposing the artifact store to the container:
+`docker/README.md` and see also `.gitlab-ci.yml`.  Note exposing the artifact
+store to the container:
 
 ```
 $ docker run --rm -it \

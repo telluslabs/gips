@@ -2,17 +2,20 @@
 
 # GIPS
 
-See http://gipit.github.io/gips/ for documentation, but know it is not
-~~necessarily~~ current.
+See http://gipit.github.io/gips/ for more documentation, but know it is not
+current.
 
 ## Installation
 
-After cloning this git repo & changing to its directory, run `install.sh`,
-which only officially supports recent versions of Ubuntu.  It will use `sudo`
-to install system packages, and may ask for authentication accordingly.  It
-runs apt-get, which may prompt you for confirmation of its actions.
-Finally, the script will show you how to set GIPS system settings with
-`gips_config`.
+Currently it's easiest to build & run in a docker container; see
+`docker/README.md`.
+
+You can also attempt to use `install.sh` for conventional installs; it is not
+necessarily current.  It only officially supports recent versions of Ubuntu.
+It will use `sudo` to install system packages, and may ask for authentication
+accordingly.  It runs apt-get, which may prompt you for confirmation of its
+actions.  Finally, the script will show you how to set GIPS system settings
+with `gips_config`.
 
 ## Configuration
 

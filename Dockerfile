@@ -26,10 +26,9 @@ RUN apt-get -y update \
 #    && mv sixsV1.1 /usr/local/bin/sixs \
 #    && rm -rf /tmp/sixs
 
-# TODO neither of the bitbucket installs seem to be necessary
+# TODO setup.py has the rios & fmask installs too; DRY:
 # TODO for a CI build, setup.py develop is ok, but not for production
-RUN pip3 install gippy \
-    && pip3 install https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3 \
+RUN pip3 install https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3 \
     && pip3 install https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.5.0.zip#egg=python-fmask-0.5.0 \
     && python3 setup.py develop
 
