@@ -138,6 +138,8 @@ class Tiles(object):
 
     def product_coverage(self):
         """ Calculated % coverage of site for each product """
+        raise NotImplementedError(
+            "Deprecated and incorrect for products that depend on any of two or more assets.")
         coverage = {}
         for p in self.dataclass._products.keys():
             assets = self.dataclass.products2assets([p])
