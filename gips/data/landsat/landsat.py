@@ -224,6 +224,7 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
     _assets = {
         # DN & SR assets are no longer fetchable
         'DN': {
+            'fetchable': False,
             'sensors': ['LT5', 'LE7', 'LC8'],
             'enddate': date(2017, 4, 30),
             'pattern': (
@@ -233,28 +234,30 @@ class landsatAsset(gips.data.core.CloudCoverAsset,
             ),
         },
         'SR': {
+            'fetchable': False,
             'sensors': ['LC8SR'],
             'enddate': date(2017, 4, 30),
             'pattern': r'^L.*?-SC.*?\.tar\.gz$',
         },
 
-        # landsat setting 'source' decides which asset type is downloaded:
-        # source == usgs -> fetch C1 assets from USGS
-        # source == s3 -> fetch C1S3 assets from AWS S3
+        # landsat setting 'source' decides what is downloaded according to 'source' here:
         'C1': {
             'sensors': ['LT5', 'LE7', 'LC8'],
             'pattern': _c1_base_pattern + r'\.tar\.gz$',
             'latency': 0,
+            'source': 'usgs',
         },
         'C1S3': {
             'sensors': ['LC8'],
             'pattern': _c1_base_pattern + r'_S3\.json$',
             'latency': 0,
+            'source': 's3',
         },
         'C1GS': {
             'sensors': ['LT5', 'LE7', 'LC8'],
             'pattern': _c1_base_pattern + r'_gs\.json$',
             'latency': 12,
+            'source': 'gs',
         },
     }
 

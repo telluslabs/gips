@@ -178,3 +178,8 @@ def t_landsatAsset_query_service_s3(
     actual = landsat.landsatAsset.query_service(
             'C1S3', '027033', datetime.date(2017, 5, 6), pclouds)
     assert expected == actual
+
+
+def t_landsatData_products2assets(m_query_s3):
+    """Unfetchable and undesired sources should be filtered out."""
+    assert {'C1S3'} == landsat.landsatData.products2assets(['rad', 'landmask'])

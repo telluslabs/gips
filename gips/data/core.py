@@ -481,11 +481,6 @@ class Asset(object):
         return 'ATD {} {} {}'.format(
             self.asset, self.tile, self.date.strftime('%Y%j'))
 
-    @classmethod
-    def get_setting(cls, key):
-        """Convenience method to acces Repository's get_setting."""
-        return cls.Repository.get_setting(key)
-
     def updated(self, newasset):
         '''
         Return:
@@ -666,6 +661,11 @@ class Asset(object):
     ##########################################################################
     # Class methods
     ##########################################################################
+    @classmethod
+    def get_setting(cls, key):
+        """Convenience method to acces Repository's get_setting."""
+        return cls.Repository.get_setting(key)
+
     @classmethod
     def discover(cls, tile, date, asset=None):
         """Factory function returns list of Assets for this tile and date.
@@ -1478,12 +1478,31 @@ class Data(object):
         return DataInventory(cls, spatial[0], temporal, **kwargs)
 
     @classmethod
+    def asset_fetch_preference(cls, p_type):
+        """Generator for preferred asset types needed for the given product type.
+
+        Defaults to all of them, but filters by source and fetchable flag.
+        """
+        for a in cls._products[p_type]['assets']:
+            # TODO move this over to Asset?  Seems like an Asset jam
+            a_entry = cls.Asset._assets[a]
+            source = a_entry.get('source', None)
+            if a_entry.get('fetchable', True) and (
+                    source is None or source == cls.get_setting('source')):
+                yield a
+
+    @classmethod
     def products2assets(cls, products):
-        """ Get list of assets needed for these products """
+        """Return the set of asset types needed for the given product types.
+
+        Asset types marked 'unfetchable' in Asset._assets are filtered out.
+        """
         assets = []
         for p in products:
+            # re outer conditional, see https://gitlab.com/appliedgeosolutions/gips/issues/668
             if 'assets' in cls._products[p]:
-                assets.extend(cls._products[p]['assets'])
+                a_types = list(cls.asset_fetch_preference(p))
+                assets.extend(a_types)
             else:
                 assets.append('')
         return set(assets)
