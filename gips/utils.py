@@ -517,11 +517,11 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     mask_img = gippy.GeoImage(rastermask)
     srs = mask_img.srs()
     filenames = [images[0].filename()]
-    for f in range(1, images.NumImages()):
+    for f in range(1, len(images)):
         filenames.append(images[f].filename())
 
     imgout = gippy.GeoImage.create_from(mask_img, outfile,
-                                        len(images[0]), images[0].DataType())
+                                        len(images[0]), images[0].type().string())
 
     imgout.set_nodata(nd)
     nddata = np.empty((len(images[0]),
@@ -549,7 +549,7 @@ def gridded_mosaic(images, outfile, rastermask, interpolation=0):
     )
     for b in range(0, images[0].nbands()):
         imgout[b].add_meta(images[0][b].meta())
-    imgout.AddMask(mask_img[0])
+    imgout.add_mask(mask_img[0])
     imgout.save()
 
 
