@@ -245,9 +245,9 @@ class Repository(object):
     # Override these functions if not using a tile/date directory structure
     ##########################################################################
     @classmethod
-    def data_path(cls, tile='', date=''):
+    def data_path(cls, tile='', date='', prefix=None):
         """ Get absolute data path for this tile and date """
-        path = cls.path('tiles')
+        path = cls.path('tiles') if prefix is None else prefix
         if tile != '':
             path = os.path.join(path, tile)
         if date != '':
