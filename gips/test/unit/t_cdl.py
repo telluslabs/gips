@@ -81,3 +81,8 @@ def t_cdlAsset_fetch_success_case(mocker, mpo, mock_context_manager):
     assert (test_url == m_requests_get.call_args[0][0]
             and expected_open_call == m_open.call_args
             and expected_copy_call == m_shutil_copy.call_args)
+
+
+def t_cdlData_products2assets():
+    """cdlmkii shouldn't be in the query set for the cdl product."""
+    assert {'cdl'} == cdl.cdlData.products2assets(['cdl'])

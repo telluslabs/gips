@@ -73,6 +73,7 @@ class cdlAsset(Asset):
         },
         _cdlmkii: {
             'pattern': r'^(?P<tile>[A-Z]{2})_(?P<date>\d{4})_' + _cdl + '_' + _cdlmkii + r'\.zip$',
+            'fetchable': False,
             'description': '',
             'startdate': datetime.date(1997, 1, 1),
             'latency': 365, # see previous for explanation for this crazy value
