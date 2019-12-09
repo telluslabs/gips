@@ -1206,11 +1206,9 @@ class landsatData(gips.data.core.CloudCoverData):
                         )
                         try:
                             # on error, use the unshifted image
-                            s2_export = self.sentinel2_coreg_export(tmpdir_fp)
-                            self.run_arop(s2_export, img['NIR'].filename(), source='sentinel2')
-                        except CantAlignError as cae:
-                            verbose_out('Co-registration error '
-                                        '(FALLBACK): {}'.format(cae), 4)
+                            mos_source = settings().REPOS['landsat'].get(
+                                'coreg_mos_source', 'sentinel2'
+                            )
                             sat_key = 'custom_mosaic' if mos_source != 'sentinel2' else 'sentinel2'
                             base_image_fp = None
                             if mos_source is 'sentinel2':
