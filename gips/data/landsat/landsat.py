@@ -1204,16 +1204,11 @@ class landsatData(gips.data.core.CloudCoverData):
                     with utils.error_handler('Problem with running AROP'):
                         tmpdir_fp = self.generate_temp_path('arop')
                         utils.mkdir(tmpdir_fp)
+                        mos_source = settings().REPOS['landsat'].get(
+                            'coreg_mos_source', 'sentinel2'
+                        )
                         try:
                             # on error, use the unshifted image
-                            s2_export = self.sentinel2_coreg_export(tmpdir_fp)
-                            self.run_arop(s2_export, img['NIR'].filename())
-                        except NoSentinelError:
-                            verbose_out(
-                                'No Sentinel found for co-registration', 4)
-                        except CantAlignError as cae:
-                            verbose_out('Co-registration error '
-                                        '(FALLBACK): {}'.format(cae), 4)
                             mos_source = settings().REPOS['landsat'].get(
                                 'coreg_mos_source', 'sentinel2'
                             )
@@ -1222,10 +1217,10 @@ class landsatData(gips.data.core.CloudCoverData):
                             if mos_source is 'sentinel2':
                                 base_image_fp = self.sentinel2_coreg_export(tmpdir_fp)
                             else:
-                                proj = img.Projection()
+                                proj = img.projection()
                                 base_image_fp = self.custom_mosaic_coreg_export(
                                         mos_source, proj, tmpdir_fp)
-                            nir_band = img['NIR'].Filename()
+                            nir_band = img['NIR'].filename()
                             self.run_arop(base_image_fp, nir_band, source=sat_key)
                         except NoBasemapError:
                             # TODO: once we have confidence that this error is
@@ -1958,7 +1953,9 @@ class landsatData(gips.data.core.CloudCoverData):
                       "-of", "ENVI", "-a_nodata", "0"]
         # only use images that are in the same proj as landsat tile
         merge_args.extend(geo_images)
-        subprocess.call(merge_args, env={"GDAL_NUM_THREADS": "1"}, )
+        env = os.environ.copy()
+        env["GDAL_NUM_THREADS"] = "1"
+        subprocess.call(merge_args, env=env)
         self._time_report("done with s2 export")
         return tmpdir + '/sentinel_mosaic.bin'
 
@@ -1988,7 +1985,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 asset._sensors[asset.sensor]['colors'].index('NIR')
             ]
             if asset_type not in ['C1GS', 'C1S3']:
-                warp_band_filename = '/vsitar/' + os.path.join(asset.filename, warp_band_filename)
+                warp_band_filename = os.path.join(asset.filename, warp_band_filename)
 
             # TODO:  I believe this is a singleton, so it should go away
             warp_bands_bin = []
@@ -2010,10 +2007,10 @@ class landsatData(gips.data.core.CloudCoverData):
                         if f.endswith("B{}.bin".format(nir_band))
             ][0]
             warp_base_band_img = gippy.GeoImage(os.path.join(tmpdir, warp_base_band_filename))
-            base_pixel_size = abs(base_band_img.Resolution().x())
-            warp_pixel_size = abs(warp_base_band_img.Resolution().x())
-            base_warp_ul_delta_x = base_band_img.MinXY().x() - warp_base_band_img.MinXY().x()
-            base_warp_ul_delta_y = base_band_img.MaxXY().y() - warp_base_band_img.MaxXY().y()
+            base_pixel_size = abs(base_band_img.resolution().x())
+            warp_pixel_size = abs(warp_base_band_img.resolution().x())
+            base_warp_ul_delta_x = base_band_img.minxy().x() - warp_base_band_img.minxy().x()
+            base_warp_ul_delta_y = base_band_img.maxxy().y() - warp_base_band_img.maxxy().y()
             out_pixel_size = max(base_pixel_size, warp_pixel_size)
             lnd_sen_lut = {'LT5': 'Landsat5', 'LE7': 'Landsat7', 'LC8': 'Landsat8'}
             base_params = dict(
@@ -2022,7 +2019,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 warp_bands=' '.join([os.path.join(tmpdir, band) for band in warp_bands_bin]),
                 warp_base_band=os.path.join(tmpdir, warp_base_band_filename),
                 warp_data_type=' '.join(([
-                    str(warp_base_band_img.DataType())
+                    str(warp_base_band_img.type())
                 ] * len(warp_bands_bin))),
                 warp_nsample=warp_base_band_img.xsize(),
                 warp_nline=warp_base_band_img.ysize(),
@@ -2152,7 +2149,7 @@ class landsatData(gips.data.core.CloudCoverData):
                     exc_msg = ('AROP: shift magnitude of {}, exceeds thresholed of '
                          '{}').format(shift_mag, shift_mag_thresh)
                     exc_code = CantAlignError.EXCESSIVE_SHIFT
-                if exc_code is None and (used_cp is None or used_cp < used_cp_thresh):
+                if exc_code is None and (used_cp is None or int(used_cp) < used_cp_thresh):
                     exc_msg = ('AROP: need at least {} Control Points, and '
                            'only found {}').format(used_cp_thresh, used_cp)
                     exc_code = CantAlignError.INSUFFICIENT_CP
