@@ -528,7 +528,7 @@ class Asset(object):
         respective 'tiles.shp' file as WKT. Needs to be extended for
         untiled assets.
         """
-        return self.get_geofeature().WKT()
+        return self.get_geofeature().wkt_geometry()
 
     ##########################################################################
     # Child classes should not generally have to override anything below here

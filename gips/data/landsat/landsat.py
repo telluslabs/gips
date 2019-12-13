@@ -1849,9 +1849,9 @@ class landsatData(gips.data.core.CloudCoverData):
         feat = self.assets[asset].get_geofeature()
         utm_gjs_feat = geojson.Feature(
             geometry=wkt_loads(
-                utils.transform_shape(feat.WKT(),
-                                      feat.Projection(),
-                                      img.Projection()),
+                utils.transform_shape(feat.wkt_geometry(),
+                                      feat.srs(),
+                                      img.srs()),
             ),
             properties={}
         )
