@@ -1,2 +1,2 @@
 # non-fancy build GIPS container
-docker build -t telluslabs/gips1 .
+docker build -t gips1 .
