@@ -35,7 +35,10 @@ class RequestedProducts(object):
     # TODO - move Products to dataclass specific class in data.core?
     # TODO - incorporate product groups
     def __init__(self, dataclass, products=None):
-        """ Create product object """
+        """Products needs to be a list of product types & arguments.
+
+        Example ['cloudmask', 'ndvi-toa'].
+        """
         self.dataclass = dataclass
         products = products if products is not None else dataclass._products.keys()
         self.requested = {p: p.split('-') for p in products}

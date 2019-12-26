@@ -1093,7 +1093,12 @@ class Data(object):
         return cls.Asset.Repository.get_setting(key)
 
     def needed_products(self, products, overwrite):
-        """ Make sure all products exist and return those that need processing """
+        """Make sure all products exist and return those that need processing
+
+        products is a list of hyphenated products & arguments,
+        eg ['cloudmask, 'ndvi-toa']. overwrite is a boolean.  Return value is
+        a dict of this format: {p: p.split('-') for p in products}.
+        """
         # TODO calling RequestedProducts twice is strange; rework into something clean
         products = self.RequestedProducts(products)
         products = self.RequestedProducts(
