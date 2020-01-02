@@ -245,9 +245,9 @@ class Repository(object):
     # Override these functions if not using a tile/date directory structure
     ##########################################################################
     @classmethod
-    def data_path(cls, tile='', date=''):
+    def data_path(cls, tile='', date='', prefix=None):
         """ Get absolute data path for this tile and date """
-        path = cls.path('tiles')
+        path = cls.path('tiles') if prefix is None else prefix
         if tile != '':
             path = os.path.join(path, tile)
         if date != '':
@@ -1093,7 +1093,12 @@ class Data(object):
         return cls.Asset.Repository.get_setting(key)
 
     def needed_products(self, products, overwrite):
-        """ Make sure all products exist and return those that need processing """
+        """Make sure all products exist and return those that need processing
+
+        products is a list of hyphenated products & arguments,
+        eg ['cloudmask, 'ndvi-toa']. overwrite is a boolean.  Return value is
+        a dict of this format: {p: p.split('-') for p in products}.
+        """
         # TODO calling RequestedProducts twice is strange; rework into something clean
         products = self.RequestedProducts(products)
         products = self.RequestedProducts(
