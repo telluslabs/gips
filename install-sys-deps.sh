@@ -27,6 +27,11 @@ apt-get install -y \
     gdal-bin libgdal-dev python-dev python3-dev python3-gdal python-gdal \
     curl wget gfortran libgnutls28-dev
 
+# needed for coregistration routines
+curl -o /usr/local/bin/ortho \
+     https://gitlab.com/daganinc/arop/raw/v2.2.9/bin/ortho?inline=false \
+    && chmod +x /usr/local/bin/ortho
+
 # can't presume user wants ubuntu's python3-pip because it's common practice to install
 # it themselves, so need to check first
 if command -v pip3 &>/dev/null; then
