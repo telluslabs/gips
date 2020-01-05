@@ -1204,9 +1204,6 @@ class landsatData(gips.data.core.CloudCoverData):
                     with utils.error_handler('Problem with running AROP'):
                         tmpdir_fp = self.generate_temp_path('arop')
                         utils.mkdir(tmpdir_fp)
-                        mos_source = settings().REPOS['landsat'].get(
-                            'coreg_mos_source', 'sentinel2'
-                        )
                         try:
                             # on error, use the unshifted image
                             mos_source = settings().REPOS['landsat'].get(
