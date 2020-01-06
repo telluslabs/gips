@@ -1982,7 +1982,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 asset._sensors[asset.sensor]['colors'].index('NIR')
             ]
             if asset_type not in ['C1GS', 'C1S3']:
-                warp_band_filename = os.path.join(asset.filename, warp_band_filename)
+                warp_band_filename = '/vsitar/' + os.path.join(asset.filename, warp_band_filename)
 
             # TODO:  I believe this is a singleton, so it should go away
             warp_bands_bin = []
