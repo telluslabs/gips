@@ -1204,9 +1204,6 @@ class landsatData(gips.data.core.CloudCoverData):
                     with utils.error_handler('Problem with running AROP'):
                         tmpdir_fp = self.generate_temp_path('arop')
                         utils.mkdir(tmpdir_fp)
-                        mos_source = settings().REPOS['landsat'].get(
-                            'coreg_mos_source', 'sentinel2'
-                        )
                         try:
                             # on error, use the unshifted image
                             mos_source = settings().REPOS['landsat'].get(
@@ -1985,7 +1982,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 asset._sensors[asset.sensor]['colors'].index('NIR')
             ]
             if asset_type not in ['C1GS', 'C1S3']:
-                warp_band_filename = os.path.join(asset.filename, warp_band_filename)
+                warp_band_filename = '/vsitar/' + os.path.join(asset.filename, warp_band_filename)
 
             # TODO:  I believe this is a singleton, so it should go away
             warp_bands_bin = []
