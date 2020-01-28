@@ -87,14 +87,21 @@ def run_export(args):
                 pcov=args.pcov, ptile=args.ptile
             )
 
-            # create tld: SITENAME--KEY_DATATYPE_SUFFIX
+            # How does export set the name of the TLD for the export?
+            #   sitename = layer name of the first feature in the --site, if it has one
+            #   key    = primary search key of the site, specified by user
+            #   res    = <X-resolution><Y-resolution> (I guess?  Might be Y-X)
+            #   driver = just the normal driver string (named 'args.command' naturally)
+            #   suffix = custom string specified by user for their optional convenience
+            # so the TLD name ends up being:
+            #   [<sitename>][--<key>][_<res>]_<driver>[_suffix]
             if args.notld:
                 tld = args.outdir
             else:
-                key = '' if args.key == '' else '--' + args.key
+                key    = '' if args.key == ''    else '--' + args.key
+                res    = '' if args.res is None  else '_%sx%s' % (args.res[0], args.res[1])
                 suffix = '' if args.suffix == '' else '_' + args.suffix
-                res = '' if args.res is None else '_%sx%s' % (args.res[0], args.res[1])
-                bname = (
+                bname  = (
                     extents[0].site.layer_name() +
                     key + res + '_' + args.command + suffix
                 )
