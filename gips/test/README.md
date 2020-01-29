@@ -2,8 +2,6 @@ GIPS Automated Testing
 ======================
 See also `docker/README.md`.
 
-See the end of this file for a quick-start section, after configuring pytest:
-
 Configuration
 -------------
 Create a file named `pytest.ini` in the project directory, and use it to set
@@ -81,6 +79,13 @@ what was expected.  This is because pytest sees each item on the command line
 as a separate run of the module, even though really it's the same file listed
 mulitple times.  Instead, avoid the problem by using `-k` to specify tests.
 
+Running Debuggers
+-----------------
+If you want to view `print` statements, or if you want to run the debugger
+(`pdb` or `breakpoint()`) you _must_ specify `pytest -s`. This is due to
+pytest's draconian control of the standard streams by default. See also
+ `pytest --pdb`.
+
 Writing Unit Tests with Mocking
 ===============================
 First, reading about fixtures is especially recommended as the GIPS test suite
@@ -127,32 +132,39 @@ https://pytest-django.readthedocs.io/en/latest/
 
 Running System Tests
 ====================
-Each test runs `gips_something` commands, usually just one, as subprocesses.
-The test harness observes the filesystem before and after the test, and any
-created files are observed.  These observations are then compared with known
-correct values to see if the test ought to pass.
+Most gips commands create files as their primary function so most of the
+system tests follow this pattern:
 
-System tests require a little setup, unfortunately:  Edit `settings.py` and
+1. Record the list of files in the gips archive.
+2. Run one or more gips commands, each as a subprocess.
+3. See if any new files are present, and if they are, confirm they match
+   a pre-recorded set of known-good values.
+
+The system test suite is expected to be run within a docker container that can
+be thrown away after each run, so it doesn't clean up after itself (see
+`docker/README.md`).  Otherwise, files created during the test may interfere
+with future runs, and must be manually removed.
+
+**Setup**:  You should have a `pytest.ini` (see above).  Edit `settings.py` and
 set `GIPS_OVERRIDE_VERSION` to the version the system tests expect.  You can
 check this by looking in `gips/test/sys/expected/modis.py` and checking on the
-version that is expected to be output.  You should also have a correct
-`pytest.ini` file (see above).  Back up any data files you want to retain in
-your data repo directory; some system tests need to operate destructively on
-it.
+version that is expected to be output.  Back up any data files you want to
+retain in your data repo directory; some system tests need to operate
+destructively on it.
 
-System tests check gips' ability to process input files into output files, and
-ultimately depend on data downloaded from official sources, such as landsat
-images.  To avoid excess fetching from official servers, the test suite uses a
-shared artifact store, which the gips system tests know to access if required:
+**Test Artifacts:** System tests depend on data downloaded from official
+sources, such as landsat images.  To avoid excess fetching from data providers,
+the test suite uses a shared artifact store, which the gips system tests know
+ to access if required:
 
 ```
 # be sure to set artifact-store-path in pytest.ini; see above.
-py.test --sys              # run tests without emplacing artifacts first
-py.test --sys --setup-repo # emplace artifacts then run tests
-py.test --sys              # artifacts are retained for subsequent runs
+pytest --sys              # run tests without emplacing artifacts first
+pytest --sys --setup-repo # emplace artifacts then run tests
+pytest --sys              # artifacts are retained for subsequent runs
 # a more realistic system test run, with several useful options specified:
-# (see py.test --help for details; several are GIPS-custom options):
-py.test -s -x -vv --sys --setup-repo -k prism
+# (see pytest --help for details; several are GIPS-custom options):
+pytest -s -x -vv --sys --setup-repo -k prism
 ```
 
 If you don't have access to the artifact store, it can be built by running
@@ -172,23 +184,6 @@ mostly tests of `gips_inventory --fetch`, will always be skipped without the
 `--src-altering` option.  Some other tests may not run unless `--slow` is
 given.  Note also that the source-altering tests may leave the repo in a state
 that requires `--setup-repo` or `--clear-repo` for the other tests to pass.
-
-Testing Within Docker Containers
---------------------------------
-Gips can be built into a docker container; crib the approach in
-`docker/README.md` and see also `.gitlab-ci.yml`.  Note exposing the artifact
-store to the container:
-
-```
-$ docker run --rm -it \
-> -v /net/cluster/projects/gips-dev/sys-test-assets:/artifact-store \
-> gips_test /bin/bash
-gips@c6fa60790073:/gips$ pytest -k aod --sys --setup-repo -s -vv
-```
-
-The working copy of gips can be tested without rebuilding the docker image by
-adding `-v /path/to/src/gips:/gips`.  This is also useful for saving
-recordings of new expectations; see `--record` below.
 
 Writing System Tests:  Testing a New Driver
 ===========================================
@@ -274,23 +269,3 @@ your expectations in a separate file, and import its content into eg
 If your driver needs additional system tests that don't follow the standard
 parttern, you can place these in their own test file, eg:
 `gips/test/sys/t_granitesat.py`
-
-Caveats & Tips
-==============
-If you want to view `print` statements, or if you want to run the debugger
-(`import pdb; pdb.set_trace()`) you _must_ specify `py.test -s`. This is due to
-pytest's somewhat draconian defaults regarding the brevity of test run output
-by default.
-
-Quick Start
-===========
-```
-py.test # run unit tests (after activating your virtualenv)
-
-# realistically, a system test run for a specific driver looks like this:
-py.test -s -x -vv --sys --setup-repo -k prism
-
-# the help message for pytest includes help for custom options, such as
-# --sys, and --setup-repo:
-py.test --help
-```
