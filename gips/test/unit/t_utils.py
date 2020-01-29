@@ -172,14 +172,11 @@ def t_gips_script_setup(mocker, driver_string, stop_on_error, setup_orm):
 
 
 def t_lib_error_handler_base_case(mocker):
-    """Test error handler for GIPS' library mode:  non-entry into except."""
-    m_report_error = mocker.patch.object(utils, 'report_error')
-
-    # implicit assertion is that no exception is raised
+    """If there's no error it shouldn't log nor should any exception be raised."""
+    m_getLogger = mocker.patch.object(utils.logging, 'getLogger')
     with utils.lib_error_handler():
         pass # stand-in for non-raising code
-
-    m_report_error.assert_not_called()
+    m_getLogger.assert_not_called() # implicit additional assertion is that no exception is raised
 
 
 @pytest.mark.parametrize('continuable, stop_on_error', (
@@ -187,25 +184,22 @@ def t_lib_error_handler_base_case(mocker):
     (False, True),
     (True,  True)))
 def t_lib_error_handler_reraise(mocker, continuable, stop_on_error):
-    """Test exception-reraising cases of lib_error_handler."""
-    m_report_error = mocker.patch.object(utils, 'report_error')
-
+    """For most error cases, it should re-raise and log."""
+    m_getLogger = mocker.patch.object(utils.logging, 'getLogger')
     mocker.patch.object(utils, '_stop_on_error', new=stop_on_error)
     with pytest.raises(RuntimeError):
         with utils.lib_error_handler('PREFIX', continuable):
             raise RuntimeError("AAAAAH!")
-    m_report_error.assert_not_called()
+    m_getLogger.assert_called_once()
 
 
 def t_lib_error_handler_continuable_case(mocker):
-    """Test error handler for GIPS' library mode."""
-    m_report_error = mocker.patch.object(utils, 'report_error')
+    """For continuable errors, it should log but not re-raise."""
+    m_getLogger = mocker.patch.object(utils.logging, 'getLogger')
     mocker.patch.object(utils, '_stop_on_error', new=False)
-
-    rte = RuntimeError("AAAAAH!")
     with utils.lib_error_handler('PREFIX', True):
-        raise rte
-    m_report_error.assert_called_once_with(rte, 'PREFIX')
+        raise RuntimeError("AAAAAH!")
+    m_getLogger.assert_called_once()
 
 
 def t_cli_error_handler_base_case(mocker):
