@@ -34,6 +34,7 @@ import traceback
 import datetime
 import time
 import json
+import logging
 
 import numpy as np
 import requests
@@ -70,34 +71,64 @@ class Colors():
     _WHITE  = _c + '47m'
 
 
+def verbosity_to_log_level(v):
+    """Converts verbosity values (`-v 3`) to python log levels.
+
+    Verbosity levels don't map to log levels:  Log levels describe
+    severity, but verbosity describes level of detail or noisiness on
+    the console.  Most of gips CLI output is probably INFO or DEBUG,
+    whereas the WARNING, ERROR, and CRITICAL stuff is all (or had better
+    be) at -v1, and will be in the context of error handling anyway.
+    """
+    # gips.parsers says verbosity 0 means "quiet" mode, while the default for -v is 1.
+    if v < 1:
+        return logging.WARNING
+    if v == 1:
+        return logging.INFO
+    if v > 1:
+        return logging.DEBUG
+
+
 def verbose_out(obj, level=1, stream=sys.stdout):
-    """print(obj) but only if the user's chosen verbosity level warrants it.
-    Print to stdout by default, but select any stream the user wishes.  Finally
-    if the obj is a list or tuple, print each contained object consecutively on
-    separate lines.  The stream may be specified by passing in the stream object or
-    by the special strings, 'stderr' and 'stdout'.
+    """print() or log() the object, conditional on _lib_mode.
+
+    If _lib_mode, python's logging is used and `stream` is ignored.
+    Otherwise, print the object to the stream, but only if the user's
+    chosen verbosity level warrants it. Finally if the obj is a list or
+    tuple, print each contained object consecutively on separate lines.
     """
     #TODO: Add real documentation of rules regarding levels used within
     #      GIPS. Levels 1-4 are used frequently.  Setting `-v5` is
     #      "let me see everything" level.
-    streams = {'stdout': sys.stdout, 'stderr': sys.stderr}
-    if verbosity() >= level:
-        if not isinstance(obj, (list, tuple)):
-            obj = [obj]
-        for o in obj:
-            print(o, file=streams.get(stream, stream))
+    is_listy = isinstance(obj, (list, tuple))
+    if _lib_mode:
+        logger = logging.getLogger(_named_logger) # believed quick enough to run every time
+        log_level = verbosity_to_log_level(level)
+        if is_listy:
+            [logger.log(log_level, o) for o in obj]
+        else:
+            logger.log(log_level, obj)
+    elif verbosity() >= level:
+        if is_listy:
+            [print(o, file=stream) for o in obj]
+        else:
+            print(obj, file=stream)
+
 
 VerboseOut = verbose_out # VerboseOut name is deprecated
 
 
-def vprint(*args, **kwargs):
-    """Just print() but gatekept by verbosity similarly to verbose_out.
+def vprint(*args, sep=' ', end='\n', level=1, file=sys.stdout):
+    """As verbose_out but accept arguments similarly to print().
 
-    Except for 'level' all kwargs are passed on to print() (sep, file, etc).
+    Pass in 'level=n' to print at that verbosity (default is 1). Other kwargs,
+    such as 'sep', are passed on to print(), but 'file' may be ignored when
+    printing to a log as python logging has no notion of stdout vs stderr.
     """
-    level = kwargs.pop('level', 1)
-    if verbosity() >= level:
-        print(*args, **kwargs)
+    if _lib_mode:
+        logging.getLogger(_named_logger).log(verbosity_to_log_level(level), sep.join(args))
+    elif verbosity() >= level:
+        print(*args, sep=sep, end=end, level=level, file=file)
 
 
 def verbosity(new=None):
@@ -106,9 +137,6 @@ def verbosity(new=None):
     if new is not None:
         gippy.Options.set_verbose(new)
     return gippy.Options.verbose()
-
-
-
 
 
 ##############################################################################
@@ -578,11 +606,14 @@ def julian_date(date_and_time, variant=None):
 ##############################################################################
 # Error handling and script setup & teardown
 ##############################################################################
-
 _traceback_verbosity = 3    # only print a traceback if the user selects this verbosity or higher
 _accumulated_errors = []    # used for tracking success/failure & doing final error reporting when
                             # GIPS is running as a command-line application
 _stop_on_error = False      # should GIPS try to recover from errors?  Set by gips_script_setup
+# should gips operate "as a library?" Controls whether gips communicates with
+# logging or else print(); probably in lockstep with error handler config:
+_lib_mode = True
+_named_logger = 'gips'      # used by all of gips (instead of one logger per module)
 
 
 def set_error_handler(handler):
@@ -606,14 +637,16 @@ def report_error(error, msg_prefix, show_tb=True):
 
 @contextmanager
 def lib_error_handler(msg_prefix='Error', continuable=False):
-    """Handle errors appropriately for GIPS running as a library."""
+    """Handle errors appropriately for GIPS running as a library:
+
+    Log exceptions in any case, but only re-raise if the error is not
+    continuable or current configuration calls for stopping on all errors.
+    """
     try:
         yield
     except Exception as e:
-        if continuable and not _stop_on_error:
-            e.tb_text = traceback.format_exc()
-            report_error(e, msg_prefix)
-        else:
+        logging.getLogger(_named_logger).exception(msg_prefix) # automatically gets exc_info
+        if _stop_on_error or not continuable:
             raise
 
 
@@ -656,9 +689,18 @@ def cli_error_handler(msg_prefix='Error', continuable=False):
 
 
 def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
-    """Run this at the beginning of a GIPS CLI program to do setup."""
+    """Run this at the beginning of a GIPS CLI program.
+
+    Returns the data class corresponding `driver_string`, or else None.
+    `stop_on_error` causes the error handler to ignore continuable flags
+    and stop on the first uncaught exception.  If `setup_orm`, configure
+    the ORM & its inventory database. Also sets error handling to CLI
+    mode and sets gips generally to non-lib-mode.
+    """
     global _stop_on_error
     _stop_on_error = stop_on_error
+    global _lib_mode
+    _lib_mode = False
     set_error_handler(cli_error_handler)
     from gips.inventory import orm # avoids a circular import
     with error_handler():
@@ -671,6 +713,14 @@ def gips_script_setup(driver_string=None, stop_on_error=False, setup_orm=True):
 ##############################################################################
 # misc
 ##############################################################################
+def configure_logging():
+    """Configure the python logging module with gips setting `LOGGING`.
+
+    Use this when you want to use gips as a library but want the convenience
+    of configuring logging using a gips setting.
+    """
+    logging.config.dictConfig(settings().LOGGING)
+
 
 def prune_unhashable(d):
     """Returns a new dict containing only the hashable values from d.

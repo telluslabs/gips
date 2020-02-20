@@ -2186,7 +2186,7 @@ class landsatData(gips.data.core.CloudCoverData):
                 utils.verbose_out('requesting ' + url, 4)
                 text = self.Asset.gs_backoff_get(url).text
         else:
-            print('asset is "{}"'.format(asset.asset))
+            utils.vprint('asset is "{}"'.format(asset.asset))
             mtl = asset.extract([f for f in asset.datafiles() if f.endswith("MTL.txt")])[0]
             with open(mtl, 'r') as mtl_file:
                 text = mtl_file.read()
@@ -2195,7 +2195,7 @@ class landsatData(gips.data.core.CloudCoverData):
             self.utm_zone_number = match.group(1)
         else:
             raise ValueError('MTL file does not contian UTM_ZONE')
-        print('utm_zone is ' + str(self.utm_zone_number))
+        utils.vprint('utm_zone is ' + str(self.utm_zone_number))
         return self.utm_zone_number
 
     def parse_coreg_coefficients(self):
