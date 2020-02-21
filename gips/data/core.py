@@ -1242,7 +1242,11 @@ class Data(object):
 
     @property
     def Repository(self):
-        """ The repository for this class """
+        """The repository for this class.
+
+        Note this only works for instances, not the class itself.  Python
+        doesn't seem to support class properties naturally?
+        """
         return self.Asset.Repository
 
     @classmethod
@@ -1289,10 +1293,10 @@ class Data(object):
         return list(set(self.products))
 
     def ParseAndAddFiles(self, filenames=None):
-        """Parse and Add filenames to existing filenames.
+        """Add the given product filenames to self.filenames.
 
-        If no filenames are provided, a list from find_files() is used
-        instead."""
+        If no filenames are provided, a list from find_files() is used instead.
+        """
         if filenames is None:
             filenames = self.find_files() # find *product* files actually
         datedir = self.Repository._datedir

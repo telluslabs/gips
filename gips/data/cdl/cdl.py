@@ -156,7 +156,7 @@ class cdlData(Data):
 
     @Data.proc_temp_dir_manager
     def process(self, products, overwrite=False, **kwargs):
-        for asset_type, asset in self.assets.iteritems():
+        for asset_type, asset in self.assets.items():
             if asset_type != _cdlmkii:  # with older cdl products, the asset is the product
                 continue
 
