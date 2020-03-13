@@ -79,8 +79,8 @@ setup(
         'pydap==3.2',
         'pysolar==0.6',
         'dbfread==2.0.7',
-        'rios @ https://bitbucket.org/chchrsc/rios/downloads/rios-1.4.3.zip#egg=rios-1.4.3',
-        'python-fmask @ https://bitbucket.org/chchrsc/python-fmask/downloads/python-fmask-0.5.0.zip#egg=python-fmask-0.5.0',
+        'rios @ https://github.com/ubarsc/rios/archive/rios-1.4.3.zip#egg=rios-rios-1.4.3#subdirectory=rios',
+        'python-fmask @ https://github.com/ubarsc/python-fmask/archive/pythonfmask-0.5.0.zip#egg=python-fmask-0.5.0',
         'usgs', # 0.2.1 known to work
         'backports.functools_lru_cache',
         'backoff',
